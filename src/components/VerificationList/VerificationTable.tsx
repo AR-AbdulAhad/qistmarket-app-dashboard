@@ -20,7 +20,7 @@ import {
 import ColumnFilter from '../DataTables/ColumnFilter'
 import { Modal } from '../Modal/Modal'
 import { cn } from '@/lib/utils'
-import { log } from 'console'
+import { useRouter } from 'next/navigation'
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL
 
@@ -85,18 +85,12 @@ const AssignedVerifications = () => {
   const [sorting, setSorting] = useState<SortingState>([{ id: 'created_at', desc: true }])
   const [loading, setLoading] = useState(false)
 
-  // Modals (example – expand as needed)
+  // Modals (remarks only, view modal removed)
   const [remarksModalOpen, setRemarksModalOpen] = useState(false)
-  const [viewModalOpen, setViewModalOpen] = useState(false)
   const [selectedOrder, setSelectedOrder] = useState<OrderWithVerification | null>(null)
   const [adminRemarks, setAdminRemarks] = useState('')
-  const [formData, setFormData] = useState<Partial<OrderWithVerification>>({})
 
-  useEffect(() => {
-    if (selectedOrder && viewModalOpen) {
-      setFormData(selectedOrder)
-    }
-  }, [selectedOrder, viewModalOpen])
+  const router = useRouter()
 
   // ── Data Fetching ──────────────────────────────────────────────────────────
   const fetchAssignedVerifications = async () => {
@@ -134,12 +128,7 @@ const AssignedVerifications = () => {
   }
 
   const handleView = (order: OrderWithVerification) => {
-    setSelectedOrder(order)
-
-    setViewModalOpen(true)
-
-    console.log(order);
-
+    router.push(`/verifications/${order.id}`)
   }
 
   const saveRemarks = async () => {
@@ -437,248 +426,6 @@ const AssignedVerifications = () => {
       </div>
 
       {/* Remarks Modal */}
-      <Modal
-        open={viewModalOpen}
-        onClose={() => {
-          setViewModalOpen(false)
-          setSelectedOrder(null)
-          // Optional: reset form state if you use one
-        }}
-        className="max-w-4xl rounded-2xl bg-white p-6 shadow-2xl dark:bg-gray-900 sm:p-8 overflow-y-auto max-h-[90vh]"
-      >
-        {selectedOrder && (
-          <>
-            <div className="mb-6 flex items-center justify-between">
-              <h2 className="text-2xl font-bold text-dark dark:text-white">
-                Order {selectedOrder.order_ref}
-              </h2>
-              <span className="rounded-full bg-blue-100 px-4 py-1 text-sm font-medium text-blue-800 dark:bg-blue-900/40 dark:text-blue-300">
-                {selectedOrder.status.toUpperCase()}
-              </span>
-            </div>
-
-            <form
-              onSubmit={(e) => {
-                e.preventDefault()
-                // handleSave() - implement your save logic here
-                console.log("Saving:", formData)
-                // You can call your PATCH API here
-              }}
-              className="space-y-8"
-            >
-              {/* ── Customer & Contact ──────────────────────────────────────── */}
-              <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Customer Name
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.customer_name}
-                    onChange={(e) => setFormData({ ...formData, customer_name: e.target.value })}
-                    className="mt-1 block w-full rounded-lg border border-stroke bg-transparent px-4 py-2.5 outline-none focus:border-[#ff3d3d] dark:border-dark-3"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    WhatsApp Number
-                  </label>
-                  <input
-                    type="tel"
-                    value={formData.whatsapp_number}
-                    onChange={(e) => setFormData({ ...formData, whatsapp_number: e.target.value })}
-                    className="mt-1 block w-full rounded-lg border border-stroke bg-transparent px-4 py-2.5 outline-none focus:border-[#ff3d3d] dark:border-dark-3"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Token Number
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.token_number}
-                    readOnly
-                    className="mt-1 block w-full rounded-lg border border-stroke bg-gray-100 px-4 py-2.5 text-gray-500 dark:bg-dark-3 dark:text-gray-400"
-                  />
-                </div>
-              </div>
-
-              {/* ── Address ─────────────────────────────────────────────────── */}
-              <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Full Address
-                  </label>
-                  <textarea
-                    value={formData.address}
-                    onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                    rows={2}
-                    className="mt-1 block w-full rounded-lg border border-stroke bg-transparent px-4 py-2.5 outline-none focus:border-[#ff3d3d] dark:border-dark-3"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Area
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.area || ''}
-                    onChange={(e) => setFormData({ ...formData, area: e.target.value })}
-                    className="mt-1 block w-full rounded-lg border border-stroke bg-transparent px-4 py-2.5 outline-none focus:border-[#ff3d3d] dark:border-dark-3"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    City
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.city || ''}
-                    onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                    className="mt-1 block w-full rounded-lg border border-stroke bg-transparent px-4 py-2.5 outline-none focus:border-[#ff3d3d] dark:border-dark-3"
-                  />
-                </div>
-              </div>
-
-              {/* ── Product & Payment ───────────────────────────────────────── */}
-              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Product
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.product_name}
-                    onChange={(e) => setFormData({ ...formData, product_name: e.target.value })}
-                    className="mt-1 block w-full rounded-lg border border-stroke bg-transparent px-4 py-2.5 outline-none focus:border-[#ff3d3d] dark:border-dark-3"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Total Amount (£)
-                  </label>
-                  <input
-                    type="number"
-                    value={formData.total_amount}
-                    onChange={(e) => setFormData({ ...formData, total_amount: Number(e.target.value) })}
-                    className="mt-1 block w-full rounded-lg border border-stroke bg-transparent px-4 py-2.5 outline-none focus:border-[#ff3d3d] dark:border-dark-3"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Advance Amount (£)
-                  </label>
-                  <input
-                    type="number"
-                    value={formData.advance_amount}
-                    onChange={(e) => setFormData({ ...formData, advance_amount: Number(e.target.value) })}
-                    className="mt-1 block w-full rounded-lg border border-stroke bg-transparent px-4 py-2.5 outline-none focus:border-[#ff3d3d] dark:border-dark-3"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Monthly Amount (£)
-                  </label>
-                  <input
-                    type="number"
-                    value={formData.monthly_amount}
-                    readOnly
-                    className="mt-1 block w-full rounded-lg border border-stroke bg-gray-100 px-4 py-2.5 text-gray-500 dark:bg-dark-3 dark:text-gray-400"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Months
-                  </label>
-                  <input
-                    type="number"
-                    value={formData.months}
-                    onChange={(e) => setFormData({ ...formData, months: Number(e.target.value) })}
-                    className="mt-1 block w-full rounded-lg border border-stroke bg-transparent px-4 py-2.5 outline-none focus:border-[#ff3d3d] dark:border-dark-3"
-                  />
-                </div>
-              </div>
-
-              {/* ── System / Audit Fields (read-only) ──────────────────────────────── */}
-              <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-                <div>
-                  <label className="block text-sm font-medium text-gray-500 dark:text-gray-400">
-                    Order Reference
-                  </label>
-                  <div className="mt-1 rounded-lg bg-gray-100 px-4 py-2.5 text-gray-700 dark:bg-dark-3 dark:text-gray-300">
-                    {formData.order_ref}
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-500 dark:text-gray-400">
-                    Created By
-                  </label>
-                  <div className="mt-1 rounded-lg bg-gray-100 px-4 py-2.5 text-gray-700 dark:bg-dark-3 dark:text-gray-300">
-                    {formData.created_by?.full_name || formData.created_by?.username || '—'}
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-500 dark:text-gray-400">
-                    Assigned To
-                  </label>
-                  <div className="mt-1 rounded-lg bg-gray-100 px-4 py-2.5 text-gray-700 dark:bg-dark-3 dark:text-gray-300">
-                    {formData.assigned_to?.full_name || formData.assigned_to?.username || '—'}
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-500 dark:text-gray-400">
-                    Channel
-                  </label>
-                  <div className="mt-1 rounded-lg bg-gray-100 px-4 py-2.5 text-gray-700 dark:bg-dark-3 dark:text-gray-300">
-                    {formData.channel}
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-500 dark:text-gray-400">
-                    Created At
-                  </label>
-                  <div className="mt-1 rounded-lg bg-gray-100 px-4 py-2.5 text-gray-700 dark:bg-dark-3 dark:text-gray-300">
-                    {formData.created_at
-                      ? new Date(formData.created_at).toLocaleString()
-                      : "-"}
-                  </div>
-
-                </div>
-              </div>
-
-              {/* Buttons */}
-              <div className="mt-10 flex justify-end gap-4">
-                <button
-                  type="button"
-                  onClick={() => setViewModalOpen(false)}
-                  className="rounded-lg border border-stroke px-6 py-2.5 text-dark hover:bg-gray-100 dark:border-dark-3 dark:text-white dark:hover:bg-dark-3"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="rounded-lg bg-[#ff3d3d] px-6 py-2.5 text-white hover:bg-[#ff3d3d]/90"
-                >
-                  Save Changes
-                </button>
-              </div>
-            </form>
-          </>
-        )}
-      </Modal>
-
       <Modal
         open={remarksModalOpen}
         onClose={() => {

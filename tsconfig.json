@@ -34,7 +34,7 @@
     "**/*.tsx",
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts"
-, "src/app/reset-password/page.jsx"  ],
+, "src/app/reset-password/page.tsx"  ],
   "exclude": [
     "node_modules"
   ]

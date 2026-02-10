@@ -24,6 +24,11 @@ export const NAV_DATA = [
         items: [],
       },
       {
+        title: "Approved Order List",
+        icon: Icons.HomeIcon,
+        items: [],
+      },
+      {
         title: "User Management",
         icon: Icons.HomeIcon,
         items: [
