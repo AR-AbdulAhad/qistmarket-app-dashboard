@@ -12,15 +12,13 @@ import {
 } from '@tanstack/react-table'
 import Cookies from 'js-cookie'
 import { SearchIcon, PointerUp, ChevronUpIcon } from '@/assets/icons'
-import {
-  Dropdown,
-  DropdownContent,
-  DropdownTrigger,
-} from '@/components/ui/dropdown'
 import ColumnFilter from '../DataTables/ColumnFilter'
 import { Modal } from '../Modal/Modal'
 import { cn } from '@/lib/utils'
 import { useRouter } from 'next/navigation'
+import { createPortal } from 'react-dom'
+import { useRef } from 'react'
+
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL
 
@@ -272,47 +270,140 @@ const AssignedVerifications = () => {
       id: 'actions',
       header: 'Actions',
       enableSorting: false,
+      enableColumnFilter: false,
       cell: ({ row }) => {
         const order = row.original
+
         const [isOpen, setIsOpen] = useState(false)
+        const [position, setPosition] = useState({ top: 0, left: 0 })
+        const [openUp, setOpenUp] = useState(false)
+
+        const triggerRef = useRef<HTMLButtonElement | null>(null)
+        const dropdownRef = useRef<HTMLDivElement | null>(null)
+
+        const toggleDropdown = () => {
+          if (!triggerRef.current) return
+
+          const rect = triggerRef.current.getBoundingClientRect()
+
+          const dropdownWidth = 192
+          const dropdownHeight = 170
+
+          const spaceBelow = window.innerHeight - rect.bottom
+          const spaceRight = window.innerWidth - rect.right
+
+          const shouldOpenUp = spaceBelow < dropdownHeight
+          const shouldAlignLeft = spaceRight < dropdownWidth
+
+          setOpenUp(shouldOpenUp)
+
+          setPosition({
+            top: shouldOpenUp
+              ? rect.top + window.scrollY - 8
+              : rect.bottom + window.scrollY + 6,
+            left: shouldAlignLeft
+              ? rect.left + window.scrollX
+              : rect.right + window.scrollX - dropdownWidth,
+          })
+
+          setIsOpen((prev) => !prev)
+        }
+
+        // Outside click + ESC support
+        useEffect(() => {
+          const handleClickOutside = (e: MouseEvent) => {
+            const target = e.target as Node
+
+            if (
+              triggerRef.current &&
+              !triggerRef.current.contains(target) &&
+              dropdownRef.current &&
+              !dropdownRef.current.contains(target)
+            ) {
+              setIsOpen(false)
+            }
+          }
+
+          const handleEscape = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') {
+              setIsOpen(false)
+            }
+          }
+
+          if (isOpen) {
+            document.addEventListener('mousedown', handleClickOutside)
+            document.addEventListener('keydown', handleEscape)
+          }
+
+          return () => {
+            document.removeEventListener('mousedown', handleClickOutside)
+            document.removeEventListener('keydown', handleEscape)
+          }
+        }, [isOpen])
 
         return (
-          <Dropdown isOpen={isOpen} setIsOpen={setIsOpen}>
-            <DropdownTrigger className="group flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium text-dark shadow-sm hover:text-[#ff3d3d] data-[state=open]:text-[#ff3d3d] dark:border dark:border-dark-3 dark:text-white">
+          <>
+            <button
+              ref={triggerRef}
+              onClick={toggleDropdown}
+              className="group flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium text-dark shadow-[0_1px_3px_0_rgba(166,175,195,0.4)] hover:text-[#ff3d3d] dark:border dark:border-dark-3 dark:text-white dark:shadow-none"
+            >
               <span>Actions</span>
-              <ChevronUpIcon className="size-4 translate-y-[5%] rotate-180 transition-transform group-data-[state=open]:rotate-0" />
-            </DropdownTrigger>
-            <DropdownContent align="end" className="fixed !z-[9999] mt-2 w-48 rounded-md border border-stroke bg-white shadow-xl dark:border-dark-3 dark:bg-gray-900">
-              <ul className="text-sm font-medium">
-                <li>
-                  <button
-                    onClick={() => {
-                      handleEditRemarks(order)
-                      setIsOpen(false)
-                    }}
-                    className="block w-full px-4 py-2.5 text-left hover:bg-[#F5F7FD] hover:text-[#ff3d3d] dark:hover:bg-dark-3"
-                  >
-                    {order.verification?.admin_remarks ? 'Edit Remarks' : 'Add Remarks'}
-                  </button>
-                </li>
-                <li>
-                  <button
-                    onClick={() => {
-                      handleView(order)
-                      setIsOpen(false)
-                    }}
-                    className="block w-full px-4 py-2.5 text-left hover:bg-[#F5F7FD] hover:text-[#ff3d3d] dark:hover:bg-dark-3"
-                  >
-                    View
-                  </button>
-                </li>
-                {/* Add more actions: View full details, Approve/Reject, etc. */}
-              </ul>
-            </DropdownContent>
-          </Dropdown>
+              <ChevronUpIcon
+                className={`size-4 transition-transform ${
+                  isOpen ? 'rotate-0' : 'rotate-180'
+                }`}
+              />
+            </button>
+
+            {isOpen &&
+              createPortal(
+                <div
+                  ref={dropdownRef}
+                  style={{
+                    position: 'absolute',
+                    top: position.top,
+                    left: position.left,
+                    transform: openUp ? 'translateY(-100%)' : 'none',
+                  }}
+                  className="z-[99999] w-48 rounded-md border border-stroke bg-white shadow-xl dark:border-dark-3 dark:bg-gray-900"
+                >
+                  <ul className="overflow-hidden text-sm font-medium">
+
+                    <li>
+                      <button
+                        onClick={() => {
+                          handleEditRemarks(order)
+                          setIsOpen(false)
+                        }}
+                        className="block w-full px-4 py-2.5 text-left hover:bg-[#F5F7FD] hover:text-[#ff3d3d] dark:hover:bg-dark-3"
+                      >
+                        {order.verification?.admin_remarks
+                          ? 'Edit Remarks'
+                          : 'Add Remarks'}
+                      </button>
+                    </li>
+
+                    <li>
+                      <button
+                        onClick={() => {
+                          handleView(order)
+                          setIsOpen(false)
+                        }}
+                        className="block w-full px-4 py-2.5 text-left hover:bg-[#F5F7FD] hover:text-[#ff3d3d] dark:hover:bg-dark-3"
+                      >
+                        View
+                      </button>
+                    </li>
+
+                  </ul>
+                </div>,
+                document.body
+              )}
+          </>
         )
       },
-    },
+    }
   ]
 
   const table = useReactTable({

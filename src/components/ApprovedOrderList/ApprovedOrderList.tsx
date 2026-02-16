@@ -14,14 +14,12 @@ import {
 } from '@tanstack/react-table'
 import Cookies from 'js-cookie'
 import { ChevronLeft, ChevronRight, SearchIcon, PointerUp, ChevronUpIcon } from '@/assets/icons'
-import {
-  Dropdown,
-  DropdownContent,
-  DropdownTrigger,
-} from '@/components/ui/dropdown'
 import ColumnFilter from '../DataTables/ColumnFilter'
 import { Modal } from '../Modal/Modal'
 import { cn } from '@/lib/utils'
+import { createPortal } from 'react-dom'
+import { useRef } from 'react'
+
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL
 
@@ -325,56 +323,147 @@ const ApprovedOrderList = () => {
       enableColumnFilter: true,
     },
     {
-      id: 'actions',
-      header: 'Actions',
+      id: "actions",
+      header: "Actions",
       enableSorting: false,
       enableColumnFilter: false,
       cell: ({ row }) => {
-        const order = row.original
-        const [isOpen, setIsOpen] = useState(false)
+        const order = row.original;
+
+        const [isOpen, setIsOpen] = useState(false);
+        const [position, setPosition] = useState({ top: 0, left: 0 });
+        const [openUp, setOpenUp] = useState(false);
+
+        const triggerRef = useRef<HTMLButtonElement | null>(null);
+        const dropdownRef = useRef<HTMLDivElement | null>(null);
+
+        const toggleDropdown = () => {
+          if (!triggerRef.current) return;
+
+          const rect = triggerRef.current.getBoundingClientRect();
+
+          const dropdownWidth = 176; // w-44
+          const dropdownHeight = 150;
+
+          const spaceBelow = window.innerHeight - rect.bottom;
+          const spaceRight = window.innerWidth - rect.right;
+
+          const shouldOpenUp = spaceBelow < dropdownHeight;
+          const shouldAlignLeft = spaceRight < dropdownWidth;
+
+          setOpenUp(shouldOpenUp);
+
+          setPosition({
+            top: shouldOpenUp
+              ? rect.top + window.scrollY - 8
+              : rect.bottom + window.scrollY + 6,
+            left: shouldAlignLeft
+              ? rect.left + window.scrollX
+              : rect.right + window.scrollX - dropdownWidth,
+          });
+
+          setIsOpen((prev) => !prev);
+        };
+
+        // Outside click + ESC support
+        useEffect(() => {
+          const handleClickOutside = (e: MouseEvent) => {
+            const target = e.target as Node;
+
+            if (
+              triggerRef.current &&
+              !triggerRef.current.contains(target) &&
+              dropdownRef.current &&
+              !dropdownRef.current.contains(target)
+            ) {
+              setIsOpen(false);
+            }
+          };
+
+          const handleEscape = (e: KeyboardEvent) => {
+            if (e.key === "Escape") {
+              setIsOpen(false);
+            }
+          };
+
+          if (isOpen) {
+            document.addEventListener("mousedown", handleClickOutside);
+            document.addEventListener("keydown", handleEscape);
+          }
+
+          return () => {
+            document.removeEventListener("mousedown", handleClickOutside);
+            document.removeEventListener("keydown", handleEscape);
+          };
+        }, [isOpen]);
 
         return (
-          <Dropdown isOpen={isOpen} setIsOpen={setIsOpen}>
-            <DropdownTrigger className="group flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium text-dark shadow-[0_1px_3px_0_rgba(166,175,195,0.4)] hover:text-[#ff3d3d] data-[state=open]:text-[#ff3d3d] dark:border dark:border-dark-3 dark:text-white dark:shadow-none">
-              <span>Actions</span>
-              <ChevronUpIcon className="size-4 translate-y-[5%] rotate-180 transition-transform group-data-[state=open]:rotate-0" />
-            </DropdownTrigger>
-            <DropdownContent
-              align="end"
-              className="fixed !z-[9999] mt-2 w-44 origin-top-right rounded-md border border-stroke bg-white shadow-xl dark:border-dark-3 dark:bg-gray-900 pointer-events-auto"
+          <>
+            <button
+              ref={triggerRef}
+              onClick={toggleDropdown}
+              className="group flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium text-dark shadow-[0_1px_3px_0_rgba(166,175,195,0.4)] hover:text-[#ff3d3d] dark:border dark:border-dark-3 dark:text-white dark:shadow-none"
             >
-              <ul className="overflow-hidden text-sm font-medium text-current">
-                {order.delivery_officer ? (
-                  <li>
-                    <button
-                      onClick={() => {
-                        handleUnassignClick(order)
-                        setIsOpen(false)
-                      }}
-                      className="block w-full px-4 py-2.5 text-left hover:bg-red-50 hover:text-red-600 focus:bg-red-50 focus:text-red-600 dark:hover:bg-red-900/30 dark:hover:text-red-400"
-                    >
-                      Unassign Delivery
-                    </button>
-                  </li>
-                ) : (
-                  <li>
-                    <button
-                      onClick={() => {
-                        handleAssignClick(order)
-                        setIsOpen(false)
-                      }}
-                      className="block w-full px-4 py-2.5 text-left hover:bg-[#F5F7FD] hover:text-[#ff3d3d] focus:bg-[#F5F7FD] focus:text-[#ff3d3d] dark:hover:bg-dark-3 dark:hover:text-neutral-50"
-                    >
-                      Assign Delivery
-                    </button>
-                  </li>
-                )}
-              </ul>
-            </DropdownContent>
-          </Dropdown>
-        )
+              <span>Actions</span>
+              <svg
+                className={`size-4 transition-transform ${
+                  isOpen ? "rotate-0" : "rotate-180"
+                }`}
+                viewBox="0 0 20 20"
+                fill="currentColor"
+              >
+                <path d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.7a.75.75 0 111.06 1.06l-4.24 4.25a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z" />
+              </svg>
+            </button>
+
+            {isOpen &&
+              createPortal(
+                <div
+                  ref={dropdownRef}
+                  style={{
+                    position: "absolute",
+                    top: position.top,
+                    left: position.left,
+                    transform: openUp ? "translateY(-100%)" : "none",
+                  }}
+                  className="z-[99999] w-44 rounded-md border border-stroke bg-white shadow-xl dark:border-dark-3 dark:bg-gray-900"
+                >
+                  <ul className="overflow-hidden text-sm font-medium text-current">
+
+                    {order.delivery_officer ? (
+                      <li>
+                        <button
+                          onClick={() => {
+                            handleUnassignClick(order);
+                            setIsOpen(false);
+                          }}
+                          className="block w-full px-4 py-2.5 text-left hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/30 dark:hover:text-red-400"
+                        >
+                          Unassign Delivery
+                        </button>
+                      </li>
+                    ) : (
+                      <li>
+                        <button
+                          onClick={() => {
+                            handleAssignClick(order);
+                            setIsOpen(false);
+                          }}
+                          className="block w-full px-4 py-2.5 text-left hover:bg-[#F5F7FD] hover:text-[#ff3d3d] dark:hover:bg-dark-3 dark:hover:text-neutral-50"
+                        >
+                          Assign Delivery
+                        </button>
+                      </li>
+                    )}
+
+                  </ul>
+                </div>,
+                document.body
+              )}
+          </>
+        );
       },
-    },
+    }
   ]
 
   const table = useReactTable({
