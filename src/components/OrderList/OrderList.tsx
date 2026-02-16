@@ -291,7 +291,11 @@ const OrderList = () => {
     { accessorKey: 'city', header: 'City', enableColumnFilter: true },
     { accessorKey: 'area', header: 'Area', enableColumnFilter: true },
     { accessorKey: 'product_name', header: 'Product', enableColumnFilter: true },
-    { accessorKey: 'total_amount', header: 'Total Amount', enableColumnFilter: false },
+    {
+      accessorKey: 'total_amount',
+      header: 'Total Amount',
+      cell: ({ getValue }) => `Rs. ${Number(getValue()).toLocaleString()}`,
+    },
     { accessorKey: 'status', header: 'Status', enableColumnFilter: true },
     {
       id: 'created_by',

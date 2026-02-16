@@ -186,7 +186,7 @@ const AssignedVerifications = () => {
     {
       accessorKey: 'total_amount',
       header: 'Total Amount',
-      cell: ({ getValue }) => `£${Number(getValue()).toLocaleString()}`,
+      cell: ({ getValue }) => `Rs. ${Number(getValue()).toLocaleString()}`,
     },
     {
       id: 'officer',
