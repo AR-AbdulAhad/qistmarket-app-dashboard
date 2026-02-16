@@ -408,16 +408,34 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
               </div>
               <div className="rounded bg-white p-4 text-center shadow-sm dark:bg-gray-800">
                 <div className="text-sm text-gray-600 dark:text-gray-400">Current Status</div>
-                <div className={cn(
-                  "text-2xl font-bold",
-                  percentage >= 60 ? "text-green-600" :
-                  percentage < 30 ? "text-red-600" :
-                  "text-amber-600"
-                )}>
-                  {percentage >= 60 ? 'APPROVED' :
-                   percentage < 30 ? 'REJECTED' :
-                   'Pending Final Decision'}
+                <div className="flex flex-col">
+                <div
+                  className={cn(
+                    "text-2xl font-bold tracking-wide",
+                    percentage === 0
+                      ? "text-gray-500"
+                      : percentage >= 60
+                      ? "text-green-600"
+                      : percentage < 30
+                      ? "text-red-600"
+                      : "text-amber-600"
+                  )}
+                >
+                  {percentage === 0
+                    ? "Awaiting Review"
+                    : percentage >= 60
+                    ? "APPROVED"
+                    : percentage < 30
+                    ? "REJECTED"
+                    : "Pending Final Decision"}
                 </div>
+
+                {percentage === 0 && (
+                  <span className="text-sm text-gray-400">
+                    No evaluation has been submitted yet.
+                  </span>
+                )}
+              </div>
               </div>
             </div>
 
