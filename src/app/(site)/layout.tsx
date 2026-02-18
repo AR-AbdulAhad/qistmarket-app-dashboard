@@ -49,6 +49,9 @@ export default function Layout({ children }: PropsWithChildren) {
           <strong>{notif.title}</strong>
           <span>{notif.message}</span>
         </div>,
+        {
+          duration: 7000,
+        }
       );
     });
 
