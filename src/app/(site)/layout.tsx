@@ -49,19 +49,6 @@ export default function Layout({ children }: PropsWithChildren) {
           <strong>{notif.title}</strong>
           <span>{notif.message}</span>
         </div>,
-        {
-          duration: 7000,
-          position: "top-right",
-          style: {
-            border: "1px solid #3b82f6",
-            padding: "16px",
-            color: "#1e40af",
-          },
-          iconTheme: {
-            primary: "#3b82f6",
-            secondary: "#fff",
-          },
-        }
       );
     });
 
