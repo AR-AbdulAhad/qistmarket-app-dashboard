@@ -6,7 +6,7 @@ import toast from 'react-hot-toast';
 import { SearchIcon } from '@/assets/icons';
 import io from 'socket.io-client';
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000';
 
 interface Location {
   latitude: number;
@@ -63,12 +63,19 @@ export default function VerificationOfficersPage() {
     const token = Cookies.get('auth_token');
     if (!token) return;
 
-    socketRef.current = io(BACKEND_URL, { auth: { token } });
+    socketRef.current = io(BACKEND_URL, {
+      auth: { token },
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
+    });
 
     socketRef.current.on('connect', () => {
       socketRef.current.emit('join_admin_notifications', token);
+      console.log('Socket connected – joined admins room');
     });
 
+    // Real-time officer status (online/offline)
     socketRef.current.on('officer_status_update', (data: { officerId: number; is_online: boolean }) => {
       setOfficers((prev) =>
         prev.map((o) => (o.id === data.officerId ? { ...o, is_online: data.is_online } : o))
@@ -81,6 +88,7 @@ export default function VerificationOfficersPage() {
       }
     });
 
+    // Real-time location updates
     socketRef.current.on('officer_location_update', (data: any) => {
       const newLoc = {
         latitude: data.latitude,
@@ -98,7 +106,73 @@ export default function VerificationOfficersPage() {
       }
     });
 
+    // Real-time monthly online hours update (badge & profile card)
+    socketRef.current.on('officer_monthly_update', (data: {
+      officerId: number;
+      monthly_online_hours: string;
+      month: string;
+    }) => {
+      setOfficers((prev) =>
+        prev.map((o) =>
+          o.id === data.officerId ? { ...o, monthly_online_hours: data.monthly_online_hours } : o
+        )
+      );
+      setFilteredOfficers((prev) =>
+        prev.map((o) =>
+          o.id === data.officerId ? { ...o, monthly_online_hours: data.monthly_online_hours } : o
+        )
+      );
+
+      if (selectedOfficer?.id === data.officerId) {
+        setSelectedOfficer((prev) =>
+          prev ? { ...prev, monthly_online_hours: data.monthly_online_hours } : null
+        );
+      }
+    });
+
+    // Real-time daily attendance row update
+    socketRef.current.on('officer_daily_update', (data: {
+      officerId: number;
+      date: string;
+      online_hours: string;
+    }) => {
+      if (selectedOfficer?.id !== data.officerId) return;
+      if (!officerStats) return;
+      if (!officerStats.daily_stats.some((d) => d.date === data.date)) return;
+
+      setOfficerStats((prev) => {
+        if (!prev) return prev;
+
+        const updatedDaily = prev.daily_stats.map((day) => {
+          if (day.date === data.date) {
+            const newOnline = data.online_hours;
+            const expected = Number(prev.expected_daily_hours);
+            const newOffline = Math.max(0, expected - Number(newOnline)).toFixed(2);
+
+            return {
+              ...day,
+              online_hours: newOnline,
+              worked_hours: newOnline,
+              offline_during_work_hours: newOffline,
+            };
+          }
+          return day;
+        });
+
+        return { ...prev, daily_stats: updatedDaily };
+      });
+    });
+
+    socketRef.current.on('connect_error', (err: any) => {
+      console.error('Socket connection error:', err.message);
+    });
+
     return () => {
+      socketRef.current?.off('officer_status_update');
+      socketRef.current?.off('officer_location_update');
+      socketRef.current?.off('officer_monthly_update');
+      socketRef.current?.off('officer_daily_update');
+      socketRef.current?.off('connect_error');
       socketRef.current?.disconnect();
     };
   }, []);
@@ -130,19 +204,22 @@ export default function VerificationOfficersPage() {
     setIsLoading(true);
     try {
       const token = Cookies.get('auth_token');
+      if (!token) throw new Error('No auth token');
+
       const response = await fetch(`${BACKEND_URL}/api/officers`, {
         headers: { Authorization: `Bearer ${token}` },
       });
+
       const result = await response.json();
       if (result.success) {
         setOfficers(result.data.officers);
         setFilteredOfficers(result.data.officers);
       } else {
-        toast.error(result.error?.message || 'Failed to fetch officers');
+        toast.error(result.error?.message || 'Failed to load officers');
       }
     } catch (error) {
-      console.error('Error fetching officers:', error);
-      toast.error('Connection error');
+      console.error('Fetch officers error:', error);
+      toast.error('Failed to connect to server');
     } finally {
       setIsLoading(false);
     }
@@ -151,15 +228,20 @@ export default function VerificationOfficersPage() {
   const fetchOfficerDailyStats = async (officerId: number) => {
     try {
       const token = Cookies.get('auth_token');
+      if (!token) return;
+
       const res = await fetch(`${BACKEND_URL}/api/officers/${officerId}/stats`, {
         headers: { Authorization: `Bearer ${token}` },
       });
+
       const result = await res.json();
       if (result.success) {
         setOfficerStats(result.data);
+      } else {
+        console.warn('Failed to load daily stats:', result.error);
       }
     } catch (err) {
-      console.error('Failed to fetch officer stats', err);
+      console.error('Daily stats fetch error:', err);
     }
   };
 
@@ -176,9 +258,12 @@ export default function VerificationOfficersPage() {
         <h2 className="text-title-md2 font-bold text-black dark:text-white">
           Verification Officer Management
         </h2>
-        <p className="font-medium">Monitor officer status, locations, attendance, and field tasks in real-time.</p>
+        <p className="font-medium">
+          Real-time monitoring of officer status, location, attendance, and assignments.
+        </p>
       </div>
 
+      {/* KPI Cards */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4 md:gap-6 xl:gap-7.5 mb-8">
         <StatCard title="Total Officers" value={stats.total} color="blue" />
         <StatCard title="Online Now" value={stats.online} color="green" isPulse />
@@ -187,7 +272,7 @@ export default function VerificationOfficersPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Officer List Sidebar */}
+        {/* Officer List */}
         <div className="lg:col-span-4 xl:col-span-3">
           <div className="rounded-xl border border-stroke bg-white shadow-default dark:border-strokedark dark:bg-boxdark overflow-hidden">
             <div className="p-4 border-b border-stroke dark:border-strokedark">
@@ -209,7 +294,7 @@ export default function VerificationOfficersPage() {
               {isLoading ? (
                 <div className="p-8 text-center text-gray-500">Loading officers...</div>
               ) : filteredOfficers.length === 0 ? (
-                <div className="p-8 text-center text-gray-500">No officers found.</div>
+                <div className="p-8 text-center text-gray-500">No officers found</div>
               ) : (
                 filteredOfficers.map((officer) => (
                   <div
@@ -229,7 +314,7 @@ export default function VerificationOfficersPage() {
                         className={`absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-2 border-white dark:border-boxdark ${
                           officer.is_online ? 'bg-green-500' : 'bg-gray-400'
                         }`}
-                      ></span>
+                      />
                     </div>
                     <div className="flex-1 min-w-0">
                       <h4 className="font-bold text-black dark:text-white truncate">
@@ -244,14 +329,14 @@ export default function VerificationOfficersPage() {
           </div>
         </div>
 
-        {/* Details Pane */}
+        {/* Details View */}
         <div className="lg:col-span-8 xl:col-span-9">
           {selectedOfficer ? (
-            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-6">
-              {/* Profile Card */}
+            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              {/* Profile Header */}
               <div className="rounded-xl border border-stroke bg-white p-6 shadow-default dark:border-strokedark dark:bg-boxdark">
                 <div className="flex flex-col md:flex-row md:items-center gap-6">
-                  <div className="h-24 w-24 flex-shrink-0 rounded-full bg-gray-100 dark:bg-meta-4 flex items-center justify-center text-4xl font-bold border-4 border-gray-50">
+                  <div className="h-24 w-24 rounded-full bg-gray-100 dark:bg-meta-4 flex items-center justify-center text-4xl font-bold border-4 border-gray-50 flex-shrink-0">
                     {selectedOfficer.full_name.charAt(0)}
                   </div>
                   <div className="flex-1">
@@ -267,35 +352,30 @@ export default function VerificationOfficersPage() {
                         {selectedOfficer.is_online ? 'Online' : 'Offline'}
                       </span>
                     </div>
-                    <p className="text-gray-400">
+                    <p className="text-gray-400 mt-1">
                       @{selectedOfficer.username} • {selectedOfficer.phone}
                     </p>
-                    <div className="mt-4 grid grid-cols-2 md:grid-cols-5 gap-4">
+
+                    <div className="mt-5 grid grid-cols-2 md:grid-cols-5 gap-5">
                       <div>
-                        <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Status</p>
-                        <p className="font-semibold text-black dark:text-white capitalize">
-                          {selectedOfficer.account_status}
+                        <p className="text-xs font-bold text-gray-500 uppercase tracking-wide">Status</p>
+                        <p className="font-semibold mt-1">{selectedOfficer.account_status}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold text-gray-500 uppercase tracking-wide">Bike Range</p>
+                        <p className="font-semibold mt-1">
+                          {selectedOfficer.bike_km_range ?? '—'} km
                         </p>
                       </div>
                       <div>
-                        <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Bike Range</p>
-                        <p className="font-semibold text-black dark:text-white">
-                          {selectedOfficer.bike_km_range || 'N/A'} KM
+                        <p className="text-xs font-bold text-gray-500 uppercase tracking-wide">Working Hours</p>
+                        <p className="font-semibold mt-1">
+                          {selectedOfficer.working_hours ?? 'Not set'}
                         </p>
                       </div>
                       <div>
-                        <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">
-                          Working Hours
-                        </p>
-                        <p className="font-semibold text-black dark:text-white">
-                          {selectedOfficer.working_hours || 'Not Set'}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">
-                          Monthly Online
-                        </p>
-                        <p className="font-semibold text-black dark:text-white">
+                        <p className="text-xs font-bold text-gray-500 uppercase tracking-wide">Monthly Online</p>
+                        <p className="font-semibold mt-1 text-green-600">
                           {selectedOfficer.monthly_online_hours} hrs
                         </p>
                       </div>
@@ -304,99 +384,82 @@ export default function VerificationOfficersPage() {
                 </div>
               </div>
 
+              {/* Location + Active Task */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Location Card */}
                 <div className="rounded-xl border border-stroke bg-white p-6 shadow-default dark:border-strokedark dark:bg-boxdark">
-                  <h4 className="font-bold text-black dark:text-white mb-4">Tracking Information</h4>
+                  <h4 className="font-bold mb-4">Current Position</h4>
                   {selectedOfficer.current_location || selectedOfficer.last_known_location ? (
                     <div className="space-y-4">
-                      <div className="bg-gray-50 dark:bg-meta-4/20 p-4 rounded-lg">
-                        <p className="text-xs font-bold text-gray-400 mb-1 uppercase">
-                          {selectedOfficer.is_online ? 'Current Coordinates' : 'Last Known Position'}
+                      <div className="bg-gray-50 dark:bg-meta-4/20 p-4 rounded-lg font-mono">
+                        <p className="text-xs text-gray-500 uppercase mb-1">
+                          {selectedOfficer.is_online ? 'Live' : 'Last known'}
                         </p>
-                        <p className="text-lg font-mono font-bold text-primary">
-                          {(selectedOfficer.current_location || selectedOfficer.last_known_location)?.latitude.toFixed(
-                            6
-                          )}
-                          ,{' '}
-                          {(selectedOfficer.current_location || selectedOfficer.last_known_location)?.longitude.toFixed(
-                            6
-                          )}
+                        <p className="text-lg font-bold text-primary">
+                          {(selectedOfficer.current_location || selectedOfficer.last_known_location)?.latitude.toFixed(6)},
+                          {(selectedOfficer.current_location || selectedOfficer.last_known_location)?.longitude.toFixed(6)}
                         </p>
                         <p className="text-xs text-gray-500 mt-2">
                           {selectedOfficer.is_online
-                            ? 'Live tracking active'
-                            : `Last seen: ${new Date(
-                                selectedOfficer.last_known_location?.timestamp || ''
-                              ).toLocaleString()}`}
+                            ? 'Tracking active'
+                            : `Last seen: ${new Date(selectedOfficer.last_known_location?.timestamp || '').toLocaleString()}`}
                         </p>
                       </div>
-                      <button className="w-full py-2 bg-primary text-white rounded-lg font-bold hover:bg-opacity-90 transition shadow-sm">
-                        View on Live Map
+                      <button className="w-full py-2.5 bg-primary text-white rounded-lg font-semibold hover:bg-primary/90 transition">
+                        View on Map
                       </button>
                     </div>
                   ) : (
-                    <div className="text-center py-8 text-gray-500 font-medium">No location data available</div>
+                    <div className="text-center py-10 text-gray-500">No location data</div>
                   )}
                 </div>
 
                 {/* Active Task Card */}
                 <div className="rounded-xl border border-stroke bg-white p-6 shadow-default dark:border-strokedark dark:bg-boxdark">
-                  <h4 className="font-bold text-black dark:text-white mb-4">Active Field Task</h4>
+                  <h4 className="font-bold mb-4">Current Assignment</h4>
                   {selectedOfficer.current_verification ? (
                     <div className="p-4 border border-stroke dark:border-strokedark rounded-lg">
                       <div className="flex justify-between items-start mb-3">
                         <span className="text-sm font-bold text-primary">
                           #{selectedOfficer.current_verification.order.order_ref}
                         </span>
-                        <span className="bg-yellow-500/10 text-yellow-600 text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider">
+                        <span className="bg-yellow-500/10 text-yellow-600 text-xs font-bold px-2.5 py-1 rounded uppercase">
                           In Progress
                         </span>
                       </div>
-                      <h5 className="font-bold text-black dark:text-white">
+                      <h5 className="font-bold">
                         {selectedOfficer.current_verification.order.customer_name}
                       </h5>
-                      <p className="text-xs text-gray-400 mt-1 uppercase font-bold tracking-tight">
-                        Identity & Residence Check
-                      </p>
-                      <button className="mt-4 w-full py-2 border border-stroke dark:border-strokedark text-sm font-bold hover:bg-gray-50 dark:hover:bg-meta-4 transition rounded-lg">
-                        View Order Details
+                      <p className="text-xs text-gray-500 mt-1">Identity & Residence Verification</p>
+                      <button className="mt-4 w-full py-2 border border-stroke dark:border-strokedark rounded-lg text-sm font-semibold hover:bg-gray-50 dark:hover:bg-meta-4 transition">
+                        View Details
                       </button>
                     </div>
                   ) : (
-                    <div className="text-center py-8 text-gray-500 font-medium italic">No active assignment</div>
+                    <div className="text-center py-10 text-gray-500 italic">No active task</div>
                   )}
                 </div>
               </div>
 
-              {/* Monthly Attendance Report */}
+              {/* Attendance Table – fully real-time */}
               {officerStats && (
                 <div className="rounded-xl border border-stroke bg-white p-6 shadow-default dark:border-strokedark dark:bg-boxdark">
-                  <h4 className="font-bold text-black dark:text-white mb-4">
-                    Monthly Attendance Report ({officerStats.month})
+                  <h4 className="font-bold mb-4">
+                    Monthly Attendance ({officerStats.month})
                   </h4>
                   <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-stroke dark:divide-strokedark">
                       <thead>
                         <tr>
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                            Online Hours
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                            Worked Hours
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                            Offline During Work
-                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Online Hours</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Worked Hours</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Offline (Duty Hrs)</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-stroke dark:divide-strokedark">
                         {officerStats.daily_stats.map((day) => (
-                          <tr
-                            key={day.date}
-                            className="hover:bg-gray-50 dark:hover:bg-meta-4 transition-colors"
-                          >
+                          <tr key={day.date} className="hover:bg-gray-50 dark:hover:bg-meta-4/50 transition-colors">
                             <td className="px-6 py-4 whitespace-nowrap text-sm">{day.date}</td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600">
                               {day.online_hours}
@@ -404,7 +467,7 @@ export default function VerificationOfficersPage() {
                             <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                               {day.worked_hours}
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-red-600">
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-red-600 font-medium">
                               {day.offline_during_work_hours}
                             </td>
                           </tr>
@@ -413,26 +476,23 @@ export default function VerificationOfficersPage() {
                     </table>
                   </div>
                   <p className="mt-4 text-sm text-gray-500">
-                    Expected daily working hours: {officerStats.expected_daily_hours} hrs
+                    Expected daily hours: <strong>{officerStats.expected_daily_hours}</strong> hrs
                   </p>
                 </div>
               )}
             </div>
           ) : (
-            <div className="flex h-[500px] flex-col items-center justify-center rounded-xl border border-dashed border-stroke bg-gray-50 text-center dark:border-strokedark dark:bg-boxdark">
+            <div className="flex flex-col items-center justify-center h-[500px] rounded-xl border border-dashed border-stroke bg-gray-50 dark:border-strokedark dark:bg-boxdark text-center">
               <div className="mb-6 rounded-full bg-white dark:bg-meta-4 p-8 shadow-sm">
                 <svg className="h-16 w-16 text-primary/40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="1.5"
-                    d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-6-6h-1m1-7.758a3.3 3.3 0 100 6.516"
-                  />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-6-6h-1m1-7.758a3.3 3.3 0 100 6.516" />
                 </svg>
               </div>
-              <h3 className="mb-2 text-2xl font-bold text-black dark:text-white">Select an Officer</h3>
-              <p className="max-w-xs font-medium text-gray-500">
-                Select a verification officer to view live status, location, current task, and monthly attendance details.
+              <h3 className="text-2xl font-bold text-black dark:text-white mb-2">
+                Select an Officer
+              </h3>
+              <p className="max-w-md text-gray-500">
+                Choose a verification officer to view live status, location, current task, and real-time attendance records.
               </p>
             </div>
           )}
@@ -446,14 +506,14 @@ function StatCard({
   title,
   value,
   color,
-  isPulse,
+  isPulse = false,
 }: {
   title: string;
   value: number;
   color: string;
   isPulse?: boolean;
 }) {
-  const colors: Record<string, string> = {
+  const colorClasses = {
     blue: 'bg-blue-600/10 text-blue-600',
     green: 'bg-success/10 text-success',
     gray: 'bg-gray-100 text-gray-500',
@@ -465,12 +525,12 @@ function StatCard({
       <div className="flex items-center justify-between">
         <div>
           <h4 className="text-title-md font-bold text-black dark:text-white">{value}</h4>
-          <span className="text-sm font-medium text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
-            {isPulse && <span className="flex h-2 w-2 rounded-full bg-success animate-pulse"></span>}
+          <span className="text-sm font-medium text-gray-500 dark:text-gray-400 flex items-center gap-2 mt-1">
+            {isPulse && <span className="flex h-2 w-2 rounded-full bg-success animate-pulse" />}
             {title}
           </span>
         </div>
-        <div className={`h-10 w-10 flex items-center justify-center rounded-lg ${colors[color]}`}>
+        <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${colorClasses[color as keyof typeof colorClasses]}`}>
           <svg className="h-6 w-6 fill-current" viewBox="0 0 24 24">
             <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
           </svg>
