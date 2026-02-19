@@ -46,7 +46,7 @@ interface User {
   image: string;
   coverImage: string;
   permissions: Record<string, any> | null;
-  password?:string;
+  password?: string;
 }
 
 interface PaginationInfo {
@@ -78,6 +78,7 @@ const UsersTable = () => {
     { id: "id", desc: true },
   ]);
   const [loading, setLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
@@ -89,11 +90,11 @@ const UsersTable = () => {
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
 
   useEffect(() => {
-  return () => {
-    setCoverPreview('')
-    setImagePreview('')
-  };
-}, [editModalOpen]);
+    return () => {
+      setCoverPreview('')
+      setImagePreview('')
+    };
+  }, [editModalOpen]);
 
 
 
@@ -231,9 +232,8 @@ const UsersTable = () => {
             >
               <span>Actions</span>
               <ChevronUpIcon
-                className={`size-4 transition-transform ${
-                  isOpen ? "rotate-0" : "rotate-180"
-                }`}
+                className={`size-4 transition-transform ${isOpen ? "rotate-0" : "rotate-180"
+                  }`}
               />
             </button>
 
@@ -344,6 +344,7 @@ const UsersTable = () => {
 
   const handleUpdate = async () => {
     if (!selectedUser?.id) return;
+    setIsSubmitting(true);
 
     try {
       const token = Cookies.get("auth_token");
@@ -398,6 +399,8 @@ const UsersTable = () => {
       console.error("Update error:", err);
       // Optional: show error to user
       alert(err.message || "Failed to update user");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -408,6 +411,7 @@ const UsersTable = () => {
 
   const confirmDelete = async () => {
     if (!selectedUser?.id) return;
+    setIsSubmitting(true);
     try {
       const token = Cookies.get("auth_token");
       const res = await fetch(`${BACKEND_URL}/api/users/${selectedUser.id}`, {
@@ -419,6 +423,9 @@ const UsersTable = () => {
       setDeleteModalOpen(false);
     } catch (err) {
       console.error(err);
+      alert("Failed to delete user");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -430,6 +437,7 @@ const UsersTable = () => {
 
   const updatePermissions = async () => {
     if (!selectedUser?.id) return;
+    setIsSubmitting(true);
     try {
       const token = Cookies.get("auth_token");
       const res = await fetch(
@@ -450,6 +458,9 @@ const UsersTable = () => {
       setPermissionsModalOpen(false);
     } catch (err) {
       console.error(err);
+      alert("Failed to update permissions");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -677,251 +688,253 @@ const UsersTable = () => {
           Edit User
         </h2>
         <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-  <div>
-    <label
-      htmlFor="full_name"
-      className="mb-1.5 block text-sm font-medium text-dark dark:text-gray-300"
-    >
-      Full Name
-    </label>
-    <input
-      id="full_name"
-      name="full_name"
-      value={formData.full_name || ""}
-      onChange={handleInputChange}
-      className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2.5 outline-none focus:border-[#ff3d3d] dark:border-dark-3 dark:bg-dark-2"
-    />
-  </div>
-
-  <div>
-    <label
-      htmlFor="username"
-      className="mb-1.5 block text-sm font-medium text-dark dark:text-gray-300"
-    >
-      Username
-    </label>
-    <input
-      id="username"
-      name="username"
-      value={formData.username || ""}
-      onChange={handleInputChange}
-      className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2.5 outline-none focus:border-[#ff3d3d] dark:border-dark-3 dark:bg-dark-2"
-    />
-  </div>
-
-  <div>
-    <label
-      htmlFor="email"
-      className="mb-1.5 block text-sm font-medium text-dark dark:text-gray-300"
-    >
-      Email
-    </label>
-    <input
-      id="email"
-      name="email"
-      value={formData.email || ""}
-      onChange={handleInputChange}
-      className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2.5 outline-none focus:border-[#ff3d3d] dark:border-dark-3 dark:bg-dark-2"
-    />
-  </div>
-
-  <div>
-    <label
-      htmlFor="phone"
-      className="mb-1.5 block text-sm font-medium text-dark dark:text-gray-300"
-    >
-      Phone
-    </label>
-    <input
-      id="phone"
-      name="phone"
-      value={formData.phone || ""}
-      onChange={handleInputChange}
-      className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2.5 outline-none focus:border-[#ff3d3d] dark:border-dark-3 dark:bg-dark-2"
-    />
-  </div>
-
-  <div>
-    <label
-      htmlFor="cnic"
-      className="mb-1.5 block text-sm font-medium text-dark dark:text-gray-300"
-    >
-      CNIC
-    </label>
-    <input
-      id="cnic"
-      name="cnic"
-      value={formData.cnic || ""}
-      onChange={handleInputChange}
-      className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2.5 outline-none focus:border-[#ff3d3d] dark:border-dark-3 dark:bg-dark-2"
-    />
-  </div>
-
-  <div>
-    <label
-      htmlFor="status"
-      className="mb-1.5 block text-sm font-medium text-dark dark:text-gray-300"
-    >
-      Status
-    </label>
-    <select
-      id="status"
-      name="status"
-      value={formData.status || "active"}
-      onChange={handleInputChange}
-      className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2.5 outline-none focus:border-[#ff3d3d] dark:border-dark-3 dark:bg-dark-2"
-    >
-      <option value="active">Active</option>
-      <option value="inactive">Inactive</option>
-    </select>
-  </div>
-
-  {/* Added Password Field */}
-  <div>
-    <label
-      htmlFor="password"
-      className="mb-1.5 block text-sm font-medium text-dark dark:text-gray-300"
-    >
-      Password
-    </label>
-    <input
-      id="password"
-      name="password"
-      type="password"
-      value={formData.password || ""}
-      onChange={handleInputChange}
-      placeholder="Enter new password (leave blank to keep current)"
-      className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2.5 outline-none focus:border-[#ff3d3d] dark:border-dark-3 dark:bg-dark-2"
-    />
-  </div>
-
-  <div className="md:col-span-2">
-    <label
-      htmlFor="bio"
-      className="mb-1.5 block text-sm font-medium text-dark dark:text-gray-300"
-    >
-      Bio
-    </label>
-    <textarea
-      id="bio"
-      name="bio"
-      value={formData.bio || ""}
-      onChange={handleInputChange}
-      rows={4}
-      className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2.5 outline-none focus:border-[#ff3d3d] dark:border-dark-3 dark:bg-dark-2"
-    />
-  </div>
-
-  <div className="md:col-span-2">
-    <label className="mb-1.5 block text-sm font-medium text-dark dark:text-gray-300">
-      Cover Picture
-    </label>
-    <div className="flex items-center justify-center gap-2">
-      {/* Current avatar preview */}
-      <div className="h-20 w-40 overflow-hidden border border-stroke dark:border-dark-3">
-        {coverPreview ? (
-          <img
-            src={coverPreview}
-            alt="Cover preview"
-            className="h-full w-full object-cover"
-          />
-        ) : formData.coverImage ? (
-          <img
-            src={formData.coverImage}
-            alt="Profile preview"
-            className="h-full w-full object-cover"
-          />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center bg-gray-100 text-gray-400 dark:bg-dark-3">
-            No photo
+          <div>
+            <label
+              htmlFor="full_name"
+              className="mb-1.5 block text-sm font-medium text-dark dark:text-gray-300"
+            >
+              Full Name
+            </label>
+            <input
+              id="full_name"
+              name="full_name"
+              value={formData.full_name || ""}
+              onChange={handleInputChange}
+              className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2.5 outline-none focus:border-[#ff3d3d] dark:border-dark-3 dark:bg-dark-2"
+            />
           </div>
-        )}
-      </div>
 
-      {/* Upload controls */}
-      <div>
-        <label
-          htmlFor="coverImage"
-          className="inline-flex cursor-pointer items-center justify-center rounded-md border border-stroke px-4 py-2 text-sm font-medium text-dark hover:bg-gray-100 dark:border-dark-3 dark:text-gray-300 dark:hover:bg-dark-3"
-        >
-          Upload new picture
-        </label>
-        <input
-          id="coverImage"
-          name="coverImage"
-          type="file"
-          accept="image/*"
-          onChange={handleFileChange}
-          className="hidden"
-        />
-        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-          JPG, PNG or WEBP • Max 2MB
-        </p>
-      </div>
-    </div>
-  </div>
-
-  <div className="md:col-span-2">
-    <label className="mb-1.5 block text-sm font-medium text-dark dark:text-gray-300">
-      Profile Picture
-    </label>
-    <div className="flex items-center justify-center gap-4">
-      {/* Current avatar preview */}
-      <div className="h-20 w-20 overflow-hidden rounded-full border border-stroke dark:border-dark-3">
-        {imagePreview ? (
-          <img
-            src={imagePreview}
-            alt="Profile preview"
-            className="h-full w-full object-cover"
-          />
-        ) : formData.image ? (
-          <img
-            src={formData.image}
-            alt="Profile preview"
-            className="h-full w-full object-cover"
-          />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center bg-gray-100 text-gray-400 dark:bg-dark-3">
-            No photo
+          <div>
+            <label
+              htmlFor="username"
+              className="mb-1.5 block text-sm font-medium text-dark dark:text-gray-300"
+            >
+              Username
+            </label>
+            <input
+              id="username"
+              name="username"
+              value={formData.username || ""}
+              onChange={handleInputChange}
+              className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2.5 outline-none focus:border-[#ff3d3d] dark:border-dark-3 dark:bg-dark-2"
+            />
           </div>
-        )}
-      </div>
 
-      {/* Upload controls */}
-      <div>
-        <label
-          htmlFor="image"
-          className="inline-flex cursor-pointer items-center justify-center rounded-md border border-stroke px-4 py-2 text-sm font-medium text-dark hover:bg-gray-100 dark:border-dark-3 dark:text-gray-300 dark:hover:bg-dark-3"
-        >
-          Upload new picture
-        </label>
-        <input
-          id="image"
-          name="image"
-          type="file"
-          accept="image/*"
-          onChange={handleFileChange}
-          className="hidden"
-        />
-        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-          JPG, PNG or WEBP • Max 2MB
-        </p>
-      </div>
-    </div>
-  </div>
-</div>
+          <div>
+            <label
+              htmlFor="email"
+              className="mb-1.5 block text-sm font-medium text-dark dark:text-gray-300"
+            >
+              Email
+            </label>
+            <input
+              id="email"
+              name="email"
+              value={formData.email || ""}
+              onChange={handleInputChange}
+              className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2.5 outline-none focus:border-[#ff3d3d] dark:border-dark-3 dark:bg-dark-2"
+            />
+          </div>
+
+          <div>
+            <label
+              htmlFor="phone"
+              className="mb-1.5 block text-sm font-medium text-dark dark:text-gray-300"
+            >
+              Phone
+            </label>
+            <input
+              id="phone"
+              name="phone"
+              value={formData.phone || ""}
+              onChange={handleInputChange}
+              className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2.5 outline-none focus:border-[#ff3d3d] dark:border-dark-3 dark:bg-dark-2"
+            />
+          </div>
+
+          <div>
+            <label
+              htmlFor="cnic"
+              className="mb-1.5 block text-sm font-medium text-dark dark:text-gray-300"
+            >
+              CNIC
+            </label>
+            <input
+              id="cnic"
+              name="cnic"
+              value={formData.cnic || ""}
+              onChange={handleInputChange}
+              className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2.5 outline-none focus:border-[#ff3d3d] dark:border-dark-3 dark:bg-dark-2"
+            />
+          </div>
+
+          <div>
+            <label
+              htmlFor="status"
+              className="mb-1.5 block text-sm font-medium text-dark dark:text-gray-300"
+            >
+              Status
+            </label>
+            <select
+              id="status"
+              name="status"
+              value={formData.status || "active"}
+              onChange={handleInputChange}
+              className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2.5 outline-none focus:border-[#ff3d3d] dark:border-dark-3 dark:bg-dark-2"
+            >
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+            </select>
+          </div>
+
+          {/* Added Password Field */}
+          <div>
+            <label
+              htmlFor="password"
+              className="mb-1.5 block text-sm font-medium text-dark dark:text-gray-300"
+            >
+              Password
+            </label>
+            <input
+              id="password"
+              name="password"
+              type="password"
+              value={formData.password || ""}
+              onChange={handleInputChange}
+              placeholder="Enter new password (leave blank to keep current)"
+              className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2.5 outline-none focus:border-[#ff3d3d] dark:border-dark-3 dark:bg-dark-2"
+            />
+          </div>
+
+          <div className="md:col-span-2">
+            <label
+              htmlFor="bio"
+              className="mb-1.5 block text-sm font-medium text-dark dark:text-gray-300"
+            >
+              Bio
+            </label>
+            <textarea
+              id="bio"
+              name="bio"
+              value={formData.bio || ""}
+              onChange={handleInputChange}
+              rows={4}
+              className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2.5 outline-none focus:border-[#ff3d3d] dark:border-dark-3 dark:bg-dark-2"
+            />
+          </div>
+
+          <div className="md:col-span-2">
+            <label className="mb-1.5 block text-sm font-medium text-dark dark:text-gray-300">
+              Cover Picture
+            </label>
+            <div className="flex items-center justify-center gap-2">
+              {/* Current avatar preview */}
+              <div className="h-20 w-40 overflow-hidden border border-stroke dark:border-dark-3">
+                {coverPreview ? (
+                  <img
+                    src={coverPreview}
+                    alt="Cover preview"
+                    className="h-full w-full object-cover"
+                  />
+                ) : formData.coverImage ? (
+                  <img
+                    src={formData.coverImage}
+                    alt="Profile preview"
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center bg-gray-100 text-gray-400 dark:bg-dark-3">
+                    No photo
+                  </div>
+                )}
+              </div>
+
+              {/* Upload controls */}
+              <div>
+                <label
+                  htmlFor="coverImage"
+                  className="inline-flex cursor-pointer items-center justify-center rounded-md border border-stroke px-4 py-2 text-sm font-medium text-dark hover:bg-gray-100 dark:border-dark-3 dark:text-gray-300 dark:hover:bg-dark-3"
+                >
+                  Upload new picture
+                </label>
+                <input
+                  id="coverImage"
+                  name="coverImage"
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFileChange}
+                  className="hidden"
+                />
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  JPG, PNG or WEBP • Max 2MB
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="md:col-span-2">
+            <label className="mb-1.5 block text-sm font-medium text-dark dark:text-gray-300">
+              Profile Picture
+            </label>
+            <div className="flex items-center justify-center gap-4">
+              {/* Current avatar preview */}
+              <div className="h-20 w-20 overflow-hidden rounded-full border border-stroke dark:border-dark-3">
+                {imagePreview ? (
+                  <img
+                    src={imagePreview}
+                    alt="Profile preview"
+                    className="h-full w-full object-cover"
+                  />
+                ) : formData.image ? (
+                  <img
+                    src={formData.image}
+                    alt="Profile preview"
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center bg-gray-100 text-gray-400 dark:bg-dark-3">
+                    No photo
+                  </div>
+                )}
+              </div>
+
+              {/* Upload controls */}
+              <div>
+                <label
+                  htmlFor="image"
+                  className="inline-flex cursor-pointer items-center justify-center rounded-md border border-stroke px-4 py-2 text-sm font-medium text-dark hover:bg-gray-100 dark:border-dark-3 dark:text-gray-300 dark:hover:bg-dark-3"
+                >
+                  Upload new picture
+                </label>
+                <input
+                  id="image"
+                  name="image"
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFileChange}
+                  className="hidden"
+                />
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  JPG, PNG or WEBP • Max 2MB
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
         <div className="mt-8 flex justify-end gap-4">
           <button
             onClick={() => setEditModalOpen(false)}
-            className="rounded border border-stroke px-6 py-2.5 text-dark hover:bg-gray-100 dark:border-dark-3 dark:text-white dark:hover:bg-dark-3"
+            disabled={isSubmitting}
+            className="rounded border border-stroke px-6 py-2.5 text-dark hover:bg-gray-100 disabled:opacity-50 dark:border-dark-3 dark:text-white dark:hover:bg-dark-3"
           >
             Cancel
           </button>
           <button
             onClick={handleUpdate}
-            className="rounded bg-[#ff3d3d] px-6 py-2.5 text-white hover:bg-[#ff3d3d]/90"
+            disabled={isSubmitting}
+            className="rounded bg-[#ff3d3d] px-6 py-2.5 text-white hover:bg-[#ff3d3d]/90 disabled:opacity-50"
           >
-            Save Changes
+            {isSubmitting ? "Saving..." : "Save Changes"}
           </button>
         </div>
       </Modal>
@@ -941,15 +954,17 @@ const UsersTable = () => {
         <div className="flex justify-end gap-4">
           <button
             onClick={() => setDeleteModalOpen(false)}
-            className="rounded border border-stroke px-6 py-2.5 text-dark hover:bg-gray-100 dark:border-dark-3 dark:text-white dark:hover:bg-dark-3"
+            disabled={isSubmitting}
+            className="rounded border border-stroke px-6 py-2.5 text-dark hover:bg-gray-100 disabled:opacity-50 dark:border-dark-3 dark:text-white dark:hover:bg-dark-3"
           >
             Cancel
           </button>
           <button
             onClick={confirmDelete}
-            className="rounded bg-[#ff3d3d] px-6 py-2.5 text-white hover:bg-[#ff3d3d]/90"
+            disabled={isSubmitting}
+            className="rounded bg-[#ff3d3d] px-6 py-2.5 text-white hover:bg-[#ff3d3d]/90 disabled:opacity-50"
           >
-            Delete
+            {isSubmitting ? "Deleting..." : "Delete"}
           </button>
         </div>
       </Modal>
@@ -976,15 +991,17 @@ const UsersTable = () => {
         <div className="flex justify-end gap-4">
           <button
             onClick={() => setPermissionsModalOpen(false)}
-            className="rounded border border-stroke px-6 py-2.5 text-dark hover:bg-gray-100 dark:border-dark-3 dark:text-white dark:hover:bg-dark-3"
+            disabled={isSubmitting}
+            className="rounded border border-stroke px-6 py-2.5 text-dark hover:bg-gray-100 disabled:opacity-50 dark:border-dark-3 dark:text-white dark:hover:bg-dark-3"
           >
             Cancel
           </button>
           <button
             onClick={updatePermissions}
-            className="rounded bg-[#ff3d3d] px-6 py-2.5 text-white hover:bg-[#ff3d3d]/90"
+            disabled={isSubmitting}
+            className="rounded bg-[#ff3d3d] px-6 py-2.5 text-white hover:bg-[#ff3d3d]/90 disabled:opacity-50"
           >
-            Save Permissions
+            {isSubmitting ? "Saving..." : "Save Permissions"}
           </button>
         </div>
       </Modal>

@@ -79,6 +79,7 @@ const OrderList = () => {
   const [sorting, setSorting] = useState<SortingState>([{ id: 'created_at', desc: true }])
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
   const [loading, setLoading] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   // Modals
   const [assignModalOpen, setAssignModalOpen] = useState(false)
@@ -163,6 +164,7 @@ const OrderList = () => {
 
   const confirmAssign = async () => {
     if (!selectedOrder || !selectedVerifierId) return
+    setIsSubmitting(true)
     try {
       const token = Cookies.get('auth_token')
       const res = await fetch(`${BACKEND_URL}/api/orders/${selectedOrder.id}/assign`, {
@@ -181,11 +183,15 @@ const OrderList = () => {
       setSelectedOrder(null)
     } catch (err) {
       console.error('Assign error:', err)
+      alert('Assign failed')
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
   const confirmSingleUnassign = async () => {
     if (!selectedOrder) return
+    setIsSubmitting(true)
     try {
       const token = Cookies.get('auth_token')
       const res = await fetch(`${BACKEND_URL}/api/orders/${selectedOrder.id}/assign`, {
@@ -203,6 +209,9 @@ const OrderList = () => {
       setSelectedOrder(null)
     } catch (err) {
       console.error('Unassign error:', err)
+      alert('Unassign failed')
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -217,6 +226,7 @@ const OrderList = () => {
   const confirmBulkAssign = async () => {
     if (!selectedVerifierId) return
     const ids = table.getSelectedRowModel().rows.map((r) => r.original.id)
+    setIsSubmitting(true)
 
     try {
       const token = Cookies.get('auth_token')
@@ -236,11 +246,15 @@ const OrderList = () => {
       setSelectedVerifierId(null)
     } catch (err) {
       console.error('Bulk assign error:', err)
+      alert('Bulk assign failed')
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
   const confirmBulkUnassign = async () => {
     const ids = table.getSelectedRowModel().rows.map((r) => r.original.id)
+    setIsSubmitting(true)
 
     try {
       const token = Cookies.get('auth_token')
@@ -259,6 +273,9 @@ const OrderList = () => {
       setRowSelection({})
     } catch (err) {
       console.error('Bulk unassign error:', err)
+      alert('Bulk unassign failed')
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -391,9 +408,8 @@ const OrderList = () => {
             >
               <span>Actions</span>
               <ChevronUpIcon
-                className={`size-4 transition-transform ${
-                  isOpen ? 'rotate-0' : 'rotate-180'
-                }`}
+                className={`size-4 transition-transform ${isOpen ? 'rotate-0' : 'rotate-180'
+                  }`}
               />
             </button>
 
@@ -689,16 +705,17 @@ const OrderList = () => {
               setAssignModalOpen(false)
               setSelectedVerifierId(null)
             }}
-            className="rounded border border-stroke px-6 py-2.5 text-dark hover:bg-gray-100 dark:border-dark-3 dark:text-white dark:hover:bg-dark-3"
+            className="rounded border border-stroke px-6 py-2.5 text-dark hover:bg-gray-100 dark:border-dark-3 dark:text-white dark:hover:bg-dark-3 disabled:opacity-50"
+            disabled={isSubmitting}
           >
             Cancel
           </button>
           <button
             onClick={confirmAssign}
-            disabled={!selectedVerifierId}
+            disabled={!selectedVerifierId || isSubmitting}
             className="rounded bg-[#ff3d3d] px-6 py-2.5 text-white hover:bg-[#ff3d3d]/90 disabled:opacity-50"
           >
-            Assign
+            {isSubmitting ? 'Assigning...' : 'Assign'}
           </button>
         </div>
       </Modal>
@@ -716,15 +733,17 @@ const OrderList = () => {
         <div className="mt-6 flex justify-end gap-4">
           <button
             onClick={() => setSingleUnassignModalOpen(false)}
-            className="rounded border border-stroke px-6 py-2.5 text-dark hover:bg-gray-100 dark:border-dark-3 dark:text-white dark:hover:bg-dark-3"
+            className="rounded border border-stroke px-6 py-2.5 text-dark hover:bg-gray-100 dark:border-dark-3 dark:text-white dark:hover:bg-dark-3 disabled:opacity-50"
+            disabled={isSubmitting}
           >
             Cancel
           </button>
           <button
             onClick={confirmSingleUnassign}
-            className="rounded bg-red-600 px-6 py-2.5 text-white hover:bg-red-700"
+            disabled={isSubmitting}
+            className="rounded bg-red-600 px-6 py-2.5 text-white hover:bg-red-700 disabled:opacity-50"
           >
-            Unassign
+            {isSubmitting ? 'Unassigning...' : 'Unassign'}
           </button>
         </div>
       </Modal>
@@ -760,16 +779,17 @@ const OrderList = () => {
               setBulkAssignModalOpen(false)
               setSelectedVerifierId(null)
             }}
-            className="rounded border border-stroke px-6 py-2.5 text-dark hover:bg-gray-100 dark:border-dark-3 dark:text-white dark:hover:bg-dark-3"
+            className="rounded border border-stroke px-6 py-2.5 text-dark hover:bg-gray-100 dark:border-dark-3 dark:text-white dark:hover:bg-dark-3 disabled:opacity-50"
+            disabled={isSubmitting}
           >
             Cancel
           </button>
           <button
             onClick={confirmBulkAssign}
-            disabled={!selectedVerifierId}
+            disabled={!selectedVerifierId || isSubmitting}
             className="rounded bg-[#ff3d3d] px-6 py-2.5 text-white hover:bg-[#ff3d3d]/90 disabled:opacity-50"
           >
-            Assign All
+            {isSubmitting ? 'Assigning All...' : 'Assign All'}
           </button>
         </div>
       </Modal>
@@ -787,15 +807,17 @@ const OrderList = () => {
         <div className="mt-6 flex justify-end gap-4">
           <button
             onClick={() => setBulkUnassignModalOpen(false)}
-            className="rounded border border-stroke px-6 py-2.5 text-dark hover:bg-gray-100 dark:border-dark-3 dark:text-white dark:hover:bg-dark-3"
+            className="rounded border border-stroke px-6 py-2.5 text-dark hover:bg-gray-100 dark:border-dark-3 dark:text-white dark:hover:bg-dark-3 disabled:opacity-50"
+            disabled={isSubmitting}
           >
             Cancel
           </button>
           <button
             onClick={confirmBulkUnassign}
-            className="rounded bg-red-600 px-6 py-2.5 text-white hover:bg-red-700"
+            disabled={isSubmitting}
+            className="rounded bg-red-600 px-6 py-2.5 text-white hover:bg-red-700 disabled:opacity-50"
           >
-            Unassign All
+            {isSubmitting ? 'Unassigning All...' : 'Unassign All'}
           </button>
         </div>
       </Modal>

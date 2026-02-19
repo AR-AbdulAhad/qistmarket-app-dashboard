@@ -29,6 +29,17 @@ export const NAV_DATA = [
         items: [],
       },
       {
+        title: "Delivery Management",
+        icon: Icons.HomeIcon,
+        items: [],
+      },
+      {
+        title: "Verification Officers",
+        icon: Icons.HomeIcon,
+        url: "/verification-officers",
+        items: [],
+      },
+      {
         title: "User Management",
         icon: Icons.HomeIcon,
         items: [
@@ -39,6 +50,10 @@ export const NAV_DATA = [
           {
             title: "User List",
             url: "/user-management/user-list",
+          },
+          {
+            title: "Deletion Requests",
+            url: "/admin/deletion-requests",
           },
         ],
       },
@@ -63,12 +78,12 @@ export const NAV_DATA = [
       //       title: "View Officer Live Location",
       //       url: "/tracker",
       //     },
-          
+
       //      {
       //       title: "Today's Summary",
       //       url: "/",
       //     },
-           
+
       //   ],
       // },
       // {
@@ -87,5 +102,5 @@ export const NAV_DATA = [
       // },
     ],
   },
- 
+
 ];

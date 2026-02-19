@@ -8,6 +8,9 @@ import { CameraIcon } from "./_components/icons";
 import Cookies from "js-cookie";
 import { useAuth } from "../../../../contexts/AuthContext";
 import { jwtDecode } from "jwt-decode";
+import { getMyDeletionRequest, requestAccountDeletion } from "@/services/account-deletion.service";
+import { AccountDeletionRequest } from "@/types/account-deletion";
+import { Modal } from "@/components/Modal/Modal";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
 
@@ -40,6 +43,12 @@ export default function ProfilePage() {
   const [fileCover, setFileCover] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
 
+  // Deletion Request State
+  const [deletionRequest, setDeletionRequest] = useState<AccountDeletionRequest | null>(null);
+  const [deletionReason, setDeletionReason] = useState("");
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
+
   useEffect(() => {
     if (user) {
       setData({
@@ -47,8 +56,18 @@ export default function ProfilePage() {
         profilePhoto: user.image || "/images/user/user-03.png",
         coverPhoto: user.coverImage || "/images/cover/cover-01.png",
       });
+      fetchDeletionRequest();
     }
   }, [user]);
+
+  const fetchDeletionRequest = async () => {
+    try {
+      const response = await getMyDeletionRequest();
+      setDeletionRequest(response.request);
+    } catch (error) {
+      console.error("Failed to fetch deletion request", error);
+    }
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, files } = e.target;
@@ -100,11 +119,29 @@ export default function ProfilePage() {
     }
   };
 
+  const handleDeletionRequestClick = () => {
+    if (!deletionReason.trim()) return toast.error("Please provide a reason");
+    setIsConfirmModalOpen(true);
+  };
+
+  const handleConfirmDeletion = async () => {
+    setIsDeleting(true);
+    try {
+      await requestAccountDeletion(deletionReason);
+      toast.success("Deletion request submitted");
+      setDeletionReason("");
+      setIsConfirmModalOpen(false);
+      fetchDeletionRequest();
+    } catch (error) {
+      toast.error("Failed to submit request");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   if (authLoading) return <div className="text-center py-10">Loading...</div>;
 
   if (!user) return null;
-
-  console.log("User Data:", user);
 
   return (
     <div className="mx-auto w-full max-w-[970px]">
@@ -193,6 +230,81 @@ export default function ProfilePage() {
           </button>
         </div>
       </form>
+
+      {/* Account Deletion Section */}
+      <div className="mt-10 overflow-hidden rounded-[10px] bg-white shadow-1 dark:bg-gray-dark dark:shadow-card p-6">
+        <h3 className="text-xl font-semibold text-black dark:text-white mb-4">
+          Account Deletion
+        </h3>
+
+        {deletionRequest && deletionRequest.status === 'pending' ? (
+          <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4">
+            <div className="flex">
+              <div className="ml-3">
+                <p className="text-sm text-yellow-700">
+                  You have a pending account deletion request submitted on {new Date(deletionRequest.requestedAt).toLocaleDateString()}.
+                  <br />
+                  Current Status: <span className="font-bold">{deletionRequest.status.toUpperCase()}</span>
+                </p>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div>
+            <p className="mb-4 text-sm text-body-color dark:text-body-color-dark">
+              If you wish to delete your account, please provide a reason below. This action cannot be undone once approved by an admin.
+            </p>
+            <div className="mb-4">
+              <label className="mb-2.5 block font-medium text-black dark:text-white">
+                Reason for Deletion
+              </label>
+              <textarea
+                rows={3}
+                placeholder="Why do you want to delete your account?"
+                className="w-full rounded-lg border-[1.5px] border-stroke bg-transparent px-5 py-3 text-black outline-none transition focus:border-danger active:border-danger disabled:cursor-default disabled:bg-whiter dark:border-form-strokedark dark:bg-form-input dark:text-white dark:focus:border-danger"
+                value={deletionReason}
+                onChange={(e) => setDeletionReason(e.target.value)}
+              />
+            </div>
+            <button
+              type="button"
+              onClick={handleDeletionRequestClick}
+              disabled={isDeleting || !deletionReason.trim()}
+              className="flex justify-center rounded-lg bg-red-600 px-6 py-2 font-medium text-white hover:bg-opacity-90 disabled:opacity-50"
+            >
+              Request Account Deletion
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Confirmation Modal */}
+      <Modal open={isConfirmModalOpen} onClose={() => setIsConfirmModalOpen(false)}>
+        <div className="rounded-[10px] border border-stroke bg-white p-4 shadow-1 dark:border-dark-3 dark:bg-gray-dark dark:shadow-card sm:p-7.5">
+          <h3 className="mb-4 text-xl font-semibold text-black dark:text-white">
+            Confirm Deletion Request
+          </h3>
+          <p className="mb-6 text-body-color dark:text-body-color-dark">
+            Are you sure you want to submit a request to delete your account? This action cannot be undone.
+          </p>
+          <div className="flex justify-end gap-3">
+            <button
+              onClick={() => setIsConfirmModalOpen(false)}
+              className="rounded-lg border border-stroke px-6 py-2 font-medium text-black hover:shadow-1 dark:border-strokedark dark:text-white"
+              disabled={isDeleting}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleConfirmDeletion}
+              disabled={isDeleting}
+              className="rounded-lg bg-red-600 px-6 py-2 font-medium text-white hover:bg-opacity-90 disabled:opacity-50"
+            >
+              {isDeleting ? "Submitting..." : "Confirm"}
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

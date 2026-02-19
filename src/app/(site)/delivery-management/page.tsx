@@ -3,6 +3,10 @@
 import { useState, useEffect } from 'react';
 import Cookies from 'js-cookie';
 import toast from 'react-hot-toast';
+import { DeliveryActionsModal } from '@/components/DeliveryManagement/DeliveryActionsModal';
+import { DeliveryTable } from '@/components/DeliveryManagement/DeliveryTable';
+import { DeliveryStats } from '@/components/DeliveryManagement/DeliveryStats';
+import { SearchIcon } from '@/assets/icons';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
 
@@ -35,72 +39,93 @@ interface BoyDetails {
   pending_products: ProductGroup[];
 }
 
+interface DeliveryOrder {
+  id: number;
+  order_ref: string;
+  customer_name: string;
+  address: string;
+  product_name: string;
+  amount: number;
+  status: string;
+  delivery_officer: { username: string; full_name: string } | null;
+  updated_at: string;
+}
+
 export default function DeliveryManagement() {
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'all_deliveries'>('dashboard');
+
+  // Dashboard State
   const [deliveryBoys, setDeliveryBoys] = useState<DeliveryBoy[]>([]);
+  const [filteredBoys, setFilteredBoys] = useState<DeliveryBoy[]>([]);
+  const [boySearch, setBoySearch] = useState('');
+
   const [selectedBoyId, setSelectedBoyId] = useState<number | null>(null);
   const [boyDetails, setBoyDetails] = useState<BoyDetails | null>(null);
   const [otpInput, setOtpInput] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isActionLoading, setIsActionLoading] = useState<boolean>(false);
 
+  // All Deliveries State
+  const [allDeliveries, setAllDeliveries] = useState<DeliveryOrder[]>([]);
+  const [deliveriesLoading, setDeliveriesLoading] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState<DeliveryOrder | null>(null);
+  const [actionType, setActionType] = useState<'deliver' | 'return' | null>(null);
+
+  // Calculated Stats
+  const totalRiders = deliveryBoys.length;
+  const activeDeliveries = allDeliveries.filter(d => d.status === 'in_transit' || d.status === 'picked_up').length;
+  const completedToday = allDeliveries.filter(d => d.status === 'delivered').length;
+  const returnedToday = allDeliveries.filter(d => d.status === 'returned').length;
+
   useEffect(() => {
     fetchDeliveryBoys();
+    fetchAllDeliveries();
   }, []);
+
+  useEffect(() => {
+    if (boySearch.trim() === '') {
+      setFilteredBoys(deliveryBoys);
+    } else {
+      const lower = boySearch.toLowerCase();
+      setFilteredBoys(deliveryBoys.filter(boy =>
+        boy.name.toLowerCase().includes(lower) ||
+        boy.username.toLowerCase().includes(lower)
+      ));
+    }
+  }, [boySearch, deliveryBoys]);
 
   const fetchDeliveryBoys = async (): Promise<void> => {
     try {
       const token = Cookies.get('auth_token');
-      if (!token) {
-        toast.error('Authentication token not found');
-        return;
-      }
+      if (!token) return;
 
       const response = await fetch(`${BACKEND_URL}/api/delivery-management/dashboard`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
       });
-
       const result = await response.json();
-
       if (result.success) {
         setDeliveryBoys(result.data);
-      } else {
-        toast.error(result.error || 'Failed to load delivery personnel');
+        setFilteredBoys(result.data);
       }
     } catch (error) {
       console.error('Error fetching delivery boys:', error);
-      toast.error('Network error while loading delivery personnel');
     }
   };
 
   const fetchBoyDetails = async (boyId: number): Promise<void> => {
     setIsLoading(true);
     setSelectedBoyId(boyId);
-
     try {
       const token = Cookies.get('auth_token');
-      if (!token) {
-        toast.error('Authentication token not found');
-        return;
-      }
-
       const response = await fetch(`${BACKEND_URL}/api/delivery-management/boy/${boyId}/details`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
       });
-
       const result = await response.json();
-
       if (result.success) {
         setBoyDetails(result.data);
-      } else {
-        toast.error(result.error || 'Failed to load delivery boy details');
       }
     } catch (error) {
       console.error('Error fetching boy details:', error);
-      toast.error('Network error');
     } finally {
       setIsLoading(false);
     }
@@ -108,16 +133,9 @@ export default function DeliveryManagement() {
 
   const handleGenerateOtp = async (): Promise<void> => {
     if (!selectedBoyId) return;
-
     setIsActionLoading(true);
-
     try {
       const token = Cookies.get('auth_token');
-      if (!token) {
-        toast.error('Authentication required');
-        return;
-      }
-
       const response = await fetch(`${BACKEND_URL}/api/delivery-management/generate-pickup-otp`, {
         method: 'POST',
         headers: {
@@ -126,16 +144,13 @@ export default function DeliveryManagement() {
         },
         body: JSON.stringify({ deliveryBoyId: selectedBoyId }),
       });
-
       const result = await response.json();
-
       if (result.success) {
         toast.success('OTP has been generated and sent via WhatsApp');
       } else {
         toast.error(result.error || 'Failed to generate OTP');
       }
     } catch (error) {
-      console.error('Error generating OTP:', error);
       toast.error('Failed to send OTP');
     } finally {
       setIsActionLoading(false);
@@ -147,16 +162,9 @@ export default function DeliveryManagement() {
       toast.error('Please enter a valid 6-digit OTP');
       return;
     }
-
     setIsActionLoading(true);
-
     try {
       const token = Cookies.get('auth_token');
-      if (!token) {
-        toast.error('Authentication required');
-        return;
-      }
-
       const response = await fetch(`${BACKEND_URL}/api/delivery-management/verify-pickup-otp`, {
         method: 'POST',
         headers: {
@@ -165,215 +173,331 @@ export default function DeliveryManagement() {
         },
         body: JSON.stringify({ deliveryBoyId: selectedBoyId, otp: otpInput }),
       });
-
       const result = await response.json();
-
       if (result.success) {
         toast.success(result.message || 'Orders successfully marked as picked');
         setOtpInput('');
-        // Refresh details
         await fetchBoyDetails(selectedBoyId);
+        fetchAllDeliveries(); // Refresh stats
       } else {
         toast.error(result.error || 'Invalid or expired OTP');
       }
     } catch (error) {
-      console.error('Error verifying OTP:', error);
       toast.error('Failed to verify OTP');
     } finally {
       setIsActionLoading(false);
     }
   };
 
+  const fetchAllDeliveries = async () => {
+    setDeliveriesLoading(true);
+    try {
+      const token = Cookies.get('auth_token');
+      const response = await fetch(`${BACKEND_URL}/api/orders/delivery-status`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success) {
+          setAllDeliveries(result.data);
+        }
+      } else {
+        setAllDeliveries([]);
+      }
+    } catch (error) {
+      console.error('Failed to fetch deliveries', error);
+      setAllDeliveries([]);
+    } finally {
+      setDeliveriesLoading(false);
+    }
+  };
+
   return (
-    <div className="container mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-8">
-        Delivery Management
-      </h1>
+    <div className="mx-auto max-w-screen-2xl p-4 md:p-6 2xl:p-10">
+      <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="text-title-md2 font-bold text-black dark:text-white">
+            Delivery Management
+          </h2>
+          <p className="font-medium">Manage riders, pickups, and track overall delivery performance.</p>
+        </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-        {/* Left column – List of delivery personnel */}
-        <div className="lg:col-span-1">
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5 sticky top-6">
-            <h2 className="text-xl font-semibold mb-5 text-gray-800 dark:text-gray-200">
-              Delivery Personnel
-            </h2>
+        <div className="flex rounded-lg bg-gray-2 p-1 dark:bg-meta-4">
+          <button
+            onClick={() => setActiveTab('dashboard')}
+            className={`rounded-md py-2 px-6 text-sm font-medium transition-all duration-200 ${activeTab === 'dashboard'
+                ? 'bg-white text-primary shadow-card dark:bg-boxdark dark:text-white'
+                : 'text-gray-600 hover:text-primary dark:text-gray-400 dark:hover:text-white'
+              }`}
+          >
+            Dashboard
+          </button>
+          <button
+            onClick={() => setActiveTab('all_deliveries')}
+            className={`rounded-md py-2 px-6 text-sm font-medium transition-all duration-200 ${activeTab === 'all_deliveries'
+                ? 'bg-white text-primary shadow-card dark:bg-boxdark dark:text-white'
+                : 'text-gray-600 hover:text-primary dark:text-gray-400 dark:hover:text-white'
+              }`}
+          >
+            All Deliveries
+          </button>
+        </div>
+      </div>
 
-            {deliveryBoys.length === 0 ? (
-              <p className="text-gray-500 dark:text-gray-400 text-center py-8">
-                No active delivery personnel found
-              </p>
-            ) : (
-              <div className="space-y-3 max-h-[70vh] overflow-y-auto pr-2">
-                {deliveryBoys.map((boy) => (
-                  <div
-                    key={boy.id}
-                    onClick={() => fetchBoyDetails(boy.id)}
-                    className={`p-4 rounded-lg border cursor-pointer transition-all duration-200 ${
-                      selectedBoyId === boy.id
-                        ? 'border-blue-600 bg-blue-50 dark:bg-blue-950/30 shadow-sm'
-                        : 'border-gray-200 dark:border-gray-700 hover:border-blue-400 hover:bg-gray-50 dark:hover:bg-gray-800'
-                    }`}
-                  >
-                    <div className="flex items-center gap-4">
-                      {boy.profile_image ? (
-                        <img
-                          src={boy.profile_image}
-                          alt={boy.name}
-                          className="w-12 h-12 rounded-full object-cover border border-gray-300 dark:border-gray-600"
-                        />
+      {/* KPI Stats Top Row */}
+      <DeliveryStats
+        totalRiders={totalRiders}
+        activeDeliveries={activeDeliveries}
+        completedToday={completedToday}
+        returnedToday={returnedToday}
+      />
+
+      {activeTab === 'dashboard' ? (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          {/* Rider Selection List - Left Side */}
+          <div className="lg:col-span-4 xl:col-span-3">
+            <div className="rounded-xl border border-stroke bg-white shadow-default dark:border-strokedark dark:bg-boxdark overflow-hidden">
+              <div className="border-b border-stroke py-4 px-6.5 dark:border-strokedark bg-gray-50 dark:bg-meta-4/20">
+                <h3 className="font-semibold text-black dark:text-white">
+                  Delivery Riders
+                </h3>
+              </div>
+
+              <div className="p-4 border-b border-stroke dark:border-strokedark">
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
+                    <SearchIcon className="h-5 w-5" />
+                  </span>
+                  <input
+                    type="text"
+                    placeholder="Search rider..."
+                    value={boySearch}
+                    onChange={(e) => setBoySearch(e.target.value)}
+                    className="w-full rounded-lg border border-stroke bg-transparent py-2.5 pl-11 pr-5 text-black outline-none focus:border-primary focus-visible:shadow-none dark:border-strokedark dark:bg-meta-4 dark:text-white dark:focus:border-primary transition-all"
+                  />
+                </div>
+              </div>
+
+              <div className="flex flex-col max-h-[600px] overflow-y-auto">
+                {filteredBoys.length === 0 ? (
+                  <div className="p-8 text-center text-gray-500">No riders found.</div>
+                ) : (
+                  filteredBoys.map((boy) => (
+                    <div
+                      key={boy.id}
+                      onClick={() => fetchBoyDetails(boy.id)}
+                      className={`flex items-center gap-4 px-6 py-4 cursor-pointer transition-all border-l-4 ${selectedBoyId === boy.id
+                          ? 'bg-gray-50 dark:bg-meta-4/30 border-primary'
+                          : 'border-transparent hover:bg-gray-50 dark:hover:bg-meta-4/20'
+                        }`}
+                    >
+                      <div className="relative h-12 w-12 flex-shrink-0">
+                        {boy.profile_image ? (
+                          <img
+                            src={boy.profile_image}
+                            alt={boy.name}
+                            className="h-full w-full rounded-full object-cover border border-stroke dark:border-strokedark shadow-sm"
+                          />
+                        ) : (
+                          <div className="h-full w-full rounded-full bg-gray-200 dark:bg-meta-4 flex items-center justify-center text-lg font-bold text-gray-500">
+                            {boy.name.charAt(0)}
+                          </div>
+                        )}
+                        <span className="absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-2 border-white bg-success dark:border-boxdark"></span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-bold text-black dark:text-white truncate">
+                          {boy.name}
+                        </h4>
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm font-medium text-gray-400 truncate">@{boy.username}</p>
+                          {boy.pending_count > 0 && (
+                            <span className="inline-flex items-center justify-center rounded-full bg-primary py-0.5 px-2 text-xs font-bold text-white shadow-sm">
+                              {boy.pending_count}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Rider Details and Actions - Right Side */}
+          <div className="lg:col-span-8 xl:col-span-9 space-y-6">
+            {isLoading ? (
+              <div className="flex h-[400px] items-center justify-center rounded-xl border border-stroke bg-white shadow-default dark:border-strokedark dark:bg-boxdark">
+                <div className="h-12 w-12 animate-spin rounded-full border-4 border-solid border-primary border-t-transparent"></div>
+              </div>
+            ) : selectedBoyId && boyDetails ? (
+              <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-6">
+                {/* Rider Profile Card */}
+                <div className="rounded-xl border border-stroke bg-white p-6 shadow-default dark:border-strokedark dark:bg-boxdark">
+                  <div className="flex flex-col lg:flex-row lg:items-center gap-6">
+                    <div className="h-24 w-24 flex-shrink-0 rounded-full border-4 border-gray-100 dark:border-meta-4 overflow-hidden shadow-lg">
+                      {boyDetails.boy.profile_image ? (
+                        <img src={boyDetails.boy.profile_image} alt="Profile" className="h-full w-full object-cover" />
                       ) : (
-                        <div className="w-12 h-12 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center text-xl font-semibold text-gray-600 dark:text-gray-300">
-                          {boy.name.charAt(0)}
+                        <div className="h-full w-full bg-gray-200 flex items-center justify-center text-3xl font-bold dark:bg-meta-4">
+                          {boyDetails.boy.name.charAt(0)}
                         </div>
                       )}
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3">
+                        <h3 className="text-2xl font-bold text-black dark:text-white">
+                          {boyDetails.boy.name}
+                        </h3>
+                        <span className="inline-flex rounded bg-success/10 py-1 px-3 text-sm font-bold text-success">
+                          Active
+                        </span>
+                      </div>
+                      <p className="font-medium text-gray-500">@{boyDetails.boy.username}</p>
+                      {boyDetails.boy.whatsapp && (
+                        <div className="mt-3 flex items-center gap-2 text-green-600 font-semibold">
+                          <svg className="fill-current" width="18" height="18" viewBox="0 0 24 24"><path d="M12.031 2c-5.511 0-9.997 4.486-9.997 9.998 0 1.767.459 3.428 1.259 4.878l-1.293 4.735 4.854-1.274c1.401.761 2.993 1.2 4.672 1.2 5.513 0 9.99-4.487 9.99-9.999 0-5.511-4.486-9.998-9.985-9.998zm3.037 14.12c-.237.669-1.4 1.218-1.928 1.297-.48.071-.856.347-3.003-.547-2.75-1.146-4.52-3.931-4.659-4.114-.139-.181-1.135-1.503-1.135-2.868 0-1.365.717-2.035.973-2.314.197-.215.523-.32.839-.32.103 0 .197.005.281.01.271.012.399.014.573.431.218.522.744 1.815.809 1.944.065.129.109.28.022.455-.088.174-.131.28-.261.431l-.398.463c-.131.144-.271.3-.117.564.153.264.679 1.119 1.455 1.81.996.888 1.835 1.163 2.099 1.294.264.131.417.109.57.022.153-.087.653-.761.827-1.021.174-.261.348-.218.587-.131.239.088 1.52.717 1.781.847.261.13.435.196.499.305.064.108.064.63-.173 1.299z" /></svg>
+                          WhatsApp: {boyDetails.boy.whatsapp}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
 
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-gray-900 dark:text-white truncate">
-                          {boy.name}
-                        </p>
-                        <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
-                          @{boy.username}
-                        </p>
-                        <p className="text-sm font-medium mt-1 text-blue-700 dark:text-blue-400">
-                          Pending: {boy.pending_count}
-                        </p>
+                {/* Pickup/OTP Action Card */}
+                <div className="rounded-xl border border-primary/20 bg-primary/5 p-6 shadow-default dark:border-primary/30 dark:bg-primary/5">
+                  <div className="flex flex-col lg:flex-row items-center justify-between gap-6">
+                    <div className="flex-1">
+                      <h4 className="text-xl font-bold text-black dark:text-white mb-2">Pickup Confirmation</h4>
+                      <p className="font-medium text-gray-600 dark:text-gray-400">
+                        Authorize the load pickup by generating an OTP. Verify the code provided by the rider to confirm assignment.
+                      </p>
+                    </div>
+                    <div className="flex flex-col sm:flex-row items-center gap-4 w-full lg:w-auto">
+                      <div className="relative w-full sm:w-48">
+                        <input
+                          type="text"
+                          maxLength={6}
+                          value={otpInput}
+                          onChange={(e) => setOtpInput(e.target.value.replace(/\D/g, ''))}
+                          placeholder="OTP Code"
+                          className="w-full rounded-lg border border-primary/30 bg-white py-3.5 px-4 text-center text-xl font-bold tracking-widest outline-none focus:border-primary dark:bg-black dark:border-strokedark"
+                        />
+                      </div>
+                      <div className="flex gap-3 w-full sm:w-auto">
+                        <button
+                          onClick={handleGenerateOtp}
+                          disabled={isActionLoading}
+                          className="flex-1 sm:flex-none inline-flex items-center justify-center rounded-lg bg-blue-600 py-3.5 px-6 font-bold text-white hover:bg-opacity-90 transition disabled:opacity-50"
+                        >
+                          {isActionLoading ? '...' : 'Send OTP'}
+                        </button>
+                        <button
+                          onClick={handleVerifyOtp}
+                          disabled={isActionLoading || otpInput.length !== 6}
+                          className="flex-1 sm:flex-none inline-flex items-center justify-center rounded-lg bg-success py-3.5 px-8 font-bold text-white hover:bg-opacity-90 transition disabled:opacity-50"
+                        >
+                          {isActionLoading ? '...' : 'Verify'}
+                        </button>
                       </div>
                     </div>
                   </div>
-                ))}
+                </div>
+
+                {/* Allocated Products Grid */}
+                <div className="space-y-4">
+                  <h4 className="text-title-sm font-bold text-black dark:text-white pl-1">
+                    Allocated Inventory
+                    <span className="ml-2 text-sm font-medium text-gray-500">
+                      ({boyDetails.pending_products.length} categories)
+                    </span>
+                  </h4>
+
+                  {boyDetails.pending_products.length === 0 ? (
+                    <div className="rounded-xl border border-dashed border-stroke bg-gray-50 p-10 text-center dark:border-strokedark dark:bg-boxdark">
+                      <p className="font-medium text-gray-500">No pending products allocated to this rider.</p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                      {boyDetails.pending_products.map((product) => (
+                        <div key={product.product_name} className="relative overflow-hidden rounded-xl border border-stroke bg-white p-5 shadow-sm hover:shadow-md transition-all dark:border-strokedark dark:bg-boxdark group">
+                          <div className="mb-4">
+                            <h5 className="text-lg font-bold text-black dark:text-white truncate" title={product.product_name}>
+                              {product.product_name}
+                            </h5>
+                            <span className="text-xs font-bold text-primary uppercase tracking-wider">Product Group</span>
+                          </div>
+
+                          <div className="flex items-end justify-between">
+                            <div>
+                              <p className="text-4xl font-black text-black dark:text-white group-hover:text-primary transition-colors">
+                                {product.count}
+                                <span className="text-sm font-bold text-gray-400 ml-1">UNITS</span>
+                              </p>
+                              <p className="text-sm font-semibold text-gray-500 mt-1">
+                                Value: <span className="text-black dark:text-white">{product.total_amount.toLocaleString()} PKR</span>
+                              </p>
+                            </div>
+                            <div className="text-right text-[10px] font-bold text-gray-400 space-y-0.5">
+                              <p>ADVANCE: {product.advance_amount.toLocaleString()}</p>
+                              <p>PLAN: {product.monthly_amount.toLocaleString()} × {product.months}</p>
+                            </div>
+                          </div>
+                          <div className="absolute -right-4 -bottom-4 h-20 w-20 rounded-full bg-primary/5 group-hover:bg-primary/10 transition-all"></div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="flex h-[500px] flex-col items-center justify-center rounded-xl border border-dashed border-stroke bg-gray-50 text-center dark:border-strokedark dark:bg-boxdark">
+                <div className="mb-6 rounded-full bg-white dark:bg-meta-4 p-8 shadow-sm">
+                  <svg className="h-16 w-16 text-primary/40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                </div>
+                <h3 className="mb-2 text-2xl font-bold text-black dark:text-white">Select a Rider</h3>
+                <p className="max-w-xs font-medium text-gray-500">
+                  Select a delivery personnel from the sidebar to manage their workload and verify pickups.
+                </p>
               </div>
             )}
           </div>
         </div>
+      ) : (
+        /* All Deliveries Tab - Tracking and Historical Data */
+        <div className="animate-in fade-in duration-500">
+          <DeliveryTable
+            data={allDeliveries}
+            loading={deliveriesLoading}
+            onMarkDelivered={(order) => {
+              setSelectedOrder(order);
+              setActionType('deliver');
+            }}
+            onMarkReturned={(order) => {
+              setSelectedOrder(order);
+              setActionType('return');
+            }}
+          />
 
-        {/* Right column – Details & OTP actions */}
-        <div className="lg:col-span-3">
-          {isLoading ? (
-            <div className="flex justify-center items-center h-96">
-              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-600"></div>
-            </div>
-          ) : selectedBoyId && boyDetails ? (
-            <div className="space-y-10">
-              {/* Profile header */}
-              <div className="flex flex-col sm:flex-row sm:items-center gap-6 pb-8 border-b border-gray-200 dark:border-gray-700">
-                {boyDetails.boy.profile_image && (
-                  <img
-                    src={boyDetails.boy.profile_image}
-                    alt={boyDetails.boy.name}
-                    className="w-24 h-24 rounded-full object-cover border-4 border-gray-200 dark:border-gray-700 shadow-sm"
-                  />
-                )}
-
-                <div>
-                  <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-                    {boyDetails.boy.name}
-                  </h2>
-                  <p className="text-gray-600 dark:text-gray-400">
-                    @{boyDetails.boy.username}
-                  </p>
-                  {boyDetails.boy.whatsapp && (
-                    <p className="mt-2 text-green-600 dark:text-green-400 font-medium">
-                      WhatsApp: {boyDetails.boy.whatsapp}
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              {/* Pending products */}
-              <section>
-                <h3 className="text-xl font-semibold mb-5 text-gray-800 dark:text-gray-200">
-                  Pending Products to Deliver
-                </h3>
-
-                {boyDetails.pending_products.length === 0 ? (
-                  <div className="bg-gray-50 dark:bg-gray-900/40 rounded-lg p-8 text-center text-gray-500 dark:text-gray-400">
-                    No pending products at this time
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {boyDetails.pending_products.map((product) => (
-                      <div
-                        key={product.product_name}
-                        className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow"
-                      >
-                        <h4 className="font-semibold text-lg mb-3 text-gray-900 dark:text-white">
-                          {product.product_name}
-                        </h4>
-                        <div className="text-4xl font-bold text-blue-700 dark:text-blue-400 mb-4">
-                          {product.count}×
-                        </div>
-                        <div className="space-y-2 text-sm">
-                          <p>
-                            <span className="text-gray-600 dark:text-gray-400">Total value:</span>{' '}
-                            <strong className="text-gray-900 dark:text-white">
-                              {product.total_amount.toLocaleString()} PKR
-                            </strong>
-                          </p>
-                          <p>
-                            Advance:{' '}
-                            <strong>{product.advance_amount.toLocaleString()} PKR</strong>
-                          </p>
-                          <p>
-                            Monthly:{' '}
-                            <strong>
-                              {product.monthly_amount.toLocaleString()} PKR × {product.months} mo
-                            </strong>
-                          </p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </section>
-
-              {/* OTP Section */}
-              <section className="bg-gray-50 dark:bg-gray-900/40 rounded-xl p-7 border border-gray-200 dark:border-gray-700">
-                <h3 className="text-xl font-semibold mb-6 text-gray-800 dark:text-gray-200">
-                  Pickup Confirmation (OTP)
-                </h3>
-
-                <div className="flex flex-col sm:flex-row gap-6">
-                  <button
-                    onClick={handleGenerateOtp}
-                    disabled={isActionLoading}
-                    className="bg-blue-600 hover:bg-blue-700 text-white font-medium px-8 py-3.5 rounded-lg transition disabled:opacity-60 disabled:cursor-not-allowed flex-1 sm:flex-none"
-                  >
-                    {isActionLoading ? 'Sending...' : 'Generate & Send OTP'}
-                  </button>
-
-                  <div className="flex-1">
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Enter OTP received by delivery personnel
-                    </label>
-                    <div className="flex gap-4">
-                      <input
-                        type="text"
-                        maxLength={6}
-                        value={otpInput}
-                        onChange={(e) => setOtpInput(e.target.value.replace(/\D/g, ''))}
-                        placeholder="██████"
-                        className="border border-gray-300 dark:border-gray-600 rounded-lg px-5 py-3 text-center text-2xl tracking-widest font-mono w-full sm:w-48 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                      <button
-                        onClick={handleVerifyOtp}
-                        disabled={isActionLoading || otpInput.length !== 6}
-                        className="bg-green-600 hover:bg-green-700 text-white font-medium px-10 py-3.5 rounded-lg transition disabled:opacity-60 disabled:cursor-not-allowed flex-1 sm:flex-none"
-                      >
-                        {isActionLoading ? 'Verifying...' : 'Verify & Confirm Pickup'}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </section>
-            </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center h-96 text-gray-500 dark:text-gray-400">
-              <p className="text-xl mb-2">Select a delivery personnel</p>
-              <p>from the list on the left to view details and manage pickup</p>
-            </div>
-          )}
+          <DeliveryActionsModal
+            isOpen={!!selectedOrder}
+            onClose={() => {
+              setSelectedOrder(null);
+              setActionType(null);
+            }}
+            orderId={selectedOrder?.id || null}
+            actionType={actionType}
+            onSuccess={() => {
+              fetchAllDeliveries();
+            }}
+          />
         </div>
-      </div>
+      )}
     </div>
   );
 }
+
