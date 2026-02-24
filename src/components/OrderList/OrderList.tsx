@@ -19,6 +19,7 @@ import { Modal } from '../Modal/Modal'
 import { cn } from '@/lib/utils'
 import { createPortal } from 'react-dom'
 import { useRef } from 'react'
+import { useRouter } from 'next/navigation'
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL
 
@@ -33,9 +34,12 @@ interface Order {
   whatsapp_number: string
   address: string
   city: string | null
-  area: string | null
+  area: string;
+  zone: string | null;
+  block: string | null;
+  street: string | null;
+  house_no: string | null;
   product_name: string
-  total_amount: number
   advance_amount: number
   monthly_amount: number
   months: number
@@ -44,6 +48,21 @@ interface Order {
   created_at: string
   created_by: { username: string } | null
   assigned_to: { username: string } | null
+  cancelled_reason?: string | null
+  cancelled_at?: string | null
+  productHistories?: {
+    id: number
+    previous_product: string
+    current_product: string
+    changed_at: string
+    changed_by: { username: string, full_name: string }
+  }[]
+}
+
+interface OrderListProps {
+  forcedStatus?: string
+  hideActions?: boolean
+  hideSelection?: boolean
 }
 
 interface User {
@@ -64,7 +83,8 @@ interface PaginationInfo {
 // ─────────────────────────────────────────────────────────────────────────────
 // Main Component
 // ─────────────────────────────────────────────────────────────────────────────
-const OrderList = () => {
+const OrderList = ({ forcedStatus, hideActions, hideSelection }: OrderListProps) => {
+  const router = useRouter()
   const [orders, setOrders] = useState<Order[]>([])
   const [pagination, setPagination] = useState<PaginationInfo>({
     page: 1,
@@ -91,6 +111,17 @@ const OrderList = () => {
   const [selectedVerifierId, setSelectedVerifierId] = useState<number | null>(null)
   const [verifiers, setVerifiers] = useState<User[]>([])
 
+  // Filtration
+  const [dateRange, setDateRange] = useState('All')
+  const [startDate, setStartDate] = useState('')
+  const [endDate, setEndDate] = useState('')
+
+  // Action Modals
+  const [editModalOpen, setEditModalOpen] = useState(false)
+  const [cancelModalOpen, setCancelModalOpen] = useState(false)
+  const [cancelReason, setCancelReason] = useState('')
+  const [newProductName, setNewProductName] = useState('')
+
   // ── Data Fetching ──────────────────────────────────────────────────────────
   const fetchOrders = async () => {
     setLoading(true)
@@ -105,6 +136,24 @@ const OrderList = () => {
         sortBy: sorting[0]?.id || 'created_at',
         sortDir: sorting[0]?.desc ? 'desc' : 'asc',
       })
+
+      if (forcedStatus) {
+        params.append('status', forcedStatus)
+      } else {
+        // Default for Order List page: new and pending
+        const statusFilter = columnFilters.find(f => f.id === 'status')
+        if (!statusFilter) {
+          params.append('status', 'new,pending')
+        }
+      }
+
+      if (dateRange !== 'All') {
+        params.append('dateRange', dateRange)
+        if (dateRange === 'Custom Range' && startDate && endDate) {
+          params.append('startDate', startDate)
+          params.append('endDate', endDate)
+        }
+      }
 
       columnFilters.forEach((f) => {
         if (f.id && f.value) params.append(f.id, String(f.value))
@@ -145,7 +194,7 @@ const OrderList = () => {
 
   useEffect(() => {
     fetchOrders()
-  }, [pagination.page, pagination.limit, globalFilter, columnFilters, sorting])
+  }, [pagination.page, pagination.limit, globalFilter, columnFilters, sorting, dateRange, startDate, endDate])
 
   useEffect(() => {
     fetchVerifiers()
@@ -252,6 +301,74 @@ const OrderList = () => {
     }
   }
 
+  const handleCancelClick = (order: Order) => {
+    setSelectedOrder(order)
+    setCancelReason('')
+    setCancelModalOpen(true)
+  }
+
+  const confirmCancel = async () => {
+    if (!selectedOrder || !cancelReason.trim()) return
+    setIsSubmitting(true)
+    try {
+      const token = Cookies.get('auth_token')
+      const res = await fetch(`${BACKEND_URL}/api/orders/${selectedOrder.id}/cancel`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ reason: cancelReason }),
+      })
+
+      if (!res.ok) throw new Error('Cancellation failed')
+      await fetchOrders()
+      setCancelModalOpen(false)
+      setSelectedOrder(null)
+    } catch (err) {
+      console.error('Cancel error:', err)
+      alert('Cancellation failed')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const handleEditClick = (order: Order) => {
+    setSelectedOrder(order)
+    setNewProductName(order.product_name)
+    setEditModalOpen(true)
+  }
+
+  const confirmEdit = async () => {
+    if (!selectedOrder || !newProductName.trim()) return
+    setIsSubmitting(true)
+    try {
+      const token = Cookies.get('auth_token')
+      const res = await fetch(`${BACKEND_URL}/api/orders/${selectedOrder.id}/update-item`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ product_name: newProductName }),
+      })
+
+      if (!res.ok) throw new Error('Update failed')
+      await fetchOrders()
+      setEditModalOpen(false)
+      setSelectedOrder(null)
+    } catch (err) {
+      console.error('Update error:', err)
+      alert('Update failed')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const handleViewClick = (order: Order) => {
+    router.push(`/orders/${order.id}`)
+  }
+
   const confirmBulkUnassign = async () => {
     const ids = table.getSelectedRowModel().rows.map((r) => r.original.id)
     setIsSubmitting(true)
@@ -281,16 +398,16 @@ const OrderList = () => {
 
   // ── Columns ────────────────────────────────────────────────────────────────
   const columns: ColumnDef<Order>[] = [
-    {
+    ...(hideSelection ? [] : [{
       id: 'select',
-      header: ({ table }) => (
+      header: ({ table }: { table: any }) => (
         <input
           type="checkbox"
           checked={table.getIsAllPageRowsSelected()}
           onChange={table.getToggleAllPageRowsSelectedHandler()}
         />
       ),
-      cell: ({ row }) => (
+      cell: ({ row }: { row: any }) => (
         <input
           type="checkbox"
           checked={row.getIsSelected()}
@@ -300,7 +417,7 @@ const OrderList = () => {
       ),
       enableSorting: false,
       enableColumnFilter: false,
-    },
+    }]),
     { accessorKey: 'order_ref', header: 'Order Ref', enableColumnFilter: true },
     { accessorKey: 'token_number', header: 'Token Number', enableColumnFilter: true },
     { accessorKey: 'customer_name', header: 'Customer Name', enableColumnFilter: true },
@@ -309,11 +426,66 @@ const OrderList = () => {
     { accessorKey: 'area', header: 'Area', enableColumnFilter: true },
     { accessorKey: 'product_name', header: 'Product', enableColumnFilter: true },
     {
-      accessorKey: 'total_amount',
-      header: 'Total Amount',
+      accessorKey: 'advance_amount',
+      header: 'Advance Amount',
       cell: ({ getValue }) => `Rs. ${Number(getValue()).toLocaleString()}`,
     },
-    { accessorKey: 'status', header: 'Status', enableColumnFilter: true },
+    {
+      accessorKey: 'status',
+      header: 'Status',
+      enableColumnFilter: true,
+      cell: ({ row }) => {
+        const status = row.original.status?.toLowerCase() || '';
+
+        let label = '';
+        let className = 'inline-flex px-2.5 py-1 rounded-full text-xs font-medium';
+
+        switch (status) {
+          case 'new':
+            label = 'New';
+            className += ' bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300';
+            break;
+
+          case 'pending':
+            label = 'Pending';
+            className += ' bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-300';
+            break;
+
+          case 'in_progress':
+          case 'in-progress':
+            label = 'In Progress';
+            className += ' bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300';
+            break;
+
+          case 'picked':
+            label = 'Picked';
+            className += ' bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300';
+            break;
+
+          case 'cancelled':
+            label = 'Cancelled';
+            className += ' bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300';
+            break;
+
+          case 'completed':
+            label = 'Completed';
+            className += ' bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300';
+            break;
+
+          case 'delivered':
+            label = 'Delivered';
+            className += ' bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300';
+            break;
+
+          default:
+            label = status ? status.charAt(0).toUpperCase() + status.slice(1) : 'Unknown';
+            className += ' bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
+            break;
+        }
+
+        return <span className={className}>{label}</span>;
+      },
+    },
     {
       id: 'created_by',
       accessorFn: (row) => row.created_by?.username || '',
@@ -427,30 +599,70 @@ const OrderList = () => {
                 >
                   <ul className="overflow-hidden text-sm font-medium">
 
-                    {order.assigned_to ? (
-                      <li>
-                        <button
-                          onClick={() => {
-                            handleUnassignClick(order)
-                            setIsOpen(false)
-                          }}
-                          className="block w-full px-4 py-2.5 text-left hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/30 dark:hover:text-red-400"
-                        >
-                          Unassign
-                        </button>
-                      </li>
-                    ) : (
-                      <li>
-                        <button
-                          onClick={() => {
-                            handleAssignClick(order)
-                            setIsOpen(false)
-                          }}
-                          className="block w-full px-4 py-2.5 text-left hover:bg-[#F5F7FD] hover:text-[#ff3d3d] dark:hover:bg-dark-3"
-                        >
-                          Assign
-                        </button>
-                      </li>
+                    <li>
+                      <button
+                        onClick={() => {
+                          handleViewClick(order)
+                          setIsOpen(false)
+                        }}
+                        className="block w-full px-4 py-2.5 text-left hover:bg-[#F5F7FD] hover:text-[#ff3d3d] dark:hover:bg-dark-3"
+                      >
+                        View Details
+                      </button>
+                    </li>
+
+                    <li>
+                      <button
+                        onClick={() => {
+                          handleEditClick(order)
+                          setIsOpen(false)
+                        }}
+                        className="block w-full px-4 py-2.5 text-left hover:bg-[#F5F7FD] hover:text-[#ff3d3d] dark:hover:bg-dark-3"
+                      >
+                        Edit Item
+                      </button>
+                    </li>
+
+                    <li>
+                      <button
+                        onClick={() => {
+                          handleCancelClick(order)
+                          setIsOpen(false)
+                        }}
+                        className="block w-full px-4 py-2.5 text-left hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/30 dark:hover:text-red-400"
+                      >
+                        Cancel Order
+                      </button>
+                    </li>
+
+                    {!hideActions && (
+                      <>
+                        {order.assigned_to ? (
+                          <li>
+                            <button
+                              onClick={() => {
+                                handleUnassignClick(order)
+                                setIsOpen(false)
+                              }}
+                              className="block w-full px-4 py-2.5 text-left hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/30 dark:hover:text-red-400"
+                            >
+                              Unassign
+                            </button>
+                          </li>
+                        ) : (
+                          <li>
+                            <button
+                              onClick={() => {
+                                handleAssignClick(order)
+                                setIsOpen(false)
+                              }}
+                              className="block w-full px-4 py-2.5 text-left hover:bg-[#F5F7FD] hover:text-[#ff3d3d] dark:hover:bg-dark-3"
+                            >
+                              Assign
+                            </button>
+                          </li>
+                        )}
+                      </>
                     )}
 
                   </ul>
@@ -524,24 +736,62 @@ const OrderList = () => {
           </button>
         </div>
 
-        <div className="flex items-center font-medium">
-          <p className="pl-2 font-medium text-dark dark:text-current">Per Page:</p>
-          <select
-            value={pagination.limit}
-            onChange={(e) => setPagination((p) => ({ ...p, limit: Number(e.target.value), page: 1 }))}
-            className="bg-transparent pl-2.5"
-          >
-            {[5, 10, 15, 20, 50].map((size) => (
-              <option key={size} value={size}>
-                {size}
-              </option>
-            ))}
-          </select>
+        <div className="flex items-center font-medium gap-4">
+          <div className="flex items-center">
+            <p className="pr-2 text-dark dark:text-current">Date Range:</p>
+            <select
+              value={dateRange}
+              onChange={(e) => {
+                setDateRange(e.target.value)
+                setPagination((p) => ({ ...p, page: 1 }))
+              }}
+              className="rounded-lg border border-stroke bg-transparent px-3 py-1.5 outline-none focus:border-[#ff3d3d] dark:border-dark-3"
+            >
+              {['All', 'Day', 'Week', 'Month', 'Quarter', 'Year', 'Custom Range'].map((r) => (
+                <option key={r} value={r} className='dark:bg-dark-2'>
+                  {r}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {dateRange === 'Custom Range' && (
+            <div className="flex items-center gap-2">
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="rounded-lg border border-stroke bg-transparent px-2 py-1 outline-none focus:border-[#ff3d3d] dark:border-dark-3"
+              />
+              <span>to</span>
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="rounded-lg border border-stroke bg-transparent px-2 py-1 outline-none focus:border-[#ff3d3d] dark:border-dark-3"
+              />
+            </div>
+          )}
+
+          <div className="flex items-center">
+            <p className="pl-2 font-medium text-dark dark:text-current">Per Page:</p>
+            <select
+              value={pagination.limit}
+              onChange={(e) => setPagination((p) => ({ ...p, limit: Number(e.target.value), page: 1 }))}
+              className="bg-transparent pl-2.5"
+            >
+              {[5, 10, 15, 20, 50].map((size) => (
+                <option key={size} value={size}>
+                  {size}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
 
       {/* Bulk actions */}
-      {selectedCount > 0 && (
+      {selectedCount > 0 && !hideSelection && (
         <div className="px-7.5 pb-4 flex flex-wrap gap-4">
           <button
             onClick={handleBulkAssign}
@@ -675,6 +925,95 @@ const OrderList = () => {
       </div>
 
       {/* ── Modals ──────────────────────────────────────────────────────────────── */}
+
+      {/* Edit Product Modal */}
+      <Modal
+        open={editModalOpen}
+        onClose={() => setEditModalOpen(false)}
+        className="max-w-md rounded-2xl bg-white p-8 shadow-xl dark:bg-gray-800"
+      >
+        <h2 className="mb-4 text-xl font-semibold text-dark dark:text-white">Edit Product Name</h2>
+        <p className="mb-6 text-gray-600 dark:text-gray-300">
+          Changing product name for order <strong>{selectedOrder?.order_ref}</strong>. This action will be logged in history.
+        </p>
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium mb-1 dark:text-gray-300">Current Product Name:</label>
+            <input
+              type="text"
+              readOnly
+              value={selectedOrder?.product_name || ''}
+              className="w-full rounded-lg border border-stroke bg-gray-100 px-4 py-2.5 outline-none dark:border-dark-3 dark:bg-dark-3 dark:text-gray-400"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1 dark:text-gray-300">New Product Name:</label>
+            <input
+              type="text"
+              value={newProductName}
+              onChange={(e) => setNewProductName(e.target.value)}
+              className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2.5 outline-none focus:border-[#ff3d3d] dark:border-dark-3"
+              placeholder="Enter new product name"
+            />
+          </div>
+        </div>
+        <div className="mt-6 flex justify-end gap-4">
+          <button
+            onClick={() => setEditModalOpen(false)}
+            className="rounded border border-stroke px-6 py-2.5 text-dark hover:bg-gray-100 dark:border-dark-3 dark:text-white dark:hover:bg-dark-3 disabled:opacity-50"
+            disabled={isSubmitting}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={confirmEdit}
+            disabled={!newProductName.trim() || newProductName === selectedOrder?.product_name || isSubmitting}
+            className="rounded bg-blue-600 px-6 py-2.5 text-white hover:bg-blue-700 disabled:opacity-50"
+          >
+            {isSubmitting ? 'Updating...' : 'Update Product'}
+          </button>
+        </div>
+      </Modal>
+
+      {/* Cancel Order Modal */}
+      <Modal
+        open={cancelModalOpen}
+        onClose={() => setCancelModalOpen(false)}
+        className="max-w-md rounded-2xl bg-white p-8 shadow-xl dark:bg-gray-800"
+      >
+        <h2 className="mb-4 text-xl font-semibold text-dark dark:text-white">Cancel Order</h2>
+        <p className="mb-4 text-gray-600 dark:text-gray-300">
+          Are you sure you want to cancel order <strong>{selectedOrder?.order_ref}</strong>?
+        </p>
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium mb-1 dark:text-gray-300">Reason for Cancellation (Mandatory):</label>
+            <textarea
+              value={cancelReason}
+              onChange={(e) => setCancelReason(e.target.value)}
+              className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2.5 outline-none focus:border-[#ff3d3d] dark:border-dark-3"
+              rows={3}
+              placeholder="e.g., Customer not responding, Incorrect information..."
+            ></textarea>
+          </div>
+        </div>
+        <div className="mt-6 flex justify-end gap-4">
+          <button
+            onClick={() => setCancelModalOpen(false)}
+            className="rounded border border-stroke px-6 py-2.5 text-dark hover:bg-gray-100 dark:border-dark-3 dark:text-white dark:hover:bg-dark-3 disabled:opacity-50"
+            disabled={isSubmitting}
+          >
+            Go Back
+          </button>
+          <button
+            onClick={confirmCancel}
+            disabled={!cancelReason.trim() || isSubmitting}
+            className="rounded bg-red-600 px-6 py-2.5 text-white hover:bg-red-700 disabled:opacity-50"
+          >
+            {isSubmitting ? 'Cancelling...' : 'Confirm Cancellation'}
+          </button>
+        </div>
+      </Modal>
 
       {/* Single Assign Modal */}
       <Modal

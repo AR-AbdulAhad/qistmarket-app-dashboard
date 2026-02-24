@@ -11,7 +11,7 @@ import {
   useReactTable,
 } from '@tanstack/react-table'
 import Cookies from 'js-cookie'
-import { SearchIcon, PointerUp, ChevronUpIcon } from '@/assets/icons'
+import { SearchIcon, PointerUp, ChevronUpIcon, ChevronLeft, ChevronRight } from '@/assets/icons'
 import ColumnFilter from '../DataTables/ColumnFilter'
 import { Modal } from '../Modal/Modal'
 import { cn } from '@/lib/utils'
@@ -81,6 +81,19 @@ const AssignedVerifications = () => {
   const [globalFilter, setGlobalFilter] = useState('')
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
   const [sorting, setSorting] = useState<SortingState>([{ id: 'created_at', desc: true }])
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 10,
+    total: 0,
+    totalPages: 1,
+    hasNext: false,
+    hasPrev: false,
+  })
+
+  // Filtration
+  const [dateRange, setDateRange] = useState('All')
+  const [startDate, setStartDate] = useState('')
+  const [endDate, setEndDate] = useState('')
   const [loading, setLoading] = useState(false)
 
   // Modals (remarks only, view modal removed)
@@ -97,7 +110,27 @@ const AssignedVerifications = () => {
       const token = Cookies.get('auth_token')
       if (!token) return
 
-      const res = await fetch(`${BACKEND_URL}/api/orders/verification-pending`, {  // ← adjust endpoint path if needed
+      const params = new URLSearchParams({
+        page: pagination.page.toString(),
+        limit: pagination.limit.toString(),
+        search: globalFilter.trim(),
+        sortBy: sorting[0]?.id || 'created_at',
+        sortDir: sorting[0]?.desc ? 'desc' : 'asc',
+      })
+
+      if (dateRange !== 'All') {
+        params.append('dateRange', dateRange)
+        if (dateRange === 'Custom Range' && startDate && endDate) {
+          params.append('startDate', startDate)
+          params.append('endDate', endDate)
+        }
+      }
+
+      columnFilters.forEach((f) => {
+        if (f.id && f.value) params.append(f.id, String(f.value))
+      })
+
+      const res = await fetch(`${BACKEND_URL}/api/orders/verification-pending?${params}`, {
         headers: { Authorization: `Bearer ${token}` },
       })
 
@@ -106,6 +139,7 @@ const AssignedVerifications = () => {
 
       if (json.success && json.data?.orders) {
         setOrders(json.data.orders)
+        setPagination(json.data.pagination)
       }
     } catch (err) {
       console.error('Fetch error:', err)
@@ -116,14 +150,9 @@ const AssignedVerifications = () => {
 
   useEffect(() => {
     fetchAssignedVerifications()
-  }, [])
+  }, [pagination.page, pagination.limit, globalFilter, columnFilters, sorting, dateRange, startDate, endDate])
 
   // ── Handlers ───────────────────────────────────────────────────────────────
-  const handleEditRemarks = (order: OrderWithVerification) => {
-    setSelectedOrder(order)
-    setAdminRemarks(order.verification?.admin_remarks || '')
-    setRemarksModalOpen(true)
-  }
 
   const handleView = (order: OrderWithVerification) => {
     router.push(`/verifications/${order.id}`)
@@ -184,35 +213,35 @@ const AssignedVerifications = () => {
       enableColumnFilter: true,
     },
     {
-      accessorKey: 'total_amount',
-      header: 'Total Amount',
+      accessorKey: 'advance_amount',
+      header: 'Advance Amount',
       cell: ({ getValue }) => `Rs. ${Number(getValue()).toLocaleString()}`,
     },
     {
-      id: 'officer',
-      header: 'Verification Officer',
-      accessorFn: (row) => row.verification?.verification_officer?.full_name || row.verification?.verification_officer?.username || '—',
-      enableColumnFilter: true,
-    },
-    {
-      accessorKey: 'verification.status',
-      header: 'Verification Status',
+      accessorKey: 'status',
+      header: 'Status',
       enableColumnFilter: true,
       cell: ({ row }) => {
-        const status = row.original.verification?.status
+        const status = row.original.status
         return (
           <span
             className={cn(
               'inline-flex px-2.5 py-1 rounded-full text-xs font-medium',
               status === 'completed'
                 ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300'
-                : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300'
+                : 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300'
             )}
           >
-            {status === 'completed' ? 'Completed' : 'In Progress'}
+            {status === 'completed' ? 'Completed' : 'Cancelled'}
           </span>
         )
       },
+    },
+    {
+      id: 'officer',
+      header: 'Verification Officer',
+      accessorFn: (row) => row.verification?.verification_officer?.full_name || row.verification?.verification_officer?.username || '—',
+      enableColumnFilter: true,
     },
     {
       id: 'approved',
@@ -350,9 +379,8 @@ const AssignedVerifications = () => {
             >
               <span>Actions</span>
               <ChevronUpIcon
-                className={`size-4 transition-transform ${
-                  isOpen ? 'rotate-0' : 'rotate-180'
-                }`}
+                className={`size-4 transition-transform ${isOpen ? 'rotate-0' : 'rotate-180'
+                  }`}
               />
             </button>
 
@@ -373,26 +401,12 @@ const AssignedVerifications = () => {
                     <li>
                       <button
                         onClick={() => {
-                          handleEditRemarks(order)
-                          setIsOpen(false)
-                        }}
-                        className="block w-full px-4 py-2.5 text-left hover:bg-[#F5F7FD] hover:text-[#ff3d3d] dark:hover:bg-dark-3"
-                      >
-                        {order.verification?.admin_remarks
-                          ? 'Edit Remarks'
-                          : 'Add Remarks'}
-                      </button>
-                    </li>
-
-                    <li>
-                      <button
-                        onClick={() => {
                           handleView(order)
                           setIsOpen(false)
                         }}
                         className="block w-full px-4 py-2.5 text-left hover:bg-[#F5F7FD] hover:text-[#ff3d3d] dark:hover:bg-dark-3"
                       >
-                        View
+                        View for Verification
                       </button>
                     </li>
 
@@ -426,18 +440,74 @@ const AssignedVerifications = () => {
   return (
     <section className="data-table-common rounded-[10px] bg-white shadow-1 dark:bg-gray-dark dark:shadow-card">
       {/* Top bar */}
-      <div className="flex justify-between px-7.5 py-4.5">
+      <div className="flex flex-col gap-4 px-7.5 py-4.5 lg:flex-row lg:items-center lg:justify-between">
         <div className="relative z-20 w-full max-w-[500px]">
           <input
             type="text"
             value={globalFilter ?? ''}
-            onChange={(e) => setGlobalFilter(e.target.value)}
-            className="w-full rounded-lg border border-stroke bg-transparent px-5 py-2.5 outline-none focus:border-[#ff3d3d]"
+            onChange={(e) => {
+              setGlobalFilter(e.target.value)
+              setPagination(p => ({ ...p, page: 1 }))
+            }}
+            className="w-full rounded-lg border border-stroke bg-transparent px-5 py-2.5 outline-none focus:border-[#ff3d3d] dark:border-dark-3"
             placeholder="Search order ref, customer, officer, remarks..."
           />
           <button className="absolute right-0 top-0 flex h-11.5 w-11.5 items-center justify-center rounded-r-md bg-[#ff3d3d] text-white">
             <SearchIcon className="size-4.5" />
           </button>
+        </div>
+
+        <div className="flex flex-wrap items-center font-medium gap-4">
+          <div className="flex items-center">
+            <p className="pr-2 text-dark dark:text-current">Date Range:</p>
+            <select
+              value={dateRange}
+              onChange={(e) => {
+                setDateRange(e.target.value)
+                setPagination((p) => ({ ...p, page: 1 }))
+              }}
+              className="rounded-lg border border-stroke bg-transparent px-3 py-1.5 outline-none focus:border-[#ff3d3d] dark:border-dark-3 font-medium"
+            >
+              {['All', 'Day', 'Week', 'Month', 'Quarter', 'Year', 'Custom Range'].map((r) => (
+                <option key={r} value={r} className='dark:bg-dark-2'>
+                  {r}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {dateRange === 'Custom Range' && (
+            <div className="flex items-center gap-2">
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="rounded-lg border border-stroke bg-transparent px-2 py-1 outline-none focus:border-[#ff3d3d] dark:border-dark-3"
+              />
+              <span>to</span>
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="rounded-lg border border-stroke bg-transparent px-2 py-1 outline-none focus:border-[#ff3d3d] dark:border-dark-3"
+              />
+            </div>
+          )}
+
+          <div className="flex items-center">
+            <p className="pl-2 font-medium text-dark dark:text-current">Per Page:</p>
+            <select
+              value={pagination.limit}
+              onChange={(e) => setPagination((p) => ({ ...p, limit: Number(e.target.value), page: 1 }))}
+              className="bg-transparent pl-2.5 outline-none"
+            >
+              {[5, 10, 15, 20, 50].map((size) => (
+                <option key={size} value={size}>
+                  {size}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
 
@@ -514,6 +584,44 @@ const AssignedVerifications = () => {
             )}
           </tbody>
         </table>
+      </div>
+
+      {/* Pagination */}
+      <div className="flex justify-between items-center px-7.5 py-7">
+        <div className="flex items-center">
+          <button
+            className="flex items-center justify-center rounded-[3px] p-[7px] hover:bg-[#ff3d3d] hover:text-white disabled:pointer-events-none"
+            onClick={() => setPagination((p) => ({ ...p, page: Math.max(1, p.page - 1) }))}
+            disabled={pagination.page === 1 || loading}
+          >
+            <ChevronLeft width={18} height={18} />
+          </button>
+
+          {Array.from({ length: Math.min(pagination.totalPages, 10) }, (_, i) => i + 1).map((pageNum) => (
+            <button
+              key={pageNum}
+              onClick={() => setPagination((p) => ({ ...p, page: pageNum }))}
+              className={cn(
+                'mx-1 flex items-center justify-center rounded-[3px] p-1.5 px-[15px] font-medium hover:bg-opacity-90 hover:bg-[#ff3d3d] hover:text-white',
+                pagination.page === pageNum && 'bg-[#ff3d3d] text-white',
+                pagination.page !== pageNum && 'bg-gray-2 dark:bg-dark-3 dark:text-white text-dark'
+              )}
+            >
+              {pageNum}
+            </button>
+          ))}
+
+          <button
+            className="flex items-center justify-center rounded-[3px] p-[7px] hover:bg-[#ff3d3d] hover:text-white disabled:pointer-events-none"
+            onClick={() => setPagination((p) => ({ ...p, page: Math.min(pagination.totalPages, p.page + 1) }))}
+            disabled={pagination.page === pagination.totalPages || loading}
+          >
+            <ChevronRight width={18} height={18} />
+          </button>
+        </div>
+        <p className="font-medium dark:text-white">
+          Showing page {pagination.page} of {pagination.totalPages} ({pagination.total} records)
+        </p>
       </div>
 
       {/* Remarks Modal */}

@@ -16,6 +16,30 @@ export const NAV_DATA = [
             title: "Order List",
             url: "/orders-list",
           },
+          {
+            title: "Pending Orders",
+            url: "/pending-orders",
+          },
+          {
+            title: "In Progress Orders",
+            url: "/in-progress-orders",
+          },
+          {
+            title: "Cancelled Orders",
+            url: "/cancelled-orders",
+          },
+          {
+            title: "Completed Orders",
+            url: "/completed-orders",
+          },
+          {
+            title: "Delivered Orders",
+            url: "/delivered-orders",
+          },
+          {
+            title: "Picked Orders",
+            url: "/picked-orders",
+          },
         ],
       },
       {
@@ -29,14 +53,28 @@ export const NAV_DATA = [
         items: [],
       },
       {
-        title: "Delivery Management",
+        title: "Delivery Officers",
         icon: Icons.HomeIcon,
         items: [],
       },
       {
         title: "Verification Officers",
         icon: Icons.HomeIcon,
-        url: "/verification-officers",
+        items: [
+          {
+            title: "Officer List",
+            url: "/verification-officers",
+          },
+          {
+            title: "Area Assignments",
+            url: "/admin/officer-assignments",
+          },
+        ],
+      },
+      {
+        title: "Notifications",
+        icon: Icons.HomeIcon,
+        url: "/notifications",
         items: [],
       },
       {

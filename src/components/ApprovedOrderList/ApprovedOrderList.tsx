@@ -13,6 +13,7 @@ import {
   RowSelectionState,
 } from '@tanstack/react-table'
 import Cookies from 'js-cookie'
+import { useRouter } from 'next/navigation'
 import { ChevronLeft, ChevronRight, SearchIcon, PointerUp, ChevronUpIcon } from '@/assets/icons'
 import ColumnFilter from '../DataTables/ColumnFilter'
 import { Modal } from '../Modal/Modal'
@@ -34,7 +35,11 @@ interface Order {
   whatsapp_number: string
   address: string
   city: string | null
-  area: string | null
+  area: string;
+  zone: string | null;
+  block: string | null;
+  street: string | null;
+  house_no: string | null;
   product_name: string
   total_amount: number
   advance_amount: number
@@ -83,6 +88,12 @@ const ApprovedOrderList = () => {
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
   const [loading, setLoading] = useState(false)
 
+  const [dateRange, setDateRange] = useState('All')
+  const [startDate, setStartDate] = useState('')
+  const [endDate, setEndDate] = useState('')
+
+  const router = useRouter()
+
   // Modals
   const [assignModalOpen, setAssignModalOpen] = useState(false)
   const [bulkAssignModalOpen, setBulkAssignModalOpen] = useState(false)
@@ -107,6 +118,14 @@ const ApprovedOrderList = () => {
         sortBy: sorting[0]?.id || 'created_at',
         sortDir: sorting[0]?.desc ? 'desc' : 'asc',
       })
+
+      if (dateRange !== 'All') {
+        params.append('dateRange', dateRange)
+        if (dateRange === 'Custom Range' && startDate && endDate) {
+          params.append('startDate', startDate)
+          params.append('endDate', endDate)
+        }
+      }
 
       columnFilters.forEach((f) => {
         if (f.id && f.value) params.append(f.id, String(f.value))
@@ -151,7 +170,7 @@ const ApprovedOrderList = () => {
 
   useEffect(() => {
     fetchApprovedOrders()
-  }, [pagination.page, pagination.limit, globalFilter, columnFilters, sorting])
+  }, [pagination.page, pagination.limit, globalFilter, columnFilters, sorting, dateRange, startDate, endDate])
 
   useEffect(() => {
     fetchDeliveryOfficers()
@@ -410,9 +429,8 @@ const ApprovedOrderList = () => {
             >
               <span>Actions</span>
               <svg
-                className={`size-4 transition-transform ${
-                  isOpen ? "rotate-0" : "rotate-180"
-                }`}
+                className={`size-4 transition-transform ${isOpen ? "rotate-0" : "rotate-180"
+                  }`}
                 viewBox="0 0 20 20"
                 fill="currentColor"
               >
@@ -459,6 +477,18 @@ const ApprovedOrderList = () => {
                         </button>
                       </li>
                     )}
+
+                    <li>
+                      <button
+                        onClick={() => {
+                          router.push(`/orders/${order.id}`);
+                          setIsOpen(false);
+                        }}
+                        className="block w-full px-4 py-2.5 text-left hover:bg-[#F5F7FD] hover:text-[#ff3d3d] dark:hover:bg-dark-3"
+                      >
+                        View Details
+                      </button>
+                    </li>
 
                   </ul>
                 </div>,
@@ -526,24 +556,62 @@ const ApprovedOrderList = () => {
             className="w-full rounded-lg border border-stroke bg-transparent px-5 py-2.5 outline-none focus:border-[#ff3d3d]"
             placeholder="Search approved orders..."
           />
-          <button className="absolute right-0 top-0 flex h-11.5 w-11.5 items-center justify-center rounded-r-md bg-[#ff3d3d] text-white">
+          <button className="absolute right-0 top-0 flex h-11.5 w-11.5 items-center justify-center rounded-r-md bg-[#ff3d3d] text-white font-medium">
             <SearchIcon className="size-4.5" />
           </button>
         </div>
 
-        <div className="flex items-center font-medium">
-          <p className="pl-2 font-medium text-dark dark:text-current">Per Page:</p>
-          <select
-            value={pagination.limit}
-            onChange={(e) => setPagination((p) => ({ ...p, limit: Number(e.target.value), page: 1 }))}
-            className="bg-transparent pl-2.5"
-          >
-            {[5, 10, 15, 20, 50].map((size) => (
-              <option key={size} value={size}>
-                {size}
-              </option>
-            ))}
-          </select>
+        <div className="flex flex-wrap items-center font-medium gap-4">
+          <div className="flex items-center">
+            <p className="pr-2 text-dark dark:text-current">Date Range:</p>
+            <select
+              value={dateRange}
+              onChange={(e) => {
+                setDateRange(e.target.value)
+                setPagination((p) => ({ ...p, page: 1 }))
+              }}
+              className="rounded-lg border border-stroke bg-transparent px-3 py-1.5 outline-none focus:border-[#ff3d3d] dark:border-dark-3 font-medium"
+            >
+              {['All', 'Day', 'Week', 'Month', 'Quarter', 'Year', 'Custom Range'].map((r) => (
+                <option key={r} value={r} className='dark:bg-dark-2'>
+                  {r}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {dateRange === 'Custom Range' && (
+            <div className="flex items-center gap-2">
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="rounded-lg border border-stroke bg-transparent px-2 py-1 outline-none focus:border-[#ff3d3d] dark:border-dark-3"
+              />
+              <span>to</span>
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="rounded-lg border border-stroke bg-transparent px-2 py-1 outline-none focus:border-[#ff3d3d] dark:border-dark-3"
+              />
+            </div>
+          )}
+
+          <div className="flex items-center">
+            <p className="pl-2 font-medium text-dark dark:text-current">Per Page:</p>
+            <select
+              value={pagination.limit}
+              onChange={(e) => setPagination((p) => ({ ...p, limit: Number(e.target.value), page: 1 }))}
+              className="bg-transparent pl-2.5 outline-none"
+            >
+              {[5, 10, 15, 20, 50].map((size) => (
+                <option key={size} value={size}>
+                  {size}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
 

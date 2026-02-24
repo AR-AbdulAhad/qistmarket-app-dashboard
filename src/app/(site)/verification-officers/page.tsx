@@ -260,6 +260,8 @@ export default function VerificationOfficersPage() {
         activeVerifications: officers.filter((o) => o.current_verification).length,
     };
 
+    console.log(officerStats)
+
     return (
         <div className="mx-auto max-w-screen-2xl p-4 md:p-6 2xl:p-10">
             <div className="mb-8">

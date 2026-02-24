@@ -26,7 +26,19 @@ interface VerificationData {
     name: string
     father_husband_name: string
     present_address: string
+    present_zone: string | null
+    present_area: string | null
+    present_block: string | null
+    present_street: string | null
+    present_house_no: string | null
+    present_period_of_stay: string | null
     permanent_address: string
+    permanent_zone: string | null
+    permanent_area: string | null
+    permanent_block: string | null
+    permanent_street: string | null
+    permanent_house_no: string | null
+    permanent_period_of_stay: string | null
     utility_bill_url: string | null
     cnic_number: string
     cnic_front_url: string | null
@@ -50,7 +62,19 @@ interface VerificationData {
     name: string
     father_husband_name: string
     present_address: string
+    present_zone: string | null
+    present_area: string | null
+    present_block: string | null
+    present_street: string | null
+    present_house_no: string | null
+    present_period_of_stay: string | null
     permanent_address: string
+    permanent_zone: string | null
+    permanent_area: string | null
+    permanent_block: string | null
+    permanent_street: string | null
+    permanent_house_no: string | null
+    permanent_period_of_stay: string | null
     utility_bill_url: string | null
     cnic_number: string
     cnic_front_url: string | null
@@ -207,50 +231,50 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
     }
 
     if (!data?.id) {
-        toast.error('Verification ID not available')
-        return
+      toast.error('Verification ID not available')
+      return
     }
 
     setSubmitting(true)
 
     try {
-    const token = Cookies.get('auth_token');
-    const res = await fetch(`${BACKEND_URL}/api/verification/${data.id}/approve`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({
-        approved: decision === 'approve',
-        remarks: decision === 'approve' ? null : remarks.trim() || null,
-      }),
-    });
+      const token = Cookies.get('auth_token');
+      const res = await fetch(`${BACKEND_URL}/api/verification/${data.id}/approve`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          approved: decision === 'approve',
+          remarks: decision === 'approve' ? null : remarks.trim() || null,
+        }),
+      });
 
-    const result = await res.json();
+      const result = await res.json();
 
-    if (!res.ok || !result.success) {
-      throw new Error(result.error || 'Failed to submit review');
+      if (!res.ok || !result.success) {
+        throw new Error(result.error || 'Failed to submit review');
+      }
+
+      // Refresh
+      const refreshRes = await fetch(`${BACKEND_URL}/api/verification/order/${id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const refreshJson = await refreshRes.json();
+
+      if (refreshJson.success && refreshJson.data?.verification) {
+        setData(refreshJson.data.verification);
+        setDecision(null);
+        setRemarks('');
+        toast.success('Review submitted successfully');
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Error submitting review');
+    } finally {
+      setSubmitting(false);
     }
-
-    // Refresh
-    const refreshRes = await fetch(`${BACKEND_URL}/api/verification/order/${id}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    const refreshJson = await refreshRes.json();
-
-    if (refreshJson.success && refreshJson.data?.verification) {
-      setData(refreshJson.data.verification);
-      setDecision(null);
-      setRemarks('');
-      toast.success('Review submitted successfully');
-    }
-  } catch (err: any) {
-    toast.error(err.message || 'Error submitting review');
-  } finally {
-    setSubmitting(false);
-  }
-};
+  };
 
   if (loading) return <div className="py-20 text-center">Loading verification details...</div>
   if (error) return <div className="py-20 text-center text-red-600">{error}</div>
@@ -401,7 +425,7 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
                 <div className={cn(
                   "text-2xl font-bold",
                   percentage >= 60 ? "text-green-600" :
-                  percentage >= 30 ? "text-amber-600" : "text-red-600"
+                    percentage >= 30 ? "text-amber-600" : "text-red-600"
                 )}>
                   {percentage}%
                 </div>
@@ -409,33 +433,33 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
               <div className="rounded bg-white p-4 text-center shadow-sm dark:bg-gray-800">
                 <div className="text-sm text-gray-600 dark:text-gray-400">Current Status</div>
                 <div className="flex flex-col">
-                <div
-                  className={cn(
-                    "text-2xl font-bold tracking-wide",
-                    percentage === 0
-                      ? "text-gray-500"
+                  <div
+                    className={cn(
+                      "text-2xl font-bold tracking-wide",
+                      percentage === 0
+                        ? "text-gray-500"
+                        : percentage >= 60
+                          ? "text-green-600"
+                          : percentage < 30
+                            ? "text-red-600"
+                            : "text-amber-600"
+                    )}
+                  >
+                    {percentage === 0
+                      ? "Awaiting Review"
                       : percentage >= 60
-                      ? "text-green-600"
-                      : percentage < 30
-                      ? "text-red-600"
-                      : "text-amber-600"
-                  )}
-                >
-                  {percentage === 0
-                    ? "Awaiting Review"
-                    : percentage >= 60
-                    ? "APPROVED"
-                    : percentage < 30
-                    ? "REJECTED"
-                    : "Pending Final Decision"}
-                </div>
+                        ? "APPROVED"
+                        : percentage < 30
+                          ? "REJECTED"
+                          : "Pending Final Decision"}
+                  </div>
 
-                {percentage === 0 && (
-                  <span className="text-sm text-gray-400">
-                    No evaluation has been submitted yet.
-                  </span>
-                )}
-              </div>
+                  {percentage === 0 && (
+                    <span className="text-sm text-gray-400">
+                      No evaluation has been submitted yet.
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -490,8 +514,8 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
                     rows={5}
                     value={remarks}
                     onChange={(e) => setRemarks(e.target.value)}
-                    placeholder={decision === 'reject' 
-                      ? "Please explain why you are rejecting..." 
+                    placeholder={decision === 'reject'
+                      ? "Please explain why you are rejecting..."
                       : "Optional notes (not saved when approving)"}
                     disabled={decision === 'approve'}
                   />
@@ -506,8 +530,8 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
                       submitting || !decision
                         ? "bg-gray-400 cursor-not-allowed"
                         : decision === 'approve'
-                        ? "bg-green-600 hover:bg-green-700"
-                        : "bg-red-600 hover:bg-red-700"
+                          ? "bg-green-600 hover:bg-green-700"
+                          : "bg-red-600 hover:bg-red-700"
                     )}
                   >
                     {submitting ? 'Submitting...' : 'Submit Review'}
@@ -548,6 +572,16 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
               </label>
               <div className="mt-1 rounded-lg bg-gray-100 px-4 py-2.5 dark:bg-dark-3 dark:text-gray-300">
                 {data.purchaser.present_address}
+                {(data.purchaser.present_zone || data.purchaser.present_area || data.purchaser.present_block) && (
+                  <div className="mt-1 text-xs text-gray-500">
+                    Structured: {data.purchaser.present_zone}, {data.purchaser.present_area}, {data.purchaser.present_block}, {data.purchaser.present_street}, {data.purchaser.present_house_no}
+                  </div>
+                )}
+                {data.purchaser.present_period_of_stay && (
+                  <div className="mt-1 text-xs font-medium text-blue-600">
+                    Stay Period: {data.purchaser.present_period_of_stay}
+                  </div>
+                )}
               </div>
             </div>
             <div>
@@ -556,6 +590,16 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
               </label>
               <div className="mt-1 rounded-lg bg-gray-100 px-4 py-2.5 dark:bg-dark-3 dark:text-gray-300">
                 {data.purchaser.permanent_address}
+                {(data.purchaser.permanent_zone || data.purchaser.permanent_area || data.purchaser.permanent_block) && (
+                  <div className="mt-1 text-xs text-gray-500">
+                    Structured: {data.purchaser.permanent_zone}, {data.purchaser.permanent_area}, {data.purchaser.permanent_block}, {data.purchaser.permanent_street}, {data.purchaser.permanent_house_no}
+                  </div>
+                )}
+                {data.purchaser.permanent_period_of_stay && (
+                  <div className="mt-1 text-xs font-medium text-blue-600">
+                    Stay Period: {data.purchaser.permanent_period_of_stay}
+                  </div>
+                )}
               </div>
             </div>
             <div>
@@ -692,6 +736,16 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
               </label>
               <div className="mt-1 rounded-lg bg-gray-100 px-4 py-2.5 dark:bg-dark-3 dark:text-gray-300">
                 {grantor.present_address}
+                {(grantor.present_zone || grantor.present_area || grantor.present_block) && (
+                  <div className="mt-1 text-xs text-gray-500">
+                    Structured: {grantor.present_zone}, {grantor.present_area}, {grantor.present_block}, {grantor.present_street}, {grantor.present_house_no}
+                  </div>
+                )}
+                {grantor.present_period_of_stay && (
+                  <div className="mt-1 text-xs font-medium text-blue-600">
+                    Stay Period: {grantor.present_period_of_stay}
+                  </div>
+                )}
               </div>
             </div>
             <div>
@@ -700,6 +754,16 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
               </label>
               <div className="mt-1 rounded-lg bg-gray-100 px-4 py-2.5 dark:bg-dark-3 dark:text-gray-300">
                 {grantor.permanent_address}
+                {(grantor.permanent_zone || grantor.permanent_area || grantor.permanent_block) && (
+                  <div className="mt-1 text-xs text-gray-500">
+                    Structured: {grantor.permanent_zone}, {grantor.permanent_area}, {grantor.permanent_block}, {grantor.permanent_street}, {grantor.permanent_house_no}
+                  </div>
+                )}
+                {grantor.permanent_period_of_stay && (
+                  <div className="mt-1 text-xs font-medium text-blue-600">
+                    Stay Period: {grantor.permanent_period_of_stay}
+                  </div>
+                )}
               </div>
             </div>
             <div>
@@ -823,10 +887,10 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
                 doc.person_type.startsWith('grantor') &&
                 Number(doc.person_type.replace('grantor', '')) === grantor.grantor_number
             ).length === 0 && (
-              <p className="mt-4 text-gray-500 dark:text-gray-400 italic">
-                No documents uploaded for this grantor
-              </p>
-            )}
+                <p className="mt-4 text-gray-500 dark:text-gray-400 italic">
+                  No documents uploaded for this grantor
+                </p>
+              )}
           </div>
         </div>
       ))}

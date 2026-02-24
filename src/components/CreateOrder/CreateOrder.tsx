@@ -12,8 +12,15 @@ const CreateOrders: React.FC = () => {
     customer_name: '',
     whatsapp_number: '',
     address: '',
-    city: '',
+    city: 'Karachi', // Default city
     area: '',
+    zone: '',
+    block: '',
+    street: '',
+    house_no: '',
+    gender: '',
+    marital_status: '',
+    residential_type: '',
     product_name: '',
     total_amount: '',
     advance_amount: '',
@@ -21,6 +28,8 @@ const CreateOrders: React.FC = () => {
     months: '',
     channel: '',
   });
+
+  const [isManualAddress, setIsManualAddress] = useState(false);
 
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
   const [selectedPlan, setSelectedPlan] = useState<any>(null);
@@ -32,10 +41,13 @@ const CreateOrders: React.FC = () => {
   const addressRef = useRef<HTMLInputElement>(null);
   const cityRef = useRef<HTMLSelectElement>(null);
   const areaRef = useRef<HTMLSelectElement>(null);
+  const genderRef = useRef<HTMLSelectElement>(null);
+  const maritalRef = useRef<HTMLSelectElement>(null);
+  const residentialRef = useRef<HTMLSelectElement>(null);
   const channelRef = useRef<HTMLDivElement>(null);
 
   // ────────────────────────────────────────────────
-  // Hardcoded data (replaces previous API fetches)
+  // Hardcoded data (same as your original)
   // ────────────────────────────────────────────────
 
   const citiesData: Record<string, string[]> = {
@@ -120,7 +132,6 @@ const CreateOrders: React.FC = () => {
         { id: 5102, advance: 29750, monthlyAmount: 12400, months: 6, totalPrice: 104150, isActive: true },
       ],
     },
-    // Add more sample products as needed
   ];
 
   const channels = [
@@ -130,9 +141,10 @@ const CreateOrders: React.FC = () => {
     { id: 'referral', name: 'Referral', icon: Users, description: 'Orders from customer referrals or repeats' },
   ];
 
-  // ────────────────────────────────────────────────
-  // Computed areas based on selected city
-  // ────────────────────────────────────────────────
+  const genderOptions = ['Male', 'Female', 'Unidentified'];
+  const maritalOptions = ['Single', 'Married', 'Divorced', 'Widowed'];
+  const residentialOptions = ['Own', 'Rented', 'With Family'];
+
   const areas = formData.city && citiesData[formData.city] ? citiesData[formData.city] : [];
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -165,9 +177,22 @@ const CreateOrders: React.FC = () => {
     if (!formData.whatsapp_number.trim() || !/^(\+92|0)?[0-9]{10}$/.test(formData.whatsapp_number.replace(/\s+/g, ''))) {
       newErrors.whatsapp_number = 'Valid WhatsApp number is required';
     }
-    if (!formData.address.trim()) newErrors.address = 'Address is required';
+
+    if (isManualAddress) {
+      if (!formData.address.trim()) newErrors.address = 'Address is required';
+    } else {
+      if (!formData.zone) newErrors.zone = 'Zone is required';
+      if (!formData.area) newErrors.area = 'Area is required';
+    }
+
     if (!formData.city) newErrors.city = 'City is required';
     if (formData.city && !formData.area) newErrors.area = 'Area is required';
+
+    // New fields - making them required (as per previous backend validation)
+    if (!formData.gender) newErrors.gender = 'Gender is required';
+    if (!formData.marital_status) newErrors.marital_status = 'Marital status is required';
+    if (!formData.residential_type) newErrors.residential_type = 'Residential type is required';
+
     if (!selectedProduct) newErrors.product = 'Product is required';
     if (!selectedPlan) newErrors.plan = 'Installment plan is required';
     if (!formData.channel) newErrors.channel = 'Channel is required';
@@ -185,12 +210,32 @@ const CreateOrders: React.FC = () => {
       const token = Cookies.get("auth_token");
       if (!token) throw new Error("No authentication token found");
 
+      // Construct address if not manual
+      let submissionAddress = formData.address.trim();
+      if (!isManualAddress) {
+        const parts = [
+          formData.house_no,
+          formData.street,
+          formData.block,
+          formData.area,
+          formData.zone
+        ].filter(p => p && p.trim() !== '');
+        submissionAddress = parts.join(', ');
+      }
+
       const payload = {
         customer_name: formData.customer_name.trim(),
         whatsapp_number: formData.whatsapp_number.trim(),
-        address: formData.address.trim(),
+        address: submissionAddress,
         city: formData.city,
         area: formData.area,
+        zone: formData.zone,
+        block: formData.block,
+        street: formData.street,
+        house_no: formData.house_no,
+        gender: formData.gender,
+        marital_status: formData.marital_status,
+        residential_type: formData.residential_type,
         product_name: formData.product_name.trim(),
         total_amount: formData.total_amount,
         advance_amount: formData.advance_amount,
@@ -216,9 +261,12 @@ const CreateOrders: React.FC = () => {
 
       // Reset form
       setFormData({
-        customer_name: '', whatsapp_number: '', address: '', city: '', area: '',
+        customer_name: '', whatsapp_number: '', address: '', city: 'Karachi', area: '',
+        zone: '', block: '', street: '', house_no: '',
+        gender: '', marital_status: '', residential_type: '',
         product_name: '', total_amount: '', advance_amount: '', monthly_amount: '', months: '', channel: ''
       });
+      setIsManualAddress(false);
       setSelectedProduct(null);
       setSelectedPlan(null);
       setErrors({});
@@ -239,7 +287,7 @@ const CreateOrders: React.FC = () => {
           <form onSubmit={handleSubmit} className="space-y-8">
 
             {/* ────────────────────────────────────────────────
-                Customer Information
+                Customer Information (with new fields)
             ──────────────────────────────────────────────── */}
             <section className="border-b pb-6">
               <h2 className="text-xl font-semibold text-gray-800 mb-6">Customer Information</h2>
@@ -273,18 +321,96 @@ const CreateOrders: React.FC = () => {
                   {errors.whatsapp_number && <p className="text-red-600 text-sm mt-1">{errors.whatsapp_number}</p>}
                 </div>
 
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Full Address <span className="text-red-600">*</span></label>
-                  <input
-                    ref={addressRef}
-                    type="text"
-                    name="address"
-                    value={formData.address}
-                    onChange={handleChange}
-                    className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-red-500 outline-none transition ${errors.address ? 'border-red-500' : 'border-gray-300'}`}
-                    placeholder="House #, Street, etc."
-                  />
-                  {errors.address && <p className="text-red-600 text-sm mt-1">{errors.address}</p>}
+                <div className="md:col-span-2 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-sm font-medium text-gray-700">Address Information <span className="text-red-600">*</span></label>
+                    <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-600">
+                      <input
+                        type="checkbox"
+                        checked={isManualAddress}
+                        onChange={(e) => setIsManualAddress(e.target.checked)}
+                        className="rounded text-red-600 focus:ring-red-500"
+                      />
+                      Manual Entry
+                    </label>
+                  </div>
+
+                  {isManualAddress ? (
+                    <input
+                      ref={addressRef}
+                      type="text"
+                      name="address"
+                      value={formData.address}
+                      onChange={handleChange}
+                      className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-red-500 outline-none transition ${errors.address ? 'border-red-500' : 'border-gray-300'}`}
+                      placeholder="Full Address (House #, Street, Block, Area, etc.)"
+                    />
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <select
+                          name="zone"
+                          value={formData.zone}
+                          onChange={handleChange}
+                          className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-red-500 outline-none transition ${errors.zone ? 'border-red-500' : 'border-gray-300'}`}
+                        >
+                          <option value="">Select Zone</option>
+                          <option value="Central">Central</option>
+                          <option value="East">East</option>
+                          <option value="West">West</option>
+                          <option value="South">South</option>
+                          <option value="Malir">Malir</option>
+                          <option value="Korangi">Korangi</option>
+                        </select>
+                        {errors.zone && <p className="text-red-600 text-sm mt-1">{errors.zone}</p>}
+                      </div>
+                      <div>
+                        <select
+                          name="area"
+                          value={formData.area}
+                          onChange={handleChange}
+                          className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-red-500 outline-none transition ${errors.area ? 'border-red-500' : 'border-gray-300'}`}
+                        >
+                          <option value="">Select Area</option>
+                          {areas.map(area => (
+                            <option key={area} value={area}>{area}</option>
+                          ))}
+                        </select>
+                        {errors.area && <p className="text-red-600 text-sm mt-1">{errors.area}</p>}
+                      </div>
+                      <div>
+                        <input
+                          type="text"
+                          name="block"
+                          value={formData.block}
+                          onChange={handleChange}
+                          placeholder="Block / Sector"
+                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none transition"
+                        />
+                      </div>
+                      <div>
+                        <input
+                          type="text"
+                          name="street"
+                          value={formData.street}
+                          onChange={handleChange}
+                          placeholder="Street"
+                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none transition"
+                        />
+                      </div>
+                      <div className="md:col-span-2">
+                        <input
+                          type="text"
+                          name="house_no"
+                          value={formData.house_no}
+                          onChange={handleChange}
+                          placeholder="House No / Appartment #"
+                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none transition"
+                        />
+                      </div>
+                    </div>
+                  )}
+                  {errors.address && isManualAddress && <p className="text-red-600 text-sm mt-1">{errors.address}</p>}
                 </div>
 
                 <div>
@@ -321,11 +447,63 @@ const CreateOrders: React.FC = () => {
                   </select>
                   {errors.area && <p className="text-red-600 text-sm mt-1">{errors.area}</p>}
                 </div>
+
+                {/* ── New fields inserted here ── */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Gender <span className="text-red-600">*</span></label>
+                  <select
+                    ref={genderRef}
+                    name="gender"
+                    value={formData.gender}
+                    onChange={handleChange}
+                    className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-red-500 outline-none transition ${errors.gender ? 'border-red-500' : 'border-gray-300'}`}
+                  >
+                    <option value="">Select Gender</option>
+                    {genderOptions.map(opt => (
+                      <option key={opt} value={opt}>{opt}</option>
+                    ))}
+                  </select>
+                  {errors.gender && <p className="text-red-600 text-sm mt-1">{errors.gender}</p>}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Marital Status <span className="text-red-600">*</span></label>
+                  <select
+                    ref={maritalRef}
+                    name="marital_status"
+                    value={formData.marital_status}
+                    onChange={handleChange}
+                    className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-red-500 outline-none transition ${errors.marital_status ? 'border-red-500' : 'border-gray-300'}`}
+                  >
+                    <option value="">Select Status</option>
+                    {maritalOptions.map(opt => (
+                      <option key={opt} value={opt}>{opt}</option>
+                    ))}
+                  </select>
+                  {errors.marital_status && <p className="text-red-600 text-sm mt-1">{errors.marital_status}</p>}
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Residential Type <span className="text-red-600">*</span></label>
+                  <select
+                    ref={residentialRef}
+                    name="residential_type"
+                    value={formData.residential_type}
+                    onChange={handleChange}
+                    className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-red-500 outline-none transition ${errors.residential_type ? 'border-red-500' : 'border-gray-300'}`}
+                  >
+                    <option value="">Select Type</option>
+                    {residentialOptions.map(opt => (
+                      <option key={opt} value={opt}>{opt}</option>
+                    ))}
+                  </select>
+                  {errors.residential_type && <p className="text-red-600 text-sm mt-1">{errors.residential_type}</p>}
+                </div>
               </div>
             </section>
 
             {/* ────────────────────────────────────────────────
-                Product & Installment Plan
+                Product & Installment Plan (original style)
             ──────────────────────────────────────────────── */}
             <section className="border-b pb-6">
               <h2 className="text-xl font-semibold text-gray-800 mb-6">Product & Installment Plan</h2>
@@ -360,11 +538,10 @@ const CreateOrders: React.FC = () => {
                       .map((plan: any) => (
                         <label
                           key={plan.id}
-                          className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
-                            selectedPlan?.id === plan.id
-                              ? 'border-red-500 bg-red-50 shadow-sm'
-                              : 'border-gray-200 hover:border-red-300'
-                          }`}
+                          className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${selectedPlan?.id === plan.id
+                            ? 'border-red-500 bg-red-50 shadow-sm'
+                            : 'border-gray-200 hover:border-red-300'
+                            }`}
                         >
                           <input
                             type="radio"
@@ -392,7 +569,7 @@ const CreateOrders: React.FC = () => {
             </section>
 
             {/* ────────────────────────────────────────────────
-                Order Channel
+                Order Channel (original style)
             ──────────────────────────────────────────────── */}
             <section ref={channelRef} className="border-b pb-6">
               <h2 className="text-xl font-semibold text-gray-800 mb-6">Order Channel <span className="text-red-600">*</span></h2>
@@ -403,11 +580,10 @@ const CreateOrders: React.FC = () => {
                   return (
                     <label
                       key={ch.id}
-                      className={`p-5 border-2 rounded-xl cursor-pointer transition-all text-center ${
-                        formData.channel === ch.id
-                          ? 'border-red-500 bg-red-50 shadow-sm'
-                          : 'border-gray-200 hover:border-red-300 hover:shadow'
-                      }`}
+                      className={`p-5 border-2 rounded-xl cursor-pointer transition-all text-center ${formData.channel === ch.id
+                        ? 'border-red-500 bg-red-50 shadow-sm'
+                        : 'border-gray-200 hover:border-red-300 hover:shadow'
+                        }`}
                     >
                       <input
                         type="radio"
@@ -428,7 +604,7 @@ const CreateOrders: React.FC = () => {
             </section>
 
             {/* ────────────────────────────────────────────────
-                Actions
+                Actions (original button sizes & layout)
             ──────────────────────────────────────────────── */}
             <div className="flex flex-col sm:flex-row gap-4 pt-4">
               <button
@@ -448,7 +624,9 @@ const CreateOrders: React.FC = () => {
                 type="button"
                 onClick={() => {
                   setFormData({
-                    customer_name: '', whatsapp_number: '', address: '', city: '', area: '',
+                    customer_name: '', whatsapp_number: '', address: '', city: 'Karachi', area: '',
+                    zone: '', block: '', street: '', house_no: '',
+                    gender: '', marital_status: '', residential_type: '',
                     product_name: '', total_amount: '', advance_amount: '', monthly_amount: '', months: '', channel: ''
                   });
                   setSelectedProduct(null);
