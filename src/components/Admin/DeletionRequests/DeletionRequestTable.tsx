@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import Loader from "@/components/common/Loader";
 import { getAllDeletionRequests, reviewDeletionRequest } from "@/services/account-deletion.service";
 import { AccountDeletionRequest } from "@/types/account-deletion";
 import { ReviewModal } from "./ReviewModal";
@@ -47,7 +48,7 @@ export default function DeletionRequestsTable() {
     };
 
     if (loading) {
-        return <div>Loading...</div>;
+        return <Loader text="Loading requests..." className="py-20" />;
     }
 
     return (

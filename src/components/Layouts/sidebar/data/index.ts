@@ -55,7 +55,16 @@ export const NAV_DATA = [
       {
         title: "Delivery Officers",
         icon: Icons.HomeIcon,
-        items: [],
+        items: [
+          {
+            title: "Officer List",
+            url: "/delivery-officers",
+          },
+          {
+            title: "Area Assignments",
+            url: "/admin/delivery-assignments",
+          },
+        ],
       },
       {
         title: "Verification Officers",
@@ -92,6 +101,28 @@ export const NAV_DATA = [
           {
             title: "Deletion Requests",
             url: "/admin/deletion-requests",
+          },
+        ],
+      },
+      {
+        title: "Address Management",
+        icon: Icons.HomeIcon,
+        items: [
+          {
+            title: "Cities",
+            url: "/admin/addresses/cities",
+          },
+          {
+            title: "Zones",
+            url: "/admin/addresses/zones",
+          },
+          {
+            title: "Areas",
+            url: "/admin/addresses/areas",
+          },
+          {
+            title: "Bulk Upload",
+            url: "/admin/addresses/bulk-upload",
           },
         ],
       },

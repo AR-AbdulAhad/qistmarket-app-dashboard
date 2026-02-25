@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Loader from "@/components/common/Loader";
 import {
   ColumnDef,
   ColumnFiltersState,
@@ -603,7 +604,7 @@ const UsersTable = () => {
             {loading ? (
               <tr>
                 <td colSpan={columns.length} className="py-12 text-center">
-                  Loading...
+                  <Loader text="Loading users..." />
                 </td>
               </tr>
             ) : users.length === 0 ? (

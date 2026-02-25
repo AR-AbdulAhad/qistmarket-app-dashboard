@@ -3,7 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useSidebarContext } from "../sidebar/sidebar-context";
 import { MenuIcon } from "./icons";
-// import { Notification } from "./notification";
+import { Notification } from "./notification";
 // import { ThemeToggleSwitch } from "./theme-toggle";
 import { UserInfo } from "./user-info";
 
@@ -40,11 +40,11 @@ export function Header() {
       </div>
 
       <div className="flex flex-1 items-center justify-end gap-2 min-[375px]:gap-4">
-        
+
 
         {/* <ThemeToggleSwitch /> */}
 
-        {/* <Notification /> */}
+        <Notification />
         <UserInfo />
       </div>
     </header>

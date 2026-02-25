@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
+import Loader from '@/components/common/Loader'
 import {
   ColumnDef,
   ColumnFiltersState,
@@ -322,17 +323,11 @@ const ApprovedOrderList = () => {
     { accessorKey: 'area', header: 'Area', enableColumnFilter: true },
     { accessorKey: 'product_name', header: 'Product', enableColumnFilter: true },
     {
-      accessorKey: 'total_amount',
-      header: 'Total Amount',
+      accessorKey: 'advance_amount',
+      header: 'Advance Amount',
       cell: ({ getValue }) => `Rs. ${Number(getValue()).toLocaleString()}`,
     },
     { accessorKey: 'status', header: 'Status', enableColumnFilter: true },
-    {
-      id: 'verification_status',
-      accessorFn: (row) => row.verification?.status || 'N/A',
-      header: 'Verification',
-      enableColumnFilter: true,
-    },
     {
       id: 'created_by',
       accessorFn: (row) => row.created_by?.username || '',
@@ -682,7 +677,7 @@ const ApprovedOrderList = () => {
             {loading ? (
               <tr>
                 <td colSpan={columns.length} className="py-12 text-center">
-                  Loading...
+                  <Loader text="Loading approved orders..." />
                 </td>
               </tr>
             ) : orders.length === 0 ? (

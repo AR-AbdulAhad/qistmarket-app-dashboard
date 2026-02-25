@@ -30,10 +30,16 @@ const CreateOrders: React.FC = () => {
   });
 
   const [isManualAddress, setIsManualAddress] = useState(false);
+  const [isCustomProduct, setIsCustomProduct] = useState(false);
 
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
   const [selectedPlan, setSelectedPlan] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [products, setProducts] = useState<any[]>([]);
+  const [categories, setCategories] = useState<string[]>([]);
+  const [subcategories, setSubcategories] = useState<string[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState('');
+  const [selectedSubcategory, setSelectedSubcategory] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const nameRef = useRef<HTMLInputElement>(null);
@@ -46,93 +52,68 @@ const CreateOrders: React.FC = () => {
   const residentialRef = useRef<HTMLSelectElement>(null);
   const channelRef = useRef<HTMLDivElement>(null);
 
+  const [addressHierarchy, setAddressHierarchy] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchHierarchy = async () => {
+      try {
+        const token = Cookies.get("auth_token");
+        const resp = await fetch(`${BACKEND_URL}/api/address/hierarchy`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        const data = await resp.json();
+        if (data.success) {
+          setAddressHierarchy(data.data);
+        }
+      } catch (err) {
+        console.error("Error fetching address hierarchy:", err);
+      }
+    };
+    fetchHierarchy();
+  }, []);
+
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        const token = Cookies.get("auth_token");
+        const resp = await fetch(`${BACKEND_URL}/api/products`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        const data = await resp.json();
+        if (data.success) {
+          setProducts(data.data);
+          const uniqueCategories = Array.from(new Set(data.data.map((p: any) => p.category_name))) as string[];
+          setCategories(uniqueCategories.sort());
+        }
+      } catch (err) {
+        console.error("Error fetching products:", err);
+      }
+    };
+    fetchProducts();
+  }, []);
+
+  useEffect(() => {
+    if (selectedCategory) {
+      const filteredSubcats = Array.from(new Set(
+        products
+          .filter(p => p.category_name === selectedCategory)
+          .map(p => p.subcategory_name)
+      )) as string[];
+      setSubcategories(filteredSubcats.sort());
+      setSelectedSubcategory('');
+      setSelectedProduct(null);
+    } else {
+      setSubcategories([]);
+    }
+  }, [selectedCategory, products]);
+
   // ────────────────────────────────────────────────
   // Hardcoded data (same as your original)
   // ────────────────────────────────────────────────
 
-  const citiesData: Record<string, string[]> = {
-    Karachi: [
-      "Abbas Town",
-      "Abdullah Haroon Road",
-      "Abid Town",
-      "Abu Zar Ghaffari",
-      "Abul Hassan Isphani Road",
-      "Abul Isphani Road",
-      "Agra Taj Colony",
-      "Airport",
-      "Akhtar Colony",
-      "Alamgir Society",
-      "Ameeruddin Memon Colony",
-      "Ancholi",
-      "Askari 1",
-      "Askari 2",
-      "Askari 3",
-      "Askari 4",
-      "Bahria Town Karachi",
-      "Baldia Town",
-      "Battery Road",
-      "Buffer Zone",
-      "Cantonment",
-      "Clifton",
-      "DHA",
-      "Federal B Area",
-      "Gadap Town",
-      "Gulistan-e-Johar",
-      "Gulshan-e-Iqbal",
-      "Jamshed Road",
-      "Jinnah Colony",
-      "Korangi",
-      "Liaquatabad",
-      "Malir",
-      "Nazimabad",
-      "North Karachi",
-      "North Nazimabad",
-      "Orangi Town",
-      "PECHS",
-      "Saddar",
-      "Shah Faisal Colony",
-      "Sharafi Goth",
-      "Saudabad",
-      "Surjani Town",
-    ]
-  };
+  // No longer hardcoded
+  // const citiesData: Record<string, string[]> = { ... };
 
-  const products = [
-    {
-      id: 978,
-      name: "Twin Tub Washing Machine DW-10600",
-      brand: "Qist Market",
-      price: 51000,
-      ProductInstallments: [
-        { id: 4906, advance: 20400, monthlyAmount: 12200, months: 3, totalPrice: 57000, isActive: true },
-        { id: 4907, advance: 17850, monthlyAmount: 7500, months: 6, totalPrice: 62850, isActive: true },
-        { id: 4908, advance: 15300, monthlyAmount: 5800, months: 9, totalPrice: 67500, isActive: true },
-        { id: 4909, advance: 12750, monthlyAmount: 4900, months: 12, totalPrice: 71550, isActive: true },
-        { id: 4910, advance: 12750, monthlyAmount: 2900, months: 24, totalPrice: 82350, isActive: true },
-      ],
-    },
-    {
-      id: 979,
-      name: "Smart LED TV 43 inch",
-      brand: "Qist Market",
-      price: 65000,
-      ProductInstallments: [
-        { id: 5001, advance: 26000, monthlyAmount: 15600, months: 3, totalPrice: 72800, isActive: true },
-        { id: 5002, advance: 22750, monthlyAmount: 9500, months: 6, totalPrice: 79750, isActive: true },
-        { id: 5003, advance: 19500, monthlyAmount: 7400, months: 9, totalPrice: 86100, isActive: true },
-      ],
-    },
-    {
-      id: 980,
-      name: "Refrigerator 300L Double Door",
-      brand: "Qist Market",
-      price: 85000,
-      ProductInstallments: [
-        { id: 5101, advance: 34000, monthlyAmount: 20400, months: 3, totalPrice: 95200, isActive: true },
-        { id: 5102, advance: 29750, monthlyAmount: 12400, months: 6, totalPrice: 104150, isActive: true },
-      ],
-    },
-  ];
 
   const channels = [
     { id: 'website', name: 'Website', icon: Globe, description: 'Orders placed through the official website' },
@@ -145,7 +126,11 @@ const CreateOrders: React.FC = () => {
   const maritalOptions = ['Single', 'Married', 'Divorced', 'Widowed'];
   const residentialOptions = ['Own', 'Rented', 'With Family'];
 
-  const areas = formData.city && citiesData[formData.city] ? citiesData[formData.city] : [];
+  // Get zones for selected city
+  const zonesForCity = formData.city ? addressHierarchy.find(c => c.name === formData.city)?.zones || [] : [];
+
+  // Get areas for selected zone
+  const areasForZone = formData.zone ? zonesForCity.find((z: any) => z.name === formData.zone)?.areas || [] : [];
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -193,8 +178,16 @@ const CreateOrders: React.FC = () => {
     if (!formData.marital_status) newErrors.marital_status = 'Marital status is required';
     if (!formData.residential_type) newErrors.residential_type = 'Residential type is required';
 
-    if (!selectedProduct) newErrors.product = 'Product is required';
-    if (!selectedPlan) newErrors.plan = 'Installment plan is required';
+    if (!isCustomProduct) {
+      if (!selectedProduct) newErrors.product = 'Product is required';
+      if (!selectedPlan) newErrors.plan = 'Installment plan is required';
+    } else {
+      if (!formData.product_name.trim()) newErrors.product_name = 'Product name is required';
+      if (!formData.total_amount || isNaN(Number(formData.total_amount))) newErrors.total_amount = 'Total amount is required';
+      if (!formData.advance_amount || isNaN(Number(formData.advance_amount))) newErrors.advance_amount = 'Advance amount is required';
+      if (!formData.monthly_amount || isNaN(Number(formData.monthly_amount))) newErrors.monthly_amount = 'Monthly amount is required';
+      if (!formData.months || isNaN(Number(formData.months))) newErrors.months = 'Months is required';
+    }
     if (!formData.channel) newErrors.channel = 'Channel is required';
 
     setErrors(newErrors);
@@ -267,6 +260,7 @@ const CreateOrders: React.FC = () => {
         product_name: '', total_amount: '', advance_amount: '', monthly_amount: '', months: '', channel: ''
       });
       setIsManualAddress(false);
+      setIsCustomProduct(false);
       setSelectedProduct(null);
       setSelectedPlan(null);
       setErrors({});
@@ -355,12 +349,9 @@ const CreateOrders: React.FC = () => {
                           className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-red-500 outline-none transition ${errors.zone ? 'border-red-500' : 'border-gray-300'}`}
                         >
                           <option value="">Select Zone</option>
-                          <option value="Central">Central</option>
-                          <option value="East">East</option>
-                          <option value="West">West</option>
-                          <option value="South">South</option>
-                          <option value="Malir">Malir</option>
-                          <option value="Korangi">Korangi</option>
+                          {zonesForCity.map((zone: any) => (
+                            <option key={zone.id} value={zone.name}>{zone.name}</option>
+                          ))}
                         </select>
                         {errors.zone && <p className="text-red-600 text-sm mt-1">{errors.zone}</p>}
                       </div>
@@ -372,8 +363,8 @@ const CreateOrders: React.FC = () => {
                           className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-red-500 outline-none transition ${errors.area ? 'border-red-500' : 'border-gray-300'}`}
                         >
                           <option value="">Select Area</option>
-                          {areas.map(area => (
-                            <option key={area} value={area}>{area}</option>
+                          {areasForZone.map((area: any) => (
+                            <option key={area.id} value={area.name}>{area.name}</option>
                           ))}
                         </select>
                         {errors.area && <p className="text-red-600 text-sm mt-1">{errors.area}</p>}
@@ -423,8 +414,8 @@ const CreateOrders: React.FC = () => {
                     className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-red-500 outline-none transition ${errors.city ? 'border-red-500' : 'border-gray-300'}`}
                   >
                     <option value="">Select City</option>
-                    {Object.keys(citiesData).map(city => (
-                      <option key={city} value={city}>{city}</option>
+                    {addressHierarchy.map(city => (
+                      <option key={city.id} value={city.name}>{city.name}</option>
                     ))}
                   </select>
                   {errors.city && <p className="text-red-600 text-sm mt-1">{errors.city}</p>}
@@ -441,8 +432,9 @@ const CreateOrders: React.FC = () => {
                     className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-red-500 outline-none transition disabled:bg-gray-100 ${errors.area ? 'border-red-500' : 'border-gray-300'}`}
                   >
                     <option value="">Select Area</option>
-                    {areas.map(area => (
-                      <option key={area} value={area}>{area}</option>
+                    {/* Fallback areas for backward compatibility or simple selection */}
+                    {zonesForCity.flatMap((z: any) => z.areas).map((area: any) => (
+                      <option key={area.id} value={area.name}>{area.name}</option>
                     ))}
                   </select>
                   {errors.area && <p className="text-red-600 text-sm mt-1">{errors.area}</p>}
@@ -506,65 +498,190 @@ const CreateOrders: React.FC = () => {
                 Product & Installment Plan (original style)
             ──────────────────────────────────────────────── */}
             <section className="border-b pb-6">
-              <h2 className="text-xl font-semibold text-gray-800 mb-6">Product & Installment Plan</h2>
-
-              <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Product <span className="text-red-600">*</span></label>
-                <select
-                  name="product_name"
-                  value={formData.product_name}
-                  onChange={(e) => {
-                    const prod = products.find(p => p.name === e.target.value);
-                    if (prod) handleProductSelect(prod);
-                  }}
-                  className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-red-500 outline-none transition ${errors.product ? 'border-red-500' : 'border-gray-300'}`}
-                >
-                  <option value="">Select Product</option>
-                  {products.map((p: any) => (
-                    <option key={p.id} value={p.name}>
-                      {p.name} – {p.brand} ({p.price.toLocaleString()} PKR)
-                    </option>
-                  ))}
-                </select>
-                {errors.product && <p className="text-red-600 text-sm mt-1">{errors.product}</p>}
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-semibold text-gray-800">Product & Installment Plan</h2>
+                <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-600">
+                  <input
+                    type="checkbox"
+                    checked={isCustomProduct}
+                    onChange={(e) => {
+                      setIsCustomProduct(e.target.checked);
+                      if (e.target.checked) {
+                        setSelectedProduct(null);
+                        setSelectedPlan(null);
+                        setFormData(prev => ({ ...prev, product_name: '', total_amount: '', advance_amount: '', monthly_amount: '', months: '' }));
+                      }
+                    }}
+                    className="rounded text-red-600 focus:ring-red-500"
+                  />
+                  Custom Product
+                </label>
               </div>
 
-              {selectedProduct && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-3">Installment Plan <span className="text-red-600">*</span></label>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {selectedProduct.ProductInstallments
-                      ?.filter((p: any) => p.isActive)
-                      .map((plan: any) => (
-                        <label
-                          key={plan.id}
-                          className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${selectedPlan?.id === plan.id
-                            ? 'border-red-500 bg-red-50 shadow-sm'
-                            : 'border-gray-200 hover:border-red-300'
-                            }`}
-                        >
-                          <input
-                            type="radio"
-                            name="plan"
-                            checked={selectedPlan?.id === plan.id}
-                            onChange={() => handlePlanSelect(plan)}
-                            className="sr-only"
-                          />
-                          <div className="text-center">
-                            <div className="font-semibold text-lg">{plan.months} Months</div>
-                            <div className="text-sm text-gray-600 mt-1">
-                              Advance: <span className="font-medium">{plan.advance.toLocaleString()}</span>
-                              <br />
-                              Monthly: <span className="font-medium">{plan.monthlyAmount.toLocaleString()}</span>
-                              <br />
-                              Total: <span className="font-medium">{plan.totalPrice.toLocaleString()}</span>
-                            </div>
-                          </div>
-                        </label>
-                      ))}
+              {isCustomProduct ? (
+                <div className="space-y-6">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Product Name <span className="text-red-600">*</span></label>
+                    <input
+                      type="text"
+                      name="product_name"
+                      value={formData.product_name}
+                      onChange={handleChange}
+                      className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-red-500 outline-none transition ${errors.product_name ? 'border-red-500' : 'border-gray-300'}`}
+                      placeholder="Enter custom product name"
+                    />
+                    {errors.product_name && <p className="text-red-600 text-sm mt-1">{errors.product_name}</p>}
                   </div>
-                  {errors.plan && <p className="text-red-600 text-sm mt-2">{errors.plan}</p>}
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Total Amount <span className="text-red-600">*</span></label>
+                      <input
+                        type="number"
+                        name="total_amount"
+                        value={formData.total_amount}
+                        onChange={handleChange}
+                        className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-red-500 outline-none transition ${errors.total_amount ? 'border-red-500' : 'border-gray-300'}`}
+                        placeholder="0.00"
+                      />
+                      {errors.total_amount && <p className="text-red-600 text-sm mt-1">{errors.total_amount}</p>}
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Advance Amount <span className="text-red-600">*</span></label>
+                      <input
+                        type="number"
+                        name="advance_amount"
+                        value={formData.advance_amount}
+                        onChange={handleChange}
+                        className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-red-500 outline-none transition ${errors.advance_amount ? 'border-red-500' : 'border-gray-300'}`}
+                        placeholder="0.00"
+                      />
+                      {errors.advance_amount && <p className="text-red-600 text-sm mt-1">{errors.advance_amount}</p>}
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Monthly Amount <span className="text-red-600">*</span></label>
+                      <input
+                        type="number"
+                        name="monthly_amount"
+                        value={formData.monthly_amount}
+                        onChange={handleChange}
+                        className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-red-500 outline-none transition ${errors.monthly_amount ? 'border-red-500' : 'border-gray-300'}`}
+                        placeholder="0.00"
+                      />
+                      {errors.monthly_amount && <p className="text-red-600 text-sm mt-1">{errors.monthly_amount}</p>}
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Duration (Months) <span className="text-red-600">*</span></label>
+                      <input
+                        type="number"
+                        name="months"
+                        value={formData.months}
+                        onChange={handleChange}
+                        className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-red-500 outline-none transition ${errors.months ? 'border-red-500' : 'border-gray-300'}`}
+                        placeholder="e.g. 12"
+                      />
+                      {errors.months && <p className="text-red-600 text-sm mt-1">{errors.months}</p>}
+                    </div>
+                  </div>
                 </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Category <span className="text-red-600">*</span></label>
+                      <select
+                        value={selectedCategory}
+                        onChange={(e) => setSelectedCategory(e.target.value)}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none transition"
+                      >
+                        <option value="">Select Category</option>
+                        {categories.map(cat => (
+                          <option key={cat} value={cat}>{cat}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Subcategory <span className="text-red-600">*</span></label>
+                      <select
+                        value={selectedSubcategory}
+                        onChange={(e) => setSelectedSubcategory(e.target.value)}
+                        disabled={!selectedCategory}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none transition disabled:bg-gray-50"
+                      >
+                        <option value="">Select Subcategory</option>
+                        {subcategories.map(sub => (
+                          <option key={sub} value={sub}>{sub}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="mb-6">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Product <span className="text-red-600">*</span></label>
+                    <select
+                      name="product_name"
+                      value={formData.product_name}
+                      disabled={!selectedSubcategory}
+                      onChange={(e) => {
+                        const prod = products.find(p => p.name === e.target.value);
+                        if (prod) handleProductSelect(prod);
+                      }}
+                      className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-red-500 outline-none transition disabled:bg-gray-50 ${errors.product ? 'border-red-500' : 'border-gray-300'}`}
+                    >
+                      <option value="">Select Product</option>
+                      {products
+                        .filter(p => p.category_name === selectedCategory && p.subcategory_name === selectedSubcategory)
+                        .map((p: any) => (
+                          <option key={p.id} value={p.name}>
+                            {p.name}
+                          </option>
+                        ))}
+                    </select>
+                    {errors.product && <p className="text-red-600 text-sm mt-1">{errors.product}</p>}
+                  </div>
+
+                  {selectedProduct && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-3">Installment Plan <span className="text-red-600">*</span></label>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {selectedProduct.ProductInstallments
+                          ?.filter((p: any) => p.isActive)
+                          .map((plan: any) => (
+                            <label
+                              key={plan.id}
+                              className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${selectedPlan?.id === plan.id
+                                ? 'border-red-500 bg-red-50 shadow-sm'
+                                : 'border-gray-200 hover:border-red-300'
+                                }`}
+                            >
+                              <input
+                                type="radio"
+                                name="plan"
+                                checked={selectedPlan?.id === plan.id}
+                                onChange={() => handlePlanSelect(plan)}
+                                className="sr-only"
+                              />
+                              <div className="text-center">
+                                <div className="font-semibold text-lg">{plan.months} Months</div>
+                                <div className="text-sm text-gray-600 mt-1">
+                                  Advance: <span className="font-medium">Rs. {plan.advance.toLocaleString()}</span>
+                                  <br />
+                                  Monthly: <span className="font-medium">Rs. {plan.monthlyAmount.toLocaleString()}</span>
+                                  <br />
+                                  Total: <span className="font-medium">Rs. {plan.totalPrice.toLocaleString()}</span>
+                                </div>
+                              </div>
+                            </label>
+                          ))}
+                      </div>
+                      {errors.plan && <p className="text-red-600 text-sm mt-2">{errors.plan}</p>}
+                    </div>
+                  )}
+                </>
               )}
             </section>
 
@@ -631,6 +748,8 @@ const CreateOrders: React.FC = () => {
                   });
                   setSelectedProduct(null);
                   setSelectedPlan(null);
+                  setIsManualAddress(false);
+                  setIsCustomProduct(false);
                   setErrors({});
                 }}
                 className="px-8 py-3.5 border-2 border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 transition"

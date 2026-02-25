@@ -39,7 +39,7 @@ export function Notification() {
           {unreadCount > 0 && (
             <span
               className={cn(
-                "absolute -right-1 -top-1 z-1 flex size-5 items-center justify-center rounded-full bg-red-light text-[10px] font-bold text-white ring-2 ring-gray-2 dark:ring-dark-3",
+                "absolute -right-3 -top-5 z-1 flex size-5 items-center justify-center rounded-full bg-red-light text-[10px] font-bold text-white ring-2 ring-gray-2 dark:ring-dark-3",
               )}
             >
               {unreadCount > 99 ? "99+" : unreadCount}

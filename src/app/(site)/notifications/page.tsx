@@ -1,60 +1,101 @@
-"use client";
 
+"use client";
+import { useEffect, useState } from "react";
 import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
+import Loader from "@/components/common/Loader";
 import { useNotifications } from "../../../../contexts/NotificationContext";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 import { cn } from "@/lib/utils";
-import { CheckCheck, Trash2, Bell, BellOff } from "lucide-react";
+import { CheckCheck, Trash2, Bell, BellOff, ChevronLeft, ChevronRight } from "lucide-react";
 
 dayjs.extend(relativeTime);
 
 const NotificationsPage = () => {
-    const { notifications, unreadCount, markAsRead, markAllAsRead, loading } = useNotifications();
+    const {
+        notifications,
+        unreadCount,
+        markAsRead,
+        markAllAsRead,
+        loading,
+        pagination,
+        fetchNotifications
+    } = useNotifications();
+
+    const [status, setStatus] = useState("all");
+    const [page, setPage] = useState(1);
+
+    useEffect(() => {
+        fetchNotifications(page, 10, status);
+    }, [page, status]);
+
+    const handleStatusChange = (newStatus: string) => {
+        setStatus(newStatus);
+        setPage(1); // Reset to first page on filter change
+    };
 
     return (
         <div className="mx-auto max-w-7xl">
             <Breadcrumb pageName="Notifications" />
 
             <div className="rounded-[10px] bg-white shadow-1 dark:bg-gray-dark dark:shadow-card">
-                <div className="flex items-center justify-between border-b border-stroke px-4 py-4 dark:border-dark-3 sm:px-6 md:px-7.5">
+                <div className="flex flex-col gap-4 border-b border-stroke px-4 py-4 dark:border-dark-3 sm:px-6 md:px-7.5 lg:flex-row lg:items-center lg:justify-between">
                     <div className="flex items-center gap-3">
                         <h3 className="text-xl font-semibold text-dark dark:text-white">
-                            All Notifications
+                            Notifications
                         </h3>
                         {unreadCount > 0 && (
                             <span className="inline-flex items-center justify-center rounded-full bg-primary px-2.5 py-0.5 text-xs font-medium text-white">
-                                {unreadCount} Unread
+                                {unreadCount} New
                             </span>
                         )}
                     </div>
 
-                    {notifications.length > 0 && unreadCount > 0 && (
-                        <button
-                            onClick={markAllAsRead}
-                            className="flex items-center gap-2 text-sm font-medium text-primary hover:underline"
-                        >
-                            <CheckCheck size={18} />
-                            Mark all as read
-                        </button>
-                    )}
+                    <div className="flex flex-wrap items-center gap-3">
+                        <div className="flex rounded-lg border border-stroke p-1 dark:border-dark-3 bg-gray-2 dark:bg-dark-2">
+                            {["all", "unread", "read"].map((s) => (
+                                <button
+                                    key={s}
+                                    onClick={() => handleStatusChange(s)}
+                                    className={cn(
+                                        "rounded-md px-4 py-1.5 text-sm font-medium transition-all capitalize",
+                                        status === s
+                                            ? "bg-white text-dark shadow-sm dark:bg-gray-dark dark:text-white"
+                                            : "text-dark-6 hover:text-dark dark:text-dark-6 dark:hover:text-white"
+                                    )}
+                                >
+                                    {s}
+                                </button>
+                            ))}
+                        </div>
+
+                        {notifications.length > 0 && unreadCount > 0 && (
+                            <button
+                                onClick={markAllAsRead}
+                                className="flex items-center gap-2 rounded-lg border border-primary px-4 py-2 text-sm font-medium text-primary hover:bg-primary hover:text-white transition-all shadow-sm"
+                            >
+                                <CheckCheck size={18} />
+                                Mark all as read
+                            </button>
+                        )}
+                    </div>
                 </div>
 
                 <div className="p-4 sm:p-6 md:p-7.5">
-                    {loading && notifications.length === 0 ? (
-                        <div className="flex h-60 items-center justify-center">
-                            <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
-                        </div>
+                    {loading ? (
+                        <Loader text="Fetching notifications..." className="h-60" />
                     ) : notifications.length === 0 ? (
                         <div className="flex flex-col items-center justify-center py-20 text-center">
                             <div className="mb-4 flex size-20 items-center justify-center rounded-full bg-gray-2 dark:bg-dark-3">
                                 <BellOff size={40} className="text-dark-6" />
                             </div>
                             <h4 className="mb-1 text-xl font-semibold text-dark dark:text-white">
-                                No notifications yet
+                                No {status !== "all" ? status : ""} notifications
                             </h4>
                             <p className="text-dark-6">
-                                We'll notify you when something important happens.
+                                {status === "all"
+                                    ? "We'll notify you when something important happens."
+                                    : `You don't have any ${status} notifications at the moment.`}
                             </p>
                         </div>
                     ) : (
@@ -63,34 +104,34 @@ const NotificationsPage = () => {
                                 <div
                                     key={notif.id}
                                     className={cn(
-                                        "relative flex gap-4 rounded-xl border border-stroke p-4 transition-all dark:border-dark-3",
+                                        "relative flex gap-4 rounded-xl border border-stroke p-4 transition-all dark:border-dark-3 hover:shadow-md",
                                         notif.isRead
                                             ? "bg-transparent"
-                                            : "bg-blue-light-5/30 border-primary/20 dark:bg-primary/5 dark:border-primary/20 shadow-sm"
+                                            : "bg-primary/5 border-primary/20 dark:bg-primary/5 dark:border-primary/20"
                                     )}
                                 >
                                     <div className={cn(
                                         "flex size-12 shrink-0 items-center justify-center rounded-full",
-                                        notif.isRead ? "bg-gray-2 dark:bg-dark-3" : "bg-primary/10 text-primary"
+                                        notif.isRead ? "bg-gray-2 dark:bg-dark-3 text-dark-6" : "bg-primary text-white"
                                     )}>
                                         <Bell size={24} />
                                     </div>
 
-                                    <div className="flex-1">
+                                    <div className="flex-1 min-w-0">
                                         <div className="flex items-start justify-between gap-4">
-                                            <div>
+                                            <div className="min-w-0 flex-1">
                                                 <h5 className={cn(
-                                                    "text-base font-semibold",
+                                                    "text-base font-semibold truncate",
                                                     notif.isRead ? "text-dark dark:text-white" : "text-primary dark:text-white"
                                                 )}>
                                                     {notif.title}
                                                 </h5>
-                                                <p className="mt-1 text-sm text-dark-5 dark:text-dark-6">
+                                                <p className="mt-1 text-sm text-dark-5 dark:text-dark-6 leading-relaxed">
                                                     {notif.message}
                                                 </p>
                                             </div>
                                             <div className="text-right shrink-0">
-                                                <span className="block text-xs text-dark-6 dark:text-dark-7">
+                                                <span className="block text-xs font-medium text-dark-6 dark:text-dark-7">
                                                     {dayjs(notif.createdAt).format("MMM DD, YYYY")}
                                                 </span>
                                                 <span className="mt-1 block text-[10px] text-dark-6 dark:text-dark-7">
@@ -99,11 +140,11 @@ const NotificationsPage = () => {
                                             </div>
                                         </div>
 
-                                        <div className="mt-4 flex items-center justify-end gap-4">
+                                        <div className="mt-3 flex items-center justify-end">
                                             {!notif.isRead && (
                                                 <button
                                                     onClick={() => markAsRead(notif.id)}
-                                                    className="text-xs font-semibold text-primary hover:underline"
+                                                    className="text-xs font-bold text-primary hover:text-primary/80 transition-colors uppercase tracking-wider"
                                                 >
                                                     Mark as read
                                                 </button>
@@ -112,6 +153,50 @@ const NotificationsPage = () => {
                                     </div>
                                 </div>
                             ))}
+
+                            {/* Pagination Controls */}
+                            {pagination.totalPages > 1 && (
+                                <div className="mt-8 flex items-center justify-between border-t border-stroke pt-6 dark:border-dark-3">
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            onClick={() => setPage(p => Math.max(1, p - 1))}
+                                            disabled={page === 1 || loading}
+                                            className="flex items-center justify-center rounded-lg border border-stroke p-2 hover:bg-gray-2 disabled:opacity-50 dark:border-dark-3 dark:hover:bg-dark-2 transition-all"
+                                        >
+                                            <ChevronLeft size={20} />
+                                        </button>
+
+                                        <div className="flex items-center gap-1">
+                                            {Array.from({ length: pagination.totalPages }, (_, i) => i + 1).map((p) => (
+                                                <button
+                                                    key={p}
+                                                    onClick={() => setPage(p)}
+                                                    className={cn(
+                                                        "flex size-10 items-center justify-center rounded-lg text-sm font-bold transition-all",
+                                                        page === p
+                                                            ? "bg-primary text-white shadow-md shadow-primary/20"
+                                                            : "hover:bg-gray-2 dark:hover:bg-dark-2 text-dark dark:text-white"
+                                                    )}
+                                                >
+                                                    {p}
+                                                </button>
+                                            ))}
+                                        </div>
+
+                                        <button
+                                            onClick={() => setPage(p => Math.min(pagination.totalPages, p + 1))}
+                                            disabled={page === pagination.totalPages || loading}
+                                            className="flex items-center justify-center rounded-lg border border-stroke p-2 hover:bg-gray-2 disabled:opacity-50 dark:border-dark-3 dark:hover:bg-dark-2 transition-all"
+                                        >
+                                            <ChevronRight size={20} />
+                                        </button>
+                                    </div>
+
+                                    <p className="text-sm font-medium text-dark-6 dark:text-dark-7">
+                                        Showing page {page} of {pagination.totalPages}
+                                    </p>
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>

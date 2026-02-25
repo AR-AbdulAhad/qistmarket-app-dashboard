@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
+import Loader from '@/components/common/Loader'
 import {
   ColumnDef,
   ColumnFiltersState,
@@ -121,6 +122,13 @@ const OrderList = ({ forcedStatus, hideActions, hideSelection }: OrderListProps)
   const [cancelModalOpen, setCancelModalOpen] = useState(false)
   const [cancelReason, setCancelReason] = useState('')
   const [newProductName, setNewProductName] = useState('')
+  const [products, setProducts] = useState<any[]>([])
+  const [categories, setCategories] = useState<string[]>([])
+  const [subcategories, setSubcategories] = useState<string[]>([])
+  const [selectedCategory, setSelectedCategory] = useState('')
+  const [selectedSubcategory, setSelectedSubcategory] = useState('')
+  const [selectedProduct, setSelectedProduct] = useState<any>(null)
+  const [selectedPlan, setSelectedPlan] = useState<any>(null)
 
   // ── Data Fetching ──────────────────────────────────────────────────────────
   const fetchOrders = async () => {
@@ -199,6 +207,44 @@ const OrderList = ({ forcedStatus, hideActions, hideSelection }: OrderListProps)
   useEffect(() => {
     fetchVerifiers()
   }, [])
+
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        const token = Cookies.get('auth_token')
+        const res = await fetch(`${BACKEND_URL}/api/products`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        if (res.ok) {
+          const json = await res.json()
+          if (json.success) {
+            setProducts(json.data)
+            const uniqueCategories = Array.from(new Set(json.data.map((p: any) => p.category_name))) as string[]
+            setCategories(uniqueCategories.sort())
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load products', err)
+      }
+    }
+    fetchProducts()
+  }, [])
+
+  useEffect(() => {
+    if (selectedCategory) {
+      const filteredSubcats = Array.from(new Set(
+        products
+          .filter(p => p.category_name === selectedCategory)
+          .map(p => p.subcategory_name)
+      )) as string[]
+      setSubcategories(filteredSubcats.sort())
+      setSelectedSubcategory('')
+      setSelectedProduct(null)
+      setSelectedPlan(null)
+    } else {
+      setSubcategories([])
+    }
+  }, [selectedCategory, products])
 
   // ── Handlers ───────────────────────────────────────────────────────────────
   const handleAssignClick = (order: Order) => {
@@ -336,11 +382,15 @@ const OrderList = ({ forcedStatus, hideActions, hideSelection }: OrderListProps)
   const handleEditClick = (order: Order) => {
     setSelectedOrder(order)
     setNewProductName(order.product_name)
+    setSelectedCategory('')
+    setSelectedSubcategory('')
+    setSelectedProduct(null)
+    setSelectedPlan(null)
     setEditModalOpen(true)
   }
 
   const confirmEdit = async () => {
-    if (!selectedOrder || !newProductName.trim()) return
+    if (!selectedOrder || !selectedProduct || !selectedPlan) return
     setIsSubmitting(true)
     try {
       const token = Cookies.get('auth_token')
@@ -350,13 +400,21 @@ const OrderList = ({ forcedStatus, hideActions, hideSelection }: OrderListProps)
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ product_name: newProductName }),
+        body: JSON.stringify({
+          product_name: selectedProduct.name,
+          advance_amount: selectedPlan.advance,
+          monthly_amount: selectedPlan.monthlyAmount,
+          months: selectedPlan.months,
+          total_amount: selectedPlan.totalPrice
+        }),
       })
 
       if (!res.ok) throw new Error('Update failed')
       await fetchOrders()
       setEditModalOpen(false)
       setSelectedOrder(null)
+      setSelectedProduct(null)
+      setSelectedPlan(null)
     } catch (err) {
       console.error('Update error:', err)
       alert('Update failed')
@@ -857,7 +915,7 @@ const OrderList = ({ forcedStatus, hideActions, hideSelection }: OrderListProps)
             {loading ? (
               <tr>
                 <td colSpan={columns.length} className="py-12 text-center">
-                  Loading...
+                  <Loader text="Loading orders..." />
                 </td>
               </tr>
             ) : orders.length === 0 ? (
@@ -936,26 +994,94 @@ const OrderList = ({ forcedStatus, hideActions, hideSelection }: OrderListProps)
         <p className="mb-6 text-gray-600 dark:text-gray-300">
           Changing product name for order <strong>{selectedOrder?.order_ref}</strong>. This action will be logged in history.
         </p>
-        <div className="space-y-4">
+        <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
           <div>
-            <label className="block text-sm font-medium mb-1 dark:text-gray-300">Current Product Name:</label>
-            <input
-              type="text"
-              readOnly
-              value={selectedOrder?.product_name || ''}
-              className="w-full rounded-lg border border-stroke bg-gray-100 px-4 py-2.5 outline-none dark:border-dark-3 dark:bg-dark-3 dark:text-gray-400"
-            />
+            <label className="block text-sm font-medium mb-1 dark:text-gray-300">Current Product:</label>
+            <div className="p-3 bg-gray-50 dark:bg-dark-3 rounded-lg border border-stroke dark:border-dark-3 text-sm">
+              {selectedOrder?.product_name}
+            </div>
           </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-1 dark:text-gray-300">Category:</label>
+              <select
+                value={selectedCategory}
+                onChange={(e) => setSelectedCategory(e.target.value)}
+                className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2.5 outline-none focus:border-[#ff3d3d] dark:border-dark-3 text-sm"
+              >
+                <option value="">Select Category</option>
+                {categories.map(cat => (
+                  <option key={cat} value={cat}>{cat}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1 dark:text-gray-300">Subcategory:</label>
+              <select
+                value={selectedSubcategory}
+                onChange={(e) => setSelectedSubcategory(e.target.value)}
+                disabled={!selectedCategory}
+                className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2.5 outline-none focus:border-[#ff3d3d] dark:border-dark-3 text-sm disabled:bg-gray-100"
+              >
+                <option value="">Select Subcategory</option>
+                {subcategories.map(sub => (
+                  <option key={sub} value={sub}>{sub}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
           <div>
-            <label className="block text-sm font-medium mb-1 dark:text-gray-300">New Product Name:</label>
-            <input
-              type="text"
-              value={newProductName}
-              onChange={(e) => setNewProductName(e.target.value)}
-              className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2.5 outline-none focus:border-[#ff3d3d] dark:border-dark-3"
-              placeholder="Enter new product name"
-            />
+            <label className="block text-sm font-medium mb-1 dark:text-gray-300">Select New Product:</label>
+            <select
+              disabled={!selectedSubcategory}
+              onChange={(e) => {
+                const prod = products.find(p => p.name === e.target.value)
+                if (prod) setSelectedProduct(prod)
+              }}
+              className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2.5 outline-none focus:border-[#ff3d3d] dark:border-dark-3 text-sm disabled:bg-gray-100"
+            >
+              <option value="">Select Product</option>
+              {products
+                .filter(p => p.category_name === selectedCategory && p.subcategory_name === selectedSubcategory)
+                .map((p: any) => (
+                  <option key={p.id} value={p.name}>
+                    {p.name}
+                  </option>
+                ))}
+            </select>
           </div>
+
+          {selectedProduct && (
+            <div className="space-y-3 pt-2">
+              <label className="block text-sm font-medium dark:text-gray-300">Select Plan:</label>
+              <div className="grid grid-cols-1 gap-3">
+                {selectedProduct.ProductInstallments?.filter((p: any) => p.isActive).map((plan: any) => (
+                  <label
+                    key={plan.id}
+                    className={`p-3 border rounded-lg cursor-pointer transition-all ${selectedPlan?.id === plan.id
+                      ? 'border-[#ff3d3d] bg-red-50'
+                      : 'border-stroke hover:border-red-200'
+                      }`}
+                  >
+                    <input
+                      type="radio"
+                      className="sr-only"
+                      checked={selectedPlan?.id === plan.id}
+                      onChange={() => setSelectedPlan(plan)}
+                    />
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="font-semibold">{plan.months} Months</span>
+                      <span>Adv: Rs. {plan.advance.toLocaleString()}</span>
+                      <span>Month: Rs. {plan.monthlyAmount.toLocaleString()}</span>
+                      <span>Total: Rs. {plan.totalPrice.toLocaleString()}</span>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
         <div className="mt-6 flex justify-end gap-4">
           <button
@@ -967,8 +1093,8 @@ const OrderList = ({ forcedStatus, hideActions, hideSelection }: OrderListProps)
           </button>
           <button
             onClick={confirmEdit}
-            disabled={!newProductName.trim() || newProductName === selectedOrder?.product_name || isSubmitting}
-            className="rounded bg-blue-600 px-6 py-2.5 text-white hover:bg-blue-700 disabled:opacity-50"
+            disabled={!selectedProduct || !selectedPlan || isSubmitting}
+            className="rounded bg-[#ff3d3d] px-6 py-2.5 text-white hover:bg-[#ff3d3d]/90 disabled:opacity-50"
           >
             {isSubmitting ? 'Updating...' : 'Update Product'}
           </button>

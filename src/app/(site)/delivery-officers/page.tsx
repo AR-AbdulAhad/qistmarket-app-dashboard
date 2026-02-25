@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Cookies from 'js-cookie';
 import toast from 'react-hot-toast';
+import Loader from '@/components/common/Loader';
 import { DeliveryActionsModal } from '@/components/DeliveryManagement/DeliveryActionsModal';
 import { DeliveryTable } from '@/components/DeliveryManagement/DeliveryTable';
 import { DeliveryStats } from '@/components/DeliveryManagement/DeliveryStats';
@@ -17,6 +18,9 @@ interface DeliveryBoy {
   profile_image: string | null;
   pending_count: number;
   whatsapp: string | null;
+  is_online: boolean;
+  delivered_today: number;
+  returned_today: number;
 }
 
 interface ProductGroup {
@@ -35,6 +39,8 @@ interface BoyDetails {
     username: string;
     profile_image: string | null;
     whatsapp: string | null;
+    is_online: boolean;
+    last_online_at: string | null;
   };
   pending_products: ProductGroup[];
 }
@@ -69,13 +75,13 @@ export default function DeliveryOfficers() {
   const [allDeliveries, setAllDeliveries] = useState<DeliveryOrder[]>([]);
   const [deliveriesLoading, setDeliveriesLoading] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<DeliveryOrder | null>(null);
-  const [actionType, setActionType] = useState<'deliver' | 'return' | null>(null);
+  const [actionType, setActionType] = useState<'deliver' | 'return' | 'refund' | null>(null);
 
-  // Calculated Stats
+  // KPI Stats Top Row
   const totalRiders = deliveryBoys.length;
   const activeDeliveries = allDeliveries.filter(d => d.status === 'in_transit' || d.status === 'picked_up').length;
-  const completedToday = allDeliveries.filter(d => d.status === 'delivered').length;
-  const returnedToday = allDeliveries.filter(d => d.status === 'returned').length;
+  const completedToday = deliveryBoys.reduce((sum, b) => sum + (b.delivered_today || 0), 0);
+  const returnedToday = deliveryBoys.reduce((sum, b) => sum + (b.returned_today || 0), 0);
 
   useEffect(() => {
     fetchDeliveryBoys();
@@ -158,8 +164,8 @@ export default function DeliveryOfficers() {
   };
 
   const handleVerifyOtp = async (): Promise<void> => {
-    if (!selectedBoyId || otpInput.length !== 6) {
-      toast.error('Please enter a valid 6-digit OTP');
+    if (!selectedBoyId || otpInput.length !== 5) {
+      toast.error('Please enter a valid 5-digit OTP');
       return;
     }
     setIsActionLoading(true);
@@ -227,8 +233,8 @@ export default function DeliveryOfficers() {
           <button
             onClick={() => setActiveTab('dashboard')}
             className={`rounded-md py-2 px-6 text-sm font-medium transition-all duration-200 ${activeTab === 'dashboard'
-                ? 'bg-white text-primary shadow-card dark:bg-boxdark dark:text-white'
-                : 'text-gray-600 hover:text-primary dark:text-gray-400 dark:hover:text-white'
+              ? 'bg-white text-primary shadow-card dark:bg-boxdark dark:text-white'
+              : 'text-gray-600 hover:text-primary dark:text-gray-400 dark:hover:text-white'
               }`}
           >
             Dashboard
@@ -236,8 +242,8 @@ export default function DeliveryOfficers() {
           <button
             onClick={() => setActiveTab('all_deliveries')}
             className={`rounded-md py-2 px-6 text-sm font-medium transition-all duration-200 ${activeTab === 'all_deliveries'
-                ? 'bg-white text-primary shadow-card dark:bg-boxdark dark:text-white'
-                : 'text-gray-600 hover:text-primary dark:text-gray-400 dark:hover:text-white'
+              ? 'bg-white text-primary shadow-card dark:bg-boxdark dark:text-white'
+              : 'text-gray-600 hover:text-primary dark:text-gray-400 dark:hover:text-white'
               }`}
           >
             All Deliveries
@@ -288,8 +294,8 @@ export default function DeliveryOfficers() {
                       key={boy.id}
                       onClick={() => fetchBoyDetails(boy.id)}
                       className={`flex items-center gap-4 px-6 py-4 cursor-pointer transition-all border-l-4 ${selectedBoyId === boy.id
-                          ? 'bg-gray-50 dark:bg-meta-4/30 border-primary'
-                          : 'border-transparent hover:bg-gray-50 dark:hover:bg-meta-4/20'
+                        ? 'bg-gray-50 dark:bg-meta-4/30 border-primary'
+                        : 'border-transparent hover:bg-gray-50 dark:hover:bg-meta-4/20'
                         }`}
                     >
                       <div className="relative h-12 w-12 flex-shrink-0">
@@ -304,17 +310,25 @@ export default function DeliveryOfficers() {
                             {boy.name.charAt(0)}
                           </div>
                         )}
-                        <span className="absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-2 border-white bg-success dark:border-boxdark"></span>
+                        <span className={`absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-2 border-white dark:border-boxdark ${boy.is_online ? 'bg-success' : 'bg-gray-300'}`}></span>
                       </div>
                       <div className="flex-1 min-w-0">
-                        <h4 className="font-bold text-black dark:text-white truncate">
-                          {boy.name}
-                        </h4>
                         <div className="flex items-center justify-between">
-                          <p className="text-sm font-medium text-gray-400 truncate">@{boy.username}</p>
+                          <h4 className="font-bold text-black dark:text-white truncate">
+                            {boy.name}
+                          </h4>
+                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${boy.is_online ? 'bg-success/10 text-success' : 'bg-gray-100 text-gray-400'}`}>
+                            {boy.is_online ? 'ONLINE' : 'OFFLINE'}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between mt-0.5">
+                          <div className="flex gap-2 text-[10px] font-bold">
+                            <span className="text-success">D: {boy.delivered_today || 0}</span>
+                            <span className="text-danger">R: {boy.returned_today || 0}</span>
+                          </div>
                           {boy.pending_count > 0 && (
-                            <span className="inline-flex items-center justify-center rounded-full bg-primary py-0.5 px-2 text-xs font-bold text-white shadow-sm">
-                              {boy.pending_count}
+                            <span className="inline-flex items-center justify-center rounded-full bg-primary py-0.5 px-2 text-[10px] font-bold text-white shadow-sm">
+                              {boy.pending_count} PENDING
                             </span>
                           )}
                         </div>
@@ -329,9 +343,7 @@ export default function DeliveryOfficers() {
           {/* Rider Details and Actions - Right Side */}
           <div className="lg:col-span-8 xl:col-span-9 space-y-6">
             {isLoading ? (
-              <div className="flex h-[400px] items-center justify-center rounded-xl border border-stroke bg-white shadow-default dark:border-strokedark dark:bg-boxdark">
-                <div className="h-12 w-12 animate-spin rounded-full border-4 border-solid border-primary border-t-transparent"></div>
-              </div>
+              <Loader text="Loading rider details..." className="h-[400px] items-center justify-center rounded-xl border border-stroke bg-white shadow-default dark:border-strokedark dark:bg-boxdark" />
             ) : selectedBoyId && boyDetails ? (
               <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-6">
                 {/* Rider Profile Card */}
@@ -396,7 +408,7 @@ export default function DeliveryOfficers() {
                         </button>
                         <button
                           onClick={handleVerifyOtp}
-                          disabled={isActionLoading || otpInput.length !== 6}
+                          disabled={isActionLoading || otpInput.length !== 5}
                           className="flex-1 sm:flex-none inline-flex items-center justify-center rounded-lg bg-success py-3.5 px-8 font-bold text-white hover:bg-opacity-90 transition disabled:opacity-50"
                         >
                           {isActionLoading ? '...' : 'Verify'}
@@ -415,7 +427,7 @@ export default function DeliveryOfficers() {
                     </span>
                   </h4>
 
-                  {boyDetails.pending_products.length === 0 ? (
+                  {boyDetails.pending_products.length === 1 ? (
                     <div className="rounded-xl border border-dashed border-stroke bg-gray-50 p-10 text-center dark:border-strokedark dark:bg-boxdark">
                       <p className="font-medium text-gray-500">No pending products allocated to this rider.</p>
                     </div>
@@ -481,6 +493,10 @@ export default function DeliveryOfficers() {
               setSelectedOrder(order);
               setActionType('return');
             }}
+            onMarkRefunded={(order) => {
+              setSelectedOrder(order);
+              setActionType('refund');
+            }}
           />
 
           <DeliveryActionsModal
@@ -490,7 +506,7 @@ export default function DeliveryOfficers() {
               setActionType(null);
             }}
             orderId={selectedOrder?.id || null}
-            actionType={actionType}
+            actionType={actionType as any}
             onSuccess={() => {
               fetchAllDeliveries();
             }}

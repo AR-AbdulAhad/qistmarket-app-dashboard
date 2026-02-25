@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
+import Loader from '@/components/common/Loader'
 import {
   ColumnDef,
   ColumnFiltersState,
@@ -559,7 +560,7 @@ const AssignedVerifications = () => {
             {loading ? (
               <tr>
                 <td colSpan={columns.length} className="py-20 text-center">
-                  Loading verifications...
+                  <Loader text="Loading verifications..." />
                 </td>
               </tr>
             ) : orders.length === 0 ? (

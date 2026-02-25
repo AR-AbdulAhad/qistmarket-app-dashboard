@@ -9,7 +9,7 @@ interface DeliveryActionsModalProps {
     isOpen: boolean;
     onClose: () => void;
     orderId: number | null;
-    actionType: 'deliver' | 'return' | null;
+    actionType: 'deliver' | 'return' | 'refund' | null;
     onSuccess: () => void;
 }
 
@@ -22,7 +22,40 @@ export const DeliveryActionsModal = ({
 }: DeliveryActionsModalProps) => {
     const [remarks, setRemarks] = useState('');
     const [returnReason, setReturnReason] = useState('');
+    const [otp, setOtp] = useState('');
+    const [isOtpSent, setIsOtpSent] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isSendingOtp, setIsSendingOtp] = useState(false);
+
+    const handleSendOtp = async () => {
+        if (!orderId) return;
+        setIsSendingOtp(true);
+        try {
+            const token = Cookies.get('auth_token');
+            const endpoint = actionType === 'deliver'
+                ? `${BACKEND_URL}/api/delivery/generate-otp`
+                : `${BACKEND_URL}/api/delivery/refund/generate-otp`;
+
+            const res = await fetch(endpoint, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({ order_id: orderId }),
+            });
+
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error?.message || 'Failed to send OTP');
+
+            setIsOtpSent(true);
+            toast.success('OTP sent to customer successfully');
+        } catch (error: any) {
+            toast.error(error.message || 'Failed to send OTP');
+        } finally {
+            setIsSendingOtp(false);
+        }
+    };
 
     const handleSubmit = async () => {
         if (!orderId || !actionType) return;
@@ -32,22 +65,30 @@ export const DeliveryActionsModal = ({
             return;
         }
 
+        if ((actionType === 'deliver' || actionType === 'refund') && !otp) {
+            toast.error('Please enter the OTP provided by the customer');
+            return;
+        }
+
         setIsSubmitting(true);
 
         try {
             const token = Cookies.get('auth_token');
-            const endpoint =
-                actionType === 'deliver'
-                    ? `${BACKEND_URL}/api/orders/${orderId}/mark-delivered`
-                    : `${BACKEND_URL}/api/orders/${orderId}/mark-returned`;
+            let endpoint = '';
+            let body: any = { order_id: orderId };
 
-            const body =
-                actionType === 'deliver'
-                    ? { remarks }
-                    : { reason: returnReason, remarks };
+            if (actionType === 'deliver') {
+                endpoint = `${BACKEND_URL}/api/delivery/verify-otp`;
+                body.otp = otp;
+            } else if (actionType === 'refund') {
+                endpoint = `${BACKEND_URL}/api/delivery/refund/verify-otp`;
+                body.otp = otp;
+            } else if (actionType === 'return') {
+                endpoint = `${BACKEND_URL}/api/delivery/return`;
+                body.reason = returnReason;
+                body.remarks = remarks;
+            }
 
-            // Simulating API call if backend not ready
-            // await new Promise((resolve) => setTimeout(resolve, 1000));
             const res = await fetch(endpoint, {
                 method: 'POST',
                 headers: {
@@ -57,46 +98,64 @@ export const DeliveryActionsModal = ({
                 body: JSON.stringify(body),
             });
 
+            const data = await res.json();
             if (!res.ok) {
-                const data = await res.json();
-                throw new Error(data.message || 'Action failed');
+                if (data.valid === false) {
+                    throw new Error(data.message || 'Invalid OTP');
+                }
+                throw new Error(data.error?.message || data.message || 'Action failed');
             }
 
             toast.success(
                 actionType === 'deliver'
-                    ? 'Order marked as Delivered'
-                    : 'Order marked as Returned'
+                    ? 'Order delivered successfully'
+                    : actionType === 'refund'
+                        ? 'Refund processed successfully'
+                        : 'Order marked as Returned'
             );
             onSuccess();
             onClose();
+            // Reset state
+            setOtp('');
+            setIsOtpSent(false);
+            setReturnReason('');
+            setRemarks('');
         } catch (error: any) {
             console.error('Delivery action error:', error);
-            toast.error(error.message || 'Failed to update order status');
+            toast.error(error.message || 'Failed to process request');
         } finally {
             setIsSubmitting(false);
         }
     };
 
+    const handleModalClose = () => {
+        setOtp('');
+        setIsOtpSent(false);
+        setReturnReason('');
+        setRemarks('');
+        onClose();
+    };
+
     return (
         <Modal
             open={isOpen}
-            onClose={onClose}
+            onClose={handleModalClose}
             className="max-w-md rounded-2xl bg-white p-8 shadow-xl dark:bg-gray-800"
         >
-            <h2 className="mb-4 text-xl font-semibold text-dark dark:text-white">
-                {actionType === 'deliver' ? 'Mark as Delivered' : 'Mark as Returned'}
+            <h2 className="mb-4 text-xl font-bold text-dark dark:text-white">
+                {actionType === 'deliver' ? 'Confirm Delivery' : actionType === 'refund' ? 'Process Refund' : 'Mark as Returned'}
             </h2>
 
-            <div className="space-y-4">
+            <div className="space-y-5">
                 {actionType === 'return' && (
                     <div>
-                        <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        <label className="mb-2 block text-sm font-bold text-gray-700 dark:text-gray-300">
                             Reason for Return *
                         </label>
                         <select
                             value={returnReason}
                             onChange={(e) => setReturnReason(e.target.value)}
-                            className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2.5 outline-none focus:border-[#ff3d3d] dark:border-dark-3 dark:bg-dark-2"
+                            className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2.5 outline-none focus:border-primary dark:border-strokedark dark:bg-meta-4"
                         >
                             <option value="">Select Reason</option>
                             <option value="Customer Not Available">Customer Not Available</option>
@@ -108,33 +167,63 @@ export const DeliveryActionsModal = ({
                     </div>
                 )}
 
+                {(actionType === 'deliver' || actionType === 'refund') && (
+                    <div className="rounded-xl bg-gray-50 p-4 dark:bg-meta-4/20 border border-dashed border-stroke dark:border-strokedark">
+                        <div className="flex items-center justify-between mb-3">
+                            <label className="text-sm font-bold text-gray-700 dark:text-gray-300">
+                                Verify with OTP *
+                            </label>
+                            <button
+                                onClick={handleSendOtp}
+                                disabled={isSendingOtp || isSubmitting}
+                                className="text-xs font-bold text-primary hover:underline disabled:opacity-50"
+                            >
+                                {isSendingOtp ? 'Sending...' : isOtpSent ? 'Resend OTP' : 'Send OTP'}
+                            </button>
+                        </div>
+                        <input
+                            type="text"
+                            maxLength={6}
+                            value={otp}
+                            onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
+                            placeholder="Enter 6-digit OTP"
+                            className="w-full rounded-lg border border-stroke bg-white py-3 px-4 text-center text-2xl font-black tracking-widest outline-none focus:border-primary dark:border-strokedark dark:bg-boxdark"
+                        />
+                        <p className="mt-2 text-[10px] text-gray-500 text-center font-medium">
+                            Ask the customer for the verification code sent to their phone.
+                        </p>
+                    </div>
+                )}
+
                 <div>
-                    <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    <label className="mb-2 block text-sm font-bold text-gray-700 dark:text-gray-300">
                         Remarks (Optional)
                     </label>
                     <textarea
                         value={remarks}
                         onChange={(e) => setRemarks(e.target.value)}
-                        className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2.5 outline-none focus:border-[#ff3d3d] dark:border-dark-3 dark:bg-dark-2"
+                        className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2.5 outline-none focus:border-primary dark:border-strokedark dark:bg-meta-4"
                         rows={3}
                         placeholder="Add any additional notes..."
                     />
                 </div>
 
-                <div className="mt-6 flex justify-end gap-4">
+                <div className="mt-6 flex justify-end gap-3">
                     <button
-                        onClick={onClose}
+                        onClick={handleModalClose}
                         disabled={isSubmitting}
-                        className="rounded border border-stroke px-6 py-2.5 text-dark hover:bg-gray-100 disabled:opacity-50 dark:border-dark-3 dark:text-white dark:hover:bg-dark-3"
+                        className="flex-1 rounded-lg border border-stroke py-3 font-bold text-dark hover:bg-gray-100 disabled:opacity-50 dark:border-strokedark dark:text-white dark:hover:bg-meta-4"
                     >
                         Cancel
                     </button>
                     <button
                         onClick={handleSubmit}
-                        disabled={isSubmitting}
-                        className={`rounded px-6 py-2.5 text-white disabled:opacity-50 ${actionType === 'deliver'
-                                ? 'bg-green-600 hover:bg-green-700'
-                                : 'bg-red-600 hover:bg-red-700'
+                        disabled={isSubmitting || ((actionType === 'deliver' || actionType === 'refund') && !otp)}
+                        className={`flex-1 rounded-lg py-3 font-bold text-white shadow-md transition disabled:opacity-50 ${actionType === 'deliver'
+                            ? 'bg-success hover:bg-opacity-90'
+                            : actionType === 'refund'
+                                ? 'bg-blue-600 hover:bg-opacity-90'
+                                : 'bg-red-600 hover:bg-opacity-90'
                             }`}
                     >
                         {isSubmitting ? 'Processing...' : 'Confirm'}

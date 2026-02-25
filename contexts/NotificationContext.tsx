@@ -15,11 +15,19 @@ interface Notification {
     relatedId?: number;
 }
 
+interface Pagination {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+}
+
 interface NotificationContextType {
     notifications: Notification[];
     unreadCount: number;
     loading: boolean;
-    fetchNotifications: () => Promise<void>;
+    pagination: Pagination;
+    fetchNotifications: (page?: number, limit?: number, status?: string) => Promise<void>;
     markAsRead: (id: number) => Promise<void>;
     markAllAsRead: () => Promise<void>;
 }
@@ -30,23 +38,30 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
     const [notifications, setNotifications] = useState<Notification[]>([]);
     const [unreadCount, setUnreadCount] = useState(0);
     const [loading, setLoading] = useState(false);
+    const [pagination, setPagination] = useState<Pagination>({
+        page: 1,
+        limit: 10,
+        total: 0,
+        totalPages: 1
+    });
     const [socket, setSocket] = useState<Socket | null>(null);
 
     const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "https://qistmarket-software-backend.onrender.com";
 
-    const fetchNotifications = async () => {
+    const fetchNotifications = async (page = 1, limit = 10, status = "all") => {
         const token = Cookies.get("auth_token");
         if (!token) return;
 
         try {
             setLoading(true);
-            const res = await fetch(`${backendUrl}/api/notifications?limit=20`, {
+            const res = await fetch(`${backendUrl}/api/notifications?page=${page}&limit=${limit}&status=${status}`, {
                 headers: { Authorization: `Bearer ${token}` },
             });
             const result = await res.json();
             if (result.success) {
                 setNotifications(result.data.notifications);
                 setUnreadCount(result.data.unreadCount);
+                setPagination(result.data.pagination);
             }
         } catch (error) {
             console.error("Failed to fetch notifications:", error);
@@ -111,13 +126,13 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
         newSocket.on("new_notification", (notif: Notification) => {
             setNotifications((prev) => [notif, ...prev]);
             setUnreadCount((prev) => prev + 1);
-            toast.success(
-                <div className="flex flex-col gap-1 text-sm">
-                    <strong className="font-bold">{notif.title}</strong>
-                    <span>{notif.message}</span>
-                </div>,
-                { duration: 5000 }
-            );
+            // toast.success(
+            //     <div className="flex flex-col gap-1 text-sm">
+            //         <strong className="font-bold">{notif.title}</strong>
+            //         <span>{notif.message}</span>
+            //     </div>,
+            //     { duration: 5000 }
+            // );
         });
 
         setSocket(newSocket);
@@ -133,6 +148,7 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
                 notifications,
                 unreadCount,
                 loading,
+                pagination,
                 fetchNotifications,
                 markAsRead,
                 markAllAsRead,

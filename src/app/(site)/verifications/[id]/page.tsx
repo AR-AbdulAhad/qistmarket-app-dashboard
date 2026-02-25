@@ -4,6 +4,7 @@ import { use } from 'react'
 import Cookies from 'js-cookie'
 import { cn } from '@/lib/utils'
 import toast from "react-hot-toast";
+import Loader from '@/components/common/Loader';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL
 
@@ -276,7 +277,7 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
     }
   };
 
-  if (loading) return <div className="py-20 text-center">Loading verification details...</div>
+  if (loading) return <Loader text="Loading verification details..." />
   if (error) return <div className="py-20 text-center text-red-600">{error}</div>
   if (!data) return <div className="py-20 text-center">No data available</div>
 

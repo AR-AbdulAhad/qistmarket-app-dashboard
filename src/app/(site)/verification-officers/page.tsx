@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import Cookies from 'js-cookie';
 import toast from 'react-hot-toast';
+import Loader from '@/components/common/Loader';
 import { SearchIcon } from '@/assets/icons';
 import io from 'socket.io-client';
 
@@ -302,7 +303,7 @@ export default function VerificationOfficersPage() {
 
                         <div className="flex flex-col max-h-[600px] overflow-y-auto">
                             {isLoading ? (
-                                <div className="p-8 text-center text-gray-500">Loading officers...</div>
+                                <Loader text="Loading officers..." />
                             ) : filteredOfficers.length === 0 ? (
                                 <div className="p-8 text-center text-gray-500">No officers found</div>
                             ) : (
@@ -311,8 +312,8 @@ export default function VerificationOfficersPage() {
                                         key={officer.id}
                                         onClick={() => setSelectedOfficer(officer)}
                                         className={`flex items-center gap-4 px-6 py-4 cursor-pointer transition-all border-l-4 ${selectedOfficer?.id === officer.id
-                                                ? 'bg-gray-50 dark:bg-meta-4/30 border-primary'
-                                                : 'border-transparent hover:bg-gray-50 dark:hover:bg-meta-4/20'
+                                            ? 'bg-gray-50 dark:bg-meta-4/30 border-primary'
+                                            : 'border-transparent hover:bg-gray-50 dark:hover:bg-meta-4/20'
                                             }`}
                                     >
                                         <div className="relative h-12 w-12 flex-shrink-0">

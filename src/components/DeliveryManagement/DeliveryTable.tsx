@@ -7,7 +7,8 @@ import {
     useReactTable,
 } from '@tanstack/react-table';
 import { useState } from 'react';
-import { ChevronLeft, ChevronRight, SearchIcon } from '@/assets/icons';
+import Loader from "@/components/common/Loader";
+import { ChevronLeft, ChevronRight, SearchIcon, RotateCcw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface DeliveryOrder {
@@ -27,6 +28,7 @@ interface DeliveryTableProps {
     loading: boolean;
     onMarkDelivered: (order: DeliveryOrder) => void;
     onMarkReturned: (order: DeliveryOrder) => void;
+    onMarkRefunded: (order: DeliveryOrder) => void;
 }
 
 export const DeliveryTable = ({
@@ -34,6 +36,7 @@ export const DeliveryTable = ({
     loading,
     onMarkDelivered,
     onMarkReturned,
+    onMarkRefunded,
 }: DeliveryTableProps) => {
     const [globalFilter, setGlobalFilter] = useState('');
     const [statusFilter, setStatusFilter] = useState('all');
@@ -73,7 +76,8 @@ export const DeliveryTable = ({
                     "inline-flex rounded-full py-1 px-3 text-xs font-bold uppercase tracking-wider",
                     row.original.status === 'delivered' ? "bg-success/10 text-success" :
                         row.original.status === 'returned' ? "bg-danger/10 text-danger" :
-                            "bg-warning/10 text-warning"
+                            row.original.status === 'refunded' ? "bg-blue-600/10 text-blue-600" :
+                                "bg-warning/10 text-warning"
                 )}>
                     {row.original.status.replace('_', ' ')}
                 </span>
@@ -84,22 +88,34 @@ export const DeliveryTable = ({
             header: 'Actions',
             cell: ({ row }) => {
                 const order = row.original;
-                if (order.status !== 'in_transit' && order.status !== 'picked_up') return null;
 
                 return (
-                    <div className="flex items-center gap-3">
-                        <button
-                            onClick={() => onMarkDelivered(order)}
-                            className="bg-success/10 text-success cursor-pointer rounded-md py-1.5 px-3 text-xs font-bold hover:bg-success hover:text-white transition-all shadow-sm"
-                        >
-                            DELIVERED
-                        </button>
-                        <button
-                            onClick={() => onMarkReturned(order)}
-                            className="bg-danger/10 text-danger cursor-pointer rounded-md py-1.5 px-3 text-xs font-bold hover:bg-danger hover:text-white transition-all shadow-sm"
-                        >
-                            RETURNED
-                        </button>
+                    <div className="flex items-center gap-2">
+                        {(order.status === 'in_transit' || order.status === 'picked_up') && (
+                            <>
+                                <button
+                                    onClick={() => onMarkDelivered(order)}
+                                    className="bg-success text-white cursor-pointer rounded-md py-1.5 px-3 text-[10px] font-bold hover:bg-opacity-90 transition-all shadow-sm"
+                                >
+                                    DELIVER
+                                </button>
+                                <button
+                                    onClick={() => onMarkReturned(order)}
+                                    className="bg-danger text-white cursor-pointer rounded-md py-1.5 px-3 text-[10px] font-bold hover:bg-opacity-90 transition-all shadow-sm"
+                                >
+                                    RETURN
+                                </button>
+                            </>
+                        )}
+                        {(order.status === 'delivered') && (
+                            <button
+                                onClick={() => onMarkRefunded(order)}
+                                className="bg-blue-600 text-white cursor-pointer rounded-md py-1.5 px-3 text-[10px] font-bold hover:bg-opacity-90 transition-all shadow-sm flex items-center gap-1"
+                            >
+                                <RotateCcw size={12} />
+                                REFUND
+                            </button>
+                        )}
                     </div>
                 );
             },
@@ -128,12 +144,7 @@ export const DeliveryTable = ({
     });
 
     if (loading) {
-        return (
-            <div className="rounded-[10px] border border-stroke bg-white p-20 shadow-1 dark:border-strokedark dark:bg-gray-dark text-center">
-                <div className="inline-block h-10 w-10 animate-spin rounded-full border-4 border-solid border-primary border-t-transparent"></div>
-                <p className="mt-4 font-medium text-gray-500">Loading delivery data...</p>
-            </div>
-        );
+        return <Loader text="Loading delivery data..." className="py-20 rounded-[10px] border border-stroke bg-white shadow-1 dark:border-strokedark dark:bg-gray-dark" />;
     }
 
     return (
@@ -165,6 +176,7 @@ export const DeliveryTable = ({
                         <option value="in_transit">In Transit</option>
                         <option value="delivered">Delivered</option>
                         <option value="returned">Returned</option>
+                        <option value="refunded">Refunded</option>
                     </select>
                 </div>
             </div>
@@ -233,4 +245,3 @@ export const DeliveryTable = ({
         </div>
     );
 };
-

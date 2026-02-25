@@ -24,7 +24,7 @@ interface Officer {
 // const zones = [...];
 // const karachiAreas = [...];
 
-const OfficerAssignmentsPage = () => {
+const DeliveryOfficerAssignmentsPage = () => {
     const [officers, setOfficers] = useState<Officer[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedOfficer, setSelectedOfficer] = useState<Officer | null>(null);
@@ -49,7 +49,7 @@ const OfficerAssignmentsPage = () => {
         try {
             const token = Cookies.get("auth_token");
             const [offResp, addrResp] = await Promise.all([
-                fetch(`${BACKEND_URL}/api/assignments/officers`, { headers: { Authorization: `Bearer ${token}` } }),
+                fetch(`${BACKEND_URL}/api/assignments/officers?role=delivery`, { headers: { Authorization: `Bearer ${token}` } }),
                 fetch(`${BACKEND_URL}/api/address/hierarchy`, { headers: { Authorization: `Bearer ${token}` } })
             ]);
 
@@ -120,11 +120,11 @@ const OfficerAssignmentsPage = () => {
 
     return (
         <div className="mx-auto max-w-7xl">
-            <Breadcrumb pageName="Officer Area Assignments" />
+            <Breadcrumb pageName="Delivery Officer Area Assignments" />
 
             <div className="bg-white dark:bg-gray-dark rounded-xl shadow-sm overflow-hidden">
                 <div className="p-6 border-b border-gray-200 dark:border-gray-800 flex flex-col md:flex-row justify-between items-center gap-4">
-                    <h2 className="text-xl font-bold">Verification Officers</h2>
+                    <h2 className="text-xl font-bold">Delivery Officers</h2>
                     <div className="relative w-full md:w-64">
                         <input
                             type="text"
@@ -150,7 +150,7 @@ const OfficerAssignmentsPage = () => {
                             {loading ? (
                                 <tr>
                                     <td colSpan={4} className="px-6 py-10 text-center">
-                                        <Loader text="Loading data..." />
+                                        <Loader text="Loading officers..." />
                                     </td>
                                 </tr>
                             ) : filteredOfficers.length === 0 ? (
@@ -189,94 +189,96 @@ const OfficerAssignmentsPage = () => {
             </div>
 
             {/* Assignment Modal */}
-            {isModalOpen && selectedOfficer && (
-                <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-black/50 overflow-y-auto">
-                    <div className="bg-white dark:bg-gray-dark rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
-                        <div className="p-6 border-b border-gray-200 dark:border-gray-800 flex justify-between items-center">
-                            <div>
-                                <h3 className="text-lg font-bold">Manage Assignments</h3>
-                                <p className="text-sm text-gray-500">Assigning areas to <b>{selectedOfficer.full_name}</b></p>
+            {
+                isModalOpen && selectedOfficer && (
+                    <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-black/50 overflow-y-auto">
+                        <div className="bg-white dark:bg-gray-dark rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+                            <div className="p-6 border-b border-gray-200 dark:border-gray-800 flex justify-between items-center">
+                                <div>
+                                    <h3 className="text-lg font-bold">Manage Assignments</h3>
+                                    <p className="text-sm text-gray-500">Assigning areas to <b>{selectedOfficer.full_name}</b></p>
+                                </div>
+                                <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-gray-100 rounded-full">&times;</button>
                             </div>
-                            <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-gray-100 rounded-full">&times;</button>
-                        </div>
 
-                        <div className="flex-1 overflow-hidden flex">
-                            {/* Zones List */}
-                            <div className="w-1/4 border-r border-gray-100 dark:border-gray-800 p-4 space-y-2 overflow-y-auto">
-                                <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4">Zones</p>
-                                {zones.map((zone: string) => (
+                            <div className="flex-1 overflow-hidden flex">
+                                {/* Zones List */}
+                                <div className="w-1/4 border-r border-gray-100 dark:border-gray-800 p-4 space-y-2 overflow-y-auto">
+                                    <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4">Zones</p>
+                                    {zones.map((zone: string) => (
+                                        <button
+                                            key={zone}
+                                            onClick={() => setSelectedZone(zone)}
+                                            className={`w-full text-left px-4 py-3 rounded-lg text-sm font-medium transition ${selectedZone === zone
+                                                ? 'bg-red-600 text-white'
+                                                : 'hover:bg-gray-100 dark:hover:bg-gray-800'
+                                                }`}
+                                        >
+                                            {zone}
+                                        </button>
+                                    ))}
+                                </div>
+
+                                {/* Areas List */}
+                                <div className="flex-1 p-6 overflow-y-auto">
+                                    <div className="flex justify-between items-center mb-6">
+                                        <h4 className="font-bold text-gray-800 dark:text-white">Areas in {selectedZone}</h4>
+                                        <p className="text-sm text-gray-500">{tempAssignments.filter(a => a.zone === selectedZone).length} selected</p>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+                                        {areasInSelectedZone.map((area: string) => {
+                                            const isSelected = tempAssignments.some(a => a.zone === selectedZone && a.area === area);
+                                            return (
+                                                <label
+                                                    key={area}
+                                                    className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition ${isSelected
+                                                        ? 'border-red-600 bg-red-50/50 dark:bg-red-900/10'
+                                                        : 'border-gray-100 dark:border-gray-800 hover:border-red-200'
+                                                        }`}
+                                                >
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={isSelected}
+                                                        onChange={() => handleToggleArea(area)}
+                                                        className="w-4 h-4 text-red-600 rounded focus:ring-red-500"
+                                                    />
+                                                    <span className={`text-sm ${isSelected ? 'font-semibold text-red-700' : 'text-gray-600 dark:text-gray-400'}`}>
+                                                        {area}
+                                                    </span>
+                                                </label>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="p-6 border-t border-gray-200 dark:border-gray-800 flex justify-between items-center">
+                                <div className="text-sm text-gray-500">
+                                    Total Assigned: <b>{tempAssignments.length}</b> areas across <b>{new Set(tempAssignments.map(a => a.zone)).size}</b> zones
+                                </div>
+                                <div className="flex gap-3">
                                     <button
-                                        key={zone}
-                                        onClick={() => setSelectedZone(zone)}
-                                        className={`w-full text-left px-4 py-3 rounded-lg text-sm font-medium transition ${selectedZone === zone
-                                            ? 'bg-red-600 text-white'
-                                            : 'hover:bg-gray-100 dark:hover:bg-gray-800'
-                                            }`}
+                                        onClick={() => setIsModalOpen(false)}
+                                        className="px-6 py-2.5 border border-gray-300 rounded-xl hover:bg-gray-50 transition font-medium"
                                     >
-                                        {zone}
+                                        Cancel
                                     </button>
-                                ))}
-                            </div>
-
-                            {/* Areas List */}
-                            <div className="flex-1 p-6 overflow-y-auto">
-                                <div className="flex justify-between items-center mb-6">
-                                    <h4 className="font-bold text-gray-800 dark:text-white">Areas in {selectedZone}</h4>
-                                    <p className="text-sm text-gray-500">{tempAssignments.filter(a => a.zone === selectedZone).length} selected</p>
+                                    <button
+                                        onClick={handleSave}
+                                        disabled={saving}
+                                        className="px-8 py-2.5 bg-red-600 text-white rounded-xl hover:bg-red-700 transition font-medium disabled:opacity-50"
+                                    >
+                                        {saving ? 'Saving...' : 'Save Changes'}
+                                    </button>
                                 </div>
-
-                                <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
-                                    {areasInSelectedZone.map((area: string) => {
-                                        const isSelected = tempAssignments.some(a => a.zone === selectedZone && a.area === area);
-                                        return (
-                                            <label
-                                                key={area}
-                                                className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition ${isSelected
-                                                    ? 'border-red-600 bg-red-50/50 dark:bg-red-900/10'
-                                                    : 'border-gray-100 dark:border-gray-800 hover:border-red-200'
-                                                    }`}
-                                            >
-                                                <input
-                                                    type="checkbox"
-                                                    checked={isSelected}
-                                                    onChange={() => handleToggleArea(area)}
-                                                    className="w-4 h-4 text-red-600 rounded focus:ring-red-500"
-                                                />
-                                                <span className={`text-sm ${isSelected ? 'font-semibold text-red-700' : 'text-gray-600 dark:text-gray-400'}`}>
-                                                    {area}
-                                                </span>
-                                            </label>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="p-6 border-t border-gray-200 dark:border-gray-800 flex justify-between items-center">
-                            <div className="text-sm text-gray-500">
-                                Total Assigned: <b>{tempAssignments.length}</b> areas across <b>{new Set(tempAssignments.map(a => a.zone)).size}</b> zones
-                            </div>
-                            <div className="flex gap-3">
-                                <button
-                                    onClick={() => setIsModalOpen(false)}
-                                    className="px-6 py-2.5 border border-gray-300 rounded-xl hover:bg-gray-50 transition font-medium"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    onClick={handleSave}
-                                    disabled={saving}
-                                    className="px-8 py-2.5 bg-red-600 text-white rounded-xl hover:bg-red-700 transition font-medium disabled:opacity-50"
-                                >
-                                    {saving ? 'Saving...' : 'Save Changes'}
-                                </button>
                             </div>
                         </div>
                     </div>
-                </div>
-            )}
-        </div>
+                )
+            }
+        </div >
     );
 };
 
-export default OfficerAssignmentsPage;
+export default DeliveryOfficerAssignmentsPage;
