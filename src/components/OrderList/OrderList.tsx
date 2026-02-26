@@ -1055,33 +1055,35 @@ const OrderList = ({ forcedStatus, hideActions, hideSelection }: OrderListProps)
 
           {selectedProduct && (
             <div className="space-y-3 pt-2">
-              <label className="block text-sm font-medium dark:text-gray-300">Select Plan:</label>
-              <div className="grid grid-cols-1 gap-3">
-                {selectedProduct.ProductInstallments?.filter((p: any) => p.isActive).map((plan: any) => (
-                  <label
-                    key={plan.id}
-                    className={`p-3 border rounded-lg cursor-pointer transition-all ${selectedPlan?.id === plan.id
-                      ? 'border-[#ff3d3d] bg-red-50'
-                      : 'border-stroke hover:border-red-200'
-                      }`}
-                  >
-                    <input
-                      type="radio"
-                      className="sr-only"
-                      checked={selectedPlan?.id === plan.id}
-                      onChange={() => setSelectedPlan(plan)}
-                    />
-                    <div className="flex justify-between items-center text-xs">
-                      <span className="font-semibold">{plan.months} Months</span>
-                      <span>Adv: Rs. {plan.advance.toLocaleString()}</span>
-                      <span>Month: Rs. {plan.monthlyAmount.toLocaleString()}</span>
-                      <span>Total: Rs. {plan.totalPrice.toLocaleString()}</span>
-                    </div>
-                  </label>
-                ))}
-              </div>
+                <label className="block text-sm font-medium dark:text-gray-300">Installment Plan:</label>
+                <div className="grid grid-cols-1 gap-3">
+                    {selectedProduct.ProductInstallments?.filter((p: any) => p.isActive).map((plan: any) => (
+                        <label
+                            key={plan.id}
+                            className={`p-4 border rounded-xl cursor-pointer transition-all ${selectedPlan?.id === plan.id
+                                ? 'border-primary bg-primary/5 ring-1 ring-primary'
+                                : 'border-stroke hover:border-primary/50 dark:border-dark-3'
+                                }`}
+                        >
+                            <input
+                                type="radio"
+                                className="sr-only"
+                                checked={selectedPlan?.id === plan.id}
+                                onChange={() => setSelectedPlan(plan)}
+                            />
+                            <div className="flex justify-between items-center">
+                                <span className="font-bold text-dark dark:text-white">{plan.months} Months</span>
+                                <div className="text-right text-xs space-y-0.5">
+                                    <div className="text-gray-500">Advance: <span className="text-dark dark:text-white font-medium">Rs. {plan.advance.toLocaleString()}</span></div>
+                                    <div className="text-gray-500">Monthly: <span className="text-dark dark:text-white font-medium">Rs. {plan.monthlyAmount.toLocaleString()}</span></div>
+                                    <div className="text-gray-500">Total: <span className="text-dark dark:text-white font-medium">Rs. {plan.totalPrice.toLocaleString()}</span></div>
+                                </div>
+                            </div>
+                        </label>
+                    ))}
+                </div>
             </div>
-          )}
+        )}
         </div>
         <div className="mt-6 flex justify-end gap-4">
           <button

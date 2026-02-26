@@ -427,7 +427,7 @@ export default function DeliveryOfficers() {
                     </span>
                   </h4>
 
-                  {boyDetails.pending_products.length === 1 ? (
+                  {boyDetails.pending_products.length === 0 ? (
                     <div className="rounded-xl border border-dashed border-stroke bg-gray-50 p-10 text-center dark:border-strokedark dark:bg-boxdark">
                       <p className="font-medium text-gray-500">No pending products allocated to this rider.</p>
                     </div>

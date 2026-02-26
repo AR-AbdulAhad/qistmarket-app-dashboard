@@ -17,6 +17,12 @@ interface Order {
     customer_name: string;
     whatsapp_number: string;
     address: string;
+    gender?: string | null;
+    residential_type?: string | null;
+    zone?: string | null;
+    block?: string | null;
+    house_no?: string | null;
+    street?: string | null;
     city: string | null;
     area: string | null;
     product_name: string;
@@ -218,23 +224,58 @@ export default function OrderDetailsPage() {
                 <div className="rounded-lg border border-stroke bg-white shadow-default dark:border-dark-3 dark:bg-gray-800 p-6">
                     <h3 className="text-xl font-bold border-b pb-4 mb-4 dark:text-white">Customer Information</h3>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-4 gap-x-6">
-                        <div>
-                            <p className="text-sm text-gray-500 dark:text-gray-400">Full Name</p>
-                            <p className="font-semibold">{order.customer_name}</p>
-                        </div>
-                        <div>
-                            <p className="text-sm text-gray-500 dark:text-gray-400">WhatsApp Number</p>
-                            <p className="font-semibold">{order.whatsapp_number}</p>
-                        </div>
-                        <div>
-                            <p className="text-sm text-gray-500 dark:text-gray-400">City / Area</p>
-                            <p className="font-semibold">{order.city || 'N/A'} / {order.area || 'N/A'}</p>
-                        </div>
-                        <div>
+                    <div>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">Full Name</p>
+                        <p className="font-semibold">{order.customer_name || 'N/A'}</p>
+                    </div>
+                    
+                    <div>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">WhatsApp Number</p>
+                        <p className="font-semibold">{order.whatsapp_number || 'N/A'}</p>
+                    </div>
+                    {order.address && order.address.trim() !== '' ? (
+                        <div className="sm:col-span-2">
                             <p className="text-sm text-gray-500 dark:text-gray-400">Address</p>
                             <p className="font-semibold">{order.address}</p>
                         </div>
+                    ) : (
+                        <>
+                            <div>
+                                <p className="text-sm text-gray-500 dark:text-gray-400">City</p>
+                                <p className="font-semibold">{order.city || 'N/A'}</p>
+                            </div>
+                            
+                            <div>
+                                <p className="text-sm text-gray-500 dark:text-gray-400">Area</p>
+                                <p className="font-semibold">{order.area || 'N/A'}</p>
+                            </div>
+                            
+                            <div>
+                                <p className="text-sm text-gray-500 dark:text-gray-400">Zone / Block</p>
+                                <p className="font-semibold">{order.zone || order.block || 'N/A'}</p>
+                            </div>
+                            
+                            <div>
+                                <p className="text-sm text-gray-500 dark:text-gray-400">House No / Street</p>
+                                <p className="font-semibold">
+                                    {[
+                                        order.house_no || null,
+                                        order.street || null
+                                    ].filter(Boolean).join(', ') || 'N/A'}
+                                </p>
+                            </div>
+                        </>
+                    )}
+                    <div>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">Gender</p>
+                        <p className="font-semibold">{order.gender || 'N/A'}</p>
                     </div>
+                    
+                    <div>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">Residential Type</p>
+                        <p className="font-semibold">{order.residential_type || 'N/A'}</p>
+                    </div>
+                </div>
                 </div>
 
                 {/* Order Info Card */}
@@ -335,7 +376,7 @@ export default function OrderDetailsPage() {
                                 <label className="block text-sm font-medium mb-1 dark:text-gray-300">Category:</label>
                                 <select
                                     value={selectedCategory}
-                                    onChange={(e) => setSelectedCategory(e.target.value)}
+                                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setSelectedCategory(e.target.value)}
                                     className="w-full rounded-lg border border-stroke bg-transparent px-4 py-3 outline-none focus:border-primary dark:border-dark-3 text-sm"
                                 >
                                     <option value="">Select Category</option>
@@ -348,7 +389,7 @@ export default function OrderDetailsPage() {
                                 <label className="block text-sm font-medium mb-1 dark:text-gray-300">Subcategory:</label>
                                 <select
                                     value={selectedSubcategory}
-                                    onChange={(e) => setSelectedSubcategory(e.target.value)}
+                                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setSelectedSubcategory(e.target.value)}
                                     disabled={!selectedCategory}
                                     className="w-full rounded-lg border border-stroke bg-transparent px-4 py-3 outline-none focus:border-primary dark:border-dark-3 text-sm disabled:bg-gray-100 dark:disabled:bg-dark-2"
                                 >
@@ -364,7 +405,7 @@ export default function OrderDetailsPage() {
                             <label className="block text-sm font-medium mb-1 dark:text-gray-300">New Product:</label>
                             <select
                                 disabled={!selectedSubcategory}
-                                onChange={(e) => {
+                                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
                                     const prod = products.find(p => p.name === e.target.value);
                                     if (prod) setSelectedProduct(prod);
                                 }}
@@ -404,6 +445,7 @@ export default function OrderDetailsPage() {
                                                 <div className="text-right text-xs space-y-0.5">
                                                     <div className="text-gray-500">Advance: <span className="text-dark dark:text-white font-medium">Rs. {plan.advance.toLocaleString()}</span></div>
                                                     <div className="text-gray-500">Monthly: <span className="text-dark dark:text-white font-medium">Rs. {plan.monthlyAmount.toLocaleString()}</span></div>
+                                                    <div className="text-gray-500">Total: <span className="text-dark dark:text-white font-medium">Rs. {plan.totalPrice.toLocaleString()}</span></div>
                                                 </div>
                                             </div>
                                         </label>
@@ -439,7 +481,7 @@ export default function OrderDetailsPage() {
                         <textarea
                             rows={4}
                             value={cancelReason}
-                            onChange={(e) => setCancelReason(e.target.value)}
+                            onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setCancelReason(e.target.value)}
                             placeholder="Please provide a reason for cancellation..."
                             className="w-full rounded border-[1.5px] border-stroke bg-transparent py-3 px-5 text-black outline-none transition focus:border-primary active:border-primary disabled:cursor-default disabled:bg-whiter dark:border-form-strokedark dark:bg-form-input dark:text-white dark:focus:border-primary"
                         ></textarea>
