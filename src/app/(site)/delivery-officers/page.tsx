@@ -4,8 +4,8 @@ import { useState, useEffect } from 'react';
 import Cookies from 'js-cookie';
 import toast from 'react-hot-toast';
 import Loader from '@/components/common/Loader';
-import { DeliveryActionsModal } from '@/components/DeliveryManagement/DeliveryActionsModal';
-import { DeliveryTable } from '@/components/DeliveryManagement/DeliveryTable';
+// import { DeliveryActionsModal } from '@/components/DeliveryManagement/DeliveryActionsModal';
+// import { DeliveryTable } from '@/components/DeliveryManagement/DeliveryTable';
 import { DeliveryStats } from '@/components/DeliveryManagement/DeliveryStats';
 import { SearchIcon } from '@/assets/icons';
 
@@ -482,7 +482,7 @@ export default function DeliveryOfficers() {
       ) : (
         /* All Deliveries Tab - Tracking and Historical Data */
         <div className="animate-in fade-in duration-500">
-          <DeliveryTable
+          {/* <DeliveryTable
             data={allDeliveries}
             loading={deliveriesLoading}
             onMarkDelivered={(order) => {
@@ -510,7 +510,7 @@ export default function DeliveryOfficers() {
             onSuccess={() => {
               fetchAllDeliveries();
             }}
-          />
+          /> */}
         </div>
       )}
     </div>
