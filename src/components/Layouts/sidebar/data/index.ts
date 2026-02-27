@@ -98,10 +98,6 @@ export const NAV_DATA = [
             title: "User List",
             url: "/user-management/user-list",
           },
-          {
-            title: "Deletion Requests",
-            url: "/admin/deletion-requests",
-          },
         ],
       },
       {
