@@ -40,6 +40,10 @@ export const NAV_DATA = [
             title: "Picked Orders",
             url: "/picked-orders",
           },
+          {
+            title: "Recovery Orders",
+            url: "/recovery-orders",
+          },
         ],
       },
       {
@@ -77,6 +81,20 @@ export const NAV_DATA = [
           {
             title: "Area Assignments",
             url: "/admin/officer-assignments",
+          },
+        ],
+      },
+      {
+        title: "Recovery Officers",
+        icon: Icons.HomeIcon,
+        items: [
+          {
+            title: "Officer List",
+            url: "/recovery-officers",
+          },
+          {
+            title: "Area Assignments",
+            url: "/admin/recovery-assignments",
           },
         ],
       },

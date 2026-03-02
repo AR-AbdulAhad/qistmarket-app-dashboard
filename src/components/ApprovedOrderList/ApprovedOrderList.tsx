@@ -327,7 +327,26 @@ const ApprovedOrderList = () => {
       header: 'Advance Amount',
       cell: ({ getValue }) => `Rs. ${Number(getValue()).toLocaleString()}`,
     },
-    { accessorKey: 'status', header: 'Status', enableColumnFilter: true },
+    {
+      accessorKey: 'status',
+      header: 'Status',
+      enableColumnFilter: true,
+      cell: ({ row }) => {
+        const status = row.original.status
+        return (
+          <span
+            className={cn(
+              'inline-flex px-2.5 py-1 rounded-full text-xs font-medium',
+              status === 'approved'
+                ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300'
+                : 'bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300'
+            )}
+          >
+            {status === 'approved' ? 'Approved' : 'Picked'}
+          </span>
+        )
+      },
+    },
     {
       id: 'created_by',
       accessorFn: (row) => row.created_by?.username || '',
