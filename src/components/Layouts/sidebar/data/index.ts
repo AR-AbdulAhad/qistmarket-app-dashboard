@@ -39,11 +39,7 @@ export const NAV_DATA = [
           {
             title: "Picked Orders",
             url: "/picked-orders",
-          },
-          {
-            title: "Recovery Orders",
-            url: "/recovery-orders",
-          },
+          }
         ],
       },
       {
@@ -53,6 +49,11 @@ export const NAV_DATA = [
       },
       {
         title: "Approved Order List",
+        icon: Icons.HomeIcon,
+        items: [],
+      },
+      {
+        title: "Recovery Orders",
         icon: Icons.HomeIcon,
         items: [],
       },
