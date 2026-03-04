@@ -57,6 +57,11 @@ export default function VerificationOfficersPage() {
     const [isLoading, setIsLoading] = useState(true);
 
     const socketRef = useRef<any>(null);
+    const selectedOfficerIdRef = useRef<number | null>(null);
+
+    useEffect(() => {
+        selectedOfficerIdRef.current = selectedOfficer?.id || null;
+    }, [selectedOfficer]);
 
     useEffect(() => {
         fetchOfficers();
@@ -81,10 +86,7 @@ export default function VerificationOfficersPage() {
             setOfficers((prev) =>
                 prev.map((o) => (o.id === data.officerId ? { ...o, is_online: data.is_online } : o))
             );
-            setFilteredOfficers((prev) =>
-                prev.map((o) => (o.id === data.officerId ? { ...o, is_online: data.is_online } : o))
-            );
-            if (selectedOfficer?.id === data.officerId) {
+            if (selectedOfficerIdRef.current === data.officerId) {
                 setSelectedOfficer((prev) => prev && { ...prev, is_online: data.is_online });
             }
         });
@@ -99,10 +101,7 @@ export default function VerificationOfficersPage() {
             setOfficers((prev) =>
                 prev.map((o) => (o.id === data.officerId ? { ...o, current_location: newLoc } : o))
             );
-            setFilteredOfficers((prev) =>
-                prev.map((o) => (o.id === data.officerId ? { ...o, current_location: newLoc } : o))
-            );
-            if (selectedOfficer?.id === data.officerId) {
+            if (selectedOfficerIdRef.current === data.officerId) {
                 setSelectedOfficer((prev) => prev && { ...prev, current_location: newLoc });
             }
         });
@@ -118,13 +117,8 @@ export default function VerificationOfficersPage() {
                     o.id === data.officerId ? { ...o, monthly_online_hours: data.monthly_online_hours } : o
                 )
             );
-            setFilteredOfficers((prev) =>
-                prev.map((o) =>
-                    o.id === data.officerId ? { ...o, monthly_online_hours: data.monthly_online_hours } : o
-                )
-            );
 
-            if (selectedOfficer?.id === data.officerId) {
+            if (selectedOfficerIdRef.current === data.officerId) {
                 setSelectedOfficer((prev) =>
                     prev ? { ...prev, monthly_online_hours: data.monthly_online_hours } : null
                 );
@@ -137,9 +131,7 @@ export default function VerificationOfficersPage() {
             date: string;
             online_hours: string;
         }) => {
-            if (selectedOfficer?.id !== data.officerId) return;
-            if (!officerStats) return;
-            if (!officerStats.daily_stats.some((d) => d.date === data.date)) return;
+            if (selectedOfficerIdRef.current !== data.officerId) return;
 
             setOfficerStats((prev) => {
                 if (!prev) return prev;
