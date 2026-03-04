@@ -788,24 +788,7 @@ const UsersTable = () => {
             </select>
           </div>
 
-          {/* Added Password Field */}
-          <div>
-            <label
-              htmlFor="password"
-              className="mb-1.5 block text-sm font-medium text-dark dark:text-gray-300"
-            >
-              Password
-            </label>
-            <input
-              id="password"
-              name="password"
-              type="password"
-              value={formData.password || ""}
-              onChange={handleInputChange}
-              placeholder="Enter new password (leave blank to keep current)"
-              className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2.5 outline-none focus:border-[#ff3d3d] dark:border-dark-3 dark:bg-dark-2"
-            />
-          </div>
+          {/* Password field removed - OTP based login */}
 
           <div className="md:col-span-2">
             <label
@@ -1006,7 +989,7 @@ const UsersTable = () => {
           </button>
         </div>
       </Modal>
-    </section>
+    </section >
   );
 };
 

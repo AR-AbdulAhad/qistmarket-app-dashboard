@@ -1,10 +1,10 @@
-import SigninWithPassword from "../SigninWithPassword";
+import SigninWithOTP from "../SigninWithPassword";
 
 export default function Signin() {
   return (
     <>
       <div>
-        <SigninWithPassword />
+        <SigninWithOTP />
       </div>
     </>
   );

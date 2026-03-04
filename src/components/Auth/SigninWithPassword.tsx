@@ -2,29 +2,26 @@
 
 import {
   UserIcon,
-  EyeIcon,
-  EyeSlashIcon,
 } from "@/assets/icons";
-import Link from "next/link";
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import InputGroup from "../FormElements/InputGroup";
-import { Checkbox } from "../FormElements/checkbox";
 import Cookies from "js-cookie";
 import toast from "react-hot-toast";
+import { KeyIcon } from "lucide-react";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
 
-export default function SigninWithPassword() {
+export default function SigninWithOTP() {
   const router = useRouter();
 
   const [data, setData] = useState({
     identifier: "",
-    password: "",
+    otp: "",
     remember: false,
   });
 
-  const [showPassword, setShowPassword] = useState(false);
+  const [step, setStep] = useState<"identifier" | "otp">("identifier");
   const [deviceId, setDeviceId] = useState<string>("");
   const [loading, setLoading] = useState(false);
 
@@ -78,39 +75,58 @@ export default function SigninWithPassword() {
     });
   };
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSendOTP = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (!deviceId) {
-      toast.error("Device information is loading. Please try again in a moment.");
+    if (!data.identifier) {
+      toast.error("Please enter your email, username, CNIC or phone.");
       return;
     }
 
     setLoading(true);
-
     try {
-      const res = await fetch(`${BACKEND_URL}/api/login/web`, {
+      const res = await fetch(`${BACKEND_URL}/api/login/web/send-otp`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ identifier: data.identifier }),
+      });
+
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error?.message || "Failed to send OTP.");
+
+      toast.success(result.message || "OTP sent successfully.");
+      setStep("otp");
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerifyOTP = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!data.otp) {
+      toast.error("Please enter the 5-digit OTP.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/login/web/verify-otp`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           identifier: data.identifier,
-          password: data.password,
+          otp: data.otp,
           "device-id": deviceId,
-          remember: data.remember,
         }),
       });
 
       const result = await res.json();
-
-      if (!res.ok) {
-        throw new Error(result.error?.message);
-      }
+      if (!res.ok) throw new Error(result.error?.message || "Login failed.");
 
       toast.success(result.message);
       Cookies.set("auth_token", result.token, {
-        expires: data.remember ? 90 : 30,
+        expires: 30, // Default to 30 days
         path: "/",
       });
       router.push("/");
@@ -122,75 +138,80 @@ export default function SigninWithPassword() {
   };
 
   return (
-    <form onSubmit={handleSubmit}>
-      <InputGroup
-        type="text"
-        label="Email, Username, CNIC or Phone"
-        className="mb-4 [&_input]:py-[15px] [&_input]:pr-12"
-        placeholder="Email, Username, CNIC or Phone"
-        name="identifier"
-        handleChange={handleChange}
-        value={data.identifier}
-        icon={<UserIcon />}
-      />
+    <div>
+      {step === "identifier" ? (
+        <form onSubmit={handleSendOTP}>
+          <InputGroup
+            type="text"
+            label="Phone Number or Email"
+            className="mb-6 [&_input]:py-[15px] [&_input]:pr-12"
+            placeholder="Phone Number or Email"
+            name="identifier"
+            handleChange={handleChange}
+            value={data.identifier}
+            icon={<UserIcon />}
+          />
 
-      <div className="relative">
-        <InputGroup
-          type={showPassword ? "text" : "password"}
-          label="Password"
-          className="mb-5 [&_input]:py-[15px] [&_input]:pr-12"
-          placeholder="Your password"
-          name="password"
-          handleChange={handleChange}
-          value={data.password}
-        />
+          <button
+            type="submit"
+            disabled={loading}
+            className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#ff3d3d] p-4 font-medium text-white transition hover:bg-opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {loading ? "Sending OTP..." : "Continue"}
+            {loading && (
+              <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-solid border-white border-t-transparent" />
+            )}
+          </button>
+        </form>
+      ) : (
+        <form onSubmit={handleVerifyOTP}>
+          <p className="mb-6 text-sm text-gray-600">
+            OTP has been sent to <strong>{data.identifier}</strong>. Please enter the 5-digit code below.
+          </p>
 
-        <button
-          type="button"
-          onClick={() => setShowPassword(!showPassword)}
-          className="absolute right-3 top-[37px] -translate-y-1/2 transform text-gray-500 hover:text-gray-800 focus:outline-none"
-          style={{ marginTop: "28px" }}
-        >
-          {showPassword ? (
-            <EyeSlashIcon className="h-5 w-5" />
-          ) : (
-            <EyeIcon className="h-5 w-5" />
-          )}
-        </button>
-      </div>
+          <InputGroup
+            type="text"
+            label="Verification Code"
+            className="mb-6 [&_input]:py-[15px] [&_input]:pr-12"
+            placeholder="Enter 5-digit OTP"
+            name="otp"
+            handleChange={handleChange}
+            value={data.otp}
+            icon={<KeyIcon className="h-5 w-5" />}
+          />
 
-      <div className="mb-6 flex items-center justify-between gap-2 py-2 font-medium">
-        <Checkbox
-          label="Remember me"
-          name="remember"
-          withIcon="check"
-          minimal
-          radius="md"
-          onChange={(e) =>
-            setData({
-              ...data,
-              remember: e.target.checked,
-            })
-          }
-        />
+          <div className="mb-4.5 flex gap-4">
+            <button
+              type="button"
+              onClick={() => setStep("identifier")}
+              className="flex flex-1 items-center justify-center rounded-lg border border-stroke bg-white p-4 font-medium text-dark transition hover:bg-gray-50 focus:outline-none dark:border-dark-3 dark:bg-dark-2 dark:text-white"
+            >
+              Back
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="flex-[2] flex items-center justify-center gap-2 rounded-lg bg-[#ff3d3d] p-4 font-medium text-white transition hover:bg-opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {loading ? "Verifying..." : "Verify & Login"}
+              {loading && (
+                <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-solid border-white border-t-transparent" />
+              )}
+            </button>
+          </div>
 
-        <Link href="/auth/forgot-password" className="hover:text-[#ff3d3d] transition">
-          Forgot Password?
-        </Link>
-      </div>
-
-      <div className="mb-4.5">
-        <button
-          type="submit"
-          disabled={loading || !deviceId}
-          className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#ff3d3d] p-4 font-medium text-white transition hover:bg-opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {loading ? 'Signing In' : 'Sign In'}
-          {loading && (
-            <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-solid border-white border-t-transparent" />
-          )}
-        </button>
-      </div>
-    </form>
+          <div className="text-center mt-4">
+            <button
+              type="button"
+              onClick={handleSendOTP}
+              disabled={loading}
+              className="text-[#ff3d3d] hover:underline font-medium disabled:opacity-50"
+            >
+              Resend OTP
+            </button>
+          </div>
+        </form>
+      )}
+    </div>
   );
 }

@@ -16,7 +16,6 @@ const CreateUsers: React.FC = () => {
     phone: '',
     role_id: '',
     cnic: '',
-    password: ''
   });
   const [loading, setLoading] = useState(false);
 
@@ -28,7 +27,6 @@ const CreateUsers: React.FC = () => {
   const phoneRef = useRef<HTMLInputElement>(null);
   const cnicRef = useRef<HTMLInputElement>(null);
   const roleSectionRef = useRef<HTMLDivElement>(null);
-  const passwordRef = useRef<HTMLInputElement>(null);
 
   const roles = [
     {
@@ -73,12 +71,19 @@ const CreateUsers: React.FC = () => {
       icon: Monitor,
       description: 'Manage branch balances, confirm OTP transfers, view stock & expenses, reconcile receipts'
     },
+    // {
+    //   id: 6,
+    //   name: 'Stock Manager',
+    //   platform: 'web',
+    //   icon: Package,
+    //   description: 'Manage inventory, track stock levels, handle warehouse operations'
+    // },
     {
-      id: 6,
-      name: 'Stock Manager',
+      id: 9,
+      name: 'Form Analyzer',
       platform: 'web',
       icon: Package,
-      description: 'Manage inventory, track stock levels, handle warehouse operations'
+      description: 'Analyze and manage form data and submissions'
     }
   ];
 
@@ -90,9 +95,6 @@ const CreateUsers: React.FC = () => {
     }
   };
 
-  const togglePasswordVisibility = () => {
-    setShowPassword(prev => !prev);
-  };
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
@@ -110,11 +112,6 @@ const CreateUsers: React.FC = () => {
       newErrors.cnic = 'CNIC must be in format 42101XXXXXXXXX or 42101-XXXXXXX-X';
     }
     if (!formData.role_id) newErrors.role_id = 'Please select a role';
-    if (!formData.password) {
-      newErrors.password = 'Password is required';
-    } else if (formData.password.length < 8) {
-      newErrors.password = 'Password must be at least 8 characters';
-    }
 
     if (formData.email.trim()) {
       if (!/\S+@\S+\.\S+/.test(formData.email.trim())) {
@@ -147,9 +144,6 @@ const CreateUsers: React.FC = () => {
         case 'role_id':
           elementToScroll = roleSectionRef.current;
           break;
-        case 'password':
-          elementToScroll = passwordRef.current;
-          break;
         default:
           break;
       }
@@ -164,7 +158,7 @@ const CreateUsers: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validateForm()) return;
-    
+
     setLoading(true);
     try {
       const token = Cookies.get("auth_token");
@@ -178,7 +172,6 @@ const CreateUsers: React.FC = () => {
         phone: formData.phone.trim(),
         role_id: Number(formData.role_id),
         cnic: formData.cnic.trim().replace(/[-\s]/g, ''),
-        password: formData.password,
       };
 
       if (formData.email.trim()) {
@@ -209,10 +202,8 @@ const CreateUsers: React.FC = () => {
         phone: '',
         role_id: '',
         cnic: '',
-        password: ''
       });
       setErrors({});
-      setShowPassword(false);
 
     } catch (error: any) {
       toast.error(error.message);
@@ -229,10 +220,8 @@ const CreateUsers: React.FC = () => {
       phone: '',
       role_id: '',
       cnic: '',
-      password: ''
     });
     setErrors({});
-    setShowPassword(false);
   };
 
   const selectedRole = roles.find(r => r.id === Number(formData.role_id));
@@ -247,7 +236,7 @@ const CreateUsers: React.FC = () => {
             {/* Personal Information */}
             <div className="border-b pb-6">
               <h2 className="text-xl font-semibold text-gray-800 mb-4">Personal Information</h2>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -259,9 +248,8 @@ const CreateUsers: React.FC = () => {
                     name="fullName"
                     value={formData.fullName}
                     onChange={handleChange}
-                    className={`w-full px-4 py-2 rounded-lg border-[1.5px] bg-transparent outline-none transition focus:border-[#ff3d3d] ${
-                      errors.fullName ? 'border-red-500' : 'border-gray-300'
-                    }`}
+                    className={`w-full px-4 py-2 rounded-lg border-[1.5px] bg-transparent outline-none transition focus:border-[#ff3d3d] ${errors.fullName ? 'border-red-500' : 'border-gray-300'
+                      }`}
                     placeholder="Enter full name"
                   />
                   {errors.fullName && <p className="text-red-500 text-sm mt-1">{errors.fullName}</p>}
@@ -276,9 +264,8 @@ const CreateUsers: React.FC = () => {
                     name="email"
                     value={formData.email}
                     onChange={handleChange}
-                    className={`w-full px-4 py-2 rounded-lg border-[1.5px] bg-transparent outline-none transition focus:border-[#ff3d3d] ${
-                      errors.email ? 'border-red-500' : 'border-gray-300'
-                    }`}
+                    className={`w-full px-4 py-2 rounded-lg border-[1.5px] bg-transparent outline-none transition focus:border-[#ff3d3d] ${errors.email ? 'border-red-500' : 'border-gray-300'
+                      }`}
                     placeholder="user@example.com"
                   />
                   {errors.email && <p className="text-red-500 text-sm mt-1">{errors.email}</p>}
@@ -294,9 +281,8 @@ const CreateUsers: React.FC = () => {
                     name="username"
                     value={formData.username}
                     onChange={handleChange}
-                    className={`w-full px-4 py-2 rounded-lg border-[1.5px] bg-transparent outline-none transition focus:border-[#ff3d3d] ${
-                      errors.username ? 'border-red-500' : 'border-gray-300'
-                    }`}
+                    className={`w-full px-4 py-2 rounded-lg border-[1.5px] bg-transparent outline-none transition focus:border-[#ff3d3d] ${errors.username ? 'border-red-500' : 'border-gray-300'
+                      }`}
                     placeholder="Enter username"
                   />
                   {errors.username && <p className="text-red-500 text-sm mt-1">{errors.username}</p>}
@@ -312,9 +298,8 @@ const CreateUsers: React.FC = () => {
                     name="phone"
                     value={formData.phone}
                     onChange={handleChange}
-                    className={`w-full px-4 py-2 rounded-lg border-[1.5px] bg-transparent outline-none transition focus:border-[#ff3d3d] ${
-                      errors.phone ? 'border-red-500' : 'border-gray-300'
-                    }`}
+                    className={`w-full px-4 py-2 rounded-lg border-[1.5px] bg-transparent outline-none transition focus:border-[#ff3d3d] ${errors.phone ? 'border-red-500' : 'border-gray-300'
+                      }`}
                     placeholder="03001234567"
                   />
                   {errors.phone && <p className="text-red-500 text-sm mt-1">{errors.phone}</p>}
@@ -330,9 +315,8 @@ const CreateUsers: React.FC = () => {
                     name="cnic"
                     value={formData.cnic}
                     onChange={handleChange}
-                    className={`w-full px-4 py-2 rounded-lg border-[1.5px] bg-transparent outline-none transition focus:border-[#ff3d3d] ${
-                      errors.cnic ? 'border-red-500' : 'border-gray-300'
-                    }`}
+                    className={`w-full px-4 py-2 rounded-lg border-[1.5px] bg-transparent outline-none transition focus:border-[#ff3d3d] ${errors.cnic ? 'border-red-500' : 'border-gray-300'
+                      }`}
                     placeholder="42101XXXXXXXXX"
                   />
                   {errors.cnic && <p className="text-red-500 text-sm mt-1">{errors.cnic}</p>}
@@ -343,7 +327,7 @@ const CreateUsers: React.FC = () => {
             {/* Role Selection */}
             <div ref={roleSectionRef} className="border-b pb-6">
               <h2 className="text-xl font-semibold text-gray-800 mb-4">Role & Access</h2>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-3">
                   Select Role <span className="text-red-500">*</span>
@@ -354,11 +338,10 @@ const CreateUsers: React.FC = () => {
                     return (
                       <label
                         key={role.id}
-                        className={`relative flex items-start p-4 border-2 rounded-lg cursor-pointer transition-all ${
-                          Number(formData.role_id) === role.id
-                            ? 'border-[#ff3d3d] bg-red-50'
-                            : 'border-gray-200 hover:border-gray-300'
-                        }`}
+                        className={`relative flex items-start p-4 border-2 rounded-lg cursor-pointer transition-all ${Number(formData.role_id) === role.id
+                          ? 'border-[#ff3d3d] bg-red-50'
+                          : 'border-gray-200 hover:border-gray-300'
+                          }`}
                       >
                         <input
                           type="radio"
@@ -374,11 +357,10 @@ const CreateUsers: React.FC = () => {
                             <span className="font-semibold text-gray-900">{role.name}</span>
                           </div>
                           <p className="text-sm text-gray-600 mb-2">{role.description}</p>
-                          <span className={`inline-block px-2 py-1 text-xs font-medium rounded ${
-                            role.platform === 'mobile' 
-                              ? 'bg-green-100 text-green-700' 
-                              : 'bg-purple-100 text-purple-700'
-                          }`}>
+                          <span className={`inline-block px-2 py-1 text-xs font-medium rounded ${role.platform === 'mobile'
+                            ? 'bg-green-100 text-green-700'
+                            : 'bg-purple-100 text-purple-700'
+                            }`}>
                             {role.platform === 'mobile' ? 'Mobile App' : 'Web Dashboard'}
                           </span>
                         </div>
@@ -390,37 +372,11 @@ const CreateUsers: React.FC = () => {
               </div>
             </div>
 
-            {/* Security */}
-            <div className="border-b pb-6">
-              <h2 className="text-xl font-semibold text-gray-800 mb-4">Security</h2>
-              
-              <div className="max-w-md">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Initial Password <span className="text-red-500">*</span>
-                </label>
-                <div className="relative">
-                  <input
-                    ref={passwordRef}
-                    type={showPassword ? 'text' : 'password'}
-                    name="password"
-                    value={formData.password}
-                    onChange={handleChange}
-                    className={`w-full px-4 py-2 pr-12 rounded-lg border-[1.5px] bg-transparent outline-none transition focus:border-[#ff3d3d] ${
-                      errors.password ? 'border-red-500' : 'border-gray-300'
-                    }`}
-                    placeholder="Minimum 8 characters"
-                  />
-                  <button
-                    type="button"
-                    onClick={togglePasswordVisibility}
-                    className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-500 hover:text-gray-700"
-                  >
-                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                  </button>
-                </div>
-                {errors.password && <p className="text-red-500 text-sm mt-1">{errors.password}</p>}
-                <p className="text-sm text-gray-500 mt-1">User will be prompted to change password on first login</p>
-              </div>
+            {/* OTP Warning/Note */}
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <p className="text-sm text-blue-700">
+                <strong>Note:</strong> Dashboard users will log in via OTP sent to their WhatsApp or Email. No password setup is required.
+              </p>
             </div>
 
             {/* Selected Role Summary */}

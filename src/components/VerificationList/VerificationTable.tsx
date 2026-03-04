@@ -245,58 +245,6 @@ const AssignedVerifications = () => {
       enableColumnFilter: true,
     },
     {
-      id: 'approved',
-      header: 'Approved',
-      accessorFn: (row) => row.verification?.is_approved,
-      cell: ({ getValue }) => {
-        const val = getValue() as boolean | null | undefined
-        if (val === null || val === undefined) return <span className="text-gray-500">Pending</span>
-        return val ? (
-          <span className="text-green-600 font-medium">Yes</span>
-        ) : (
-          <span className="text-red-600 font-medium">No</span>
-        )
-      },
-    },
-    {
-      id: 'docs',
-      header: 'Documents',
-      accessorFn: (row) => row.verification?.documents?.length ?? 0,
-      cell: ({ getValue }) => {
-        const count = Number(getValue())
-        return count > 0 ? `${count} uploaded` : '—'
-      },
-    },
-    {
-      id: 'locations',
-      header: 'Location Updates',
-      accessorFn: (row) => row.verification?.locations?.length ?? 0,
-      cell: ({ getValue }) => {
-        const count = Number(getValue())
-        return count > 0 ? `${count}` : '—'
-      },
-    },
-    {
-      id: 'subrecords',
-      header: 'Records',
-      accessorFn: (row) => {
-        const v = row.verification
-        if (!v) return ''
-        const parts = []
-        if (v.purchaser) parts.push('Purchaser')
-        if (v.grantors?.length > 0) parts.push(`Grantors (${v.grantors.length})`)
-        if (v.nextOfKin) parts.push('Next of Kin')
-        return parts.join(', ') || '—'
-      },
-      enableColumnFilter: false,
-    },
-    {
-      id: 'remarks',
-      header: 'Admin Remarks',
-      accessorFn: (row) => row.verification?.admin_remarks || '',
-      enableColumnFilter: true,
-    },
-    {
       id: 'actions',
       header: 'Actions',
       enableSorting: false,
