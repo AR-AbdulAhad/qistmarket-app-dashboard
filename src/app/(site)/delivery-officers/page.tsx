@@ -467,7 +467,7 @@ export default function DeliveryOfficers() {
                         <div className="h-full w-full rounded-full bg-gray-200 dark:bg-meta-4 flex items-center justify-center text-lg font-bold text-gray-500">
                           {boy.name.charAt(0)}
                         </div>
-                        <span className={`absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-2 border-white dark:border-boxdark ${boy.is_online ? 'bg-success' : 'bg-gray-300'}`}></span>
+                        <span className={`absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-2 border-white dark:border-boxdark ${boy.is_online ? 'bg-green-500' : 'bg-gray-300'}`}></span>
                       </div>
                       <div className="flex-1 min-w-0">
                         <h4 className="font-bold text-black dark:text-white truncate">{boy.name}</h4>
