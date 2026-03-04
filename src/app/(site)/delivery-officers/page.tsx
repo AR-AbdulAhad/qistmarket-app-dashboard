@@ -1,15 +1,22 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Cookies from 'js-cookie';
 import toast from 'react-hot-toast';
 import Loader from '@/components/common/Loader';
-// import { DeliveryActionsModal } from '@/components/DeliveryManagement/DeliveryActionsModal';
-// import { DeliveryTable } from '@/components/DeliveryManagement/DeliveryTable';
+import { DeliveryActionsModal } from '@/components/DeliveryManagement/DeliveryActionsModal';
+import { DeliveryTable } from '@/components/DeliveryManagement/DeliveryTable';
 import { DeliveryStats } from '@/components/DeliveryManagement/DeliveryStats';
 import { SearchIcon } from '@/assets/icons';
+import io from 'socket.io-client';
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000';
+
+interface Location {
+  latitude: number;
+  longitude: number;
+  timestamp?: string;
+}
 
 interface DeliveryBoy {
   id: number;
@@ -18,9 +25,34 @@ interface DeliveryBoy {
   profile_image: string | null;
   pending_count: number;
   whatsapp: string | null;
+  account_status: string;
   is_online: boolean;
   delivered_today: number;
   returned_today: number;
+  current_location: Location | null;
+  last_known_location: Location | null;
+  bike_km_range: number | null;
+  working_hours: string | null;
+  monthly_online_hours: string;
+  current_assignment: {
+    id: number;
+    status: string;
+    order: { order_ref: string; customer_name: string };
+  } | null;
+}
+
+interface DailyStat {
+  date: string;
+  online_hours: string;
+  worked_hours: string;
+  offline_during_work_hours: string;
+}
+
+interface MonthlyStats {
+  officer_id: number;
+  month: string;
+  daily_stats: DailyStat[];
+  expected_daily_hours: string;
 }
 
 interface ProductGroup {
@@ -39,8 +71,14 @@ interface BoyDetails {
     username: string;
     profile_image: string | null;
     whatsapp: string | null;
+    account_status: string;
     is_online: boolean;
     last_online_at: string | null;
+    current_location: Location | null;
+    last_known_location: Location | null;
+    bike_km_range: number | null;
+    working_hours: string | null;
+    monthly_online_hours: string;
   };
   pending_products: ProductGroup[];
 }
@@ -67,6 +105,7 @@ export default function DeliveryOfficers() {
 
   const [selectedBoyId, setSelectedBoyId] = useState<number | null>(null);
   const [boyDetails, setBoyDetails] = useState<BoyDetails | null>(null);
+  const [officerStats, setOfficerStats] = useState<MonthlyStats | null>(null);
   const [otpInput, setOtpInput] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isActionLoading, setIsActionLoading] = useState<boolean>(false);
@@ -77,6 +116,13 @@ export default function DeliveryOfficers() {
   const [selectedOrder, setSelectedOrder] = useState<DeliveryOrder | null>(null);
   const [actionType, setActionType] = useState<'deliver' | 'return' | 'refund' | null>(null);
 
+  const socketRef = useRef<any>(null);
+  const selectedBoyIdRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    selectedBoyIdRef.current = selectedBoyId;
+  }, [selectedBoyId]);
+
   // KPI Stats Top Row
   const totalRiders = deliveryBoys.length;
   const activeDeliveries = allDeliveries.filter(d => d.status === 'in_transit' || d.status === 'picked_up').length;
@@ -86,19 +132,129 @@ export default function DeliveryOfficers() {
   useEffect(() => {
     fetchDeliveryBoys();
     fetchAllDeliveries();
+
+    const token = Cookies.get('auth_token');
+    if (!token) return;
+
+    socketRef.current = io(BACKEND_URL, {
+      auth: { token },
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
+    });
+
+    socketRef.current.on('connect', () => {
+      socketRef.current.emit('join_admin_notifications', token);
+    });
+
+    socketRef.current.on('officer_status_update', (data: { officerId: number; is_online: boolean; timestamp?: string }) => {
+      console.log('Status update received:', data);
+      setDeliveryBoys((prev) =>
+        prev.map((o) => (o.id === data.officerId ? { ...o, is_online: data.is_online } : o))
+      );
+      if (selectedBoyIdRef.current === data.officerId) {
+        setBoyDetails((prev) => prev ? {
+          ...prev,
+          boy: {
+            ...prev.boy,
+            is_online: data.is_online,
+            last_online_at: data.is_online ? prev.boy.last_online_at : (data.timestamp || new Date().toISOString())
+          }
+        } : null);
+      }
+    });
+
+    socketRef.current.on('officer_location_update', (data: any) => {
+      const newLoc = {
+        latitude: data.latitude,
+        longitude: data.longitude,
+        timestamp: data.timestamp,
+      };
+      setDeliveryBoys((prev) =>
+        prev.map((o) => (o.id === data.officerId ? { ...o, current_location: newLoc } : o))
+      );
+      if (selectedBoyIdRef.current === data.officerId) {
+        setBoyDetails((prev) => prev ? { ...prev, boy: { ...prev.boy, current_location: newLoc } } : null);
+      }
+    });
+
+    socketRef.current.on('officer_monthly_update', (data: {
+      officerId: number;
+      monthly_online_hours: string;
+      month: string;
+    }) => {
+      setDeliveryBoys((prev) =>
+        prev.map((o) =>
+          o.id === data.officerId ? { ...o, monthly_online_hours: data.monthly_online_hours } : o
+        )
+      );
+      if (selectedBoyIdRef.current === data.officerId) {
+        setBoyDetails((prev) =>
+          prev ? { ...prev, boy: { ...prev.boy, monthly_online_hours: data.monthly_online_hours } } : null
+        );
+      }
+    });
+
+    socketRef.current.on('officer_daily_update', (data: {
+      officerId: number;
+      date: string;
+      online_hours: string;
+    }) => {
+      if (selectedBoyIdRef.current !== data.officerId) return;
+
+      setOfficerStats((prev) => {
+        if (!prev) return prev;
+        const updatedDaily = prev.daily_stats.map((day) => {
+          if (day.date === data.date) {
+            const newOnline = data.online_hours;
+            const expected = Number(prev.expected_daily_hours);
+            const newOffline = Math.max(0, expected - Number(newOnline)).toFixed(2);
+            return {
+              ...day,
+              online_hours: newOnline,
+              worked_hours: newOnline,
+              offline_during_work_hours: newOffline,
+            };
+          }
+          return day;
+        });
+        return { ...prev, daily_stats: updatedDaily };
+      });
+    });
+
+    return () => {
+      socketRef.current?.disconnect();
+    };
   }, []);
 
   useEffect(() => {
-    if (boySearch.trim() === '') {
-      setFilteredBoys(deliveryBoys);
-    } else {
+    let result = [...deliveryBoys];
+    if (boySearch.trim() !== '') {
       const lower = boySearch.toLowerCase();
-      setFilteredBoys(deliveryBoys.filter(boy =>
+      result = result.filter(boy =>
         boy.name.toLowerCase().includes(lower) ||
         boy.username.toLowerCase().includes(lower)
-      ));
+      );
     }
+
+    // Sort: Online first, then by name
+    result.sort((a, b) => {
+      if (a.is_online === b.is_online) {
+        return a.name.localeCompare(b.name);
+      }
+      return a.is_online ? -1 : 1;
+    });
+
+    setFilteredBoys(result);
   }, [boySearch, deliveryBoys]);
+
+  useEffect(() => {
+    if (selectedBoyId) {
+      fetchStats(selectedBoyId);
+    } else {
+      setOfficerStats(null);
+    }
+  }, [selectedBoyId]);
 
   const fetchDeliveryBoys = async (): Promise<void> => {
     try {
@@ -134,6 +290,19 @@ export default function DeliveryOfficers() {
       console.error('Error fetching boy details:', error);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const fetchStats = async (id: number) => {
+    try {
+      const token = Cookies.get('auth_token');
+      const res = await fetch(`${BACKEND_URL}/api/delivery-management/boy/${id}/stats`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const result = await res.json();
+      if (result.success) setOfficerStats(result.data);
+    } catch (err) {
+      console.error(err);
     }
   };
 
@@ -219,14 +388,16 @@ export default function DeliveryOfficers() {
     }
   };
 
+  const selectedBoyFull = deliveryBoys.find(b => b.id === selectedBoyId);
+
   return (
     <div className="mx-auto max-w-screen-2xl p-4 md:p-6 2xl:p-10">
       <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-title-md2 font-bold text-black dark:text-white">
-            Delivery Officers
+            Delivery Officer Management
           </h2>
-          <p className="font-medium">Manage riders, pickups, and track overall delivery performance.</p>
+          <p className="font-medium text-gray-500">Real-time monitoring of delivery status, location, attendance, and assignments.</p>
         </div>
 
         <div className="flex rounded-lg bg-gray-2 p-1 dark:bg-meta-4">
@@ -264,12 +435,6 @@ export default function DeliveryOfficers() {
           {/* Rider Selection List - Left Side */}
           <div className="lg:col-span-4 xl:col-span-3">
             <div className="rounded-xl border border-stroke bg-white shadow-default dark:border-strokedark dark:bg-boxdark overflow-hidden">
-              <div className="border-b border-stroke py-4 px-6.5 dark:border-strokedark bg-gray-50 dark:bg-meta-4/20">
-                <h3 className="font-semibold text-black dark:text-white">
-                  Delivery Riders
-                </h3>
-              </div>
-
               <div className="p-4 border-b border-stroke dark:border-strokedark">
                 <div className="relative">
                   <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
@@ -286,7 +451,7 @@ export default function DeliveryOfficers() {
               </div>
 
               <div className="flex flex-col max-h-[600px] overflow-y-auto">
-                {filteredBoys.length === 0 ? (
+                {isLoading ? <Loader text="Loading..." /> : filteredBoys.length === 0 ? (
                   <div className="p-8 text-center text-gray-500">No riders found.</div>
                 ) : (
                   filteredBoys.map((boy) => (
@@ -299,39 +464,14 @@ export default function DeliveryOfficers() {
                         }`}
                     >
                       <div className="relative h-12 w-12 flex-shrink-0">
-                        {boy.profile_image ? (
-                          <img
-                            src={boy.profile_image}
-                            alt={boy.name}
-                            className="h-full w-full rounded-full object-cover border border-stroke dark:border-strokedark shadow-sm"
-                          />
-                        ) : (
-                          <div className="h-full w-full rounded-full bg-gray-200 dark:bg-meta-4 flex items-center justify-center text-lg font-bold text-gray-500">
-                            {boy.name.charAt(0)}
-                          </div>
-                        )}
+                        <div className="h-full w-full rounded-full bg-gray-200 dark:bg-meta-4 flex items-center justify-center text-lg font-bold text-gray-500">
+                          {boy.name.charAt(0)}
+                        </div>
                         <span className={`absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-2 border-white dark:border-boxdark ${boy.is_online ? 'bg-success' : 'bg-gray-300'}`}></span>
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between">
-                          <h4 className="font-bold text-black dark:text-white truncate">
-                            {boy.name}
-                          </h4>
-                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${boy.is_online ? 'bg-success/10 text-success' : 'bg-gray-100 text-gray-400'}`}>
-                            {boy.is_online ? 'ONLINE' : 'OFFLINE'}
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-between mt-0.5">
-                          <div className="flex gap-2 text-[10px] font-bold">
-                            <span className="text-success">D: {boy.delivered_today || 0}</span>
-                            <span className="text-danger">R: {boy.returned_today || 0}</span>
-                          </div>
-                          {boy.pending_count > 0 && (
-                            <span className="inline-flex items-center justify-center rounded-full bg-primary py-0.5 px-2 text-[10px] font-bold text-white shadow-sm">
-                              {boy.pending_count} PENDING
-                            </span>
-                          )}
-                        </div>
+                        <h4 className="font-bold text-black dark:text-white truncate">{boy.name}</h4>
+                        <p className="text-xs text-gray-400">@{boy.username}</p>
                       </div>
                     </div>
                   ))
@@ -341,40 +481,77 @@ export default function DeliveryOfficers() {
           </div>
 
           {/* Rider Details and Actions - Right Side */}
-          <div className="lg:col-span-8 xl:col-span-9 space-y-6">
-            {isLoading ? (
-              <Loader text="Loading rider details..." className="h-[400px] items-center justify-center rounded-xl border border-stroke bg-white shadow-default dark:border-strokedark dark:bg-boxdark" />
-            ) : selectedBoyId && boyDetails ? (
-              <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-6">
-                {/* Rider Profile Card */}
+          <div className="lg:col-span-8 xl:col-span-9">
+            {selectedBoyId && boyDetails ? (
+              <div className="space-y-6">
                 <div className="rounded-xl border border-stroke bg-white p-6 shadow-default dark:border-strokedark dark:bg-boxdark">
-                  <div className="flex flex-col lg:flex-row lg:items-center gap-6">
-                    <div className="h-24 w-24 flex-shrink-0 rounded-full border-4 border-gray-100 dark:border-meta-4 overflow-hidden shadow-lg">
-                      {boyDetails.boy.profile_image ? (
-                        <img src={boyDetails.boy.profile_image} alt="Profile" className="h-full w-full object-cover" />
-                      ) : (
-                        <div className="h-full w-full bg-gray-200 flex items-center justify-center text-3xl font-bold dark:bg-meta-4">
-                          {boyDetails.boy.name.charAt(0)}
-                        </div>
-                      )}
+                  <div className="flex flex-col md:flex-row gap-6 items-center">
+                    <div className="h-24 w-24 rounded-full bg-gray-100 dark:bg-meta-4 flex items-center justify-center text-4xl font-bold border-4 border-gray-50 dark:border-strokedark shadow-lg">
+                      {boyDetails.boy.name.charAt(0)}
                     </div>
                     <div className="flex-1">
                       <div className="flex items-center gap-3">
-                        <h3 className="text-2xl font-bold text-black dark:text-white">
-                          {boyDetails.boy.name}
-                        </h3>
-                        <span className="inline-flex rounded bg-success/10 py-1 px-3 text-sm font-bold text-success">
-                          Active
+                        <h3 className="text-2xl font-bold text-black dark:text-white">{boyDetails.boy.name}</h3>
+                        <span className={`rounded-full py-1 px-3 text-xs font-bold uppercase ${boyDetails.boy.is_online ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-500'}`}>
+                          {boyDetails.boy.is_online ? 'Online' : 'Offline'}
                         </span>
                       </div>
-                      <p className="font-medium text-gray-500">@{boyDetails.boy.username}</p>
-                      {boyDetails.boy.whatsapp && (
-                        <div className="mt-3 flex items-center gap-2 text-green-600 font-semibold">
-                          <svg className="fill-current" width="18" height="18" viewBox="0 0 24 24"><path d="M12.031 2c-5.511 0-9.997 4.486-9.997 9.998 0 1.767.459 3.428 1.259 4.878l-1.293 4.735 4.854-1.274c1.401.761 2.993 1.2 4.672 1.2 5.513 0 9.99-4.487 9.99-9.999 0-5.511-4.486-9.998-9.985-9.998zm3.037 14.12c-.237.669-1.4 1.218-1.928 1.297-.48.071-.856.347-3.003-.547-2.75-1.146-4.52-3.931-4.659-4.114-.139-.181-1.135-1.503-1.135-2.868 0-1.365.717-2.035.973-2.314.197-.215.523-.32.839-.32.103 0 .197.005.281.01.271.012.399.014.573.431.218.522.744 1.815.809 1.944.065.129.109.28.022.455-.088.174-.131.28-.261.431l-.398.463c-.131.144-.271.3-.117.564.153.264.679 1.119 1.455 1.81.996.888 1.835 1.163 2.099 1.294.264.131.417.109.57.022.153-.087.653-.761.827-1.021.174-.261.348-.218.587-.131.239.088 1.52.717 1.781.847.261.13.435.196.499.305.064.108.064.63-.173 1.299z" /></svg>
-                          WhatsApp: {boyDetails.boy.whatsapp}
+                      <p className="text-gray-400">@{boyDetails.boy.username} • {boyDetails.boy.whatsapp}</p>
+                      <div className="mt-5 grid grid-cols-2 md:grid-cols-5 gap-5">
+                        <div>
+                          <p className="text-xs font-bold text-gray-500 uppercase">Status</p>
+                          <p className="font-semibold text-black dark:text-white">{boyDetails.boy.account_status}</p>
                         </div>
-                      )}
+                        <div>
+                          <p className="text-xs font-bold text-gray-500 uppercase">Bike Range</p>
+                          <p className="font-semibold text-black dark:text-white">{boyDetails.boy.bike_km_range ?? '—'} km</p>
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-gray-500 uppercase">Working Hours</p>
+                          <p className="font-semibold text-black dark:text-white">{boyDetails.boy.working_hours ?? 'Not set'}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-gray-500 uppercase">Monthly Online</p>
+                          <p className="font-semibold text-green-600">{boyDetails.boy.monthly_online_hours} hrs</p>
+                        </div>
+                      </div>
                     </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="rounded-xl border border-stroke bg-white p-6 shadow-default dark:border-strokedark dark:bg-boxdark">
+                    <h4 className="font-bold mb-4">Current Position</h4>
+                    {(boyDetails.boy.current_location || boyDetails.boy.last_known_location) ? (
+                      <div className="bg-gray-50 dark:bg-meta-4/20 p-4 rounded-lg font-mono">
+                        <p className="text-xs text-gray-500 uppercase mb-1">{boyDetails.boy.is_online ? 'Live' : 'Last known'}</p>
+                        <p className="text-lg font-bold text-primary">
+                          {(boyDetails.boy.current_location || boyDetails.boy.last_known_location)?.latitude.toFixed(6)},
+                          {(boyDetails.boy.current_location || boyDetails.boy.last_known_location)?.longitude.toFixed(6)}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-2">
+                          {boyDetails.boy.is_online ? 'Tracking active' : `Last seen: ${new Date(boyDetails.boy.last_known_location?.timestamp || boyDetails.boy.last_online_at || '').toLocaleString()}`}
+                        </p>
+                      </div>
+                    ) : <p className="text-gray-500 text-center py-10">No location data available</p>}
+                  </div>
+
+                  <div className="rounded-xl border border-stroke bg-white p-6 shadow-default dark:border-strokedark dark:bg-boxdark">
+                    <h4 className="font-bold mb-4">Current Assignment</h4>
+                    {selectedBoyFull?.current_assignment ? (
+                      <div className="p-4 border border-stroke dark:border-strokedark rounded-lg">
+                        <div className="flex justify-between items-start mb-3">
+                          <span className="text-sm font-bold text-primary">#{selectedBoyFull.current_assignment.order.order_ref}</span>
+                          <span className="bg-blue-100 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400 text-xs font-bold px-2 py-1 rounded uppercase">
+                            {selectedBoyFull.current_assignment.status}
+                          </span>
+                        </div>
+                        <h5 className="font-bold text-black dark:text-white">{selectedBoyFull.current_assignment.order.customer_name}</h5>
+                        <p className="text-xs text-gray-500 mt-1">Delivery in Progress</p>
+                      </div>
+                    ) : (
+                      <div className="text-center py-10 text-gray-500 italic">No active task</div>
+                    )}
                   </div>
                 </div>
 
@@ -463,6 +640,35 @@ export default function DeliveryOfficers() {
                     </div>
                   )}
                 </div>
+
+                {officerStats && (
+                  <div className="rounded-xl border border-stroke bg-white p-6 shadow-default dark:border-strokedark dark:bg-boxdark">
+                    <h4 className="font-bold mb-4 text-black dark:text-white">Monthly Attendance ({officerStats.month})</h4>
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full divide-y divide-stroke dark:divide-strokedark">
+                        <thead>
+                          <tr>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Online Hours</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Worked Hours</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Offline (Duty)</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-stroke dark:divide-strokedark text-black dark:text-white">
+                          {officerStats.daily_stats.map((day) => (
+                            <tr key={day.date} className="hover:bg-gray-50 dark:hover:bg-meta-4/20">
+                              <td className="px-6 py-4 text-sm">{day.date}</td>
+                              <td className="px-6 py-4 text-sm font-medium text-green-600">{day.online_hours}</td>
+                              <td className="px-6 py-4 text-sm font-medium">{day.worked_hours}</td>
+                              <td className="px-6 py-4 text-sm text-red-600 font-medium">{day.offline_during_work_hours}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    <p className="mt-4 text-sm text-gray-500">Expected daily: <strong>{officerStats.expected_daily_hours}</strong> hrs</p>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="flex h-[500px] flex-col items-center justify-center rounded-xl border border-dashed border-stroke bg-gray-50 text-center dark:border-strokedark dark:bg-boxdark">
@@ -482,7 +688,7 @@ export default function DeliveryOfficers() {
       ) : (
         /* All Deliveries Tab - Tracking and Historical Data */
         <div className="animate-in fade-in duration-500">
-          {/* <DeliveryTable
+          <DeliveryTable
             data={allDeliveries}
             loading={deliveriesLoading}
             onMarkDelivered={(order) => {
@@ -510,7 +716,7 @@ export default function DeliveryOfficers() {
             onSuccess={() => {
               fetchAllDeliveries();
             }}
-          /> */}
+          />
         </div>
       )}
     </div>

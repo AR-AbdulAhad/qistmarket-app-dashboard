@@ -164,7 +164,7 @@ export const DeliveryTable = ({
                     />
                 </div>
 
-                {/* <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3">
                     <span className="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status:</span>
                     <select
                         value={statusFilter}
@@ -178,7 +178,7 @@ export const DeliveryTable = ({
                         <option value="returned">Returned</option>
                         <option value="refunded">Refunded</option>
                     </select>
-                </div> */}
+                </div>
             </div>
 
             <div className="overflow-x-auto min-h-[400px]">
