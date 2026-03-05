@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
+import dayjs from 'dayjs'
 import Loader from '@/components/common/Loader'
 import {
   ColumnDef,
@@ -21,6 +22,7 @@ import { cn } from '@/lib/utils'
 import { createPortal } from 'react-dom'
 import { useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import Pagination from '../common/Pagination'
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL
 
@@ -476,6 +478,12 @@ const OrderList = ({ forcedStatus, hideActions, hideSelection }: OrderListProps)
       enableSorting: false,
       enableColumnFilter: false,
     }]),
+    {
+      accessorKey: 'created_at',
+      header: 'Date',
+      cell: ({ getValue }) => dayjs(getValue() as string).format('MMM DD, YYYY'),
+      enableColumnFilter: true,
+    },
     { accessorKey: 'order_ref', header: 'Order Ref', enableColumnFilter: true },
     { accessorKey: 'token_number', header: 'Token Number', enableColumnFilter: true },
     { accessorKey: 'customer_name', header: 'Customer Name', enableColumnFilter: true },
@@ -944,40 +952,14 @@ const OrderList = ({ forcedStatus, hideActions, hideSelection }: OrderListProps)
 
       {/* Pagination */}
       <div className="flex justify-between items-center px-7.5 py-7">
-        <div className="flex items-center">
-          <button
-            className="flex items-center justify-center rounded-[3px] p-[7px] hover:bg-[#ff3d3d] hover:text-white disabled:pointer-events-none"
-            onClick={() => setPagination((p) => ({ ...p, page: Math.max(1, p.page - 1) }))}
-            disabled={pagination.page === 1 || loading}
-          >
-            <ChevronLeft width={18} height={18} />
-          </button>
+        <Pagination
+          currentPage={pagination.page}
+          totalPages={pagination.totalPages}
+          onPageChange={(page) => setPagination((p) => ({ ...p, page }))}
+          isLoading={loading}
+        />
 
-          {Array.from({ length: pagination.totalPages }, (_, i) => i + 1).map((pageNum) => (
-            <button
-              key={pageNum}
-              onClick={() => setPagination((p) => ({ ...p, page: pageNum }))}
-              className={cn(
-                'mx-1 flex items-center justify-center rounded-[3px] p-1.5 px-[15px] font-medium hover:bg-opacity-90 hover:bg-[#ff3d3d] hover:text-white',
-                pagination.page === pageNum && 'bg-[#ff3d3d] text-white',
-                loading && 'opacity-50 pointer-events-none'
-              )}
-              disabled={loading}
-            >
-              {pageNum}
-            </button>
-          ))}
-
-          <button
-            className="flex items-center justify-center rounded-[3px] p-[7px] hover:bg-[#ff3d3d] hover:text-white disabled:pointer-events-none"
-            onClick={() => setPagination((p) => ({ ...p, page: p.page + 1 }))}
-            disabled={pagination.page >= pagination.totalPages || loading}
-          >
-            <ChevronRight width={18} height={18} />
-          </button>
-        </div>
-
-        <p className="font-medium">
+        <p className="font-medium text-dark dark:text-white">
           Showing {pagination.page} of {pagination.totalPages} pages
         </p>
       </div>
@@ -1055,35 +1037,35 @@ const OrderList = ({ forcedStatus, hideActions, hideSelection }: OrderListProps)
 
           {selectedProduct && (
             <div className="space-y-3 pt-2">
-                <label className="block text-sm font-medium dark:text-gray-300">Installment Plan:</label>
-                <div className="grid grid-cols-1 gap-3">
-                    {selectedProduct.ProductInstallments?.filter((p: any) => p.isActive).map((plan: any) => (
-                        <label
-                            key={plan.id}
-                            className={`p-4 border rounded-xl cursor-pointer transition-all ${selectedPlan?.id === plan.id
-                                ? 'border-primary bg-primary/5 ring-1 ring-primary'
-                                : 'border-stroke hover:border-primary/50 dark:border-dark-3'
-                                }`}
-                        >
-                            <input
-                                type="radio"
-                                className="sr-only"
-                                checked={selectedPlan?.id === plan.id}
-                                onChange={() => setSelectedPlan(plan)}
-                            />
-                            <div className="flex justify-between items-center">
-                                <span className="font-bold text-dark dark:text-white">{plan.months} Months</span>
-                                <div className="text-right text-xs space-y-0.5">
-                                    <div className="text-gray-500">Advance: <span className="text-dark dark:text-white font-medium">Rs. {plan.advance.toLocaleString()}</span></div>
-                                    <div className="text-gray-500">Monthly: <span className="text-dark dark:text-white font-medium">Rs. {plan.monthlyAmount.toLocaleString()}</span></div>
-                                    <div className="text-gray-500">Total: <span className="text-dark dark:text-white font-medium">Rs. {plan.totalPrice.toLocaleString()}</span></div>
-                                </div>
-                            </div>
-                        </label>
-                    ))}
-                </div>
+              <label className="block text-sm font-medium dark:text-gray-300">Installment Plan:</label>
+              <div className="grid grid-cols-1 gap-3">
+                {selectedProduct.ProductInstallments?.filter((p: any) => p.isActive).map((plan: any) => (
+                  <label
+                    key={plan.id}
+                    className={`p-4 border rounded-xl cursor-pointer transition-all ${selectedPlan?.id === plan.id
+                      ? 'border-primary bg-primary/5 ring-1 ring-primary'
+                      : 'border-stroke hover:border-primary/50 dark:border-dark-3'
+                      }`}
+                  >
+                    <input
+                      type="radio"
+                      className="sr-only"
+                      checked={selectedPlan?.id === plan.id}
+                      onChange={() => setSelectedPlan(plan)}
+                    />
+                    <div className="flex justify-between items-center">
+                      <span className="font-bold text-dark dark:text-white">{plan.months} Months</span>
+                      <div className="text-right text-xs space-y-0.5">
+                        <div className="text-gray-500">Advance: <span className="text-dark dark:text-white font-medium">Rs. {plan.advance.toLocaleString()}</span></div>
+                        <div className="text-gray-500">Monthly: <span className="text-dark dark:text-white font-medium">Rs. {plan.monthlyAmount.toLocaleString()}</span></div>
+                        <div className="text-gray-500">Total: <span className="text-dark dark:text-white font-medium">Rs. {plan.totalPrice.toLocaleString()}</span></div>
+                      </div>
+                    </div>
+                  </label>
+                ))}
+              </div>
             </div>
-        )}
+          )}
         </div>
         <div className="mt-6 flex justify-end gap-4">
           <button

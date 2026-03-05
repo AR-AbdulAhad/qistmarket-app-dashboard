@@ -80,12 +80,19 @@ export default function RecoveryOfficersPage() {
             socketRef.current.emit('join_admin_notifications', token);
         });
 
-        socketRef.current.on('officer_status_update', (data: { officerId: number; is_online: boolean }) => {
+        socketRef.current.on('officer_status_update', (data: { officerId: number; is_online: boolean; timestamp?: string }) => {
             setOfficers((prev) =>
                 prev.map((o) => (o.id === data.officerId ? { ...o, is_online: data.is_online } : o))
             );
             if (selectedOfficerIdRef.current === data.officerId) {
-                setSelectedOfficer((prev) => prev && { ...prev, is_online: data.is_online });
+                setSelectedOfficer((prev) => prev && {
+                    ...prev,
+                    is_online: data.is_online,
+                    last_known_location: data.is_online ? prev.last_known_location : {
+                        ...(prev.last_known_location || { latitude: 0, longitude: 0 }),
+                        timestamp: data.timestamp || new Date().toISOString()
+                    }
+                });
             }
         });
 

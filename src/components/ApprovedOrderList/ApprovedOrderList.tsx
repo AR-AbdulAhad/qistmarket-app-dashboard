@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
+import dayjs from 'dayjs'
 import Loader from '@/components/common/Loader'
 import {
   ColumnDef,
@@ -21,6 +22,7 @@ import { Modal } from '../Modal/Modal'
 import { cn } from '@/lib/utils'
 import { createPortal } from 'react-dom'
 import { useRef } from 'react'
+import Pagination from '../common/Pagination'
 
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL
@@ -314,6 +316,12 @@ const ApprovedOrderList = () => {
       ),
       enableSorting: false,
       enableColumnFilter: false,
+    },
+    {
+      accessorKey: 'created_at',
+      header: 'Date',
+      cell: ({ getValue }) => dayjs(getValue() as string).format('MMM DD, YYYY'),
+      enableColumnFilter: true,
     },
     { accessorKey: 'order_ref', header: 'Order Ref', enableColumnFilter: true },
     { accessorKey: 'token_number', header: 'Token Number', enableColumnFilter: true },
@@ -725,38 +733,12 @@ const ApprovedOrderList = () => {
 
       {/* Pagination */}
       <div className="flex justify-between items-center px-7.5 py-7">
-        <div className="flex items-center">
-          <button
-            className="flex items-center justify-center rounded-[3px] p-[7px] hover:bg-[#ff3d3d] hover:text-white disabled:pointer-events-none"
-            onClick={() => setPagination((p) => ({ ...p, page: Math.max(1, p.page - 1) }))}
-            disabled={pagination.page === 1 || loading}
-          >
-            <ChevronLeft width={18} height={18} />
-          </button>
-
-          {Array.from({ length: pagination.totalPages }, (_, i) => i + 1).map((pageNum) => (
-            <button
-              key={pageNum}
-              onClick={() => setPagination((p) => ({ ...p, page: pageNum }))}
-              className={cn(
-                'mx-1 flex items-center justify-center rounded-[3px] p-1.5 px-[15px] font-medium hover:bg-opacity-90 hover:bg-[#ff3d3d] hover:text-white',
-                pagination.page === pageNum && 'bg-[#ff3d3d] text-white',
-                loading && 'opacity-50 pointer-events-none'
-              )}
-              disabled={loading}
-            >
-              {pageNum}
-            </button>
-          ))}
-
-          <button
-            className="flex items-center justify-center rounded-[3px] p-[7px] hover:bg-[#ff3d3d] hover:text-white disabled:pointer-events-none"
-            onClick={() => setPagination((p) => ({ ...p, page: p.page + 1 }))}
-            disabled={pagination.page >= pagination.totalPages || loading}
-          >
-            <ChevronRight width={18} height={18} />
-          </button>
-        </div>
+        <Pagination
+          currentPage={pagination.page}
+          totalPages={pagination.totalPages}
+          onPageChange={(page: number) => setPagination((p) => ({ ...p, page }))}
+          isLoading={loading}
+        />
 
         <p className="font-medium">
           Showing {pagination.page} of {pagination.totalPages} pages

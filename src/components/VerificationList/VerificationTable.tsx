@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
+import dayjs from 'dayjs'
 import Loader from '@/components/common/Loader'
 import {
   ColumnDef,
@@ -19,6 +20,7 @@ import { cn } from '@/lib/utils'
 import { useRouter } from 'next/navigation'
 import { createPortal } from 'react-dom'
 import { useRef } from 'react'
+import Pagination from '../common/Pagination'
 
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL
@@ -188,6 +190,12 @@ const AssignedVerifications = () => {
 
   // ── Columns ────────────────────────────────────────────────────────────────
   const columns: ColumnDef<OrderWithVerification>[] = [
+    {
+      accessorKey: 'created_at',
+      header: 'Date',
+      cell: ({ getValue }) => dayjs(getValue() as string).format('MMM DD, YYYY'),
+      enableColumnFilter: true,
+    },
     {
       accessorKey: 'order_ref',
       header: 'Order Ref',
@@ -376,10 +384,32 @@ const AssignedVerifications = () => {
       globalFilter,
       columnFilters,
       sorting,
+      pagination: {
+        pageIndex: pagination.page - 1,
+        pageSize: pagination.limit,
+      },
     },
+    pageCount: pagination.totalPages,
+    manualPagination: true,
+    manualSorting: true,
+    manualFiltering: true,
     onGlobalFilterChange: setGlobalFilter,
     onColumnFiltersChange: setColumnFilters,
     onSortingChange: setSorting,
+    onPaginationChange: (updater) => {
+      const newState =
+        typeof updater === 'function'
+          ? updater({
+            pageIndex: pagination.page - 1,
+            pageSize: pagination.limit,
+          })
+          : updater
+      setPagination((prev) => ({
+        ...prev,
+        page: newState.pageIndex + 1,
+        limit: newState.pageSize,
+      }))
+    },
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     getSortedRowModel: getSortedRowModel(),
@@ -537,37 +567,12 @@ const AssignedVerifications = () => {
 
       {/* Pagination */}
       <div className="flex justify-between items-center px-7.5 py-7">
-        <div className="flex items-center">
-          <button
-            className="flex items-center justify-center rounded-[3px] p-[7px] hover:bg-[#ff3d3d] hover:text-white disabled:pointer-events-none"
-            onClick={() => setPagination((p) => ({ ...p, page: Math.max(1, p.page - 1) }))}
-            disabled={pagination.page === 1 || loading}
-          >
-            <ChevronLeft width={18} height={18} />
-          </button>
-
-          {Array.from({ length: Math.min(pagination.totalPages, 10) }, (_, i) => i + 1).map((pageNum) => (
-            <button
-              key={pageNum}
-              onClick={() => setPagination((p) => ({ ...p, page: pageNum }))}
-              className={cn(
-                'mx-1 flex items-center justify-center rounded-[3px] p-1.5 px-[15px] font-medium hover:bg-opacity-90 hover:bg-[#ff3d3d] hover:text-white',
-                pagination.page === pageNum && 'bg-[#ff3d3d] text-white',
-                pagination.page !== pageNum && 'bg-gray-2 dark:bg-dark-3 dark:text-white text-dark'
-              )}
-            >
-              {pageNum}
-            </button>
-          ))}
-
-          <button
-            className="flex items-center justify-center rounded-[3px] p-[7px] hover:bg-[#ff3d3d] hover:text-white disabled:pointer-events-none"
-            onClick={() => setPagination((p) => ({ ...p, page: Math.min(pagination.totalPages, p.page + 1) }))}
-            disabled={pagination.page === pagination.totalPages || loading}
-          >
-            <ChevronRight width={18} height={18} />
-          </button>
-        </div>
+        <Pagination
+          currentPage={pagination.page}
+          totalPages={pagination.totalPages}
+          onPageChange={(page: number) => setPagination((p) => ({ ...p, page }))}
+          isLoading={loading}
+        />
         <p className="font-medium dark:text-white">
           Showing page {pagination.page} of {pagination.totalPages} ({pagination.total} records)
         </p>

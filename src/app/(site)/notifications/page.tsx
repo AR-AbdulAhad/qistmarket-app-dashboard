@@ -7,7 +7,8 @@ import { useNotifications } from "../../../../contexts/NotificationContext";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 import { cn } from "@/lib/utils";
-import { CheckCheck, Trash2, Bell, BellOff, ChevronLeft, ChevronRight } from "lucide-react";
+import { CheckCheck, Trash2, Bell, BellOff } from "lucide-react";
+import Pagination from "@/components/common/Pagination";
 
 dayjs.extend(relativeTime);
 
@@ -157,40 +158,12 @@ const NotificationsPage = () => {
                             {/* Pagination Controls */}
                             {pagination.totalPages > 1 && (
                                 <div className="mt-8 flex items-center justify-between border-t border-stroke pt-6 dark:border-dark-3">
-                                    <div className="flex items-center gap-2">
-                                        <button
-                                            onClick={() => setPage(p => Math.max(1, p - 1))}
-                                            disabled={page === 1 || loading}
-                                            className="flex items-center justify-center rounded-lg border border-stroke p-2 hover:bg-gray-2 disabled:opacity-50 dark:border-dark-3 dark:hover:bg-dark-2 transition-all"
-                                        >
-                                            <ChevronLeft size={20} />
-                                        </button>
-
-                                        <div className="flex items-center gap-1">
-                                            {Array.from({ length: pagination.totalPages }, (_, i) => i + 1).map((p) => (
-                                                <button
-                                                    key={p}
-                                                    onClick={() => setPage(p)}
-                                                    className={cn(
-                                                        "flex size-10 items-center justify-center rounded-lg text-sm font-bold transition-all",
-                                                        page === p
-                                                            ? "bg-primary text-white shadow-md shadow-primary/20"
-                                                            : "hover:bg-gray-2 dark:hover:bg-dark-2 text-dark dark:text-white"
-                                                    )}
-                                                >
-                                                    {p}
-                                                </button>
-                                            ))}
-                                        </div>
-
-                                        <button
-                                            onClick={() => setPage(p => Math.min(pagination.totalPages, p + 1))}
-                                            disabled={page === pagination.totalPages || loading}
-                                            className="flex items-center justify-center rounded-lg border border-stroke p-2 hover:bg-gray-2 disabled:opacity-50 dark:border-dark-3 dark:hover:bg-dark-2 transition-all"
-                                        >
-                                            <ChevronRight size={20} />
-                                        </button>
-                                    </div>
+                                    <Pagination
+                                        currentPage={page}
+                                        totalPages={pagination.totalPages}
+                                        onPageChange={(p: number) => setPage(p)}
+                                        isLoading={loading}
+                                    />
 
                                     <p className="text-sm font-medium text-dark-6 dark:text-dark-7">
                                         Showing page {page} of {pagination.totalPages}

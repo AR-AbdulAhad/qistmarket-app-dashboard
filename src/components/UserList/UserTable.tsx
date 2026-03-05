@@ -26,6 +26,7 @@ import { Modal } from "../Modal/Modal";
 import { cn } from "@/lib/utils";
 import { createPortal } from "react-dom";
 import { useRef } from "react";
+import Pagination from "../common/Pagination";
 
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
@@ -636,44 +637,14 @@ const UsersTable = () => {
 
       {/* Pagination – matched exactly */}
       <div className="flex items-center justify-between px-7.5 py-7">
-        <div className="flex items-center">
-          <button
-            className="flex items-center justify-center rounded-[3px] p-[7px] hover:bg-[#ff3d3d] hover:text-white disabled:pointer-events-none"
-            onClick={() =>
-              setPagination((p) => ({ ...p, page: Math.max(1, p.page - 1) }))
-            }
-            disabled={pagination.page === 1 || loading}
-          >
-            <ChevronLeft width={18} height={18} />
-          </button>
+        <Pagination
+          currentPage={pagination.page}
+          totalPages={pagination.totalPages}
+          onPageChange={(page: number) => setPagination((p) => ({ ...p, page }))}
+          isLoading={loading}
+        />
 
-          {Array.from({ length: pagination.totalPages }, (_, i) => i + 1).map(
-            (pageNum) => (
-              <button
-                key={pageNum}
-                onClick={() => setPagination((p) => ({ ...p, page: pageNum }))}
-                className={cn(
-                  "mx-1 flex items-center justify-center rounded-[3px] p-1.5 px-[15px] font-medium hover:bg-[#ff3d3d] hover:bg-opacity-90 hover:text-white",
-                  pagination.page === pageNum && "bg-[#ff3d3d] text-white",
-                  loading && "pointer-events-none opacity-50",
-                )}
-                disabled={loading}
-              >
-                {pageNum}
-              </button>
-            ),
-          )}
-
-          <button
-            className="flex items-center justify-center rounded-[3px] p-[7px] hover:bg-[#ff3d3d] hover:text-white disabled:pointer-events-none"
-            onClick={() => setPagination((p) => ({ ...p, page: p.page + 1 }))}
-            disabled={pagination.page >= pagination.totalPages || loading}
-          >
-            <ChevronRight width={18} height={18} />
-          </button>
-        </div>
-
-        <p className="font-medium">
+        <p className="font-medium text-dark dark:text-gray-300">
           Showing {pagination.page} of {pagination.totalPages} pages
         </p>
       </div>

@@ -1,5 +1,7 @@
 'use client'
 import { useEffect, useState, useRef } from 'react'
+import dayjs from 'dayjs'
+import Pagination from '../common/Pagination'
 import Loader from '@/components/common/Loader'
 import {
     ColumnDef,
@@ -275,6 +277,12 @@ const RecoveryOrderList = () => {
             enableSorting: false,
             enableColumnFilter: false,
         },
+        {
+            accessorKey: 'created_at',
+            header: 'Date',
+            cell: ({ getValue }) => dayjs(getValue() as string).format('MMM DD, YYYY'),
+            enableColumnFilter: true,
+        },
         { accessorKey: 'order_ref', header: 'Order Ref', enableColumnFilter: true },
         { accessorKey: 'customer_name', header: 'Customer', enableColumnFilter: true },
         { accessorKey: 'whatsapp_number', header: 'WhatsApp', enableColumnFilter: true },
@@ -470,13 +478,12 @@ const RecoveryOrderList = () => {
 
             {/* Pagination */}
             <div className="flex justify-between items-center mt-7">
-                <div className="flex gap-2">
-                    <button className="p-2 border rounded hover:bg-[#ff3d3d] hover:text-white disabled:opacity-50" onClick={() => setPagination(p => ({ ...p, page: p.page - 1 }))} disabled={pagination.page === 1 || loading}><ChevronLeft /></button>
-                    {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => i + 1).map(n => (
-                        <button key={n} className={cn('px-4 py-2 border rounded font-medium transition-all', pagination.page === n ? 'bg-[#ff3d3d] text-white' : 'hover:bg-gray-100')} onClick={() => setPagination(p => ({ ...p, page: n }))}>{n}</button>
-                    ))}
-                    <button className="p-2 border rounded hover:bg-[#ff3d3d] hover:text-white disabled:opacity-50" onClick={() => setPagination(p => ({ ...p, page: p.page + 1 }))} disabled={pagination.page >= pagination.totalPages || loading}><ChevronRight /></button>
-                </div>
+                <Pagination
+                    currentPage={pagination.page}
+                    totalPages={pagination.totalPages}
+                    onPageChange={(page: number) => setPagination((p) => ({ ...p, page }))}
+                    isLoading={loading}
+                />
                 <p className="font-medium text-gray-500">Showing {pagination.page} of {pagination.totalPages} pages ({pagination.total} total)</p>
             </div>
 
