@@ -269,10 +269,20 @@ const RecoveryOrderList = () => {
         {
             id: 'select',
             header: ({ table }) => (
-                <input type="checkbox" checked={table.getIsAllPageRowsSelected()} onChange={table.getToggleAllPageRowsSelectedHandler()} />
+                <input
+                    type="checkbox"
+                    className="h-4 w-4 rounded border-stroke text-[#ff3d3d] focus:ring-[#ff3d3d]"
+                    checked={table.getIsAllPageRowsSelected()}
+                    onChange={table.getToggleAllPageRowsSelectedHandler()}
+                />
             ),
             cell: ({ row }) => (
-                <input type="checkbox" checked={row.getIsSelected()} onChange={row.getToggleSelectedHandler()} />
+                <input
+                    type="checkbox"
+                    className="h-4 w-4 rounded border-stroke text-[#ff3d3d] focus:ring-[#ff3d3d]"
+                    checked={row.getIsSelected()}
+                    onChange={row.getToggleSelectedHandler()}
+                />
             ),
             enableSorting: false,
             enableColumnFilter: false,
@@ -288,6 +298,26 @@ const RecoveryOrderList = () => {
         { accessorKey: 'whatsapp_number', header: 'WhatsApp', enableColumnFilter: true },
         { accessorKey: 'area', header: 'Area', enableColumnFilter: true },
         { accessorKey: 'product_name', header: 'Product', enableColumnFilter: true },
+        {
+            accessorKey: 'status',
+            header: 'Status',
+            enableColumnFilter: true,
+            cell: ({ row }) => {
+                const status = row.original.status
+                return (
+                    <span
+                        className={cn(
+                            'inline-flex px-2.5 py-1 rounded-full text-xs font-medium',
+                            status === 'delivered'
+                                ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300'
+                                : 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300'
+                        )}
+                    >
+                        {status.charAt(0).toUpperCase() + status.slice(1)}
+                    </span>
+                )
+            },
+        },
         {
             id: 'recovery_officer',
             accessorFn: (row) => row.recovery_officer?.full_name || 'Unassigned',
@@ -310,7 +340,7 @@ const RecoveryOrderList = () => {
                 const toggleDropdown = () => {
                     if (!triggerRef.current) return;
                     const rect = triggerRef.current.getBoundingClientRect();
-                    const dropdownWidth = 176;
+                    const dropdownWidth = 192;
                     const dropdownHeight = 150;
                     const spaceBelow = window.innerHeight - rect.bottom;
                     const spaceRight = window.innerWidth - rect.right;
@@ -336,22 +366,36 @@ const RecoveryOrderList = () => {
 
                 return (
                     <>
-                        <button ref={triggerRef} onClick={toggleDropdown} className="group flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium text-dark shadow-[0_1px_3px_0_rgba(166,175,195,0.4)] hover:text-[#ff3d3d] dark:text-white">
+                        <button
+                            ref={triggerRef}
+                            onClick={toggleDropdown}
+                            className="group flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium text-dark shadow-[0_1px_3px_0_rgba(166,175,195,0.4)] hover:text-[#ff3d3d] dark:border dark:border-dark-3 dark:text-white dark:shadow-none"
+                        >
                             <span>Actions</span>
                             <svg className={`size-4 transition-transform ${isOpen ? "rotate-0" : "rotate-180"}`} viewBox="0 0 20 20" fill="currentColor">
                                 <path d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.7a.75.75 0 111.06 1.06l-4.24 4.25a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z" />
                             </svg>
                         </button>
                         {isOpen && createPortal(
-                            <div ref={dropdownRef} style={{ position: "absolute", top: position.top, left: position.left, transform: openUp ? "translateY(-100%)" : "none" }} className="z-[99999] w-44 rounded-md border border-stroke bg-white shadow-xl dark:bg-gray-900 overflow-hidden">
+                            <div
+                                ref={dropdownRef}
+                                style={{ position: "absolute", top: position.top, left: position.left, transform: openUp ? "translateY(-100%)" : "none" }}
+                                className="z-[99999] w-48 rounded-md border border-stroke bg-white shadow-xl dark:border-dark-3 dark:bg-gray-900 overflow-hidden"
+                            >
                                 <ul className="text-sm font-medium">
                                     <li>
-                                        <button className="block w-full px-4 py-2.5 text-left hover:bg-gray-100" onClick={() => { order.recovery_officer ? handleUnassignClick(order) : handleAssignClick(order); setIsOpen(false); }}>
+                                        <button
+                                            className="block w-full px-4 py-2.5 text-left hover:bg-[#F5F7FD] hover:text-[#ff3d3d] dark:hover:bg-dark-3"
+                                            onClick={() => { order.recovery_officer ? handleUnassignClick(order) : handleAssignClick(order); setIsOpen(false); }}
+                                        >
                                             {order.recovery_officer ? 'Unassign Recovery' : 'Assign Recovery'}
                                         </button>
                                     </li>
                                     <li>
-                                        <button className="block w-full px-4 py-2.5 text-left hover:bg-gray-100" onClick={() => { router.push(`/orders/${order.id}`); setIsOpen(false); }}>
+                                        <button
+                                            className="block w-full px-4 py-2.5 text-left hover:bg-[#F5F7FD] hover:text-[#ff3d3d] dark:hover:bg-dark-3"
+                                            onClick={() => { router.push(`/orders/${order.id}`); setIsOpen(false); }}
+                                        >
                                             View Details
                                         </button>
                                     </li>
@@ -389,12 +433,11 @@ const RecoveryOrderList = () => {
 
     const selectedCount = Object.keys(rowSelection).length
 
-    // ── Render ─────────────────────────────────────────────────────────────────
     return (
-        <section className="data-table-common rounded-[10px] bg-white shadow-1 dark:bg-gray-dark p-6">
+        <section className="data-table-common rounded-[10px] bg-white shadow-1 dark:bg-gray-dark dark:shadow-card">
             {/* Top bar */}
-            <div className="flex justify-between mb-6">
-                <div className="relative w-full max-w-[414px]">
+            <div className="flex flex-col gap-4 px-7.5 py-4.5 lg:flex-row lg:items-center lg:justify-between">
+                <div className="relative z-20 w-full max-w-[500px]">
                     <input
                         type="text"
                         value={globalFilter || ''}
@@ -402,7 +445,7 @@ const RecoveryOrderList = () => {
                             setGlobalFilter(e.target.value)
                             setPagination((p) => ({ ...p, page: 1 }))
                         }}
-                        className="w-full rounded-lg border border-stroke bg-transparent px-5 py-2.5 outline-none focus:border-[#ff3d3d]"
+                        className="w-full rounded-lg border border-stroke bg-transparent px-5 py-2.5 outline-none focus:border-[#ff3d3d] dark:border-dark-3"
                         placeholder="Search recovery orders..."
                     />
                     <button className="absolute right-0 top-0 flex h-11.5 w-11.5 items-center justify-center rounded-r-md bg-[#ff3d3d] text-white">
@@ -410,22 +453,43 @@ const RecoveryOrderList = () => {
                     </button>
                 </div>
 
-                <div className="flex items-center gap-4 font-medium">
+                <div className="flex flex-wrap items-center font-medium gap-4">
                     <div className="flex items-center">
-                        <p className="pr-2 text-dark dark:text-white">Date Range:</p>
-                        <select value={dateRange} onChange={e => { setDateRange(e.target.value); setPagination(p => ({ ...p, page: 1 })) }} className="rounded-lg border border-stroke bg-transparent px-3 py-1.5 outline-none">
-                            {['All', 'Day', 'Week', 'Month', 'Quarter', 'Year', 'Custom Range'].map(r => <option key={r} value={r}>{r}</option>)}
+                        <p className="pr-2 text-dark dark:text-current">Date Range:</p>
+                        <select
+                            value={dateRange}
+                            onChange={e => { setDateRange(e.target.value); setPagination(p => ({ ...p, page: 1 })) }}
+                            className="rounded-lg border border-stroke bg-transparent px-3 py-1.5 outline-none focus:border-[#ff3d3d] dark:border-dark-3 font-medium"
+                        >
+                            {['All', 'Day', 'Week', 'Month', 'Quarter', 'Year', 'Custom Range'].map(r => (
+                                <option key={r} value={r} className='dark:bg-dark-2'>{r}</option>
+                            ))}
                         </select>
                     </div>
                     {dateRange === 'Custom Range' && (
-                        <div className="flex gap-2">
-                            <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="rounded border border-stroke px-2 py-1" />
-                            <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="rounded border border-stroke px-2 py-1" />
+                        <div className="flex items-center gap-2">
+                            <input
+                                type="date"
+                                value={startDate}
+                                onChange={e => setStartDate(e.target.value)}
+                                className="rounded-lg border border-stroke bg-transparent px-2 py-1 outline-none focus:border-[#ff3d3d] dark:border-dark-3"
+                            />
+                            <span className="text-gray-500">to</span>
+                            <input
+                                type="date"
+                                value={endDate}
+                                onChange={e => setEndDate(e.target.value)}
+                                className="rounded-lg border border-stroke bg-transparent px-2 py-1 outline-none focus:border-[#ff3d3d] dark:border-dark-3"
+                            />
                         </div>
                     )}
-                    <div className="flex items-center">
+                    <div className="flex items-center text-dark dark:text-current font-medium">
                         <p className="pl-2">Per Page:</p>
-                        <select value={pagination.limit} onChange={e => setPagination(p => ({ ...p, limit: Number(e.target.value), page: 1 }))} className="bg-transparent pl-2.5 outline-none">
+                        <select
+                            value={pagination.limit}
+                            onChange={e => setPagination(p => ({ ...p, limit: Number(e.target.value), page: 1 }))}
+                            className="bg-transparent pl-2.5 outline-none"
+                        >
                             {[10, 20, 50, 100].map(s => <option key={s} value={s}>{s}</option>)}
                         </select>
                     </div>
@@ -434,24 +498,41 @@ const RecoveryOrderList = () => {
 
             {/* Bulk actions */}
             {selectedCount > 0 && (
-                <div className="mb-4 flex gap-4">
-                    <button onClick={() => setBulkAssignModalOpen(true)} className="rounded bg-blue-600 px-5 py-2 text-white hover:bg-blue-700">Assign Recovery ({selectedCount})</button>
-                    <button onClick={() => setBulkUnassignModalOpen(true)} className="rounded bg-red-600 px-5 py-2 text-white hover:bg-red-700">Unassign Recovery ({selectedCount})</button>
+                <div className="px-7.5 pb-4 flex gap-4">
+                    <button
+                        onClick={() => setBulkAssignModalOpen(true)}
+                        className="rounded-lg bg-red-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-red-700 transition-all flex items-center gap-2"
+                    >
+                        Assign Recovery ({selectedCount})
+                    </button>
+                    <button
+                        onClick={() => setBulkUnassignModalOpen(true)}
+                        className="rounded-lg border-2 border-red-600 bg-transparent px-5 py-2.5 text-sm font-semibold text-red-600 shadow-sm hover:border-red-700 hover:text-red-700 transition-all flex items-center gap-2"
+                    >
+                        Unassign Recovery ({selectedCount})
+                    </button>
                 </div>
             )}
 
             {/* Table */}
-            <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
+            <div className="grid grid-cols-1 overflow-x-auto">
+                <table className="datatable-table datatable-one !border-collapse w-full px-4 md:px-8">
                     <thead>
                         {table.getHeaderGroups().map(hg => (
-                            <tr key={hg.id} className="border-b border-stroke dark:border-dark-3">
+                            <tr key={hg.id} className="border-t border-stroke dark:border-dark-3">
                                 {hg.headers.map(h => (
-                                    <th key={h.id} className="p-3 align-top font-semibold whitespace-nowrap">
+                                    <th key={h.id} className="whitespace-nowrap px-3 py-4 align-top">
                                         <div className="flex flex-col min-h-[70px]">
                                             <div className="flex cursor-pointer items-center" onClick={h.column.getToggleSortingHandler()}>
-                                                {flexRender(h.column.columnDef.header, h.getContext())}
-                                                {h.column.getCanSort() && <div className="ml-2 flex flex-col"><PointerUp className="size-2.5" /><PointerUp className="size-2.5 rotate-180" /></div>}
+                                                <span className="font-[500] text-dark dark:text-white">
+                                                    {flexRender(h.column.columnDef.header, h.getContext())}
+                                                </span>
+                                                {h.column.getCanSort() && (
+                                                    <div className="ml-2 inline-flex flex-col">
+                                                        <PointerUp className="size-2.5" />
+                                                        <PointerUp className="size-2.5 rotate-180" />
+                                                    </div>
+                                                )}
                                             </div>
                                             {h.column.getCanFilter() && h.column.id !== 'select' && (
                                                 <div className="mt-2">
@@ -465,10 +546,26 @@ const RecoveryOrderList = () => {
                         ))}
                     </thead>
                     <tbody>
-                        {loading ? <tr><td colSpan={columns.length} className="py-12 text-center"><Loader text="Loading orders..." /></td></tr> : orders.length === 0 ? <tr><td colSpan={columns.length} className="py-12 text-center text-gray-500">No recovery orders found</td></tr> : (
+                        {loading ? (
+                            <tr>
+                                <td colSpan={columns.length} className="py-20 text-center">
+                                    <Loader text="Loading recovery orders..." />
+                                </td>
+                            </tr>
+                        ) : orders.length === 0 ? (
+                            <tr>
+                                <td colSpan={columns.length} className="py-20 text-center text-gray-500">
+                                    No recovery orders found
+                                </td>
+                            </tr>
+                        ) : (
                             table.getRowModel().rows.map(row => (
-                                <tr key={row.id} className="border-b border-stroke hover:bg-gray-50 dark:hover:bg-meta-4/10">
-                                    {row.getVisibleCells().map(cell => <td key={cell.id} className="p-3">{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>)}
+                                <tr key={row.id} className="border-t border-stroke dark:border-dark-3 hover:bg-gray-50/50 dark:hover:bg-dark-2/50">
+                                    {row.getVisibleCells().map(cell => (
+                                        <td key={cell.id} className="truncate px-3 py-3.5">
+                                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                                        </td>
+                                    ))}
                                 </tr>
                             ))
                         )}
@@ -477,37 +574,43 @@ const RecoveryOrderList = () => {
             </div>
 
             {/* Pagination */}
-            <div className="flex justify-between items-center mt-7">
+            <div className="flex flex-col sm:flex-row justify-between items-center px-7.5 py-7 gap-4">
                 <Pagination
                     currentPage={pagination.page}
                     totalPages={pagination.totalPages}
                     onPageChange={(page: number) => setPagination((p) => ({ ...p, page }))}
                     isLoading={loading}
                 />
-                <p className="font-medium text-gray-500">Showing {pagination.page} of {pagination.totalPages} pages ({pagination.total} total)</p>
+                <p className="font-medium text-dark dark:text-white">
+                    Showing page {pagination.page} of {pagination.totalPages} ({pagination.total} records)
+                </p>
             </div>
 
             {/* Modals */}
             <Modal open={assignModalOpen || bulkAssignModalOpen} onClose={() => { setAssignModalOpen(false); setBulkAssignModalOpen(false); }}>
-                <div className="rounded-2xl bg-white p-8 shadow-xl dark:bg-gray-800">
-                    <h2 className="text-xl font-bold mb-4">Assign Recovery Officer</h2>
-                    <p className="text-gray-500 mb-6">Choose an officer to handle recovery for {bulkAssignModalOpen ? 'selected orders' : 'this order'}.</p>
-                    <select value={selectedOfficerId || ''} onChange={e => setSelectedOfficerId(Number(e.target.value))} className="w-full p-2.5 border rounded-lg mb-6">
+                <div className="max-w-lg rounded-2xl bg-white p-8 shadow-xl dark:bg-gray-800">
+                    <h2 className="text-xl font-bold mb-4 text-dark dark:text-white">Assign Recovery Officer</h2>
+                    <p className="text-gray-500 dark:text-gray-400 mb-6">Choose an officer to handle recovery for <strong>{bulkAssignModalOpen ? 'selected orders' : selectedOrder?.order_ref}</strong>.</p>
+                    <select
+                        value={selectedOfficerId || ''}
+                        onChange={e => setSelectedOfficerId(Number(e.target.value))}
+                        className="w-full rounded-lg border border-stroke bg-transparent px-4 py-3 outline-none focus:border-[#ff3d3d] dark:border-dark-3 dark:bg-dark-2 mb-6"
+                    >
                         <option value="">Select Recovery Officer</option>
-                        {recoveryOfficers.map(o => <option key={o.id} value={o.id}>{o.full_name} (@{o.username})</option>)}
+                        {recoveryOfficers.map(o => <option key={o.id} value={o.id} className="dark:bg-dark-2">{o.full_name} (@{o.username})</option>)}
                     </select>
                     <div className="flex gap-4">
                         <button
                             disabled={isAssigning}
                             onClick={() => { setAssignModalOpen(false); setBulkAssignModalOpen(false); setSelectedOfficerId(null); }}
-                            className="flex-1 py-2.5 border rounded-lg font-bold disabled:opacity-50"
+                            className="flex-1 py-2.5 border border-stroke rounded-lg font-bold text-dark hover:bg-gray-100 dark:border-dark-3 dark:text-white dark:hover:bg-dark-3 disabled:opacity-50"
                         >
                             Cancel
                         </button>
                         <button
                             disabled={isAssigning || !selectedOfficerId}
                             onClick={assignModalOpen ? confirmAssign : confirmBulkAssign}
-                            className="flex-1 py-2.5 bg-[#ff3d3d] text-white rounded-lg font-bold disabled:opacity-50 flex items-center justify-center gap-2"
+                            className="flex-1 py-2.5 bg-[#ff3d3d] text-white rounded-lg font-bold hover:bg-[#ff3d3d]/90 disabled:opacity-50 flex items-center justify-center gap-2"
                         >
                             {isAssigning ? (
                                 <>
@@ -523,21 +626,23 @@ const RecoveryOrderList = () => {
             </Modal>
 
             <Modal open={singleUnassignModalOpen || bulkUnassignModalOpen} onClose={() => { setSingleUnassignModalOpen(false); setBulkUnassignModalOpen(false); }}>
-                <div className="rounded-2xl bg-white p-8 shadow-xl dark:bg-gray-800">
+                <div className="max-w-lg rounded-2xl bg-white p-8 shadow-xl dark:bg-gray-800">
                     <h2 className="text-xl font-bold mb-4 text-red-600">Unassign Recovery</h2>
-                    <p className="text-gray-500 mb-6 font-medium">Are you sure you want to remove the recovery officer from {bulkUnassignModalOpen ? 'these orders' : 'this order'}?</p>
-                    <div className="flex gap-4">
+                    <p className="text-gray-500 dark:text-gray-400 mb-6 font-medium">
+                        Are you sure you want to remove the recovery officer from <strong>{bulkUnassignModalOpen ? 'these orders' : selectedOrder?.order_ref}</strong>?
+                    </p>
+                    <div className="flex gap-4 pt-2">
                         <button
                             disabled={isUnassigning}
                             onClick={() => { setSingleUnassignModalOpen(false); setBulkUnassignModalOpen(false); }}
-                            className="flex-1 py-2.5 border rounded-lg font-bold disabled:opacity-50"
+                            className="flex-1 py-2.5 border border-stroke rounded-lg font-bold text-dark hover:bg-gray-100 dark:border-dark-3 dark:text-white dark:hover:bg-dark-3 disabled:opacity-50"
                         >
-                            Nevermind
+                            No, keep it
                         </button>
                         <button
                             disabled={isUnassigning}
                             onClick={singleUnassignModalOpen ? confirmSingleUnassign : confirmBulkUnassign}
-                            className="flex-1 py-2.5 bg-red-600 text-white rounded-lg font-bold shadow-lg shadow-red-200 disabled:opacity-50 flex items-center justify-center gap-2"
+                            className="flex-1 py-2.5 bg-red-600 text-white rounded-lg font-bold shadow-lg shadow-red-200 dark:shadow-none hover:bg-red-700 disabled:opacity-50 flex items-center justify-center gap-2"
                         >
                             {isUnassigning ? (
                                 <>

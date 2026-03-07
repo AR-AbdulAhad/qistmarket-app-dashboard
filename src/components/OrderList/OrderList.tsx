@@ -960,7 +960,7 @@ const OrderList = ({ forcedStatus, hideActions, hideSelection }: OrderListProps)
         />
 
         <p className="font-medium text-dark dark:text-white">
-          Showing {pagination.page} of {pagination.totalPages} pages
+           Showing page {pagination.page} of {pagination.totalPages} ({pagination.total} records)
         </p>
       </div>
 

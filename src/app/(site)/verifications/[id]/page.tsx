@@ -180,7 +180,7 @@ const shouldDisplay = (value: any): boolean => {
 // Reusable Field Component
 const Field = ({ label, value, className = "" }: { label: string; value: any; className?: string }) => {
   if (!shouldDisplay(value)) return null
-  
+
   return (
     <div className={className}>
       <label className="block text-sm font-medium text-gray-500 dark:text-gray-400">{label}</label>
@@ -197,7 +197,7 @@ function DocumentCard({ doc }: { doc: VerificationData['documents'][number] }) {
 
   return (
     <>
-      <div 
+      <div
         onClick={() => setIsModalOpen(true)}
         className="group relative overflow-hidden rounded-lg border border-stroke bg-white p-4 shadow-sm transition-all hover:shadow-md dark:border-dark-3 dark:bg-gray-800 cursor-pointer"
       >
@@ -230,11 +230,11 @@ function DocumentCard({ doc }: { doc: VerificationData['documents'][number] }) {
 
       {/* Image Modal */}
       {isModalOpen && (
-        <div 
+        <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75 p-4"
           onClick={() => setIsModalOpen(false)}
         >
-          <div 
+          <div
             className="relative max-w-4xl max-h-[90vh] overflow-hidden rounded-lg bg-white dark:bg-gray-800"
             onClick={(e) => e.stopPropagation()}
           >
@@ -264,7 +264,7 @@ function LocationPhotoCard({ photo, label }: { photo: { file_url: string, upload
 
   return (
     <>
-      <div 
+      <div
         onClick={() => setIsModalOpen(true)}
         className="group relative overflow-hidden rounded-lg border border-stroke bg-white p-4 shadow-sm transition-all hover:shadow-md dark:border-dark-3 dark:bg-gray-800 cursor-pointer"
       >
@@ -291,11 +291,11 @@ function LocationPhotoCard({ photo, label }: { photo: { file_url: string, upload
 
       {/* Image Modal */}
       {isModalOpen && (
-        <div 
+        <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75 p-4"
           onClick={() => setIsModalOpen(false)}
         >
-          <div 
+          <div
             className="relative max-w-4xl max-h-[90vh] overflow-hidden rounded-lg bg-white dark:bg-gray-800"
             onClick={(e) => e.stopPropagation()}
           >
@@ -459,9 +459,9 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
           <Field label="Order ID" value={data.order_id} />
           {data.order?.status && <Field label="Order Status" value={data.order.status} />}
           {data.verification_officer && (
-            <Field 
-              label="Officer" 
-              value={`${data.verification_officer.full_name} (${data.verification_officer.username})`} 
+            <Field
+              label="Officer"
+              value={`${data.verification_officer.full_name} (${data.verification_officer.username})`}
             />
           )}
           {data.status && (
@@ -471,8 +471,8 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
                 <span className={cn(
                   "inline-flex rounded-full px-2 py-1 text-xs font-medium",
                   data.status === 'completed' ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" :
-                  data.status === 'in_progress' ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400" :
-                  "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400"
+                    data.status === 'in_progress' ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400" :
+                      "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400"
                 )}>
                   {data.status}
                 </span>
@@ -754,9 +754,9 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
         // Check if grantor has any data to display
         const hasGrantorData = Object.values(grantor).some(val => shouldDisplay(val))
         const hasDocuments = data.documents.filter(doc => doc.person_type === `grantor${grantor.grantor_number}`).length > 0
-        
+
         if (!hasGrantorData && !hasDocuments) return null
-        
+
         return (
           <div key={grantor.id} className="mb-16">
             <h2 className="mb-4 text-2xl font-semibold text-dark dark:text-white">
@@ -864,7 +864,7 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
       {(data.locations.length > 0 || data.verification_locations.length > 0) && (
         <div className="mb-12">
           <h2 className="mb-4 text-2xl font-semibold text-dark dark:text-white">Location Tracking</h2>
-          
+
           {/* GPS Locations */}
           {data.locations.length > 0 && (
             <div className="mb-8">
@@ -878,6 +878,7 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
                       <th className="px-4 py-2 text-left">Longitude</th>
                       <th className="px-4 py-2 text-left">Accuracy</th>
                       <th className="px-4 py-2 text-left">Timestamp</th>
+                      <th className="px-4 py-2 text-left">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -888,6 +889,16 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
                         <td className="px-4 py-2">{loc.longitude}</td>
                         <td className="px-4 py-2">{loc.accuracy ? `${loc.accuracy} meters` : '—'}</td>
                         <td className="px-4 py-2">{new Date(loc.timestamp).toLocaleString()}</td>
+                        <td className="px-4 py-2">
+                          <a
+                            href={`https://www.google.com/maps/search/?api=1&query=${loc.latitude},${loc.longitude}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-primary hover:underline font-medium"
+                          >
+                            View on Map
+                          </a>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -907,7 +918,24 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
                       <Field label="Location Type" value={loc.location_type} />
                       <Field label="Label" value={loc.label} />
                       <Field label="Person Type" value={loc.person_type} />
-                      <Field label="Coordinates" value={loc.latitude && loc.longitude ? `${loc.latitude}, ${loc.longitude}` : null} />
+                      <div className="flex flex-col">
+                        <label className="block text-sm font-medium text-gray-500 dark:text-gray-400">Coordinates</label>
+                        <div className="mt-1 flex items-center gap-3 rounded-lg bg-gray-100 px-4 py-2.5 dark:bg-dark-3">
+                          <span className="dark:text-gray-300">
+                            {loc.latitude && loc.longitude ? `${loc.latitude}, ${loc.longitude}` : '—'}
+                          </span>
+                          {loc.latitude && loc.longitude && (
+                            <a
+                              href={`https://www.google.com/maps/search/?api=1&query=${loc.latitude},${loc.longitude}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-xs font-bold text-primary hover:underline ml-auto"
+                            >
+                              VIEW ON GOOGLE MAP
+                            </a>
+                          )}
+                        </div>
+                      </div>
                       <Field label="Address" value={loc.address} />
                       <Field label="Captured At" value={loc.created_at ? new Date(loc.created_at).toLocaleString() : null} />
                     </div>
@@ -917,9 +945,9 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
                         <h4 className="mb-3 font-medium text-gray-700 dark:text-gray-300">Photos</h4>
                         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                           {loc.photos.map((photo) => (
-                            <LocationPhotoCard 
-                              key={photo.id} 
-                              photo={photo} 
+                            <LocationPhotoCard
+                              key={photo.id}
+                              photo={photo}
                               label={loc.label}
                             />
                           ))}

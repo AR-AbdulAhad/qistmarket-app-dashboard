@@ -1,10 +1,31 @@
-"use client"
-import React, { useState, useEffect } from 'react';
+"use client";
+
+import React, { useState, useEffect, useRef } from "react";
 import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
 import Cookies from "js-cookie";
 import toast from "react-hot-toast";
-import { Plus, Trash2, MapPin, Edit, Loader2 } from 'lucide-react';
-import Loader from '@/components/common/Loader';
+import { Loader2 } from "lucide-react";
+import Loader from "@/components/common/Loader";
+import {
+    ColumnDef,
+    ColumnFiltersState,
+    flexRender,
+    getCoreRowModel,
+    getFilteredRowModel,
+    getPaginationRowModel,
+    getSortedRowModel,
+    SortingState,
+    useReactTable,
+} from "@tanstack/react-table";
+import {
+    SearchIcon,
+    PointerUp,
+    ChevronUpIcon,
+} from "@/assets/icons";
+import ColumnFilter from "@/components/DataTables/ColumnFilter";
+import { Modal } from "@/components/Modal/Modal";
+import Pagination from "@/components/common/Pagination";
+import { createPortal } from "react-dom";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
 
@@ -18,6 +39,7 @@ interface Area {
     id: number;
     name: string;
     zone_id: number;
+    status: string;
     zone?: Zone;
 }
 
@@ -25,20 +47,36 @@ const AreasPage = () => {
     const [areas, setAreas] = useState<Area[]>([]);
     const [zones, setZones] = useState<Zone[]>([]);
     const [loading, setLoading] = useState(true);
+
+    // Table state
+    const [globalFilter, setGlobalFilter] = useState("");
+    const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+    const [sorting, setSorting] = useState<SortingState>([]);
+    const [pagination, setPagination] = useState({
+        pageIndex: 0,
+        pageSize: 10,
+    });
+
+    // Modals state
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+
     const [selectedArea, setSelectedArea] = useState<Area | null>(null);
-    const [formData, setFormData] = useState({ name: '', zone_id: '' });
+    const [formData, setFormData] = useState({ name: "", zone_id: "", status: "active" });
     const [submitting, setSubmitting] = useState(false);
-    const [deleting, setDeleting] = useState(false);
 
     const fetchData = async () => {
+        setLoading(true);
         try {
             const token = Cookies.get("auth_token");
             const [areasResp, zonesResp] = await Promise.all([
-                fetch(`${BACKEND_URL}/api/address/areas`, { headers: { Authorization: `Bearer ${token}` } }),
-                fetch(`${BACKEND_URL}/api/address/zones`, { headers: { Authorization: `Bearer ${token}` } })
+                fetch(`${BACKEND_URL}/api/address/areas?all=true`, {
+                    headers: { Authorization: `Bearer ${token}` },
+                }),
+                fetch(`${BACKEND_URL}/api/address/zones`, {
+                    headers: { Authorization: `Bearer ${token}` },
+                }),
             ]);
 
             const areasData = await areasResp.json();
@@ -46,7 +84,6 @@ const AreasPage = () => {
 
             if (areasData.success) setAreas(areasData.data);
             if (zonesData.success) setZones(zonesData.data);
-
         } catch (err) {
             toast.error("Error fetching data");
         } finally {
@@ -58,25 +95,198 @@ const AreasPage = () => {
         fetchData();
     }, []);
 
-    const handleCreate = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!formData.name.trim() || !formData.zone_id) return;
+    // Columns
+    const columns: ColumnDef<Area>[] = [
+        {
+            accessorKey: "name",
+            header: "Area Name",
+            enableColumnFilter: true,
+        },
+        {
+            id: "zoneName",
+            accessorFn: (row) => row.zone?.name || "N/A",
+            header: "Zone",
+            enableColumnFilter: true,
+        },
+        {
+            id: "cityName",
+            accessorFn: (row) => row.zone?.city?.name || "N/A",
+            header: "City",
+            enableColumnFilter: true,
+        },
+        {
+            accessorKey: "status",
+            header: "Status",
+            enableColumnFilter: true,
+            cell: ({ row }) => (
+                <span
+                    className={`inline-block rounded-full px-3 py-1 text-xs font-semibold ${row.original.status === "active"
+                            ? "bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-500"
+                            : "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-500"
+                        }`}
+                >
+                    {row.original.status === "active" ? "Active" : "Inactive"}
+                </span>
+            ),
+        },
+        {
+            id: "actions",
+            header: "Actions",
+            enableSorting: false,
+            enableColumnFilter: false,
+            cell: ({ row }) => {
+                const area = row.original;
+                const [isOpen, setIsOpen] = useState(false);
+                const [position, setPosition] = useState({ top: 0, left: 0 });
+                const [openUp, setOpenUp] = useState(false);
+                const triggerRef = useRef<HTMLButtonElement | null>(null);
+                const dropdownRef = useRef<HTMLDivElement | null>(null);
 
+                const toggleDropdown = () => {
+                    if (!triggerRef.current) return;
+                    const rect = triggerRef.current.getBoundingClientRect();
+                    const dropdownWidth = 176;
+                    const dropdownHeight = 100;
+                    const spaceBelow = window.innerHeight - rect.bottom;
+                    const spaceRight = window.innerWidth - rect.right;
+                    const shouldOpenUp = spaceBelow < dropdownHeight;
+                    const shouldAlignLeft = spaceRight < dropdownWidth;
+
+                    setOpenUp(shouldOpenUp);
+                    setPosition({
+                        top: shouldOpenUp
+                            ? rect.top + window.scrollY - 8
+                            : rect.bottom + window.scrollY + 6,
+                        left: shouldAlignLeft
+                            ? rect.left + window.scrollX
+                            : rect.right + window.scrollX - dropdownWidth,
+                    });
+                    setIsOpen((prev) => !prev);
+                };
+
+                useEffect(() => {
+                    const handleClickOutside = (e: MouseEvent) => {
+                        const target = e.target as Node;
+                        if (
+                            triggerRef.current &&
+                            !triggerRef.current.contains(target) &&
+                            dropdownRef.current &&
+                            !dropdownRef.current.contains(target)
+                        ) {
+                            setIsOpen(false);
+                        }
+                    };
+                    const handleEscape = (e: KeyboardEvent) => {
+                        if (e.key === "Escape") setIsOpen(false);
+                    };
+                    if (isOpen) {
+                        document.addEventListener("mousedown", handleClickOutside);
+                        document.addEventListener("keydown", handleEscape);
+                    }
+                    return () => {
+                        document.removeEventListener("mousedown", handleClickOutside);
+                        document.removeEventListener("keydown", handleEscape);
+                    };
+                }, [isOpen]);
+
+                return (
+                    <>
+                        <button
+                            ref={triggerRef}
+                            onClick={toggleDropdown}
+                            className="group flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium text-dark shadow-[0_1px_3px_0_rgba(166,175,195,0.4)] hover:text-[#ff3d3d] dark:border dark:border-dark-3 dark:text-white dark:shadow-none"
+                        >
+                            <span>Actions</span>
+                            <ChevronUpIcon
+                                className={`size-4 transition-transform ${isOpen ? "rotate-0" : "rotate-180"
+                                    }`}
+                            />
+                        </button>
+                        {isOpen &&
+                            createPortal(
+                                <div
+                                    ref={dropdownRef}
+                                    style={{
+                                        position: "absolute",
+                                        top: position.top,
+                                        left: position.left,
+                                        transform: openUp ? "translateY(-100%)" : "none",
+                                    }}
+                                    className="z-[99999] w-44 rounded-md border border-stroke bg-white shadow-xl dark:border-dark-3 dark:bg-gray-900"
+                                >
+                                    <ul className="overflow-hidden text-sm font-medium text-current">
+                                        <li>
+                                            <button
+                                                onClick={() => {
+                                                    setSelectedArea(area);
+                                                    setFormData({ name: area.name, zone_id: area.zone_id.toString(), status: area.status || "active" });
+                                                    setIsEditModalOpen(true);
+                                                    setIsOpen(false);
+                                                }}
+                                                className="block w-full px-4 py-2.5 text-left hover:bg-[#F5F7FD] hover:text-[#ff3d3d] dark:hover:bg-dark-3 dark:hover:text-neutral-50"
+                                            >
+                                                Edit
+                                            </button>
+                                        </li>
+                                        <li>
+                                            <button
+                                                onClick={() => {
+                                                    setSelectedArea(area);
+                                                    setIsDeleteModalOpen(true);
+                                                    setIsOpen(false);
+                                                }}
+                                                className="block w-full px-4 py-2.5 text-left hover:bg-[#F5F7FD] hover:text-[#ff3d3d] dark:hover:bg-dark-3 dark:hover:text-neutral-50"
+                                            >
+                                                Delete
+                                            </button>
+                                        </li>
+                                    </ul>
+                                </div>,
+                                document.body
+                            )}
+                    </>
+                );
+            },
+        },
+    ];
+
+    const table = useReactTable({
+        data: areas,
+        columns,
+        state: {
+            globalFilter,
+            columnFilters,
+            sorting,
+            pagination,
+        },
+        onGlobalFilterChange: setGlobalFilter,
+        onColumnFiltersChange: setColumnFilters,
+        onSortingChange: setSorting,
+        onPaginationChange: setPagination,
+        getCoreRowModel: getCoreRowModel(),
+        getFilteredRowModel: getFilteredRowModel(),
+        getSortedRowModel: getSortedRowModel(),
+        getPaginationRowModel: getPaginationRowModel(),
+    });
+
+    // Actions
+    const handleCreate = async () => {
+        if (!formData.name.trim() || !formData.zone_id) return;
         setSubmitting(true);
         try {
             const token = Cookies.get("auth_token");
             const resp = await fetch(`${BACKEND_URL}/api/address/areas`, {
-                method: 'POST',
+                method: "POST",
                 headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: `Bearer ${token}`
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${token}`,
                 },
-                body: JSON.stringify(formData)
+                body: JSON.stringify(formData),
             });
             const data = await resp.json();
             if (data.success) {
                 toast.success("Area created successfully");
-                setFormData({ name: '', zone_id: '' });
+                setFormData({ name: "", zone_id: "", status: "active" });
                 setIsCreateModalOpen(false);
                 fetchData();
             } else {
@@ -89,25 +299,26 @@ const AreasPage = () => {
         }
     };
 
-    const handleUpdate = async (e: React.FormEvent) => {
-        e.preventDefault();
+    const handleUpdate = async () => {
         if (!selectedArea || !formData.name.trim() || !formData.zone_id) return;
-
         setSubmitting(true);
         try {
             const token = Cookies.get("auth_token");
-            const resp = await fetch(`${BACKEND_URL}/api/address/areas/${selectedArea.id}`, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: `Bearer ${token}`
-                },
-                body: JSON.stringify(formData)
-            });
+            const resp = await fetch(
+                `${BACKEND_URL}/api/address/areas/${selectedArea.id}`,
+                {
+                    method: "PUT",
+                    headers: {
+                        "Content-Type": "application/json",
+                        Authorization: `Bearer ${token}`,
+                    },
+                    body: JSON.stringify(formData),
+                }
+            );
             const data = await resp.json();
             if (data.success) {
                 toast.success("Area updated successfully");
-                setFormData({ name: '', zone_id: '' });
+                setFormData({ name: "", zone_id: "", status: "active" });
                 setIsEditModalOpen(false);
                 setSelectedArea(null);
                 fetchData();
@@ -123,14 +334,16 @@ const AreasPage = () => {
 
     const handleDelete = async () => {
         if (!selectedArea) return;
-
-        setDeleting(true);
+        setSubmitting(true);
         try {
             const token = Cookies.get("auth_token");
-            const resp = await fetch(`${BACKEND_URL}/api/address/areas/${selectedArea.id}`, {
-                method: 'DELETE',
-                headers: { Authorization: `Bearer ${token}` }
-            });
+            const resp = await fetch(
+                `${BACKEND_URL}/api/address/areas/${selectedArea.id}`,
+                {
+                    method: "DELETE",
+                    headers: { Authorization: `Bearer ${token}` },
+                }
+            );
             const data = await resp.json();
             if (data.success) {
                 toast.success("Area deleted");
@@ -143,246 +356,271 @@ const AreasPage = () => {
         } catch (err) {
             toast.error("Error deleting area");
         } finally {
-            setDeleting(false);
+            setSubmitting(false);
         }
-    };
-
-    const openEditModal = (area: Area) => {
-        setSelectedArea(area);
-        setFormData({ name: area.name, zone_id: area.zone_id.toString() });
-        setIsEditModalOpen(true);
-    };
-
-    const openDeleteModal = (area: Area) => {
-        setSelectedArea(area);
-        setIsDeleteModalOpen(true);
     };
 
     return (
         <div className="mx-auto max-w-7xl">
-            <Breadcrumb pageName="Area Management" />
-
-            <div className="flex justify-end mb-6">
+            <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <Breadcrumb pageName="Area Management" />
                 <button
-                    onClick={() => { setFormData({ name: '', zone_id: '' }); setIsCreateModalOpen(true); }}
-                    className="flex items-center gap-2 bg-red-600 text-white px-6 py-2.5 rounded-lg hover:bg-red-700 transition font-medium"
+                    onClick={() => {
+                        setFormData({ name: "", zone_id: "", status: "active" });
+                        setIsCreateModalOpen(true);
+                    }}
+                    className="flex items-center justify-center rounded-lg bg-[#ff3d3d] px-6 py-2.5 text-center font-medium text-white hover:bg-opacity-90"
                 >
-                    <Plus className="w-5 h-5" />
                     Add New Area
                 </button>
             </div>
 
-            <div className="bg-white dark:bg-gray-dark rounded-xl shadow-sm overflow-hidden">
-                <div className="overflow-x-auto">
-                    <table className="w-full text-left">
-                        <thead>
-                            <tr className="bg-gray-50 dark:bg-gray-800 text-sm font-semibold">
-                                <th className="px-6 py-4 text-gray-700 dark:text-gray-300">Area Name</th>
-                                <th className="px-6 py-4 text-gray-700 dark:text-gray-300">Zone (City)</th>
-                                <th className="px-6 py-4 text-center text-gray-700 dark:text-gray-300">Actions</th>
-                            </tr>
+            <section className="data-table-common rounded-[10px] bg-white shadow-1 dark:bg-gray-dark dark:shadow-card">
+                {/* Top bar */}
+                <div className="flex justify-between px-7.5 py-4.5">
+                    <div className="relative z-20 w-full max-w-[414px]">
+                        <input
+                            type="text"
+                            value={globalFilter || ""}
+                            onChange={(e) => setGlobalFilter(e.target.value)}
+                            className="w-full rounded-lg border border-stroke bg-transparent px-5 py-2.5 outline-none focus:border-[#ff3d3d] dark:border-dark-3 dark:bg-dark-2"
+                            placeholder="Search here..."
+                        />
+                        <button className="absolute right-0 top-0 flex h-11.5 w-11.5 items-center justify-center rounded-r-md bg-[#ff3d3d] text-white">
+                            <SearchIcon className="size-4.5" />
+                        </button>
+                    </div>
+
+                    <div className="flex items-center font-medium">
+                        <p className="pl-2 font-medium text-dark dark:text-current">
+                            Per Page:
+                        </p>
+                        <select
+                            value={table.getState().pagination.pageSize}
+                            onChange={(e) => {
+                                table.setPageSize(Number(e.target.value));
+                            }}
+                            className="bg-transparent pl-2.5 text-dark outline-none dark:text-current font-medium"
+                        >
+                            {[10, 20, 50].map((size) => (
+                                <option key={size} value={size}>
+                                    {size}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                </div>
+
+                {/* Table */}
+                <div className="grid grid-cols-1 overflow-x-auto">
+                    <table className="datatable-table datatable-one !border-collapse px-4 md:px-8">
+                        <thead className="border-separate px-4">
+                            {table.getHeaderGroups().map((headerGroup) => (
+                                <tr
+                                    className="border-t border-stroke dark:border-dark-3"
+                                    key={headerGroup.id}
+                                >
+                                    {headerGroup.headers.map((header) => (
+                                        <th
+                                            key={header.id}
+                                            className="whitespace-nowrap px-3 py-4 align-top"
+                                        >
+                                            <div className="flex min-h-[70px] flex-col">
+                                                <div
+                                                    className="flex cursor-pointer items-center"
+                                                    onClick={header.column.getToggleSortingHandler()}
+                                                >
+                                                    <span className="font-[500]">
+                                                        {flexRender(
+                                                            header.column.columnDef.header,
+                                                            header.getContext()
+                                                        )}
+                                                    </span>
+                                                    {header.column.getCanSort() && (
+                                                        <div className="ml-2 inline-flex flex-col">
+                                                            <PointerUp className="size-2.5" />
+                                                            <PointerUp className="size-2.5 rotate-180" />
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                {header.column.getCanFilter() &&
+                                                    header.column.id !== "actions" && (
+                                                        <div className="mt-2 text-dark dark:text-white">
+                                                            <ColumnFilter
+                                                                column={{
+                                                                    filterValue: header.column.getFilterValue() as string,
+                                                                    setFilter: header.column.setFilterValue,
+                                                                }}
+                                                            />
+                                                        </div>
+                                                    )}
+                                            </div>
+                                        </th>
+                                    ))}
+                                </tr>
+                            ))}
                         </thead>
-                        <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+
+                        <tbody>
                             {loading ? (
                                 <tr>
-                                    <td colSpan={3} className="px-6 py-20 text-center">
+                                    <td colSpan={columns.length} className="py-12 text-center">
                                         <Loader text="Loading areas..." />
                                     </td>
                                 </tr>
-                            ) : areas.length === 0 ? (
-                                <tr><td colSpan={3} className="px-6 py-10 text-center text-gray-400">No areas found.</td></tr>
-                            ) : areas.map(area => (
-                                <tr key={area.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition">
-                                    <td className="px-6 py-4 flex items-center gap-3">
-                                        <div className="p-2 bg-red-50 dark:bg-red-900/10 text-red-600 rounded-lg">
-                                            <MapPin className="w-5 h-5" />
-                                        </div>
-                                        <span className="font-semibold text-gray-700 dark:text-gray-200">{area.name}</span>
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <div className="flex flex-col">
-                                            <span className="text-gray-700 dark:text-gray-200 font-medium">{area.zone?.name}</span>
-                                            <span className="text-xs text-gray-500 font-normal">({area.zone?.city?.name})</span>
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <div className="flex justify-center gap-4">
-                                            <button
-                                                onClick={() => openEditModal(area)}
-                                                className="text-gray-500 hover:text-blue-600 transition"
-                                                title="Edit Area"
-                                            >
-                                                <Edit className="w-5 h-5" />
-                                            </button>
-                                            <button
-                                                onClick={() => openDeleteModal(area)}
-                                                className="text-gray-500 hover:text-red-600 transition"
-                                                title="Delete Area"
-                                            >
-                                                <Trash2 className="w-5 h-5" />
-                                            </button>
-                                        </div>
+                            ) : table.getRowModel().rows.length === 0 ? (
+                                <tr>
+                                    <td colSpan={columns.length} className="py-12 text-center text-dark dark:text-white">
+                                        No areas found.
                                     </td>
                                 </tr>
-                            ))}
+                            ) : (
+                                table.getRowModel().rows.map((row) => (
+                                    <tr
+                                        className="border-t border-stroke dark:border-dark-3"
+                                        key={row.id}
+                                    >
+                                        {row.getVisibleCells().map((cell) => (
+                                            <td key={cell.id} className="truncate px-3 py-3 text-dark dark:text-white">
+                                                {flexRender(
+                                                    cell.column.columnDef.cell,
+                                                    cell.getContext()
+                                                )}
+                                            </td>
+                                        ))}
+                                    </tr>
+                                ))
+                            )}
                         </tbody>
                     </table>
                 </div>
-            </div>
 
-            {/* Create Modal */}
-            {isCreateModalOpen && (
-                <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm transition-all">
-                    <div className="bg-white dark:bg-gray-dark rounded-2xl shadow-2xl w-full max-w-md p-8 transform transition-all animate-in fade-in zoom-in duration-300">
-                        <div className="flex items-center gap-3 mb-6">
-                            <div className="p-3 bg-red-100 dark:bg-red-900/20 text-red-600 rounded-xl">
-                                <Plus className="w-6 h-6" />
-                            </div>
-                            <h3 className="text-2xl font-bold text-gray-800 dark:text-white">Add New Area</h3>
-                        </div>
-                        <form onSubmit={handleCreate}>
-                            <div className="space-y-4 mb-8">
-                                <div>
-                                    <label className="block text-sm font-semibold text-gray-600 dark:text-gray-400 mb-2">Zone</label>
-                                    <select
-                                        value={formData.zone_id}
-                                        onChange={(e) => setFormData({ ...formData, zone_id: e.target.value })}
-                                        className="w-full px-4 py-3 border border-gray-200 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-red-500 dark:bg-gray-800 transition-all font-medium"
-                                        required
-                                    >
-                                        <option value="">Select Zone</option>
-                                        {zones.map(zone => (
-                                            <option key={zone.id} value={zone.id}>{zone.name} ({zone.city?.name})</option>
-                                        ))}
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-semibold text-gray-600 dark:text-gray-400 mb-2">Area Name</label>
-                                    <input
-                                        type="text"
-                                        value={formData.name}
-                                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                        className="w-full px-4 py-3 border border-gray-200 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-red-500 dark:bg-gray-800 transition-all font-medium"
-                                        placeholder="e.g. Gulshan-e-Iqbal"
-                                        required
-                                    />
-                                </div>
-                            </div>
-                            <div className="flex justify-end gap-3">
-                                <button
-                                    type="button"
-                                    onClick={() => setIsCreateModalOpen(false)}
-                                    className="px-6 py-3 border border-gray-300 dark:border-gray-700 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition font-semibold text-gray-700 dark:text-gray-300"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    type="submit"
-                                    disabled={submitting}
-                                    className="flex items-center justify-center gap-2 px-8 py-3 bg-red-600 text-white rounded-xl hover:bg-red-700 transition font-semibold disabled:opacity-50 min-w-[140px]"
-                                >
-                                    {submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Create Area'}
-                                </button>
-                            </div>
-                        </form>
+                {/* Pagination bar */}
+                <div className="flex items-center justify-between px-7.5 py-7 text-dark dark:text-white">
+                    <Pagination
+                        currentPage={table.getState().pagination.pageIndex + 1}
+                        totalPages={table.getPageCount()}
+                        onPageChange={(page) => table.setPageIndex(page - 1)}
+                        isLoading={loading}
+                    />
+                    <p className="font-medium text-dark dark:text-gray-300">
+                        Showing {table.getState().pagination.pageIndex + 1} of{" "}
+                        {table.getPageCount()} pages
+                    </p>
+                </div>
+            </section>
+
+            {/* CREATE / EDIT MODAL */}
+            <Modal
+                open={isCreateModalOpen || isEditModalOpen}
+                onClose={() => {
+                    setIsCreateModalOpen(false);
+                    setIsEditModalOpen(false);
+                }}
+                className="max-h-[90vh] w-full max-w-[500px] overflow-y-auto rounded-2xl bg-white p-8 shadow-xl dark:bg-gray-800"
+            >
+                <h2 className="mb-6 text-2xl font-bold text-dark dark:text-white">
+                    {isEditModalOpen ? "Edit Area" : "Add New Area"}
+                </h2>
+                <div className="space-y-4 mb-4">
+                    <div>
+                        <label className="mb-1.5 block text-sm font-medium text-dark dark:text-gray-300">
+                            Zone
+                        </label>
+                        <select
+                            value={formData.zone_id}
+                            onChange={(e) => setFormData({ ...formData, zone_id: e.target.value })}
+                            className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2.5 outline-none focus:border-[#ff3d3d] dark:border-dark-3 dark:bg-dark-2 text-dark dark:text-white font-medium"
+                        >
+                            <option value="">Select Zone</option>
+                            {zones.map((zone) => (
+                                <option key={zone.id} value={zone.id}>
+                                    {zone.name} ({zone.city?.name})
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                    <div>
+                        <label className="mb-1.5 block text-sm font-medium text-dark dark:text-gray-300">
+                            Area Name
+                        </label>
+                        <input
+                            type="text"
+                            value={formData.name}
+                            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                            className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2.5 outline-none focus:border-[#ff3d3d] dark:border-dark-3 dark:bg-dark-2 text-dark dark:text-white font-medium"
+                            placeholder="e.g. Gulshan-e-Iqbal"
+                            autoFocus
+                        />
+                    </div>
+                    <div>
+                        <label className="mb-1.5 block text-sm font-medium text-dark dark:text-gray-300">
+                            Status
+                        </label>
+                        <select
+                            value={formData.status}
+                            onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                            className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2.5 outline-none focus:border-[#ff3d3d] dark:border-dark-3 dark:bg-dark-2 text-dark dark:text-white font-medium"
+                        >
+                            <option value="active">Active</option>
+                            <option value="inactive">Inactive</option>
+                        </select>
                     </div>
                 </div>
-            )}
-
-            {/* Edit Modal */}
-            {isEditModalOpen && (
-                <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm transition-all">
-                    <div className="bg-white dark:bg-gray-dark rounded-2xl shadow-2xl w-full max-w-md p-8 transform transition-all animate-in fade-in zoom-in duration-300">
-                        <div className="flex items-center gap-3 mb-6">
-                            <div className="p-3 bg-blue-100 dark:bg-blue-900/20 text-blue-600 rounded-xl">
-                                <Edit className="w-6 h-6" />
-                            </div>
-                            <h3 className="text-2xl font-bold text-gray-800 dark:text-white">Edit Area</h3>
-                        </div>
-                        <form onSubmit={handleUpdate}>
-                            <div className="space-y-4 mb-8">
-                                <div>
-                                    <label className="block text-sm font-semibold text-gray-600 dark:text-gray-400 mb-2">Zone</label>
-                                    <select
-                                        value={formData.zone_id}
-                                        onChange={(e) => setFormData({ ...formData, zone_id: e.target.value })}
-                                        className="w-full px-4 py-3 border border-gray-200 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-red-500 dark:bg-gray-800 transition-all font-medium"
-                                        required
-                                    >
-                                        <option value="">Select Zone</option>
-                                        {zones.map(zone => (
-                                            <option key={zone.id} value={zone.id}>{zone.name} ({zone.city?.name})</option>
-                                        ))}
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-semibold text-gray-600 dark:text-gray-400 mb-2">Area Name</label>
-                                    <input
-                                        type="text"
-                                        value={formData.name}
-                                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                        className="w-full px-4 py-3 border border-gray-200 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-red-500 dark:bg-gray-800 transition-all font-medium"
-                                        placeholder="e.g. Gulshan-e-Iqbal"
-                                        required
-                                    />
-                                </div>
-                            </div>
-                            <div className="flex justify-end gap-3">
-                                <button
-                                    type="button"
-                                    onClick={() => setIsEditModalOpen(false)}
-                                    className="px-6 py-3 border border-gray-300 dark:border-gray-700 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition font-semibold text-gray-700 dark:text-gray-300"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    type="submit"
-                                    disabled={submitting}
-                                    className="flex items-center justify-center gap-2 px-8 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition font-semibold disabled:opacity-50 min-w-[140px]"
-                                >
-                                    {submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Save Changes'}
-                                </button>
-                            </div>
-                        </form>
-                    </div>
+                <div className="mt-8 flex justify-end gap-4">
+                    <button
+                        onClick={() => {
+                            setIsCreateModalOpen(false);
+                            setIsEditModalOpen(false);
+                        }}
+                        disabled={submitting}
+                        className="rounded border border-stroke px-6 py-2.5 text-dark hover:bg-gray-100 disabled:opacity-50 dark:border-dark-3 dark:text-white dark:hover:bg-dark-3"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        onClick={isEditModalOpen ? handleUpdate : handleCreate}
+                        disabled={submitting}
+                        className="rounded bg-[#ff3d3d] px-6 py-2.5 text-white hover:bg-[#ff3d3d]/90 disabled:opacity-50 flex items-center gap-2"
+                    >
+                        {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                        {submitting ? "Saving..." : isEditModalOpen ? "Save Changes" : "Create Area"}
+                    </button>
                 </div>
-            )}
+            </Modal>
 
-            {/* Delete Modal */}
-            {isDeleteModalOpen && selectedArea && (
-                <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm transition-all">
-                    <div className="bg-white dark:bg-gray-dark rounded-2xl shadow-2xl w-full max-w-md p-8 transform transition-all animate-in fade-in zoom-in duration-300">
-                        <div className="flex items-center gap-4 text-red-600 mb-6">
-                            <div className="p-4 bg-red-100 dark:bg-red-900/20 rounded-full">
-                                <Trash2 className="w-8 h-8" />
-                            </div>
-                            <div>
-                                <h3 className="text-2xl font-bold">Delete Area?</h3>
-                                <p className="text-gray-500 dark:text-gray-400 font-medium">This action cannot be undone.</p>
-                            </div>
-                        </div>
-                        <p className="text-gray-600 dark:text-gray-300 mb-8 font-medium">
-                            Are you sure you want to delete <span className="font-bold text-gray-800 dark:text-white">"{selectedArea.name}"</span>?
-                        </p>
-                        <div className="flex justify-end gap-3">
-                            <button
-                                type="button"
-                                onClick={() => setIsDeleteModalOpen(false)}
-                                className="px-6 py-3 border border-gray-300 dark:border-gray-700 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition font-semibold text-gray-700 dark:text-gray-300"
-                            >
-                                No, Keep it
-                            </button>
-                            <button
-                                onClick={handleDelete}
-                                disabled={deleting}
-                                className="flex items-center justify-center gap-2 px-8 py-3 bg-red-600 text-white rounded-xl hover:bg-red-700 transition font-semibold disabled:opacity-50 min-w-[140px]"
-                            >
-                                {deleting ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Yes, Delete'}
-                            </button>
-                        </div>
-                    </div>
+            {/* DELETE MODAL */}
+            <Modal
+                open={isDeleteModalOpen}
+                onClose={() => setIsDeleteModalOpen(false)}
+                className="w-full max-w-[500px] rounded-2xl bg-white p-8 shadow-xl dark:bg-gray-800"
+            >
+                <h2 className="mb-4 text-xl font-bold text-dark dark:text-white">
+                    Delete Area?
+                </h2>
+                <p className="mb-6 text-gray-600 dark:text-gray-300">
+                    Are you sure you want to delete <span className="font-bold">"{selectedArea?.name}"</span>?
+                    This action cannot be undone.
+                </p>
+                <div className="flex justify-end gap-4">
+                    <button
+                        onClick={() => setIsDeleteModalOpen(false)}
+                        disabled={submitting}
+                        className="rounded border border-stroke px-6 py-2.5 text-dark hover:bg-gray-100 disabled:opacity-50 dark:border-dark-3 dark:text-white dark:hover:bg-dark-3"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        onClick={handleDelete}
+                        disabled={submitting}
+                        className="rounded bg-[#ff3d3d] px-6 py-2.5 text-white hover:bg-[#ff3d3d]/90 disabled:opacity-50 flex items-center gap-2"
+                    >
+                        {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                        {submitting ? "Deleting..." : "Delete"}
+                    </button>
                 </div>
-            )}
+            </Modal>
         </div>
     );
 };

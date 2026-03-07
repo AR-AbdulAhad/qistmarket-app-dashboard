@@ -69,7 +69,6 @@ interface OrderWithVerification {
   status: string
   created_at: string
   updated_at: string
-
   assigned_to: UserSelect | null
   created_by: { username: string; full_name: string } | null
 
@@ -249,7 +248,7 @@ const AssignedVerifications = () => {
     {
       id: 'officer',
       header: 'Verification Officer',
-      accessorFn: (row) => row.verification?.verification_officer?.full_name || row.verification?.verification_officer?.username || '—',
+      accessorFn: (row) => row.verification?.verification_officer?.username || '—',
       enableColumnFilter: true,
     },
     {
@@ -573,8 +572,8 @@ const AssignedVerifications = () => {
           onPageChange={(page: number) => setPagination((p) => ({ ...p, page }))}
           isLoading={loading}
         />
-        <p className="font-medium dark:text-white">
-          Showing page {pagination.page} of {pagination.totalPages} ({pagination.total} records)
+        <p className="font-medium text-dark dark:text-white">
+           Showing page {pagination.page} of {pagination.totalPages} ({pagination.total} records)
         </p>
       </div>
 

@@ -646,7 +646,15 @@ const CreateOrders: React.FC = () => {
 
                   {selectedProduct && (
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-3">Installment Plan <span className="text-red-600">*</span></label>
+                      <div className="flex items-center gap-2 mb-3">
+                        <label className="block text-sm font-medium text-gray-700">Installment Plan <span className="text-red-600">*</span></label>
+                        {selectedProduct.isDeal && (
+                          <span className="bg-red-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full animate-pulse">
+                            DEAL
+                          </span>
+                        )}
+                      </div>
+
                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                         {selectedProduct.ProductInstallments
                           ?.filter((p: any) => p.isActive)
@@ -654,10 +662,18 @@ const CreateOrders: React.FC = () => {
                             <label
                               key={plan.id}
                               className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${selectedPlan?.id === plan.id
-                                ? 'border-red-500 bg-red-50 shadow-sm'
-                                : 'border-gray-200 hover:border-red-300'
-                                }`}
+                                ? 'border-red-500 bg-red-50 shadow-md ring-1 ring-red-500'
+                                : plan.dealId
+                                  ? 'border-red-400 bg-red-50/50 hover:border-red-500'
+                                  : 'border-gray-200 hover:border-red-300'
+                                } cursor-pointer relative overflow-hidden`}
                             >
+                              {plan.dealId && (
+                                <div className="absolute top-0 right-0 bg-red-600 text-white text-[8px] font-bold px-1.5 py-0.5 rounded-bl-lg">
+                                  DEAL PLAN
+                                </div>
+                              )}
+
                               <input
                                 type="radio"
                                 name="plan"

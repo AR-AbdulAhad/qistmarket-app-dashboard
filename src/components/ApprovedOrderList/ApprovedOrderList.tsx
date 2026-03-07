@@ -53,7 +53,6 @@ interface Order {
   created_at: string
   created_by: { username: string } | null
   assigned_to: { username: string } | null
-  delivery_officer: { username: string; full_name: string } | null
   verification: { status: string }
 }
 
@@ -363,7 +362,7 @@ const ApprovedOrderList = () => {
     },
     {
       id: 'delivery_officer',
-      accessorFn: (row) => row.delivery_officer?.username || 'Unassigned',
+      accessorFn: (row) => row.assigned_to?.username || 'Unassigned',
       header: 'Delivery Officer',
       enableColumnFilter: true,
     },
@@ -474,7 +473,7 @@ const ApprovedOrderList = () => {
                 >
                   <ul className="overflow-hidden text-sm font-medium text-current">
 
-                    {order.delivery_officer ? (
+                    {order.assigned_to ? (
                       <li>
                         <button
                           onClick={() => {
@@ -740,8 +739,8 @@ const ApprovedOrderList = () => {
           isLoading={loading}
         />
 
-        <p className="font-medium">
-          Showing {pagination.page} of {pagination.totalPages} pages
+        <p className="font-medium text-dark dark:text-white">
+           Showing page {pagination.page} of {pagination.totalPages} ({pagination.total} records)
         </p>
       </div>
 
