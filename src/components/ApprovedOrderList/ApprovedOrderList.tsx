@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import dayjs from 'dayjs'
+import toast from 'react-hot-toast'
 import Loader from '@/components/common/Loader'
 import {
   ColumnDef,
@@ -106,6 +107,11 @@ const ApprovedOrderList = () => {
   const [selectedDeliveryOfficerId, setSelectedDeliveryOfficerId] = useState<number | null>(null)
   const [deliveryOfficers, setDeliveryOfficers] = useState<User[]>([])
 
+  const [isAssigning, setIsAssigning] = useState(false)
+  const [isUnassigning, setIsUnassigning] = useState(false)
+  const [isBulkAssigning, setIsBulkAssigning] = useState(false)
+  const [isBulkUnassigning, setIsBulkUnassigning] = useState(false)
+
   // ── Data Fetching ──────────────────────────────────────────────────────────
   const fetchApprovedOrders = async () => {
     setLoading(true)
@@ -143,7 +149,9 @@ const ApprovedOrderList = () => {
 
       if (json.success && json.data?.orders) {
         setOrders(json.data.orders)
-        setPagination(json.data.pagination)
+        if (json.data.pagination) {
+          setPagination(prev => ({ ...prev, ...json.data.pagination }))
+        }
       }
     } catch (err) {
       console.error('Failed to load approved orders:', err)
@@ -191,6 +199,7 @@ const ApprovedOrderList = () => {
 
   const confirmAssign = async () => {
     if (!selectedOrder || !selectedDeliveryOfficerId) return
+    setIsAssigning(true)
 
     try {
       const token = Cookies.get('auth_token')
@@ -206,16 +215,21 @@ const ApprovedOrderList = () => {
       if (!res.ok) throw new Error('Failed to assign delivery officer')
 
       await fetchApprovedOrders()
+      toast.success('Assigned delivery officer successfully')
       setAssignModalOpen(false)
       setSelectedDeliveryOfficerId(null)
       setSelectedOrder(null)
     } catch (err) {
       console.error('Assign delivery error:', err)
+      toast.error('Failed to assign delivery officer')
+    } finally {
+      setIsAssigning(false)
     }
   }
 
   const confirmSingleUnassign = async () => {
     if (!selectedOrder) return
+    setIsUnassigning(true)
 
     try {
       const token = Cookies.get('auth_token')
@@ -231,10 +245,14 @@ const ApprovedOrderList = () => {
       if (!res.ok) throw new Error('Failed to unassign delivery officer')
 
       await fetchApprovedOrders()
+      toast.success('Unassigned delivery officer successfully')
       setSingleUnassignModalOpen(false)
       setSelectedOrder(null)
     } catch (err) {
       console.error('Unassign delivery error:', err)
+      toast.error('Failed to unassign delivery officer')
+    } finally {
+      setIsUnassigning(false)
     }
   }
 
@@ -243,6 +261,7 @@ const ApprovedOrderList = () => {
 
   const confirmBulkAssign = async () => {
     if (!selectedDeliveryOfficerId) return
+    setIsBulkAssigning(true)
 
     const ids = table.getSelectedRowModel().rows.map((r) => r.original.id)
 
@@ -260,16 +279,21 @@ const ApprovedOrderList = () => {
       if (!res.ok) throw new Error('Bulk assign failed')
 
       await fetchApprovedOrders()
+      toast.success(`Bulk assigned delivery officer to ${ids.length} orders`)
       setBulkAssignModalOpen(false)
       setRowSelection({})
       setSelectedDeliveryOfficerId(null)
     } catch (err) {
       console.error('Bulk assign delivery error:', err)
+      toast.error('Failed to perform bulk assignment')
+    } finally {
+      setIsBulkAssigning(false)
     }
   }
 
   const confirmBulkUnassign = async () => {
     const ids = table.getSelectedRowModel().rows.map((r) => r.original.id)
+    setIsBulkUnassigning(true)
 
     try {
       const token = Cookies.get('auth_token')
@@ -285,10 +309,14 @@ const ApprovedOrderList = () => {
       if (!res.ok) throw new Error('Bulk unassign failed')
 
       await fetchApprovedOrders()
+      toast.success(`Bulk unassigned delivery officer from ${ids.length} orders`)
       setBulkUnassignModalOpen(false)
       setRowSelection({})
     } catch (err) {
       console.error('Bulk unassign delivery error:', err)
+      toast.error('Failed to perform bulk unassign')
+    } finally {
+      setIsBulkUnassigning(false)
     }
   }
 
@@ -740,7 +768,7 @@ const ApprovedOrderList = () => {
         />
 
         <p className="font-medium text-dark dark:text-white">
-           Showing page {pagination.page} of {pagination.totalPages} ({pagination.total} records)
+          Showing page {pagination.page} of {pagination.totalPages} ({pagination.total} records)
         </p>
       </div>
 
@@ -775,16 +803,18 @@ const ApprovedOrderList = () => {
               setAssignModalOpen(false)
               setSelectedDeliveryOfficerId(null)
             }}
-            className="rounded border border-stroke px-6 py-2.5 text-dark hover:bg-gray-100 dark:border-dark-3 dark:text-white dark:hover:bg-dark-3"
+            disabled={isAssigning}
+            className="rounded border border-stroke px-6 py-2.5 text-dark hover:bg-gray-100 disabled:opacity-50 dark:border-dark-3 dark:text-white dark:hover:bg-dark-3"
           >
             Cancel
           </button>
           <button
             onClick={confirmAssign}
-            disabled={!selectedDeliveryOfficerId}
-            className="rounded bg-[#ff3d3d] px-6 py-2.5 text-white hover:bg-[#ff3d3d]/90 disabled:opacity-50"
+            disabled={!selectedDeliveryOfficerId || isAssigning}
+            className="rounded bg-[#ff3d3d] px-6 py-2.5 text-white hover:bg-[#ff3d3d]/90 disabled:opacity-50 flex items-center gap-2"
           >
-            Assign
+            {isAssigning && <span className="size-4 animate-spin rounded-full border-2 border-white border-t-transparent"></span>}
+            {isAssigning ? 'Assigning...' : 'Assign'}
           </button>
         </div>
       </Modal>
@@ -803,15 +833,18 @@ const ApprovedOrderList = () => {
         <div className="mt-6 flex justify-end gap-4">
           <button
             onClick={() => setSingleUnassignModalOpen(false)}
-            className="rounded border border-stroke px-6 py-2.5 text-dark hover:bg-gray-100 dark:border-dark-3 dark:text-white dark:hover:bg-dark-3"
+            disabled={isUnassigning}
+            className="rounded border border-stroke px-6 py-2.5 text-dark hover:bg-gray-100 disabled:opacity-50 dark:border-dark-3 dark:text-white dark:hover:bg-dark-3"
           >
             Cancel
           </button>
           <button
             onClick={confirmSingleUnassign}
-            className="rounded bg-red-600 px-6 py-2.5 text-white hover:bg-red-700"
+            disabled={isUnassigning}
+            className="rounded bg-red-600 px-6 py-2.5 text-white hover:bg-red-700 disabled:opacity-50 flex items-center gap-2"
           >
-            Unassign
+            {isUnassigning && <span className="size-4 animate-spin rounded-full border-2 border-white border-t-transparent"></span>}
+            {isUnassigning ? 'Unassigning...' : 'Unassign'}
           </button>
         </div>
       </Modal>
@@ -847,16 +880,18 @@ const ApprovedOrderList = () => {
               setBulkAssignModalOpen(false)
               setSelectedDeliveryOfficerId(null)
             }}
-            className="rounded border border-stroke px-6 py-2.5 text-dark hover:bg-gray-100 dark:border-dark-3 dark:text-white dark:hover:bg-dark-3"
+            disabled={isBulkAssigning}
+            className="rounded border border-stroke px-6 py-2.5 text-dark hover:bg-gray-100 disabled:opacity-50 dark:border-dark-3 dark:text-white dark:hover:bg-dark-3"
           >
             Cancel
           </button>
           <button
             onClick={confirmBulkAssign}
-            disabled={!selectedDeliveryOfficerId}
-            className="rounded bg-[#ff3d3d] px-6 py-2.5 text-white hover:bg-[#ff3d3d]/90 disabled:opacity-50"
+            disabled={!selectedDeliveryOfficerId || isBulkAssigning}
+            className="rounded bg-[#ff3d3d] px-6 py-2.5 text-white hover:bg-[#ff3d3d]/90 disabled:opacity-50 flex items-center gap-2"
           >
-            Assign All
+            {isBulkAssigning && <span className="size-4 animate-spin rounded-full border-2 border-white border-t-transparent"></span>}
+            {isBulkAssigning ? 'Assigning All...' : 'Assign All'}
           </button>
         </div>
       </Modal>
@@ -875,15 +910,18 @@ const ApprovedOrderList = () => {
         <div className="mt-6 flex justify-end gap-4">
           <button
             onClick={() => setBulkUnassignModalOpen(false)}
-            className="rounded border border-stroke px-6 py-2.5 text-dark hover:bg-gray-100 dark:border-dark-3 dark:text-white dark:hover:bg-dark-3"
+            disabled={isBulkUnassigning}
+            className="rounded border border-stroke px-6 py-2.5 text-dark hover:bg-gray-100 disabled:opacity-50 dark:border-dark-3 dark:text-white dark:hover:bg-dark-3"
           >
             Cancel
           </button>
           <button
             onClick={confirmBulkUnassign}
-            className="rounded bg-red-600 px-6 py-2.5 text-white hover:bg-red-700"
+            disabled={isBulkUnassigning}
+            className="rounded bg-red-600 px-6 py-2.5 text-white hover:bg-red-700 disabled:opacity-50 flex items-center gap-2"
           >
-            Unassign All
+            {isBulkUnassigning && <span className="size-4 animate-spin rounded-full border-2 border-white border-t-transparent"></span>}
+            {isBulkUnassigning ? 'Unassigning...' : 'Unassign All'}
           </button>
         </div>
       </Modal>

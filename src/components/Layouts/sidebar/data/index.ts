@@ -43,6 +43,12 @@ export const NAV_DATA = [
         ],
       },
       {
+        title: "Customers",
+        icon: Icons.HomeIcon,
+        url: "/admin/customers",
+        items: [],
+      },
+      {
         title: "Orders for Approval",
         icon: Icons.HomeIcon,
         items: [],
@@ -140,6 +146,12 @@ export const NAV_DATA = [
             url: "/admin/addresses/bulk-upload",
           },
         ],
+      },
+      {
+        title: "Reports",
+        icon: Icons.HomeIcon,
+        url: "/reports",
+        items: [],
       },
       // {
       //   title: "Case Assignment",

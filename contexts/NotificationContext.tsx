@@ -46,7 +46,7 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
     });
     const [socket, setSocket] = useState<Socket | null>(null);
 
-    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "https://qistmarket-software-backend.onrender.com";
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
 
     const fetchNotifications = async (page = 1, limit = 10, status = "all") => {
         const token = Cookies.get("auth_token");

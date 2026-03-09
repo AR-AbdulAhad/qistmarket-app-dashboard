@@ -23,7 +23,7 @@ export default function Layout({ children }: PropsWithChildren) {
     if (socket && socket.connected) return;
 
     const backendUrl =
-      process.env.NEXT_PUBLIC_BACKEND_URL || "https://qistmarket-software-backend.onrender.com";
+      process.env.NEXT_PUBLIC_BACKEND_URL;
 
     socket = io(backendUrl, {
       reconnection: true,
