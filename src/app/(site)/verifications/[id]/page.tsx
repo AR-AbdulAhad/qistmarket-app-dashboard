@@ -66,6 +66,7 @@ interface VerificationData {
     signature_url: string | null
     nearest_location: string
     is_verified: boolean
+    edit_history?: EditHistory[]
   }
   grantors: Array<{
     id: number
@@ -110,6 +111,7 @@ interface VerificationData {
     signature_url: string | null
     nearest_location: string
     is_verified: boolean
+    edit_history?: EditHistory[]
   }>
   nextOfKin: null | {
     id: number
@@ -166,6 +168,20 @@ interface VerificationData {
       username: string
     }
   }>
+  edit_history?: EditHistory[]
+}
+
+interface EditHistory {
+  id: number
+  verification_id: number
+  entity_type: string
+  entity_id: number
+  field_name: string
+  old_value: string | null
+  new_value: string | null
+  edited_by_id: number
+  edited_by_name: string
+  edited_at: string
 }
 
 // Helper function to check if value should be displayed
@@ -177,21 +193,165 @@ const shouldDisplay = (value: any): boolean => {
   return true
 }
 
-// Reusable Field Component
+// Editable Field Component
+const EditableField = ({ 
+  label, 
+  value, 
+  fieldName,
+  entityType,
+  entityId,
+  onSave,
+  className = "",
+  editHistory = []
+}: { 
+  label: string; 
+  value: any; 
+  fieldName: string;
+  entityType: 'purchaser' | 'grantor';
+  entityId: number;
+  onSave: (fieldName: string, newValue: string) => Promise<void>;
+  className?: string;
+  editHistory?: EditHistory[]
+}) => {
+  const [isEditing, setIsEditing] = useState(false)
+  const [inputValue, setInputValue] = useState(value || '')
+  const [isSaving, setIsSaving] = useState(false)
+  const [showHistory, setShowHistory] = useState(false)
+
+  const fieldHistory = editHistory.filter(h => h.field_name === fieldName).sort((a, b) => 
+    new Date(b.edited_at).getTime() - new Date(a.edited_at).getTime()
+  )
+
+  const handleSave = async () => {
+    if (inputValue === value) {
+      setIsEditing(false)
+      return
+    }
+
+    setIsSaving(true)
+    try {
+      await onSave(fieldName, inputValue)
+      setIsEditing(false)
+      toast.success(`${label} updated successfully`)
+    } catch (error) {
+      console.error('Save error:', error)
+      toast.error('Failed to save changes')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const handleCancel = () => {
+    setInputValue(value || '')
+    setIsEditing(false)
+  }
+
+  if (!shouldDisplay(value) && !isEditing) return null
+
+  return (
+    <div className={className}>
+      <label className="block text-sm font-medium text-gray-500 dark:text-gray-400">
+        {label}
+      </label>
+      
+      {isEditing ? (
+        <div className="mt-1">
+          <textarea
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            className="w-full rounded-lg border border-gray-300 p-2 focus:border-primary focus:ring-1 focus:ring-primary dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+            rows={3}
+            disabled={isSaving}
+            placeholder={`Enter ${label.toLowerCase()}...`}
+          />
+          <div className="mt-2 flex gap-2">
+            <button
+              onClick={handleSave}
+              disabled={isSaving}
+              className="rounded bg-green-600 px-3 py-1 text-xs text-white hover:bg-green-700 disabled:bg-gray-400"
+            >
+              {isSaving ? 'Saving...' : 'Save'}
+            </button>
+            <button
+              onClick={handleCancel}
+              disabled={isSaving}
+              className="rounded bg-gray-500 px-3 py-1 text-xs text-white hover:bg-gray-600 disabled:bg-gray-400"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div 
+          className="mt-1 rounded-lg bg-gray-100 px-4 py-2.5 dark:bg-dark-3 dark:text-gray-300 cursor-pointer hover:bg-gray-200 dark:hover:bg-dark-2 transition-colors group relative"
+          onClick={() => setIsEditing(true)}
+        >
+          <div className="flex justify-between items-start">
+            <div className="flex-1 whitespace-pre-wrap">
+              {value}
+            </div>
+            <span className="text-xs text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity ml-2">
+              Click to edit
+            </span>
+          </div>
+
+          {fieldHistory.length > 0 && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                setShowHistory(!showHistory)
+              }}
+              className="mt-1 text-xs text-gray-500 hover:text-blue-600 flex items-center gap-1"
+            >
+              <span>📋 {fieldHistory.length} edit{fieldHistory.length > 1 ? 's' : ''}</span>
+            </button>
+          )}
+
+          {showHistory && fieldHistory.length > 0 && (
+            <div className="absolute z-10 mt-2 w-72 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-3">
+              <div className="text-xs font-semibold mb-2 text-gray-700 dark:text-gray-300">
+                Edit History
+              </div>
+              <div className="space-y-2 max-h-60 overflow-y-auto">
+                {fieldHistory.map((history) => (
+                  <div key={history.id} className="text-xs border-b border-gray-100 dark:border-gray-700 pb-2">
+                    <div className="flex justify-between text-gray-600 dark:text-gray-400">
+                      <span className="font-medium">{history.edited_by_name}</span>
+                      <span>{new Date(history.edited_at).toLocaleString()}</span>
+                    </div>
+                    <div className="mt-1 text-gray-700 dark:text-gray-300">
+                      <span className="line-through text-red-500">{history.old_value || '(empty)'}</span>
+                      <span className="mx-1">→</span>
+                      <span className="text-green-500">{history.new_value}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Non-editable Field Component
 const Field = ({ label, value, className = "" }: { label: string; value: any; className?: string }) => {
   if (!shouldDisplay(value)) return null
+
+  const displayValue = typeof value === 'boolean' ? (value ? 'Yes' : 'No') : value
 
   return (
     <div className={className}>
       <label className="block text-sm font-medium text-gray-500 dark:text-gray-400">{label}</label>
       <div className="mt-1 rounded-lg bg-gray-100 px-4 py-2.5 dark:bg-dark-3 dark:text-gray-300">
-        {typeof value === 'boolean' ? (value ? 'Yes' : 'No') : value}
+        {displayValue}
       </div>
     </div>
   )
 }
 
-// Reusable Document Card Component
+// Document Card Component
 function DocumentCard({ doc }: { doc: VerificationData['documents'][number] }) {
   const [isModalOpen, setIsModalOpen] = useState(false)
 
@@ -204,17 +364,10 @@ function DocumentCard({ doc }: { doc: VerificationData['documents'][number] }) {
         <h4 className="mb-2 font-medium text-gray-800 dark:text-gray-200 line-clamp-2">
           {doc.label || doc.document_type}
         </h4>
-
         <div className="mb-3 text-xs text-gray-500 dark:text-gray-400 space-y-1">
-          <p>
-            Type: <span className="font-medium capitalize">{doc.document_type.replace('_', ' ')}</span>
-          </p>
-          <p>
-            Uploaded:{' '}
-            <span className="font-medium">{new Date(doc.uploaded_at).toLocaleString()}</span>
-          </p>
+          <p>Type: <span className="font-medium capitalize">{doc.document_type.replace('_', ' ')}</span></p>
+          <p>Uploaded: <span className="font-medium">{new Date(doc.uploaded_at).toLocaleString()}</span></p>
         </div>
-
         <div className="relative aspect-[4/3] overflow-hidden rounded-md bg-gray-100 dark:bg-gray-700">
           <img
             src={doc.file_url}
@@ -222,13 +375,11 @@ function DocumentCard({ doc }: { doc: VerificationData['documents'][number] }) {
             className="h-full w-full object-cover transition-transform group-hover:scale-105"
           />
         </div>
-
         <div className="mt-3 inline-flex items-center text-sm font-medium text-[#ff3d3d] hover:underline">
           Click to view full size →
         </div>
       </div>
 
-      {/* Image Modal */}
       {isModalOpen && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75 p-4"
@@ -258,7 +409,7 @@ function DocumentCard({ doc }: { doc: VerificationData['documents'][number] }) {
   )
 }
 
-// Reusable Location Photo Card
+// Location Photo Card Component
 function LocationPhotoCard({ photo, label }: { photo: { file_url: string, uploaded_at: string }, label: string }) {
   const [isModalOpen, setIsModalOpen] = useState(false)
 
@@ -271,11 +422,9 @@ function LocationPhotoCard({ photo, label }: { photo: { file_url: string, upload
         <h4 className="mb-2 font-medium text-gray-800 dark:text-gray-200">
           {label} - Location Photo
         </h4>
-
         <div className="mb-3 text-xs text-gray-500 dark:text-gray-400">
           <p>Uploaded: {new Date(photo.uploaded_at).toLocaleString()}</p>
         </div>
-
         <div className="relative aspect-[4/3] overflow-hidden rounded-md bg-gray-100 dark:bg-gray-700">
           <img
             src={photo.file_url}
@@ -283,13 +432,11 @@ function LocationPhotoCard({ photo, label }: { photo: { file_url: string, upload
             className="h-full w-full object-cover transition-transform group-hover:scale-105"
           />
         </div>
-
         <div className="mt-3 inline-flex items-center text-sm font-medium text-[#ff3d3d] hover:underline">
           Click to view full size →
         </div>
       </div>
 
-      {/* Image Modal */}
       {isModalOpen && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75 p-4"
@@ -326,12 +473,12 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
   const [data, setData] = useState<VerificationData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-
-  // Review form states
+  const [currentUser, setCurrentUser] = useState<{id: number, name: string} | null>(null)
   const [decision, setDecision] = useState<'approve' | 'reject' | null>(null)
   const [remarks, setRemarks] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
+  // Fetch data
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -341,6 +488,27 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
           return
         }
 
+        // Get current user info - FIXED ENDPOINT
+        try {
+          const userRes = await fetch(`${BACKEND_URL}/api/user/me`, {
+            headers: { Authorization: `Bearer ${token}` },
+          })
+          if (userRes.ok) {
+            const userJson = await userRes.json()
+            if (userJson.success && userJson.user) {
+              setCurrentUser({
+                id: userJson.user.id,
+                name: userJson.user.full_name
+              })
+              console.log('Current user:', userJson.user)
+            }
+          }
+        } catch (userErr) {
+          console.error('Error fetching user:', userErr)
+        }
+
+        // Fetch verification data
+        console.log('Fetching verification for order:', id)
         const res = await fetch(`${BACKEND_URL}/api/verification/order/${id}`, {
           headers: { Authorization: `Bearer ${token}` },
         })
@@ -348,13 +516,16 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
         if (!res.ok) throw new Error('Failed to fetch verification details')
 
         const json = await res.json()
+        console.log('API Response:', json)
 
         if (json.success && json.data?.verification) {
           setData(json.data.verification)
+          console.log('Verification data loaded:', json.data.verification)
         } else {
           setError('No verification data found')
         }
       } catch (err) {
+        console.error('Fetch error:', err)
         setError((err as Error).message || 'An error occurred')
       } finally {
         setLoading(false)
@@ -363,6 +534,97 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
 
     fetchData()
   }, [id])
+
+  const handleFieldSave = async (
+    entityType: 'purchaser' | 'grantor',
+    entityId: number,
+    fieldName: string,
+    newValue: string
+  ) => {
+    if (!data || !currentUser) {
+      console.log('Missing data or currentUser:', { data, currentUser })
+      toast.error('User information not available')
+      return
+    }
+
+    const token = Cookies.get('auth_token')
+    if (!token) {
+      toast.error('Authentication required')
+      return
+    }
+
+    try {
+      console.log('Saving field:', { entityType, entityId, fieldName, newValue })
+
+      const endpoint = entityType === 'purchaser' 
+        ? `${BACKEND_URL}/api/verification/${data.id}/purchaser/field`
+        : `${BACKEND_URL}/api/verification/${data.id}/grantor/${entityId}/field`
+
+      const payload = { 
+        field_name: fieldName, 
+        new_value: newValue 
+      }
+
+      console.log('Sending request to:', endpoint)
+      console.log('Payload:', payload)
+
+      const res = await fetch(endpoint, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      })
+
+      console.log('Response status:', res.status)
+
+      if (!res.ok) {
+        const errorData = await res.json()
+        console.error('Error response:', errorData)
+        throw new Error(errorData.error?.message || 'Failed to save changes')
+      }
+
+      const result = await res.json()
+      console.log('Success response:', result)
+
+      // Update local state
+      setData(prev => {
+        if (!prev) return prev
+
+        if (entityType === 'purchaser' && prev.purchaser) {
+          return {
+            ...prev,
+            purchaser: {
+              ...prev.purchaser,
+              [fieldName]: newValue,
+              editHistory: result.data?.editHistory || prev.purchaser.edit_history || []
+            }
+          }
+        } else if (entityType === 'grantor') {
+          return {
+            ...prev,
+            grantors: prev.grantors.map(g => 
+              g.id === entityId 
+                ? { 
+                    ...g, 
+                    [fieldName]: newValue,
+                    editHistory: result.data?.editHistory || g.edit_history || []
+                  }
+                : g
+            )
+          }
+        }
+        return prev
+      })
+
+      toast.success('Field updated successfully')
+    } catch (error) {
+      console.error('Save error:', error)
+      toast.error(error instanceof Error ? error.message : 'Failed to save changes')
+      throw error
+    }
+  }
 
   const handleSubmitReview = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -385,7 +647,7 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
     setSubmitting(true)
 
     try {
-      const token = Cookies.get('auth_token');
+      const token = Cookies.get('auth_token')
       const res = await fetch(`${BACKEND_URL}/api/verification/${data.id}/approve`, {
         method: 'POST',
         headers: {
@@ -396,32 +658,32 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
           approved: decision === 'approve',
           remarks: decision === 'approve' ? null : remarks.trim() || null,
         }),
-      });
+      })
 
-      const result = await res.json();
+      const result = await res.json()
 
       if (!res.ok || !result.success) {
-        throw new Error(result.error || 'Failed to submit review');
+        throw new Error(result.error || 'Failed to submit review')
       }
 
-      // Refresh
+      // Refresh data
       const refreshRes = await fetch(`${BACKEND_URL}/api/verification/order/${id}`, {
         headers: { Authorization: `Bearer ${token}` },
-      });
-      const refreshJson = await refreshRes.json();
+      })
+      const refreshJson = await refreshRes.json()
 
       if (refreshJson.success && refreshJson.data?.verification) {
-        setData(refreshJson.data.verification);
-        setDecision(null);
-        setRemarks('');
-        toast.success('Review submitted successfully');
+        setData(refreshJson.data.verification)
+        setDecision(null)
+        setRemarks('')
+        toast.success('Review submitted successfully')
       }
     } catch (err: any) {
-      toast.error(err.message || 'Error submitting review');
+      toast.error(err.message || 'Error submitting review')
     } finally {
-      setSubmitting(false);
+      setSubmitting(false)
     }
-  };
+  }
 
   if (loading) return <Loader text="Loading verification details..." />
   if (error) return <div className="py-20 text-center text-red-600">{error}</div>
@@ -429,8 +691,6 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
 
   const approves = data.reviews ? data.reviews.filter(r => r.approved).length : 0
   const percentage = approves * 30
-
-  // Check if the officer who completed verification has already reviewed
   const hasReviewed = data.reviews.some(
     (r) => r.reviewer.username === data.verification_officer.username
   )
@@ -449,7 +709,7 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
         )}
       </div>
 
-      {/* ── Verification Information ──────────────────────────────────────── */}
+      {/* Verification Information - NON-EDITABLE */}
       <div className="mb-12">
         <h2 className="mb-4 text-2xl font-semibold text-dark dark:text-white">
           Verification Information
@@ -471,8 +731,8 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
                 <span className={cn(
                   "inline-flex rounded-full px-2 py-1 text-xs font-medium",
                   data.status === 'completed' ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" :
-                    data.status === 'in_progress' ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400" :
-                      "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400"
+                  data.status === 'in_progress' ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400" :
+                  "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400"
                 )}>
                   {data.status}
                 </span>
@@ -486,7 +746,7 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
         </div>
       </div>
 
-      {/* ── Verification Reviews Section with Submit Form ─────────────────── */}
+      {/* Verification Reviews */}
       <div className="mb-12">
         <h2 className="mb-4 text-2xl font-semibold text-dark dark:text-white">
           Verification Reviews
@@ -550,7 +810,7 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
                 <div className={cn(
                   "text-2xl font-bold",
                   percentage >= 60 ? "text-green-600" :
-                    percentage >= 30 ? "text-amber-600" : "text-red-600"
+                  percentage >= 30 ? "text-amber-600" : "text-red-600"
                 )}>
                   {percentage}%
                 </div>
@@ -561,29 +821,15 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
                   <div
                     className={cn(
                       "text-2xl font-bold tracking-wide",
-                      percentage === 0
-                        ? "text-gray-500"
-                        : percentage >= 60
-                          ? "text-green-600"
-                          : percentage < 30
-                            ? "text-red-600"
-                            : "text-amber-600"
+                      percentage === 0 ? "text-gray-500" :
+                      percentage >= 60 ? "text-green-600" :
+                      percentage < 30 ? "text-red-600" : "text-amber-600"
                     )}
                   >
-                    {percentage === 0
-                      ? "Awaiting Review"
-                      : percentage >= 60
-                        ? "APPROVED"
-                        : percentage < 30
-                          ? "REJECTED"
-                          : "Pending Final Decision"}
+                    {percentage === 0 ? "Awaiting Review" :
+                     percentage >= 60 ? "APPROVED" :
+                     percentage < 30 ? "REJECTED" : "Pending Final Decision"}
                   </div>
-
-                  {percentage === 0 && (
-                    <span className="text-sm text-gray-400">
-                      No evaluation has been submitted yet.
-                    </span>
-                  )}
                 </div>
               </div>
             </div>
@@ -652,11 +898,8 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
                     disabled={submitting || !decision}
                     className={cn(
                       "rounded-lg px-10 py-3 font-medium text-white transition-colors",
-                      submitting || !decision
-                        ? "bg-gray-400 cursor-not-allowed"
-                        : decision === 'approve'
-                          ? "bg-green-600 hover:bg-green-700"
-                          : "bg-red-600 hover:bg-red-700"
+                      submitting || !decision ? "bg-gray-400 cursor-not-allowed" :
+                      decision === 'approve' ? "bg-green-600 hover:bg-green-700" : "bg-red-600 hover:bg-red-700"
                     )}
                   >
                     {submitting ? 'Submitting...' : 'Submit Review'}
@@ -668,66 +911,188 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
         )}
       </div>
 
-      {/* ── Purchaser Details ─────────────────────────────────────────────── */}
+      {/* Purchaser Details - EDITABLE */}
       {data.purchaser && Object.values(data.purchaser).some(val => shouldDisplay(val)) && (
         <div className="mb-12">
           <h2 className="mb-4 text-2xl font-semibold text-dark dark:text-white">
             Purchaser Details
           </h2>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-            <Field label="Name" value={data.purchaser.name} />
-            <Field label="Father/Husband Name" value={data.purchaser.father_husband_name} />
+            <EditableField 
+              label="Name" 
+              value={data.purchaser.name} 
+              fieldName="name"
+              entityType="purchaser"
+              entityId={data.purchaser.id}
+              onSave={(field, value) => handleFieldSave('purchaser', data.purchaser.id, field, value)}
+              editHistory={data.purchaser.edit_history}
+            />
+            <EditableField 
+              label="Father/Husband Name" 
+              value={data.purchaser.father_husband_name} 
+              fieldName="father_husband_name"
+              entityType="purchaser"
+              entityId={data.purchaser.id}
+              onSave={(field, value) => handleFieldSave('purchaser', data.purchaser.id, field, value)}
+              editHistory={data.purchaser.edit_history}
+            />
             {shouldDisplay(data.purchaser.present_address) && (
-              <div>
-                <label className="block text-sm font-medium text-gray-500 dark:text-gray-400">Present Address</label>
-                <div className="mt-1 rounded-lg bg-gray-100 px-4 py-2.5 dark:bg-dark-3 dark:text-gray-300">
-                  {data.purchaser.present_address}
-                  {(data.purchaser.present_zone || data.purchaser.present_area || data.purchaser.present_block) && (
-                    <div className="mt-1 text-xs text-gray-500">
-                      Structured: {data.purchaser.present_zone}, {data.purchaser.present_area}, {data.purchaser.present_block}, {data.purchaser.present_street}, {data.purchaser.present_house_no}
-                    </div>
-                  )}
-                  {shouldDisplay(data.purchaser.present_period_of_stay) && (
-                    <div className="mt-1 text-xs font-medium text-blue-600">
-                      Stay Period: {data.purchaser.present_period_of_stay}
-                    </div>
-                  )}
-                </div>
-              </div>
+              <EditableField 
+                label="Present Address" 
+                value={`${data.purchaser.present_address}${data.purchaser.present_zone ? `\nZone: ${data.purchaser.present_zone}` : ''}${data.purchaser.present_area ? `\nArea: ${data.purchaser.present_area}` : ''}${data.purchaser.present_block ? `\nBlock: ${data.purchaser.present_block}` : ''}${data.purchaser.present_street ? `\nStreet: ${data.purchaser.present_street}` : ''}${data.purchaser.present_house_no ? `\nHouse No: ${data.purchaser.present_house_no}` : ''}`}
+                fieldName="present_address"
+                entityType="purchaser"
+                entityId={data.purchaser.id}
+                onSave={(field, value) => handleFieldSave('purchaser', data.purchaser.id, field, value)}
+                editHistory={data.purchaser.edit_history}
+              />
             )}
             {shouldDisplay(data.purchaser.permanent_address) && (
-              <div>
-                <label className="block text-sm font-medium text-gray-500 dark:text-gray-400">Permanent Address</label>
-                <div className="mt-1 rounded-lg bg-gray-100 px-4 py-2.5 dark:bg-dark-3 dark:text-gray-300">
-                  {data.purchaser.permanent_address}
-                  {(data.purchaser.permanent_zone || data.purchaser.permanent_area || data.purchaser.permanent_block) && (
-                    <div className="mt-1 text-xs text-gray-500">
-                      Structured: {data.purchaser.permanent_zone}, {data.purchaser.permanent_area}, {data.purchaser.permanent_block}, {data.purchaser.permanent_street}, {data.purchaser.permanent_house_no}
-                    </div>
-                  )}
-                  {shouldDisplay(data.purchaser.permanent_period_of_stay) && (
-                    <div className="mt-1 text-xs font-medium text-blue-600">
-                      Stay Period: {data.purchaser.permanent_period_of_stay}
-                    </div>
-                  )}
-                </div>
-              </div>
+              <EditableField 
+                label="Permanent Address" 
+                value={`${data.purchaser.permanent_address}${data.purchaser.permanent_zone ? `\nZone: ${data.purchaser.permanent_zone}` : ''}${data.purchaser.permanent_area ? `\nArea: ${data.purchaser.permanent_area}` : ''}${data.purchaser.permanent_block ? `\nBlock: ${data.purchaser.permanent_block}` : ''}${data.purchaser.permanent_street ? `\nStreet: ${data.purchaser.permanent_street}` : ''}${data.purchaser.permanent_house_no ? `\nHouse No: ${data.purchaser.permanent_house_no}` : ''}`}
+                fieldName="permanent_address"
+                entityType="purchaser"
+                entityId={data.purchaser.id}
+                onSave={(field, value) => handleFieldSave('purchaser', data.purchaser.id, field, value)}
+                editHistory={data.purchaser.edit_history}
+              />
             )}
-            <Field label="CNIC Number" value={data.purchaser.cnic_number} />
-            <Field label="Telephone Number" value={data.purchaser.telephone_number} />
-            <Field label="Employment Type" value={data.purchaser.employment_type} />
-            <Field label="Job Type" value={data.purchaser.job_type} />
-            <Field label="Employer Name" value={data.purchaser.employer_name} />
-            <Field label="Employer Address" value={data.purchaser.employer_address} />
-            <Field label="Designation" value={data.purchaser.designation} />
-            <Field label="Official Number" value={data.purchaser.official_number} />
-            <Field label="Business Name" value={data.purchaser.business_name} />
-            <Field label="Established Since" value={data.purchaser.established_since} />
-            <Field label="Business Address" value={data.purchaser.business_address} />
-            <Field label="Net Income" value={data.purchaser.net_income} />
-            <Field label="Years in Company" value={data.purchaser.years_in_company} />
-            <Field label="Gross Salary" value={data.purchaser.gross_salary} />
-            <Field label="Nearest Location" value={data.purchaser.nearest_location} />
+            <EditableField 
+              label="CNIC Number" 
+              value={data.purchaser.cnic_number} 
+              fieldName="cnic_number"
+              entityType="purchaser"
+              entityId={data.purchaser.id}
+              onSave={(field, value) => handleFieldSave('purchaser', data.purchaser.id, field, value)}
+              editHistory={data.purchaser.edit_history}
+            />
+            <EditableField 
+              label="Telephone Number" 
+              value={data.purchaser.telephone_number} 
+              fieldName="telephone_number"
+              entityType="purchaser"
+              entityId={data.purchaser.id}
+              onSave={(field, value) => handleFieldSave('purchaser', data.purchaser.id, field, value)}
+              editHistory={data.purchaser.edit_history}
+            />
+            <EditableField 
+              label="Employment Type" 
+              value={data.purchaser.employment_type} 
+              fieldName="employment_type"
+              entityType="purchaser"
+              entityId={data.purchaser.id}
+              onSave={(field, value) => handleFieldSave('purchaser', data.purchaser.id, field, value)}
+              editHistory={data.purchaser.edit_history}
+            />
+            <EditableField 
+              label="Job Type" 
+              value={data.purchaser.job_type} 
+              fieldName="job_type"
+              entityType="purchaser"
+              entityId={data.purchaser.id}
+              onSave={(field, value) => handleFieldSave('purchaser', data.purchaser.id, field, value)}
+              editHistory={data.purchaser.edit_history}
+            />
+            <EditableField 
+              label="Employer Name" 
+              value={data.purchaser.employer_name} 
+              fieldName="employer_name"
+              entityType="purchaser"
+              entityId={data.purchaser.id}
+              onSave={(field, value) => handleFieldSave('purchaser', data.purchaser.id, field, value)}
+              editHistory={data.purchaser.edit_history}
+            />
+            <EditableField 
+              label="Employer Address" 
+              value={data.purchaser.employer_address} 
+              fieldName="employer_address"
+              entityType="purchaser"
+              entityId={data.purchaser.id}
+              onSave={(field, value) => handleFieldSave('purchaser', data.purchaser.id, field, value)}
+              editHistory={data.purchaser.edit_history}
+            />
+            <EditableField 
+              label="Designation" 
+              value={data.purchaser.designation} 
+              fieldName="designation"
+              entityType="purchaser"
+              entityId={data.purchaser.id}
+              onSave={(field, value) => handleFieldSave('purchaser', data.purchaser.id, field, value)}
+              editHistory={data.purchaser.edit_history}
+            />
+            <EditableField 
+              label="Official Number" 
+              value={data.purchaser.official_number} 
+              fieldName="official_number"
+              entityType="purchaser"
+              entityId={data.purchaser.id}
+              onSave={(field, value) => handleFieldSave('purchaser', data.purchaser.id, field, value)}
+              editHistory={data.purchaser.edit_history}
+            />
+            <EditableField 
+              label="Business Name" 
+              value={data.purchaser.business_name} 
+              fieldName="business_name"
+              entityType="purchaser"
+              entityId={data.purchaser.id}
+              onSave={(field, value) => handleFieldSave('purchaser', data.purchaser.id, field, value)}
+              editHistory={data.purchaser.edit_history}
+            />
+            <EditableField 
+              label="Established Since" 
+              value={data.purchaser.established_since} 
+              fieldName="established_since"
+              entityType="purchaser"
+              entityId={data.purchaser.id}
+              onSave={(field, value) => handleFieldSave('purchaser', data.purchaser.id, field, value)}
+              editHistory={data.purchaser.edit_history}
+            />
+            <EditableField 
+              label="Business Address" 
+              value={data.purchaser.business_address} 
+              fieldName="business_address"
+              entityType="purchaser"
+              entityId={data.purchaser.id}
+              onSave={(field, value) => handleFieldSave('purchaser', data.purchaser.id, field, value)}
+              editHistory={data.purchaser.edit_history}
+            />
+            <EditableField 
+              label="Net Income" 
+              value={data.purchaser.net_income} 
+              fieldName="net_income"
+              entityType="purchaser"
+              entityId={data.purchaser.id}
+              onSave={(field, value) => handleFieldSave('purchaser', data.purchaser.id, field, value)}
+              editHistory={data.purchaser.edit_history}
+            />
+            <EditableField 
+              label="Years in Company" 
+              value={data.purchaser.years_in_company} 
+              fieldName="years_in_company"
+              entityType="purchaser"
+              entityId={data.purchaser.id}
+              onSave={(field, value) => handleFieldSave('purchaser', data.purchaser.id, field, value)}
+              editHistory={data.purchaser.edit_history}
+            />
+            <EditableField 
+              label="Gross Salary" 
+              value={data.purchaser.gross_salary} 
+              fieldName="gross_salary"
+              entityType="purchaser"
+              entityId={data.purchaser.id}
+              onSave={(field, value) => handleFieldSave('purchaser', data.purchaser.id, field, value)}
+              editHistory={data.purchaser.edit_history}
+            />
+            <EditableField 
+              label="Nearest Location" 
+              value={data.purchaser.nearest_location} 
+              fieldName="nearest_location"
+              entityType="purchaser"
+              entityId={data.purchaser.id}
+              onSave={(field, value) => handleFieldSave('purchaser', data.purchaser.id, field, value)}
+              editHistory={data.purchaser.edit_history}
+            />
             <Field label="Verified" value={data.purchaser.is_verified} />
           </div>
 
@@ -749,9 +1114,8 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
         </div>
       )}
 
-      {/* ── Grantors ──────────────────────────────────────────────────────── */}
+      {/* Grantors - EDITABLE */}
       {data.grantors.map((grantor) => {
-        // Check if grantor has any data to display
         const hasGrantorData = Object.values(grantor).some(val => shouldDisplay(val))
         const hasDocuments = data.documents.filter(doc => doc.person_type === `grantor${grantor.grantor_number}`).length > 0
 
@@ -765,61 +1129,199 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
 
             {hasGrantorData && (
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-                <Field label="Name" value={grantor.name} />
-                <Field label="Father/Husband Name" value={grantor.father_husband_name} />
+                <EditableField 
+                  label="Name" 
+                  value={grantor.name} 
+                  fieldName="name"
+                  entityType="grantor"
+                  entityId={grantor.id}
+                  onSave={(field, value) => handleFieldSave('grantor', grantor.id, field, value)}
+                  editHistory={grantor.edit_history}
+                />
+                <EditableField 
+                  label="Father/Husband Name" 
+                  value={grantor.father_husband_name} 
+                  fieldName="father_husband_name"
+                  entityType="grantor"
+                  entityId={grantor.id}
+                  onSave={(field, value) => handleFieldSave('grantor', grantor.id, field, value)}
+                  editHistory={grantor.edit_history}
+                />
                 {shouldDisplay(grantor.present_address) && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-500 dark:text-gray-400">Present Address</label>
-                    <div className="mt-1 rounded-lg bg-gray-100 px-4 py-2.5 dark:bg-dark-3 dark:text-gray-300">
-                      {grantor.present_address}
-                      {(grantor.present_zone || grantor.present_area || grantor.present_block) && (
-                        <div className="mt-1 text-xs text-gray-500">
-                          Structured: {grantor.present_zone}, {grantor.present_area}, {grantor.present_block}, {grantor.present_street}, {grantor.present_house_no}
-                        </div>
-                      )}
-                      {shouldDisplay(grantor.present_period_of_stay) && (
-                        <div className="mt-1 text-xs font-medium text-blue-600">
-                          Stay Period: {grantor.present_period_of_stay}
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                  <EditableField 
+                    label="Present Address" 
+                    value={`${grantor.present_address}${grantor.present_zone ? `\nZone: ${grantor.present_zone}` : ''}${grantor.present_area ? `\nArea: ${grantor.present_area}` : ''}${grantor.present_block ? `\nBlock: ${grantor.present_block}` : ''}${grantor.present_street ? `\nStreet: ${grantor.present_street}` : ''}${grantor.present_house_no ? `\nHouse No: ${grantor.present_house_no}` : ''}`}
+                    fieldName="present_address"
+                    entityType="grantor"
+                    entityId={grantor.id}
+                    onSave={(field, value) => handleFieldSave('grantor', grantor.id, field, value)}
+                    editHistory={grantor.edit_history}
+                  />
                 )}
                 {shouldDisplay(grantor.permanent_address) && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-500 dark:text-gray-400">Permanent Address</label>
-                    <div className="mt-1 rounded-lg bg-gray-100 px-4 py-2.5 dark:bg-dark-3 dark:text-gray-300">
-                      {grantor.permanent_address}
-                      {(grantor.permanent_zone || grantor.permanent_area || grantor.permanent_block) && (
-                        <div className="mt-1 text-xs text-gray-500">
-                          Structured: {grantor.permanent_zone}, {grantor.permanent_area}, {grantor.permanent_block}, {grantor.permanent_street}, {grantor.permanent_house_no}
-                        </div>
-                      )}
-                      {shouldDisplay(grantor.permanent_period_of_stay) && (
-                        <div className="mt-1 text-xs font-medium text-blue-600">
-                          Stay Period: {grantor.permanent_period_of_stay}
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                  <EditableField 
+                    label="Permanent Address" 
+                    value={`${grantor.permanent_address}${grantor.permanent_zone ? `\nZone: ${grantor.permanent_zone}` : ''}${grantor.permanent_area ? `\nArea: ${grantor.permanent_area}` : ''}${grantor.permanent_block ? `\nBlock: ${grantor.permanent_block}` : ''}${grantor.permanent_street ? `\nStreet: ${grantor.permanent_street}` : ''}${grantor.permanent_house_no ? `\nHouse No: ${grantor.permanent_house_no}` : ''}`}
+                    fieldName="permanent_address"
+                    entityType="grantor"
+                    entityId={grantor.id}
+                    onSave={(field, value) => handleFieldSave('grantor', grantor.id, field, value)}
+                    editHistory={grantor.edit_history}
+                  />
                 )}
-                <Field label="CNIC Number" value={grantor.cnic_number} />
-                <Field label="Telephone Number" value={grantor.telephone_number} />
-                <Field label="Employment Type" value={grantor.employment_type} />
-                <Field label="Job Type" value={grantor.job_type} />
-                <Field label="Designation" value={grantor.designation} />
-                <Field label="Official Number" value={grantor.official_number} />
-                <Field label="Office Address" value={grantor.office_address} />
-                <Field label="Company Name" value={grantor.company_name} />
-                <Field label="Years in Company" value={grantor.years_in_company} />
-                <Field label="Monthly Income" value={grantor.monthly_income} />
-                <Field label="Business Name" value={grantor.business_name} />
-                <Field label="Established Since" value={grantor.established_since} />
-                <Field label="Business Address" value={grantor.business_address} />
-                <Field label="Net Income" value={grantor.net_income} />
-                <Field label="Full Residential Address" value={grantor.full_residential_address} />
-                <Field label="Relationship" value={grantor.relationship} />
-                <Field label="Nearest Location" value={grantor.nearest_location} />
+                <EditableField 
+                  label="CNIC Number" 
+                  value={grantor.cnic_number} 
+                  fieldName="cnic_number"
+                  entityType="grantor"
+                  entityId={grantor.id}
+                  onSave={(field, value) => handleFieldSave('grantor', grantor.id, field, value)}
+                  editHistory={grantor.edit_history}
+                />
+                <EditableField 
+                  label="Telephone Number" 
+                  value={grantor.telephone_number} 
+                  fieldName="telephone_number"
+                  entityType="grantor"
+                  entityId={grantor.id}
+                  onSave={(field, value) => handleFieldSave('grantor', grantor.id, field, value)}
+                  editHistory={grantor.edit_history}
+                />
+                <EditableField 
+                  label="Employment Type" 
+                  value={grantor.employment_type} 
+                  fieldName="employment_type"
+                  entityType="grantor"
+                  entityId={grantor.id}
+                  onSave={(field, value) => handleFieldSave('grantor', grantor.id, field, value)}
+                  editHistory={grantor.edit_history}
+                />
+                <EditableField 
+                  label="Job Type" 
+                  value={grantor.job_type} 
+                  fieldName="job_type"
+                  entityType="grantor"
+                  entityId={grantor.id}
+                  onSave={(field, value) => handleFieldSave('grantor', grantor.id, field, value)}
+                  editHistory={grantor.edit_history}
+                />
+                <EditableField 
+                  label="Designation" 
+                  value={grantor.designation} 
+                  fieldName="designation"
+                  entityType="grantor"
+                  entityId={grantor.id}
+                  onSave={(field, value) => handleFieldSave('grantor', grantor.id, field, value)}
+                  editHistory={grantor.edit_history}
+                />
+                <EditableField 
+                  label="Official Number" 
+                  value={grantor.official_number} 
+                  fieldName="official_number"
+                  entityType="grantor"
+                  entityId={grantor.id}
+                  onSave={(field, value) => handleFieldSave('grantor', grantor.id, field, value)}
+                  editHistory={grantor.edit_history}
+                />
+                <EditableField 
+                  label="Office Address" 
+                  value={grantor.office_address} 
+                  fieldName="office_address"
+                  entityType="grantor"
+                  entityId={grantor.id}
+                  onSave={(field, value) => handleFieldSave('grantor', grantor.id, field, value)}
+                  editHistory={grantor.edit_history}
+                />
+                <EditableField 
+                  label="Company Name" 
+                  value={grantor.company_name} 
+                  fieldName="company_name"
+                  entityType="grantor"
+                  entityId={grantor.id}
+                  onSave={(field, value) => handleFieldSave('grantor', grantor.id, field, value)}
+                  editHistory={grantor.edit_history}
+                />
+                <EditableField 
+                  label="Years in Company" 
+                  value={grantor.years_in_company} 
+                  fieldName="years_in_company"
+                  entityType="grantor"
+                  entityId={grantor.id}
+                  onSave={(field, value) => handleFieldSave('grantor', grantor.id, field, value)}
+                  editHistory={grantor.edit_history}
+                />
+                <EditableField 
+                  label="Monthly Income" 
+                  value={grantor.monthly_income} 
+                  fieldName="monthly_income"
+                  entityType="grantor"
+                  entityId={grantor.id}
+                  onSave={(field, value) => handleFieldSave('grantor', grantor.id, field, value)}
+                  editHistory={grantor.edit_history}
+                />
+                <EditableField 
+                  label="Business Name" 
+                  value={grantor.business_name} 
+                  fieldName="business_name"
+                  entityType="grantor"
+                  entityId={grantor.id}
+                  onSave={(field, value) => handleFieldSave('grantor', grantor.id, field, value)}
+                  editHistory={grantor.edit_history}
+                />
+                <EditableField 
+                  label="Established Since" 
+                  value={grantor.established_since} 
+                  fieldName="established_since"
+                  entityType="grantor"
+                  entityId={grantor.id}
+                  onSave={(field, value) => handleFieldSave('grantor', grantor.id, field, value)}
+                  editHistory={grantor.edit_history}
+                />
+                <EditableField 
+                  label="Business Address" 
+                  value={grantor.business_address} 
+                  fieldName="business_address"
+                  entityType="grantor"
+                  entityId={grantor.id}
+                  onSave={(field, value) => handleFieldSave('grantor', grantor.id, field, value)}
+                  editHistory={grantor.edit_history}
+                />
+                <EditableField 
+                  label="Net Income" 
+                  value={grantor.net_income} 
+                  fieldName="net_income"
+                  entityType="grantor"
+                  entityId={grantor.id}
+                  onSave={(field, value) => handleFieldSave('grantor', grantor.id, field, value)}
+                  editHistory={grantor.edit_history}
+                />
+                <EditableField 
+                  label="Full Residential Address" 
+                  value={grantor.full_residential_address} 
+                  fieldName="full_residential_address"
+                  entityType="grantor"
+                  entityId={grantor.id}
+                  onSave={(field, value) => handleFieldSave('grantor', grantor.id, field, value)}
+                  editHistory={grantor.edit_history}
+                />
+                <EditableField 
+                  label="Relationship" 
+                  value={grantor.relationship} 
+                  fieldName="relationship"
+                  entityType="grantor"
+                  entityId={grantor.id}
+                  onSave={(field, value) => handleFieldSave('grantor', grantor.id, field, value)}
+                  editHistory={grantor.edit_history}
+                />
+                <EditableField 
+                  label="Nearest Location" 
+                  value={grantor.nearest_location} 
+                  fieldName="nearest_location"
+                  entityType="grantor"
+                  entityId={grantor.id}
+                  onSave={(field, value) => handleFieldSave('grantor', grantor.id, field, value)}
+                  editHistory={grantor.edit_history}
+                />
                 <Field label="Verified" value={grantor.is_verified} />
               </div>
             )}
@@ -831,7 +1333,6 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
                   Grantor {grantor.grantor_number} Uploaded Documents
                   {grantor.name && ` – ${grantor.name}`}
                 </h3>
-
                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                   {data.documents
                     .filter(doc => doc.person_type === `grantor${grantor.grantor_number}`)
@@ -845,7 +1346,7 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
         )
       })}
 
-      {/* ── Next of Kin ───────────────────────────────────────────────────── */}
+      {/* Next of Kin */}
       {data.nextOfKin && Object.values(data.nextOfKin).some(val => shouldDisplay(val)) && (
         <div className="mb-12">
           <h2 className="mb-4 text-2xl font-semibold text-dark dark:text-white">
@@ -860,12 +1361,11 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
         </div>
       )}
 
-      {/* ── Locations ─────────────────────────────────────────────────────── */}
+      {/* Locations */}
       {(data.locations.length > 0 || data.verification_locations.length > 0) && (
         <div className="mb-12">
           <h2 className="mb-4 text-2xl font-semibold text-dark dark:text-white">Location Tracking</h2>
 
-          {/* GPS Locations */}
           {data.locations.length > 0 && (
             <div className="mb-8">
               <h3 className="mb-3 text-xl font-semibold text-dark dark:text-white">GPS Locations</h3>
@@ -907,7 +1407,6 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
             </div>
           )}
 
-          {/* Verification Locations with Photos */}
           {data.verification_locations.length > 0 && (
             <div>
               <h3 className="mb-3 text-xl font-semibold text-dark dark:text-white">Location Photos</h3>

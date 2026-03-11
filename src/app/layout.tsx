@@ -11,7 +11,7 @@ import { Providers } from "./providers";
 import { Toaster } from 'react-hot-toast';
 
 export const metadata: Metadata = {
-  title: "Qist Market BMS | (BNPL Management System)",
+  title: "Qist Market Management System",
   description:
     "Next.js admin dashboard toolkit with 200+ templates, UI components, and integrations for fast dashboard development.",
 };

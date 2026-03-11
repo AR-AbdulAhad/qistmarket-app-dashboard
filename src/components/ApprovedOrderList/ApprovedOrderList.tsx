@@ -49,6 +49,7 @@ interface Order {
   advance_amount: number
   monthly_amount: number
   months: number
+  delivery_officer: { username: string } | null
   channel: string
   status: string
   created_at: string
@@ -390,7 +391,7 @@ const ApprovedOrderList = () => {
     },
     {
       id: 'delivery_officer',
-      accessorFn: (row) => row.assigned_to?.username || 'Unassigned',
+      accessorFn: (row) => row.delivery_officer?.username || 'Unassigned',
       header: 'Delivery Officer',
       enableColumnFilter: true,
     },
@@ -501,7 +502,7 @@ const ApprovedOrderList = () => {
                 >
                   <ul className="overflow-hidden text-sm font-medium text-current">
 
-                    {order.assigned_to ? (
+                    {order.delivery_officer ? (
                       <li>
                         <button
                           onClick={() => {
