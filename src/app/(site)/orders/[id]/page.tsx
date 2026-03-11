@@ -16,7 +16,9 @@ interface Order {
     token_number: string;
     customer_name: string;
     whatsapp_number: string;
+    alternate_contact?: string | null;
     address: string;
+    order_notes?: string | null;
     gender?: string | null;
     residential_type?: string | null;
     zone?: string | null;
@@ -233,6 +235,11 @@ export default function OrderDetailsPage() {
                         <p className="text-sm text-gray-500 dark:text-gray-400">WhatsApp Number</p>
                         <p className="font-semibold">{order.whatsapp_number || 'N/A'}</p>
                     </div>
+
+                    <div>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">Alternate Contact</p>
+                        <p className="font-semibold">{order.alternate_contact || 'N/A'}</p>
+                    </div>
                     {order.address && order.address.trim() !== '' ? (
                         <div className="sm:col-span-2">
                             <p className="text-sm text-gray-500 dark:text-gray-400">Address</p>
@@ -274,6 +281,11 @@ export default function OrderDetailsPage() {
                     <div>
                         <p className="text-sm text-gray-500 dark:text-gray-400">Residential Type</p>
                         <p className="font-semibold">{order.residential_type || 'N/A'}</p>
+                    </div>
+
+                    <div className="sm:col-span-2">
+                        <p className="text-sm text-gray-500 dark:text-gray-400">Order Notes</p>
+                        <p className="font-semibold whitespace-pre-wrap">{order.order_notes || 'N/A'}</p>
                     </div>
                 </div>
                 </div>

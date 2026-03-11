@@ -13,11 +13,17 @@ const CreateUsers: React.FC = () => {
     fullName: '',
     email: '',
     username: '',
+    password: '',
     phone: '',
     role_id: '',
     cnic: '',
+    outlet_id: '',
   });
   const [loading, setLoading] = useState(false);
+  const [outlets, setOutlets] = useState<{ id: number; name: string; code: string }[]>([]);
+  const [showOutletModal, setShowOutletModal] = useState(false);
+  const [newOutlet, setNewOutlet] = useState({ name: '', code: '', address: '' });
+  const [creatingOutlet, setCreatingOutlet] = useState(false);
 
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -66,10 +72,10 @@ const CreateUsers: React.FC = () => {
     },
     {
       id: 5,
-      name: 'Branch User',
+      name: 'Outlet User',
       platform: 'web',
       icon: Monitor,
-      description: 'Manage branch balances, confirm OTP transfers, view stock & expenses, reconcile receipts'
+      description: 'Manage outlet balances, confirm OTP transfers, view stock & expenses, reconcile receipts'
     },
     // {
     //   id: 6,
@@ -95,12 +101,60 @@ const CreateUsers: React.FC = () => {
     }
   };
 
+  const fetchOutlets = async () => {
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/outlets`, {
+        headers: { Authorization: `Bearer ${Cookies.get("auth_token")}` },
+      });
+      const result = await res.json();
+      if (result.success) setOutlets(result.outlets);
+    } catch (error) {
+      console.error("Failed to fetch outlets:", error);
+    }
+  };
+
+  const handleCreateOutlet = async () => {
+    if (!newOutlet.name || !newOutlet.code) {
+      toast.error("Name and Code are required for an outlet");
+      return;
+    }
+    setCreatingOutlet(true);
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/outlets`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${Cookies.get("auth_token")}`
+        },
+        body: JSON.stringify(newOutlet)
+      });
+      const result = await res.json();
+      if (result.success) {
+        toast.success("Outlet created successfully");
+        setShowOutletModal(false);
+        setNewOutlet({ name: '', code: '', address: '' });
+        fetchOutlets();
+      } else {
+        toast.error(result.message || "Failed to create outlet");
+      }
+    } catch (error) {
+      toast.error("Error creating outlet");
+    } finally {
+      setCreatingOutlet(false);
+    }
+  };
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
 
     if (!formData.fullName.trim()) newErrors.fullName = 'Full name is required';
     if (!formData.username.trim()) newErrors.username = 'Username is required';
+
+    // Password required for App/Outlet roles
+    if ([1, 2, 3, 5, 8].includes(parseInt(formData.role_id)) && !formData.password.trim()) {
+      newErrors.password = 'Password is required for this role';
+    }
+
     if (!formData.phone.trim()) {
       newErrors.phone = 'Phone number is required';
     } else if (!/^(\+92|0)?[0-9]{10}$/.test(formData.phone.replace(/\s+/g, ''))) {
@@ -122,6 +176,10 @@ const CreateUsers: React.FC = () => {
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
+
+  useEffect(() => {
+    fetchOutlets();
+  }, []);
 
   useEffect(() => {
     if (Object.keys(errors).length > 0) {
@@ -172,7 +230,12 @@ const CreateUsers: React.FC = () => {
         phone: formData.phone.trim(),
         role_id: Number(formData.role_id),
         cnic: formData.cnic.trim().replace(/[-\s]/g, ''),
+        outlet_id: formData.outlet_id ? Number(formData.outlet_id) : null,
       };
+
+      if (formData.password.trim()) {
+        payload.password = formData.password.trim();
+      }
 
       if (formData.email.trim()) {
         payload.email = formData.email.trim();
@@ -189,7 +252,7 @@ const CreateUsers: React.FC = () => {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error?.message);
+        throw new Error(errorData.error?.message || "Failed to create user");
       }
 
       const result = await response.json();
@@ -199,9 +262,11 @@ const CreateUsers: React.FC = () => {
         fullName: '',
         email: '',
         username: '',
+        password: '',
         phone: '',
         role_id: '',
         cnic: '',
+        outlet_id: '',
       });
       setErrors({});
 
@@ -217,9 +282,11 @@ const CreateUsers: React.FC = () => {
       fullName: '',
       email: '',
       username: '',
+      password: '',
       phone: '',
       role_id: '',
       cnic: '',
+      outlet_id: '',
     });
     setErrors({});
   };
@@ -321,6 +388,31 @@ const CreateUsers: React.FC = () => {
                   />
                   {errors.cnic && <p className="text-red-500 text-sm mt-1">{errors.cnic}</p>}
                 </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Login Password <span className="text-red-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      name="password"
+                      value={formData.password}
+                      onChange={handleChange}
+                      className={`w-full px-4 py-2 rounded-lg border-[1.5px] bg-transparent outline-none transition focus:border-[#ff3d3d] ${errors.password ? 'border-red-500' : 'border-gray-300'
+                        }`}
+                      placeholder="Enter login password"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                    >
+                      {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    </button>
+                  </div>
+                  {errors.password && <p className="text-red-500 text-sm mt-1">{errors.password}</p>}
+                </div>
               </div>
             </div>
 
@@ -372,6 +464,40 @@ const CreateUsers: React.FC = () => {
               </div>
             </div>
 
+            {/* Outlet Selection */}
+            {(Number(formData.role_id) === 5 || Number(formData.role_id) === 2 || Number(formData.role_id) === 3 || Number(formData.role_id) === 4 || Number(formData.role_id) === 9) && (
+              <div className="border-b pb-6">
+                <h2 className="text-xl font-semibold text-gray-800 mb-4">Outlet Assignment</h2>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <select
+                      name="outlet_id"
+                      value={formData.outlet_id}
+                      onChange={handleChange}
+                      className="flex-1 px-4 py-2 rounded-lg border-[1.5px] border-gray-300 bg-transparent outline-none transition focus:border-[#ff3d3d]"
+                    >
+                      <option value="">Select an Outlet</option>
+                      {outlets.map(outlet => (
+                        <option key={outlet.id} value={outlet.id}>
+                          {outlet.name} ({outlet.code})
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => setShowOutletModal(true)}
+                      className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg border border-gray-300 font-medium transition-colors"
+                    >
+                      + Add New
+                    </button>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-2 italic">
+                    Assigning a user to an outlet scopes their data and permissions to that branch.
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* OTP Warning/Note */}
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
               <p className="text-sm text-blue-700">
@@ -416,6 +542,67 @@ const CreateUsers: React.FC = () => {
           </form>
         </div>
       </div>
+
+      {/* Outlet Creation Modal */}
+      {showOutletModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden">
+            <div className="p-6 border-b">
+              <h3 className="text-xl font-bold text-gray-900">Add New Outlet</h3>
+              <p className="text-sm text-gray-500">Create a new branch or location</p>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Outlet Name *</label>
+                <input
+                  type="text"
+                  className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-[#ff3d3d] outline-none"
+                  placeholder="e.g. Saddar Branch"
+                  value={newOutlet.name}
+                  onChange={(e) => setNewOutlet({ ...newOutlet, name: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Outlet Code *</label>
+                <input
+                  type="text"
+                  className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-[#ff3d3d] outline-none"
+                  placeholder="e.g. SDO-01"
+                  value={newOutlet.code}
+                  onChange={(e) => setNewOutlet({ ...newOutlet, code: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
+                <input
+                  type="text"
+                  className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-[#ff3d3d] outline-none"
+                  placeholder="Full location address"
+                  value={newOutlet.address}
+                  onChange={(e) => setNewOutlet({ ...newOutlet, address: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="p-6 bg-gray-50 flex gap-3">
+              <button
+                type="button"
+                onClick={() => setShowOutletModal(false)}
+                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleCreateOutlet}
+                disabled={creatingOutlet}
+                className="flex-1 px-4 py-2 bg-[#ff3d3d] text-white rounded-lg hover:bg-opacity-90 font-medium disabled:opacity-50"
+              >
+                {creatingOutlet ? 'Creating...' : 'Create Outlet'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -12,6 +12,19 @@ import { KeyIcon } from "lucide-react";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
 
+const TabButton = ({ active, label, onClick }: { active: boolean; label: string; onClick: () => void }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className={`flex-1 py-3 text-sm font-medium transition-all ${active
+      ? "border-b-2 border-[#ff3d3d] text-[#ff3d3d]"
+      : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+      }`}
+  >
+    {label}
+  </button>
+);
+
 export default function SigninWithOTP() {
   const router = useRouter();
 
@@ -19,7 +32,12 @@ export default function SigninWithOTP() {
     identifier: "",
     otp: "",
     remember: false,
+    outlet_code: "",
+    username: "",
+    password: "",
   });
+
+  const [loginType, setLoginType] = useState<"web" | "outlet">("web");
 
   const [step, setStep] = useState<"identifier" | "otp">("identifier");
   const [deviceId, setDeviceId] = useState<string>("");
@@ -129,7 +147,43 @@ export default function SigninWithOTP() {
         expires: 30, // Default to 30 days
         path: "/",
       });
+      localStorage.setItem("user", JSON.stringify(result.user));
+      localStorage.setItem("token", result.token);
       router.push("/");
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleOutletLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const { outlet_code, username, password } = data;
+    if (!outlet_code || !username || !password) {
+      toast.error("Please fill in all fields.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/outlet/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ outlet_code, username, password }),
+      });
+
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.message || "Login failed.");
+
+      toast.success("Outlet login successful.");
+      Cookies.set("auth_token", result.token, {
+        expires: 30, // Default to 30 days
+        path: "/",
+      });
+      localStorage.setItem("user", JSON.stringify(result.user));
+      localStorage.setItem("token", result.token);
+      router.push("/outlet/dashboard");
     } catch (err: any) {
       toast.error(err.message);
     } finally {
@@ -139,17 +193,126 @@ export default function SigninWithOTP() {
 
   return (
     <div>
-      {step === "identifier" ? (
-        <form onSubmit={handleSendOTP}>
+      <div className="mb-8 flex border-b border-gray-100 dark:border-gray-800">
+        <TabButton
+          active={loginType === "web"}
+          label="Web OTP Login"
+          onClick={() => setLoginType("web")}
+        />
+        <TabButton
+          active={loginType === "outlet"}
+          label="Outlet Login"
+          onClick={() => setLoginType("outlet")}
+        />
+      </div>
+
+      {loginType === "web" ? (
+        step === "identifier" ? (
+          <form onSubmit={handleSendOTP}>
+            <InputGroup
+              type="text"
+              label="Phone Number or Email"
+              className="mb-6 [&_input]:py-[15px] [&_input]:pr-12"
+              placeholder="Phone Number or Email"
+              name="identifier"
+              handleChange={handleChange}
+              value={data.identifier}
+              icon={<UserIcon />}
+            />
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#ff3d3d] p-4 font-medium text-white transition hover:bg-opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {loading ? "Sending OTP..." : "Continue"}
+              {loading && (
+                <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-solid border-white border-t-transparent" />
+              )}
+            </button>
+          </form>
+        ) : (
+          <form onSubmit={handleVerifyOTP}>
+            <p className="mb-6 text-sm text-gray-600">
+              OTP has been sent to <strong>{data.identifier}</strong>. Please enter the 5-digit code below.
+            </p>
+
+            <InputGroup
+              type="text"
+              label="Verification Code"
+              className="mb-6 [&_input]:py-[15px] [&_input]:pr-12"
+              placeholder="Enter 5-digit OTP"
+              name="otp"
+              handleChange={handleChange}
+              value={data.otp}
+              icon={<KeyIcon className="h-5 w-5" />}
+            />
+
+            <div className="mb-4.5 flex gap-4">
+              <button
+                type="button"
+                onClick={() => setStep("identifier")}
+                className="flex flex-1 items-center justify-center rounded-lg border border-stroke bg-white p-4 font-medium text-dark transition hover:bg-gray-50 focus:outline-none dark:border-dark-3 dark:bg-dark-2 dark:text-white"
+              >
+                Back
+              </button>
+              <button
+                type="submit"
+                disabled={loading}
+                className="flex-[2] flex items-center justify-center gap-2 rounded-lg bg-[#ff3d3d] p-4 font-medium text-white transition hover:bg-opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {loading ? "Verifying..." : "Verify & Login"}
+                {loading && (
+                  <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-solid border-white border-t-transparent" />
+                )}
+              </button>
+            </div>
+
+            <div className="text-center mt-4">
+              <button
+                type="button"
+                onClick={handleSendOTP}
+                disabled={loading}
+                className="text-[#ff3d3d] hover:underline font-medium disabled:opacity-50"
+              >
+                Resend OTP
+              </button>
+            </div>
+          </form>
+        )
+      ) : (
+        <form onSubmit={handleOutletLogin}>
           <InputGroup
             type="text"
-            label="Phone Number or Email"
+            label="Outlet Code"
             className="mb-6 [&_input]:py-[15px] [&_input]:pr-12"
-            placeholder="Phone Number or Email"
-            name="identifier"
+            placeholder="e.g. OUT-001"
+            name="outlet_code"
             handleChange={handleChange}
-            value={data.identifier}
+            value={data.outlet_code}
             icon={<UserIcon />}
+          />
+
+          <InputGroup
+            type="text"
+            label="Username"
+            className="mb-6 [&_input]:py-[15px] [&_input]:pr-12"
+            placeholder="Username"
+            name="username"
+            handleChange={handleChange}
+            value={data.username}
+            icon={<UserIcon />}
+          />
+
+          <InputGroup
+            type="password"
+            label="Password"
+            className="mb-6 [&_input]:py-[15px] [&_input]:pr-12"
+            placeholder="Password"
+            name="password"
+            handleChange={handleChange}
+            value={data.password}
+            icon={<KeyIcon className="h-5 w-5" />}
           />
 
           <button
@@ -157,59 +320,11 @@ export default function SigninWithOTP() {
             disabled={loading}
             className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#ff3d3d] p-4 font-medium text-white transition hover:bg-opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {loading ? "Sending OTP..." : "Continue"}
+            {loading ? "Logging in..." : "Login to Outlet"}
             {loading && (
               <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-solid border-white border-t-transparent" />
             )}
           </button>
-        </form>
-      ) : (
-        <form onSubmit={handleVerifyOTP}>
-          <p className="mb-6 text-sm text-gray-600">
-            OTP has been sent to <strong>{data.identifier}</strong>. Please enter the 5-digit code below.
-          </p>
-
-          <InputGroup
-            type="text"
-            label="Verification Code"
-            className="mb-6 [&_input]:py-[15px] [&_input]:pr-12"
-            placeholder="Enter 5-digit OTP"
-            name="otp"
-            handleChange={handleChange}
-            value={data.otp}
-            icon={<KeyIcon className="h-5 w-5" />}
-          />
-
-          <div className="mb-4.5 flex gap-4">
-            <button
-              type="button"
-              onClick={() => setStep("identifier")}
-              className="flex flex-1 items-center justify-center rounded-lg border border-stroke bg-white p-4 font-medium text-dark transition hover:bg-gray-50 focus:outline-none dark:border-dark-3 dark:bg-dark-2 dark:text-white"
-            >
-              Back
-            </button>
-            <button
-              type="submit"
-              disabled={loading}
-              className="flex-[2] flex items-center justify-center gap-2 rounded-lg bg-[#ff3d3d] p-4 font-medium text-white transition hover:bg-opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {loading ? "Verifying..." : "Verify & Login"}
-              {loading && (
-                <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-solid border-white border-t-transparent" />
-              )}
-            </button>
-          </div>
-
-          <div className="text-center mt-4">
-            <button
-              type="button"
-              onClick={handleSendOTP}
-              disabled={loading}
-              className="text-[#ff3d3d] hover:underline font-medium disabled:opacity-50"
-            >
-              Resend OTP
-            </button>
-          </div>
         </form>
       )}
     </div>

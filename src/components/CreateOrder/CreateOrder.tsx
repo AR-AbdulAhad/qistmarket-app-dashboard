@@ -11,6 +11,7 @@ const CreateOrders: React.FC = () => {
   const [formData, setFormData] = useState({
     customer_name: '',
     whatsapp_number: '',
+    alternate_contact: '',
     address: '',
     city: 'Karachi', // Default city
     area: '',
@@ -27,6 +28,7 @@ const CreateOrders: React.FC = () => {
     monthly_amount: '',
     months: '',
     channel: '',
+    order_notes: '',
   });
 
   const [isManualAddress, setIsManualAddress] = useState(false);
@@ -138,6 +140,12 @@ const CreateOrders: React.FC = () => {
     if (errors[name]) setErrors(prev => ({ ...prev, [name]: '' }));
   };
 
+  const handleTextAreaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+    if (errors[name]) setErrors(prev => ({ ...prev, [name]: '' }));
+  };
+
   const handleProductSelect = (product: any) => {
     setSelectedProduct(product);
     setSelectedPlan(null);
@@ -219,6 +227,7 @@ const CreateOrders: React.FC = () => {
       const payload = {
         customer_name: formData.customer_name.trim(),
         whatsapp_number: formData.whatsapp_number.trim(),
+        alternate_contact: formData.alternate_contact.trim() || null,
         address: submissionAddress,
         city: formData.city,
         area: formData.area,
@@ -235,6 +244,7 @@ const CreateOrders: React.FC = () => {
         monthly_amount: formData.monthly_amount,
         months: formData.months,
         channel: formData.channel,
+        order_notes: formData.order_notes.trim() || null,
       };
 
       const response = await fetch(`${BACKEND_URL}/api/orders/create`, {
@@ -254,10 +264,11 @@ const CreateOrders: React.FC = () => {
 
       // Reset form
       setFormData({
-        customer_name: '', whatsapp_number: '', address: '', city: 'Karachi', area: '',
+        customer_name: '', whatsapp_number: '', alternate_contact: '', address: '', city: 'Karachi', area: '',
         zone: '', block: '', street: '', house_no: '',
         gender: '', marital_status: '', residential_type: '',
-        product_name: '', total_amount: '', advance_amount: '', monthly_amount: '', months: '', channel: ''
+        product_name: '', total_amount: '', advance_amount: '', monthly_amount: '', months: '', channel: '',
+        order_notes: ''
       });
       setIsManualAddress(false);
       setIsCustomProduct(false);
@@ -313,6 +324,18 @@ const CreateOrders: React.FC = () => {
                     placeholder="03001234567"
                   />
                   {errors.whatsapp_number && <p className="text-red-600 text-sm mt-1">{errors.whatsapp_number}</p>}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Alternate Contact</label>
+                  <input
+                    type="tel"
+                    name="alternate_contact"
+                    value={formData.alternate_contact}
+                    onChange={handleChange}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none transition"
+                    placeholder="Optional alternate number"
+                  />
                 </div>
 
                 <div className="md:col-span-2 space-y-4">
@@ -490,6 +513,18 @@ const CreateOrders: React.FC = () => {
                     ))}
                   </select>
                   {errors.residential_type && <p className="text-red-600 text-sm mt-1">{errors.residential_type}</p>}
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Order Notes</label>
+                  <textarea
+                    name="order_notes"
+                    value={formData.order_notes}
+                    onChange={handleTextAreaChange}
+                    rows={3}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none transition"
+                    placeholder="Optional notes for this order"
+                  />
                 </div>
               </div>
             </section>
@@ -757,10 +792,11 @@ const CreateOrders: React.FC = () => {
                 type="button"
                 onClick={() => {
                   setFormData({
-                    customer_name: '', whatsapp_number: '', address: '', city: 'Karachi', area: '',
+                    customer_name: '', whatsapp_number: '', alternate_contact: '', address: '', city: 'Karachi', area: '',
                     zone: '', block: '', street: '', house_no: '',
                     gender: '', marital_status: '', residential_type: '',
-                    product_name: '', total_amount: '', advance_amount: '', monthly_amount: '', months: '', channel: ''
+                    product_name: '', total_amount: '', advance_amount: '', monthly_amount: '', months: '', channel: '',
+                    order_notes: ''
                   });
                   setSelectedProduct(null);
                   setSelectedPlan(null);

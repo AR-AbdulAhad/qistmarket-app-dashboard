@@ -49,6 +49,8 @@ interface User {
   coverImage: string;
   permissions: Record<string, any> | null;
   password?: string;
+  outlet_id?: number | null;
+  outlet?: { id: number; name: string; code: string } | null;
 }
 
 interface PaginationInfo {
@@ -90,6 +92,26 @@ const UsersTable = () => {
   const [createOrderPermission, setCreateOrderPermission] = useState(false);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
+  const [outlets, setOutlets] = useState<{ id: number; name: string; code: string; status: string; address?: string }[]>([]);
+  const [manageOutletsModalOpen, setManageOutletsModalOpen] = useState(false);
+  const [editingOutlet, setEditingOutlet] = useState<{ id?: number, name: string, code: string, address: string, status: string } | null>(null);
+
+  const fetchOutlets = async () => {
+    try {
+      const token = Cookies.get("auth_token");
+      const res = await fetch(`${BACKEND_URL}/api/outlets`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const json = await res.json();
+      if (json.success) setOutlets(json.outlets);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  useEffect(() => {
+    fetchOutlets();
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -150,6 +172,12 @@ const UsersTable = () => {
     { accessorKey: "phone", header: "Phone", enableColumnFilter: true },
     { accessorKey: "cnic", header: "CNIC", enableColumnFilter: true },
     { accessorKey: "role", header: "Role", enableColumnFilter: true },
+    {
+      accessorKey: "outlet",
+      header: "Outlet",
+      enableColumnFilter: false,
+      cell: ({ row }) => row.original.outlet?.name || "N/A",
+    },
     { accessorKey: "status", header: "Status", enableColumnFilter: true },
     {
       id: "actions",
@@ -523,7 +551,16 @@ const UsersTable = () => {
           </button>
         </div>
 
-        <div className="flex items-center font-medium">
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => {
+              setEditingOutlet({ name: '', code: '', address: '', status: 'active' });
+              setManageOutletsModalOpen(true);
+            }}
+            className="flex items-center justify-center rounded-lg bg-gray-100 px-4 py-2.5 font-medium text-dark hover:bg-gray-200 dark:bg-dark-3 dark:text-white"
+          >
+            Manage Outlets
+          </button>
           <p className="pl-2 font-medium text-dark dark:text-current">
             Per Page:
           </p>
@@ -759,7 +796,46 @@ const UsersTable = () => {
             </select>
           </div>
 
-          {/* Password field removed - OTP based login */}
+          <div>
+            <label
+              htmlFor="outlet_id"
+              className="mb-1.5 block text-sm font-medium text-dark dark:text-gray-300"
+            >
+              Assigned Outlet
+            </label>
+            <select
+              id="outlet_id"
+              name="outlet_id"
+              value={formData.outlet_id || ""}
+              onChange={handleInputChange}
+              className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2.5 outline-none focus:border-[#ff3d3d] dark:border-dark-3 dark:bg-dark-2"
+            >
+              <option value="">No Outlet</option>
+              {outlets.map((outlet) => (
+                <option key={outlet.id} value={outlet.id}>
+                  {outlet.name} ({outlet.code})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label
+              htmlFor="password"
+              className="mb-1.5 block text-sm font-medium text-dark dark:text-gray-300"
+            >
+              Update Password (leave blank to keep current)
+            </label>
+            <input
+              id="password"
+              name="password"
+              type="password"
+              value={formData.password || ""}
+              onChange={handleInputChange}
+              placeholder="Enter new password"
+              className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2.5 outline-none focus:border-[#ff3d3d] dark:border-dark-3 dark:bg-dark-2"
+            />
+          </div>
 
           <div className="md:col-span-2">
             <label
@@ -960,7 +1036,116 @@ const UsersTable = () => {
           </button>
         </div>
       </Modal>
-    </section >
+
+      <Modal
+        open={manageOutletsModalOpen}
+        onClose={() => setManageOutletsModalOpen(false)}
+        className="max-h-[90vh] w-full max-w-[800px] overflow-y-auto rounded-2xl bg-white p-8 shadow-xl dark:bg-gray-800"
+      >
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-2xl font-bold text-dark dark:text-white">Outlet Management</h2>
+          <button
+            onClick={() => setEditingOutlet({ name: '', code: '', address: '', status: 'active' })}
+            className="bg-[#ff3d3d] text-white px-4 py-2 rounded-lg text-sm font-medium"
+          >
+            + New Outlet
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          {/* Outlet Form */}
+          <div className="bg-gray-50 dark:bg-dark-2 p-6 rounded-xl border border-stroke dark:border-dark-3">
+            <h3 className="text-lg font-semibold mb-4">{editingOutlet?.id ? 'Edit Outlet' : 'Create Outlet'}</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1.5">Outlet Name</label>
+                <input
+                  value={editingOutlet?.name || ''}
+                  onChange={(e) => setEditingOutlet(prev => prev ? { ...prev, name: e.target.value } : null)}
+                  className="w-full rounded-lg border border-stroke bg-white px-4 py-2 outline-none focus:border-[#ff3d3d]"
+                  placeholder="e.g. Saddar Main branch"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1.5">Outlet Code</label>
+                <input
+                  value={editingOutlet?.code || ''}
+                  onChange={(e) => setEditingOutlet(prev => prev ? { ...prev, code: e.target.value } : null)}
+                  className="w-full rounded-lg border border-stroke bg-white px-4 py-2 outline-none focus:border-[#ff3d3d]"
+                  placeholder="e.g. SDO-1"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1.5">Status</label>
+                <select
+                  value={editingOutlet?.status || 'active'}
+                  onChange={(e) => setEditingOutlet(prev => prev ? { ...prev, status: e.target.value } : null)}
+                  className="w-full rounded-lg border border-stroke bg-white px-4 py-2 outline-none focus:border-[#ff3d3d]"
+                >
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                </select>
+              </div>
+              <button
+                disabled={isSubmitting}
+                onClick={async () => {
+                  if (!editingOutlet?.name || !editingOutlet?.code) return alert("Name and Code are required");
+                  setIsSubmitting(true);
+                  try {
+                    const token = Cookies.get("auth_token");
+                    const method = editingOutlet.id ? 'PATCH' : 'POST';
+                    const url = editingOutlet.id ? `${BACKEND_URL}/api/outlets/${editingOutlet.id}` : `${BACKEND_URL}/api/outlets`;
+                    const res = await fetch(url, {
+                      method,
+                      headers: {
+                        'Content-Type': 'application/json',
+                        Authorization: `Bearer ${token}`
+                      },
+                      body: JSON.stringify(editingOutlet)
+                    });
+                    const result = await res.json();
+                    if (result.success) {
+                      await fetchOutlets();
+                      setEditingOutlet({ name: '', code: '', address: '', status: 'active' });
+                    } else {
+                      alert(result.message || "Failed");
+                    }
+                  } catch (e) {
+                    console.error(e);
+                  } finally {
+                    setIsSubmitting(false);
+                  }
+                }}
+                className="w-full bg-[#ff3d3d] text-white py-2.5 rounded-lg font-semibold mt-4 disabled:opacity-50"
+              >
+                {isSubmitting ? 'Processing...' : (editingOutlet?.id ? 'Update Outlet' : 'Create Outlet')}
+              </button>
+            </div>
+          </div>
+
+          {/* Outlets List */}
+          <div>
+            <h3 className="text-lg font-semibold mb-4">Existing Outlets</h3>
+            <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
+              {outlets.map(o => (
+                <div key={o.id} className="flex items-center justify-between p-3 border border-stroke dark:border-dark-3 rounded-lg hover:bg-gray-50">
+                  <div>
+                    <p className="font-medium text-dark dark:text-white">{o.name}</p>
+                    <p className="text-xs text-gray-500">{o.code} • {o.status}</p>
+                  </div>
+                  <button
+                    onClick={() => setEditingOutlet({ ...o, address: o.address || '' })}
+                    className="text-[#ff3d3d] text-sm font-medium hover:underline"
+                  >
+                    Edit
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </Modal>
+    </section>
   );
 };
 

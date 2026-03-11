@@ -198,5 +198,50 @@ export const NAV_DATA = [
       // },
     ],
   },
-
+  {
+    label: "OUTLET PORTAL",
+    items: [
+      {
+        title: "Outlet Dashboard",
+        icon: Icons.HomeIcon,
+        url: "/outlet/dashboard",
+        items: [],
+      },
+      {
+        title: "Outlet Orders",
+        icon: Icons.CreateOrderSquareIcon,
+        url: "/outlet/orders",
+        items: [],
+      },
+      {
+        title: "Inventory",
+        icon: Icons.HomeIcon,
+        items: [
+          { title: "Stock List", url: "/outlet/inventory" },
+          { title: "Add Stock", url: "/outlet/inventory/add" },
+          { title: "Stock Transfers", url: "/outlet/inventory/transfers" },
+        ],
+      },
+      {
+        title: "Vendors",
+        icon: Icons.HomeIcon,
+        items: [
+          { title: "Vendor Purchases", url: "/outlet/vendors/purchases" },
+          { title: "Vendor Payments", url: "/outlet/vendors/payments" },
+        ],
+      },
+      {
+        title: "Expenses",
+        icon: Icons.HomeIcon,
+        url: "/outlet/expenses",
+        items: [],
+      },
+      {
+        title: "Cash Register",
+        icon: Icons.HomeIcon,
+        url: "/outlet/cash-register",
+        items: [],
+      },
+    ],
+  },
 ];
