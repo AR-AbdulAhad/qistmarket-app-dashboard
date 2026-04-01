@@ -37,8 +37,8 @@ export const NAV_DATA = [
             url: "/delivered-orders",
           },
           {
-            title: "Picked Orders",
-            url: "/picked-orders",
+            title: "Expired Orders",
+            url: "/expired-orders",
           }
         ],
       },
@@ -51,6 +51,7 @@ export const NAV_DATA = [
       {
         title: "Orders for Approval",
         icon: Icons.HomeIcon,
+        url: "/orders-for-approval",
         items: [],
       },
       {
@@ -153,49 +154,65 @@ export const NAV_DATA = [
         url: "/reports",
         items: [],
       },
-      // {
-      //   title: "Case Assignment",
-      //   url: "/calendar",
-      //   icon: Icons.Calendar,
-      //   items: [
-      //      {
-      //       title: "Assign Cases to Officers",
-      //       url: "/",
-      //     },
-      //   ],
-      // },
-      // {
-      //   title: "Live Location Tracking",
-      //   url: "/",
-      //   icon: Icons.User,
-      //   items: [
-
-      //      {
-      //       title: "View Officer Live Location",
-      //       url: "/tracker",
-      //     },
-
-      //      {
-      //       title: "Today's Summary",
-      //       url: "/",
-      //     },
-
-      //   ],
-      // },
-      // {
-      //   title: "Verification Review",
-      //   icon: Icons.Alphabet,
-      //   items: [
-      //     {
-      //       title: "Open Submitted Verification Report",
-      //       url: "/",
-      //     },
-      //     {
-      //       title: "Check Customer Details",
-      //       url: "/",
-      //     },
-      //   ],
-      // },
+    ],
+  },
+  {
+    label: "CSR PORTAL",
+    items: [
+      {
+        title: "CSR Dashboard",
+        icon: Icons.HomeIcon,
+        url: "/csr/dashboard",
+        items: [],
+      },
+      {
+        title: "Book Order",
+        icon: Icons.CreateOrderSquareIcon,
+        url: "/csr/create-order",
+        items: [],
+      },
+      {
+        title: "Website Orders",
+        icon: Icons.HomeIcon,
+        url: "/csr/website-orders",
+        items: [],
+      },
+      {
+        title: "Customer Search",
+        icon: Icons.HomeIcon,
+        url: "/csr/customer-search",
+        items: [],
+      },
+      {
+        title: "Clear Accounts",
+        icon: Icons.HomeIcon,
+        url: "/csr/clear-accounts",
+        items: [],
+      },
+      {
+        title: "Order Tracking",
+        icon: Icons.HomeIcon,
+        url: "/csr/order-tracking",
+        items: [],
+      },
+      {
+        title: "Expired Orders",
+        icon: Icons.HomeIcon,
+        url: "/csr/expired-orders",
+        items: [],
+      },
+      {
+        title: "Notifications",
+        icon: Icons.HomeIcon,
+        url: "/notifications",
+        items: [],
+      },
+      {
+        title: "Complaints",
+        icon: Icons.HomeIcon,
+        url: "/csr/complaints",
+        items: [],
+      },
     ],
   },
   {
@@ -237,9 +254,27 @@ export const NAV_DATA = [
         items: [],
       },
       {
+        title: "Delivery",
+        icon: Icons.CreateOrderSquareIcon,
+        url: "/outlet/delivery",
+        items: [],
+      },
+      {
+        title: "Handover History",
+        icon: Icons.HomeIcon,
+        url: "/outlet/handover-history",
+        items: [],
+      },
+      {
         title: "Cash Register",
         icon: Icons.HomeIcon,
         url: "/outlet/cash-register",
+        items: [],
+      },
+      {
+        title: "Outlet Reports",
+        icon: Icons.HomeIcon,
+        url: "/outlet/reports",
         items: [],
       },
     ],

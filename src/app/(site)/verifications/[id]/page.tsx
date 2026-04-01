@@ -169,6 +169,8 @@ interface VerificationData {
     }
   }>
   edit_history?: EditHistory[]
+  home_location_required: boolean
+  home_location_verified: boolean
 }
 
 interface EditHistory {
@@ -626,6 +628,38 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
     }
   }
 
+  const handleLocationAction = async (action: 'send-to-vo' | 'send-to-do', officerId: string) => {
+    if (!data?.id) return
+
+    const token = Cookies.get('auth_token')
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/verification/${data.id}/${action}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ officer_id: officerId })
+      })
+
+      if (!res.ok) throw new Error('Failed to assign officer for location capture')
+      
+      toast.success(action === 'send-to-vo' ? 'Successfully sent to Verification Officer' : 'Successfully sent to Delivery Officer')
+      
+      // Refresh data
+      const refreshRes = await fetch(`${BACKEND_URL}/api/verification/order/${id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      const refreshJson = await refreshRes.json()
+      if (refreshJson.success && refreshJson.data?.verification) {
+        setData(refreshJson.data.verification)
+      }
+
+    } catch (err: any) {
+      toast.error(err.message || 'Error assigning officer')
+    }
+  }
+
   const handleSubmitReview = async (e: React.FormEvent) => {
     e.preventDefault()
 
@@ -743,8 +777,54 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
           <Field label="End Time" value={data.end_time ? new Date(data.end_time).toLocaleString() : null} />
           <Field label="Created At" value={data.created_at ? new Date(data.created_at).toLocaleString() : null} />
           <Field label="Updated At" value={data.updated_at ? new Date(data.updated_at).toLocaleString() : null} />
+          {(data as any).home_location_required && (
+            <div className="col-span-full mt-4">
+              <div className={cn(
+                "flex items-center gap-2 rounded-lg p-4 font-bold border-2",
+                (data as any).home_location_verified 
+                  ? "bg-green-50 border-green-200 text-green-700 dark:bg-green-900/10 dark:border-green-800"
+                  : "bg-red-50 border-red-200 text-red-700 dark:bg-red-900/10 dark:border-red-800 animate-pulse"
+              )}>
+                <span className="text-xl">📍</span>
+                <span>HOME LOCATION REQUIRED</span>
+                {(data as any).home_location_verified && (
+                  <span className="ml-auto text-sm font-medium bg-green-100 px-2 py-0.5 rounded text-green-800">Verified</span>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </div>
+
+      {/* Location Management Actions (For Outlet/Admin) */}
+      {(data as any).home_location_required && !(data as any).home_location_verified && (
+        <div className="mb-12 rounded-xl border border-warning bg-warning/5 p-6 dark:border-warning/30">
+          <h3 className="mb-4 text-xl font-semibold text-warning">Location Handling Required</h3>
+          <p className="mb-6 text-gray-600 dark:text-gray-400 text-sm">
+            This verification requires a customer home location capture. Please choose an option below to assign an officer.
+          </p>
+          <div className="flex flex-wrap gap-4">
+            <button
+              onClick={() => {
+                const officerId = prompt("Enter Verification Officer ID:");
+                if (officerId) handleLocationAction('send-to-vo', officerId);
+              }}
+              className="rounded-lg bg-primary px-6 py-2.5 text-white hover:bg-primary/90 transition-colors shadow-sm"
+            >
+              Option 1: Send to Verification Officer
+            </button>
+            <button
+              onClick={() => {
+                const officerId = prompt("Enter Delivery Officer ID:");
+                if (officerId) handleLocationAction('send-to-do', officerId);
+              }}
+              className="rounded-lg bg-dark px-6 py-2.5 text-white hover:bg-dark/90 transition-colors shadow-sm"
+            >
+              Option 2: Send to Delivery Officer
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Verification Reviews */}
       <div className="mb-12">

@@ -9,19 +9,16 @@ import { NAV_DATA } from "./data";
 import { ArrowLeftIcon, ChevronUp } from "./icons";
 import { MenuItem } from "./menu-item";
 import { useSidebarContext } from "./sidebar-context";
+import { useAuth } from "../../../../contexts/AuthContext"; // Added AuthContext
 
 export function Sidebar() {
   const pathname = usePathname();
   const { setIsOpen, isOpen, isMobile, toggleSidebar } = useSidebarContext();
   const [expandedItems, setExpandedItems] = useState<string[]>([]);
+  const { user } = useAuth(); // Get current user
 
   const toggleExpanded = (title: string) => {
     setExpandedItems((prev) => (prev.includes(title) ? [] : [title]));
-
-    // Uncomment the following line to enable multiple expanded items
-    // setExpandedItems((prev) =>
-    //   prev.includes(title) ? prev.filter((t) => t !== title) : [...prev, title],
-    // );
   };
 
   useEffect(() => {
@@ -33,14 +30,47 @@ export function Sidebar() {
             if (!expandedItems.includes(item.title)) {
               toggleExpanded(item.title);
             }
-
-            // Break the loop
             return true;
           }
         });
       });
     });
   }, [pathname]);
+
+  // Filter navigation data based on user role
+  const filteredNavData = NAV_DATA.filter((section) => {
+    const userRole = user?.role?.toLowerCase() || "";
+    const allowedRoles = ["csr", "sale officer", "sales officer", "sale_officer", "sales_officer"];
+
+    // If user is CSR / Sale Officer, show only CSR PORTAL
+    if (allowedRoles.includes(userRole)) {
+      return section.label === "CSR PORTAL";
+    }
+
+    // Hide Outlet Portal from Admin and Super Admin
+    if (section.label === "OUTLET PORTAL" && (userRole === "admin" || userRole === "super admin")) {
+      return false;
+    }
+
+    return true;
+  }).map((section) => {
+    const userRole = user?.role?.toLowerCase() || "";
+
+    // Filter inner items
+    const filteredItems = section.items.filter((item) => {
+      // Logic for Form Analyzer "Orders for Approval"
+      if (item.title === "Orders for Approval") {
+         // Form Analyzer can see it
+         if (userRole === "formanalyzer" || userRole === "form analyzer" || userRole === "form_analyzer" || userRole === "admin" || userRole === "super admin") {
+           return true;
+         }
+         return false;
+      }
+      return true;
+    });
+
+    return { ...section, items: filteredItems };
+  });
 
   return (
     <>
@@ -79,7 +109,6 @@ export function Sidebar() {
                 className="absolute left-3/4 right-4.5 top-1/2 -translate-y-1/2 text-right"
               >
                 <span className="sr-only">Close Menu</span>
-
                 <ArrowLeftIcon className="ml-auto size-7" />
               </button>
             )}
@@ -87,7 +116,7 @@ export function Sidebar() {
 
           {/* Navigation */}
           <div className="custom-scrollbar mt-6 flex-1 overflow-y-auto pr-3 min-[850px]:mt-10">
-            {NAV_DATA.map((section) => (
+            {filteredNavData.map((section) => (
               <div key={section.label} className="mb-6">
                 <h2 className="mb-5 text-sm font-medium text-dark-4 dark:text-dark-6">
                   {section.label}
@@ -97,7 +126,7 @@ export function Sidebar() {
                   <ul className="space-y-2">
                     {section.items.map((item) => (
                       <li key={item.title}>
-                        {item.items.length ? (
+                        {item.items && item.items.length ? (
                           <div>
                             <MenuItem
                               isActive={item.items.some(

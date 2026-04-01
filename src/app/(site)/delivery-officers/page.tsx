@@ -4,6 +4,8 @@ import { useState, useEffect, useRef } from 'react';
 import Cookies from 'js-cookie';
 import toast from 'react-hot-toast';
 import Loader from '@/components/common/Loader';
+import { OfficerProfileHistory } from '@/components/OfficerProfileHistory';
+import { OfficerAttendanceHistory } from '@/components/OfficerAttendanceHistory';
 import { DeliveryActionsModal } from '@/components/DeliveryManagement/DeliveryActionsModal';
 import { DeliveryTable } from '@/components/DeliveryManagement/DeliveryTable';
 import { DeliveryStats } from '@/components/DeliveryManagement/DeliveryStats';
@@ -16,6 +18,20 @@ interface Location {
   latitude: number;
   longitude: number;
   timestamp?: string;
+}
+
+interface ProfileHistory {
+  updatedAt: string;
+  previous?: {
+    bike_km_range?: number;
+    working_hours_start?: string;
+    working_hours_end?: string;
+  };
+  updated?: {
+    bike_km_range?: number;
+    working_hours_start?: string;
+    working_hours_end?: string;
+  };
 }
 
 interface DeliveryBoy {
@@ -31,9 +47,11 @@ interface DeliveryBoy {
   returned_today: number;
   current_location: Location | null;
   last_known_location: Location | null;
+  last_online_at: string;
   bike_km_range: number | null;
   working_hours: string | null;
   monthly_online_hours: string;
+  profile_history: ProfileHistory[];
   current_assignment: {
     id: number;
     status: string;
@@ -79,6 +97,7 @@ interface BoyDetails {
     bike_km_range: number | null;
     working_hours: string | null;
     monthly_online_hours: string;
+    profile_history: ProfileHistory[];
   };
   pending_products: ProductGroup[];
 }
@@ -106,10 +125,21 @@ export default function DeliveryOfficers() {
   const [selectedBoyId, setSelectedBoyId] = useState<number | null>(null);
   const [boyDetails, setBoyDetails] = useState<BoyDetails | null>(null);
   const [officerStats, setOfficerStats] = useState<MonthlyStats | null>(null);
+  const [expandedSections, setExpandedSections] = useState<{
+    profileHistory: boolean;
+    attendance: boolean;
+  }>({ profileHistory: false, attendance: false });
   const [otpInput, setOtpInput] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isActionLoading, setIsActionLoading] = useState<boolean>(false);
+  
+  // Month navigation state
+  const [selectedMonth, setSelectedMonth] = useState<Date>(() => {
+    const today = new Date();
+    return new Date(today.getFullYear(), today.getMonth(), 1);
+  });
 
+  // All Deliveries State
   // All Deliveries State
   const [allDeliveries, setAllDeliveries] = useState<DeliveryOrder[]>([]);
   const [deliveriesLoading, setDeliveriesLoading] = useState(false);
@@ -175,6 +205,15 @@ export default function DeliveryOfficers() {
       );
       if (selectedBoyIdRef.current === data.officerId) {
         setBoyDetails((prev) => prev ? { ...prev, boy: { ...prev.boy, current_location: newLoc } } : null);
+      }
+    });
+
+    socketRef.current.on('officer_profile_updated', (data: { officerId: number; profile_history: ProfileHistory[] }) => {
+      setDeliveryBoys((prev) =>
+        prev.map((o) => (o.id === data.officerId ? { ...o, profile_history: data.profile_history } : o))
+      );
+      if (selectedBoyIdRef.current === data.officerId) {
+        setBoyDetails((prev) => prev ? { ...prev, boy: { ...prev.boy, profile_history: data.profile_history } } : null);
       }
     });
 
@@ -254,7 +293,7 @@ export default function DeliveryOfficers() {
     } else {
       setOfficerStats(null);
     }
-  }, [selectedBoyId]);
+  }, [selectedBoyId, selectedMonth]);
 
   const fetchDeliveryBoys = async (): Promise<void> => {
     try {
@@ -296,7 +335,9 @@ export default function DeliveryOfficers() {
   const fetchStats = async (id: number) => {
     try {
       const token = Cookies.get('auth_token');
-      const res = await fetch(`${BACKEND_URL}/api/delivery-management/boy/${id}/stats`, {
+      const month = (selectedMonth.getMonth() + 1).toString().padStart(2, '0');
+      const year = selectedMonth.getFullYear();
+      const res = await fetch(`${BACKEND_URL}/api/officers/${id}/stats?month=${month}&year=${year}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const result = await res.json();
@@ -364,29 +405,31 @@ export default function DeliveryOfficers() {
     }
   };
 
-  const fetchAllDeliveries = async () => {
-    setDeliveriesLoading(true);
-    try {
-      const token = Cookies.get('auth_token');
-      const response = await fetch(`${BACKEND_URL}/api/orders/delivery-status`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+const fetchAllDeliveries = async () => {
+  setDeliveriesLoading(true);
+  try {
+    const token = Cookies.get('auth_token');
+    const response = await fetch(`${BACKEND_URL}/api/orders/delivery-status`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
 
-      if (response.ok) {
-        const result = await response.json();
-        if (result.success) {
-          setAllDeliveries(result.data);
-        }
+    if (response.ok) {
+      const result = await response.json();
+      if (result.success && Array.isArray(result.data)) {
+        setAllDeliveries(result.data);
       } else {
         setAllDeliveries([]);
       }
-    } catch (error) {
-      console.error('Failed to fetch deliveries', error);
+    } else {
       setAllDeliveries([]);
-    } finally {
-      setDeliveriesLoading(false);
     }
-  };
+  } catch (error) {
+    console.error('Failed to fetch deliveries', error);
+    setAllDeliveries([]);
+  } finally {
+    setDeliveriesLoading(false);
+  }
+};
 
   const selectedBoyFull = deliveryBoys.find(b => b.id === selectedBoyId);
 
@@ -398,27 +441,6 @@ export default function DeliveryOfficers() {
             Delivery Officer Management
           </h2>
           <p className="font-medium text-gray-500">Real-time monitoring of delivery status, location, attendance, and assignments.</p>
-        </div>
-
-        <div className="flex rounded-lg bg-gray-2 p-1 dark:bg-meta-4">
-          <button
-            onClick={() => setActiveTab('dashboard')}
-            className={`rounded-md py-2 px-6 text-sm font-medium transition-all duration-200 ${activeTab === 'dashboard'
-              ? 'bg-white text-primary shadow-card dark:bg-boxdark dark:text-white'
-              : 'text-gray-600 hover:text-primary dark:text-gray-400 dark:hover:text-white'
-              }`}
-          >
-            Dashboard
-          </button>
-          <button
-            onClick={() => setActiveTab('all_deliveries')}
-            className={`rounded-md py-2 px-6 text-sm font-medium transition-all duration-200 ${activeTab === 'all_deliveries'
-              ? 'bg-white text-primary shadow-card dark:bg-boxdark dark:text-white'
-              : 'text-gray-600 hover:text-primary dark:text-gray-400 dark:hover:text-white'
-              }`}
-          >
-            All Deliveries
-          </button>
         </div>
       </div>
 
@@ -555,45 +577,100 @@ export default function DeliveryOfficers() {
                   </div>
                 </div>
 
-                {/* Pickup/OTP Action Card */}
-                <div className="rounded-xl border border-primary/20 bg-primary/5 p-6 shadow-default dark:border-primary/30 dark:bg-primary/5">
-                  <div className="flex flex-col lg:flex-row items-center justify-between gap-6">
-                    <div className="flex-1">
-                      <h4 className="text-xl font-bold text-black dark:text-white mb-2">Pickup Confirmation</h4>
-                      <p className="font-medium text-gray-600 dark:text-gray-400">
-                        Authorize the load pickup by generating an OTP. Verify the code provided by the rider to confirm assignment.
+
+                {/* Profile Update History - Expandable Section */}
+                <div className="rounded-xl border border-stroke bg-white shadow-default dark:border-strokedark dark:bg-boxdark overflow-hidden">
+                  <button
+                    onClick={() => setExpandedSections(prev => ({ ...prev, profileHistory: !prev.profileHistory }))}
+                    className="w-full flex items-center justify-between p-6 hover:bg-gray-50 dark:hover:bg-meta-4/20 transition-all"
+                  >
+                    <h4 className="font-bold text-black dark:text-white">Profile Update History</h4>
+                    <svg
+                      className={`h-5 w-5 transition-transform ${expandedSections.profileHistory ? 'rotate-180' : ''}`}
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                    </svg>
+                  </button>
+                  {expandedSections.profileHistory && (
+                    <div className="border-t border-stroke dark:border-strokedark px-6 py-4">
+                      <OfficerProfileHistory
+                        history={boyDetails.boy.profile_history || []}
+                        title="Profile Changes"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* Month Navigation */}
+                <div className="rounded-xl border border-stroke bg-white shadow-default dark:border-strokedark dark:bg-boxdark p-6">
+                  <div className="flex items-center justify-between">
+                    <button
+                      onClick={() => {
+                        const newDate = new Date(selectedMonth);
+                        newDate.setMonth(newDate.getMonth() - 1);
+                        setSelectedMonth(newDate);
+                      }}
+                      className="px-4 py-2 rounded-lg border border-stroke hover:bg-gray-50 dark:hover:bg-meta-4/20 transition"
+                    >
+                      ← Previous
+                    </button>
+                    <div className="text-center">
+                      <p className="text-lg font-bold text-black dark:text-white">
+                        {selectedMonth.toLocaleString('default', { month: 'long', year: 'numeric' })}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {selectedMonth.getFullYear() === new Date().getFullYear() && selectedMonth.getMonth() === new Date().getMonth() ? 'Current Month' : 'Historical Data'}
                       </p>
                     </div>
-                    <div className="flex flex-col sm:flex-row items-center gap-4 w-full lg:w-auto">
-                      <div className="relative w-full sm:w-48">
-                        <input
-                          type="text"
-                          maxLength={6}
-                          value={otpInput}
-                          onChange={(e) => setOtpInput(e.target.value.replace(/\D/g, ''))}
-                          placeholder="OTP Code"
-                          className="w-full rounded-lg border border-primary/30 bg-white py-3.5 px-4 text-center text-xl font-bold tracking-widest outline-none focus:border-primary dark:bg-black dark:border-strokedark"
-                        />
-                      </div>
-                      <div className="flex gap-3 w-full sm:w-auto">
-                        <button
-                          onClick={handleGenerateOtp}
-                          disabled={isActionLoading}
-                          className="flex-1 sm:flex-none inline-flex items-center justify-center rounded-lg bg-blue-600 py-3.5 px-6 font-bold text-white hover:bg-opacity-90 transition disabled:opacity-50"
-                        >
-                          {isActionLoading ? '...' : 'Send OTP'}
-                        </button>
-                        <button
-                          onClick={handleVerifyOtp}
-                          disabled={isActionLoading || otpInput.length !== 5}
-                          className="flex-1 sm:flex-none inline-flex items-center justify-center rounded-lg bg-success py-3.5 px-8 font-bold text-white hover:bg-opacity-90 transition disabled:opacity-50"
-                        >
-                          {isActionLoading ? '...' : 'Verify'}
-                        </button>
-                      </div>
-                    </div>
+                    <button
+                      onClick={() => {
+                        const newDate = new Date(selectedMonth);
+                        newDate.setMonth(newDate.getMonth() + 1);
+                        // Don't allow future months
+                        const today = new Date();
+                        if (newDate <= new Date(today.getFullYear(), today.getMonth(), 1)) {
+                          setSelectedMonth(newDate);
+                        }
+                      }}
+                      disabled={selectedMonth >= new Date(new Date().getFullYear(), new Date().getMonth(), 1)}
+                      className="px-4 py-2 rounded-lg border border-stroke hover:bg-gray-50 dark:hover:bg-meta-4/20 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Next →
+                    </button>
                   </div>
                 </div>
+
+                {/* Monthly Attendance - Expandable Section */}
+                {officerStats && (
+                  <div className="rounded-xl border border-stroke bg-white shadow-default dark:border-strokedark dark:bg-boxdark overflow-hidden">
+                    <button
+                      onClick={() => setExpandedSections(prev => ({ ...prev, attendance: !prev.attendance }))}
+                      className="w-full flex items-center justify-between p-6 hover:bg-gray-50 dark:hover:bg-meta-4/20 transition-all"
+                    >
+                      <h4 className="font-bold text-black dark:text-white">Monthly Attendance ({officerStats.month})</h4>
+                      <svg
+                        className={`h-5 w-5 transition-transform ${expandedSections.attendance ? 'rotate-180' : ''}`}
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                      </svg>
+                    </button>
+                    {expandedSections.attendance && (
+                      <div className="border-t border-stroke dark:border-strokedark px-6 py-4">
+                        <OfficerAttendanceHistory
+                          dailyStats={officerStats.daily_stats}
+                          expectedDailyHours={officerStats.expected_daily_hours}
+                          title="Daily Breakdown"
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Allocated Products Grid */}
                 <div className="space-y-4">
@@ -640,35 +717,6 @@ export default function DeliveryOfficers() {
                     </div>
                   )}
                 </div>
-
-                {officerStats && (
-                  <div className="rounded-xl border border-stroke bg-white p-6 shadow-default dark:border-strokedark dark:bg-boxdark">
-                    <h4 className="font-bold mb-4 text-black dark:text-white">Monthly Attendance ({officerStats.month})</h4>
-                    <div className="overflow-x-auto">
-                      <table className="min-w-full divide-y divide-stroke dark:divide-strokedark">
-                        <thead>
-                          <tr>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Online Hours</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Worked Hours</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Offline (Duty)</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-stroke dark:divide-strokedark text-black dark:text-white">
-                          {officerStats.daily_stats.map((day) => (
-                            <tr key={day.date} className="hover:bg-gray-50 dark:hover:bg-meta-4/20">
-                              <td className="px-6 py-4 text-sm">{day.date}</td>
-                              <td className="px-6 py-4 text-sm font-medium text-green-600">{day.online_hours}</td>
-                              <td className="px-6 py-4 text-sm font-medium">{day.worked_hours}</td>
-                              <td className="px-6 py-4 text-sm text-red-600 font-medium">{day.offline_during_work_hours}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                    <p className="mt-4 text-sm text-gray-500">Expected daily: <strong>{officerStats.expected_daily_hours}</strong> hrs</p>
-                  </div>
-                )}
               </div>
             ) : (
               <div className="flex h-[500px] flex-col items-center justify-center rounded-xl border border-dashed border-stroke bg-gray-50 text-center dark:border-strokedark dark:bg-boxdark">

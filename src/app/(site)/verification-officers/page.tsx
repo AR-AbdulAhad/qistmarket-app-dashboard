@@ -5,6 +5,8 @@ import Cookies from 'js-cookie';
 import toast from 'react-hot-toast';
 import Loader from '@/components/common/Loader';
 import { SearchIcon } from '@/assets/icons';
+import { OfficerProfileHistory } from '@/components/OfficerProfileHistory';
+import { OfficerAttendanceHistory } from '@/components/OfficerAttendanceHistory';
 import io from 'socket.io-client';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000';
@@ -13,6 +15,20 @@ interface Location {
     latitude: number;
     longitude: number;
     timestamp?: string;
+}
+
+interface ProfileHistory {
+    updatedAt: string;
+    previous?: {
+        bike_km_range?: number;
+        working_hours_start?: string;
+        working_hours_end?: string;
+    };
+    updated?: {
+        bike_km_range?: number;
+        working_hours_start?: string;
+        working_hours_end?: string;
+    };
 }
 
 interface Officer {
@@ -24,6 +40,7 @@ interface Officer {
     is_online: boolean;
     current_location: Location | null;
     last_known_location: Location | null;
+    last_online_at: string;
     bike_km_range: number | null;
     working_hours: string | null;
     current_verification: {
@@ -32,6 +49,7 @@ interface Officer {
         order: { order_ref: string; customer_name: string };
     } | null;
     monthly_online_hours: string;
+    profile_history: ProfileHistory[];
 }
 
 interface DailyStat {
@@ -54,7 +72,17 @@ export default function VerificationOfficersPage() {
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedOfficer, setSelectedOfficer] = useState<Officer | null>(null);
     const [officerStats, setOfficerStats] = useState<MonthlyStats | null>(null);
+    const [expandedSections, setExpandedSections] = useState<{
+        profileHistory: boolean;
+        attendance: boolean;
+    }>({ profileHistory: false, attendance: false });
     const [isLoading, setIsLoading] = useState(true);
+    
+    // Month navigation state
+    const [selectedMonth, setSelectedMonth] = useState<Date>(() => {
+        const today = new Date();
+        return new Date(today.getFullYear(), today.getMonth(), 1);
+    });
 
     const socketRef = useRef<any>(null);
     const selectedOfficerIdRef = useRef<number | null>(null);
@@ -82,12 +110,18 @@ export default function VerificationOfficersPage() {
         });
 
         // Real-time officer status (online/offline)
-        socketRef.current.on('officer_status_update', (data: { officerId: number; is_online: boolean }) => {
+        socketRef.current.on('officer_status_update', (data: { officerId: number; is_online: boolean; last_online_at?: string }) => {
             setOfficers((prev) =>
-                prev.map((o) => (o.id === data.officerId ? { ...o, is_online: data.is_online } : o))
+                prev.map((o) => (o.id === data.officerId 
+                    ? { ...o, is_online: data.is_online, last_online_at: data.last_online_at || o.last_online_at } 
+                    : o))
             );
             if (selectedOfficerIdRef.current === data.officerId) {
-                setSelectedOfficer((prev) => prev && { ...prev, is_online: data.is_online });
+                setSelectedOfficer((prev) => prev && { 
+                    ...prev, 
+                    is_online: data.is_online,
+                    last_online_at: data.last_online_at || prev.last_online_at 
+                });
             }
         });
 
@@ -99,10 +133,20 @@ export default function VerificationOfficersPage() {
                 timestamp: data.timestamp,
             };
             setOfficers((prev) =>
-                prev.map((o) => (o.id === data.officerId ? { ...o, current_location: newLoc } : o))
+                prev.map((o) => (o.id === data.officerId ? { ...o, current_location: newLoc, last_online_at: data.timestamp } : o))
             );
             if (selectedOfficerIdRef.current === data.officerId) {
-                setSelectedOfficer((prev) => prev && { ...prev, current_location: newLoc });
+                setSelectedOfficer((prev) => prev && { ...prev, current_location: newLoc, last_online_at: data.timestamp });
+            }
+        });
+
+        // Real-time profile updates
+        socketRef.current.on('officer_profile_updated', (data: { officerId: number; profile_history: ProfileHistory[] }) => {
+            setOfficers((prev) =>
+                prev.map((o) => (o.id === data.officerId ? { ...o, profile_history: data.profile_history } : o))
+            );
+            if (selectedOfficerIdRef.current === data.officerId) {
+                setSelectedOfficer((prev) => prev && { ...prev, profile_history: data.profile_history });
             }
         });
 
@@ -121,6 +165,26 @@ export default function VerificationOfficersPage() {
             if (selectedOfficerIdRef.current === data.officerId) {
                 setSelectedOfficer((prev) =>
                     prev ? { ...prev, monthly_online_hours: data.monthly_online_hours } : null
+                );
+            }
+        });
+
+
+        // Real-time officer current verification assignment update
+        socketRef.current.on('officer_current_verification_update', (data: {
+            officerId: number;
+            current_verification: Officer['current_verification'];
+        }) => {
+            setOfficers((prev) =>
+                prev.map((o) =>
+                    o.id === data.officerId
+                        ? { ...o, current_verification: data.current_verification }
+                        : o
+                )
+            );
+            if (selectedOfficerIdRef.current === data.officerId) {
+                setSelectedOfficer((prev) =>
+                    prev ? { ...prev, current_verification: data.current_verification } : null
                 );
             }
         });
@@ -163,6 +227,7 @@ export default function VerificationOfficersPage() {
         return () => {
             socketRef.current?.off('officer_status_update');
             socketRef.current?.off('officer_location_update');
+            socketRef.current?.off('officer_profile_updated');
             socketRef.current?.off('officer_monthly_update');
             socketRef.current?.off('officer_daily_update');
             socketRef.current?.off('connect_error');
@@ -199,7 +264,7 @@ export default function VerificationOfficersPage() {
         } else {
             setOfficerStats(null);
         }
-    }, [selectedOfficer]);
+    }, [selectedOfficer, selectedMonth]);
 
     const fetchOfficers = async () => {
         setIsLoading(true);
@@ -207,7 +272,7 @@ export default function VerificationOfficersPage() {
             const token = Cookies.get('auth_token');
             if (!token) throw new Error('No auth token');
 
-            const response = await fetch(`${BACKEND_URL}/api/officers`, {
+            const response = await fetch(`${BACKEND_URL}/api/officers/verification`, {
                 headers: { Authorization: `Bearer ${token}` },
             });
 
@@ -231,7 +296,9 @@ export default function VerificationOfficersPage() {
             const token = Cookies.get('auth_token');
             if (!token) return;
 
-            const res = await fetch(`${BACKEND_URL}/api/officers/${officerId}/stats`, {
+            const month = (selectedMonth.getMonth() + 1).toString().padStart(2, '0');
+            const year = selectedMonth.getFullYear();
+            const res = await fetch(`${BACKEND_URL}/api/officers/${officerId}/stats?month=${month}&year=${year}`, {
                 headers: { Authorization: `Bearer ${token}` },
             });
 
@@ -355,6 +422,11 @@ export default function VerificationOfficersPage() {
                                         <p className="text-gray-400 mt-1">
                                             @{selectedOfficer.username} • {selectedOfficer.phone}
                                         </p>
+                                        {!selectedOfficer.is_online && selectedOfficer.last_online_at && (
+                                            <p className="text-xs text-gray-500 mt-1">
+                                                Last seen: {new Date(selectedOfficer.last_online_at).toLocaleString()}
+                                            </p>
+                                        )}
 
                                         <div className="mt-5 grid grid-cols-2 md:grid-cols-5 gap-5">
                                             <div>
@@ -441,44 +513,100 @@ export default function VerificationOfficersPage() {
                                 </div>
                             </div>
 
+                            {/* Profile History Section */}
+                            <div className="rounded-xl border border-stroke bg-white shadow-default dark:border-strokedark dark:bg-boxdark overflow-hidden">
+                                <button
+                                    onClick={() => setExpandedSections({ ...expandedSections, profileHistory: !expandedSections.profileHistory })}
+                                    className="w-full flex items-center justify-between p-6 hover:bg-gray-50 dark:hover:bg-meta-4/20 transition"
+                                >
+                                    <h4 className="font-bold">Profile Update History</h4>
+                                    <span className={`text-xl transform transition-transform ${expandedSections.profileHistory ? 'rotate-180' : ''}`}>
+                                        ▼
+                                    </span>
+                                </button>
+                                {expandedSections.profileHistory && (
+                                    <div className="border-t border-stroke dark:border-strokedark p-6">
+                                        {selectedOfficer.profile_history && selectedOfficer.profile_history.length > 0 ? (
+                                            <OfficerProfileHistory history={selectedOfficer.profile_history} />
+                                        ) : (
+                                            <p className="text-center py-6 text-gray-500">No profile updates yet</p>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Month Navigation */}
+                            <div className="rounded-xl border border-stroke bg-white shadow-default dark:border-strokedark dark:bg-boxdark p-6">
+                                <div className="flex items-center justify-between">
+                                    <button
+                                        onClick={() => {
+                                            const newDate = new Date(selectedMonth);
+                                            newDate.setMonth(newDate.getMonth() - 1);
+                                            setSelectedMonth(newDate);
+                                        }}
+                                        className="px-4 py-2 rounded-lg border border-stroke hover:bg-gray-50 dark:hover:bg-meta-4/20 transition"
+                                    >
+                                        ← Previous
+                                    </button>
+                                    <div className="text-center">
+                                        <p className="text-lg font-bold text-black dark:text-white">
+                                            {selectedMonth.toLocaleString('default', { month: 'long', year: 'numeric' })}
+                                        </p>
+                                        <p className="text-xs text-gray-500 mt-1">
+                                            {selectedMonth.getFullYear() === new Date().getFullYear() && selectedMonth.getMonth() === new Date().getMonth() ? 'Current Month' : 'Historical Data'}
+                                        </p>
+                                    </div>
+                                    <button
+                                        onClick={() => {
+                                            const newDate = new Date(selectedMonth);
+                                            newDate.setMonth(newDate.getMonth() + 1);
+                                            // Don't allow future months
+                                            const today = new Date();
+                                            if (newDate <= new Date(today.getFullYear(), today.getMonth(), 1)) {
+                                                setSelectedMonth(newDate);
+                                            }
+                                        }}
+                                        disabled={selectedMonth >= new Date(new Date().getFullYear(), new Date().getMonth(), 1)}
+                                        className="px-4 py-2 rounded-lg border border-stroke hover:bg-gray-50 dark:hover:bg-meta-4/20 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        Next →
+                                    </button>
+                                </div>
+                            </div>
+
                             {/* Attendance Table – fully real-time */}
                             {officerStats && (
-                                <div className="rounded-xl border border-stroke bg-white p-6 shadow-default dark:border-strokedark dark:bg-boxdark">
-                                    <h4 className="font-bold mb-4">
-                                        Monthly Attendance ({officerStats.month})
-                                    </h4>
-                                    <div className="overflow-x-auto">
-                                        <table className="min-w-full divide-y divide-stroke dark:divide-strokedark">
-                                            <thead>
-                                                <tr>
-                                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-                                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Online Hours</th>
-                                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Worked Hours</th>
-                                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Offline (Duty Hrs)</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className="divide-y divide-stroke dark:divide-strokedark">
-                                                {officerStats.daily_stats.map((day) => (
-                                                    <tr key={day.date} className="hover:bg-gray-50 dark:hover:bg-meta-4/50 transition-colors">
-                                                        <td className="px-6 py-4 whitespace-nowrap text-sm">{day.date}</td>
-                                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600">
-                                                            {day.online_hours}
-                                                        </td>
-                                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                                            {day.worked_hours}
-                                                        </td>
-                                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-red-600 font-medium">
-                                                            {day.offline_during_work_hours}
-                                                        </td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
+                                <>
+                                    <div className="rounded-xl border border-stroke bg-white shadow-default dark:border-strokedark dark:bg-boxdark overflow-hidden">
+                                        <button
+                                            onClick={() => setExpandedSections({ ...expandedSections, attendance: !expandedSections.attendance })}
+                                            className="w-full flex items-center justify-between p-6 hover:bg-gray-50 dark:hover:bg-meta-4/20 transition"
+                                        >
+                                            <h4 className="font-bold">Monthly Attendance ({officerStats.month})</h4>
+                                            <span className={`text-xl transform transition-transform ${expandedSections.attendance ? 'rotate-180' : ''}`}>
+                                                ▼
+                                            </span>
+                                        </button>
+                                        {expandedSections.attendance && (
+                                            <div className="border-t border-stroke dark:border-strokedark p-6">
+                                                <OfficerAttendanceHistory 
+                                                    dailyStats={officerStats.daily_stats.map(day => {
+                                                        // If already in new format, keep as is
+                                                        if ('sessions' in day) return day as any;
+                                                        // Convert legacy format to new format
+                                                        const { date, online_hours, worked_hours, offline_during_work_hours } = day;
+                                                        return {
+                                                            date,
+                                                            sessions: [],
+                                                            // Optionally, you could push a synthetic session here if you want to show legacy data
+                                                        };
+                                                    })}
+                                                    expectedDailyHours={officerStats.expected_daily_hours}
+                                                />
+                                            </div>
+                                        )}
                                     </div>
-                                    <p className="mt-4 text-sm text-gray-500">
-                                        Expected daily hours: <strong>{officerStats.expected_daily_hours}</strong> hrs
-                                    </p>
-                                </div>
+                                </>
                             )}
                         </div>
                     ) : (
@@ -492,7 +620,7 @@ export default function VerificationOfficersPage() {
                                 Select an Officer
                             </h3>
                             <p className="max-w-md text-gray-500">
-                                Choose a verification officer to view live status, location, current task, and real-time attendance records.
+                                Choose a verification officer to view live status, location, current task, profile history, and real-time attendance records.
                             </p>
                         </div>
                     )}

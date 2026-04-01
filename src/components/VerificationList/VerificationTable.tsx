@@ -49,6 +49,8 @@ interface VerificationNested {
   nextOfKin: any | null
   locations: Array<{ timestamp: string /* + other fields */ }>
   documents: Array<{ uploaded_at: string /* + other fields */ }>
+  home_location_required: boolean
+  home_location_verified: boolean
 }
 
 interface OrderWithVerification {
@@ -230,18 +232,34 @@ const AssignedVerifications = () => {
       header: 'Status',
       enableColumnFilter: true,
       cell: ({ row }) => {
-        const status = row.original.status
+        const order = row.original
+        const status = order.status
+        const homeLocationRequired = order.verification?.home_location_required
+        const homeLocationVerified = order.verification?.home_location_verified
+
         return (
-          <span
-            className={cn(
-              'inline-flex px-2.5 py-1 rounded-full text-xs font-medium',
-              status === 'completed'
-                ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300'
-                : 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300'
+          <div className="flex flex-col gap-1">
+            <span
+              className={cn(
+                'inline-flex w-fit px-2.5 py-1 rounded-full text-xs font-medium',
+                status === 'completed' || status === 'approved'
+                  ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300'
+                  : 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300'
+              )}
+            >
+              {status === 'completed' ? 'Completed' : status === 'approved' ? 'Approved' : 'Cancelled'}
+            </span>
+            {homeLocationRequired && (
+              <span className={cn(
+                "inline-flex w-fit items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold border",
+                homeLocationVerified 
+                  ? "bg-green-50 border-green-200 text-green-700 dark:bg-green-900/20 dark:text-green-400" 
+                  : "bg-red-50 border-red-200 text-red-700 dark:bg-red-900/20 dark:text-red-400 animate-pulse"
+              )}>
+                📍 Home Location {homeLocationVerified ? 'Verified' : 'Required'}
+              </span>
             )}
-          >
-            {status === 'completed' ? 'Completed' : 'Cancelled'}
-          </span>
+          </div>
         )
       },
     },

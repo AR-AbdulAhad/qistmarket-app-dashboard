@@ -61,6 +61,11 @@ export default function OrderDetailsPage() {
     const [cancelReason, setCancelReason] = useState('');
     const [newProductName, setNewProductName] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [handoverModalOpen, setHandoverModalOpen] = useState(false);
+    const [handoverOtp, setHandoverOtp] = useState('');
+    const [selectedImei, setSelectedImei] = useState('');
+    const [inventoryItems, setInventoryItems] = useState<any[]>([]);
+    const [otpSent, setOtpSent] = useState(false);
 
     // Product dynamic data
     const [products, setProducts] = useState<any[]>([]);
@@ -188,6 +193,77 @@ export default function OrderDetailsPage() {
         }
     };
 
+    const fetchInventory = async () => {
+        try {
+            const token = Cookies.get('auth_token');
+            const res = await fetch(`${BACKEND_URL}/api/outlet/inventory`, {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            if (res.ok) {
+                const json = await res.json();
+                if (json.success) {
+                    setInventoryItems(json.inventory);
+                }
+            }
+        } catch (err) {
+            console.error('Failed to fetch inventory', err);
+        }
+    };
+
+    const initiateHandover = async () => {
+        if (!order) return;
+        setIsSubmitting(true);
+        try {
+            const token = Cookies.get('auth_token');
+            const res = await fetch(`${BACKEND_URL}/api/orders/${order.id}/initiate-handover`, {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            const json = await res.json();
+            if (json.success) {
+                setOtpSent(true);
+                alert('Handover OTP sent to delivery officer');
+            } else {
+                alert(json.message || 'Failed to initiate handover');
+            }
+        } catch (err) {
+            alert('Handover initiation failed');
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    const completeHandover = async () => {
+        if (!order || !handoverOtp || !selectedImei) return;
+        setIsSubmitting(true);
+        try {
+            const token = Cookies.get('auth_token');
+            const res = await fetch(`${BACKEND_URL}/api/orders/${order.id}/verify-handover`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({
+                    otp: handoverOtp,
+                    imei_serial: selectedImei
+                }),
+            });
+            const json = await res.json();
+            if (json.success) {
+                alert('Stock handover completed successfully');
+                setHandoverModalOpen(false);
+                await fetchOrder();
+            } else {
+                alert(json.message || 'Verification failed');
+            }
+        } catch (err) {
+            alert('Handover verification failed');
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
     if (loading) return <Loader text="Loading order details..." />;
     if (error) return <div className="p-8 text-center text-red-500">Error: {error}</div>;
     if (!order) return <div className="p-8 text-center text-gray-500">Order not found.</div>;
@@ -219,6 +295,20 @@ export default function OrderDetailsPage() {
                 >
                     Cancel Order
                 </button>
+                {order.status === 'approved' && (
+                    <button
+                        onClick={() => {
+                            setHandoverModalOpen(true);
+                            setOtpSent(false);
+                            setHandoverOtp('');
+                            setSelectedImei('');
+                            fetchInventory();
+                        }}
+                        className="rounded-md bg-green-600 px-6 py-2 text-white hover:bg-opacity-90 shadow-md"
+                    >
+                        Ready for Handover
+                    </button>
+                )}
             </div>
 
             <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
@@ -226,68 +316,68 @@ export default function OrderDetailsPage() {
                 <div className="rounded-lg border border-stroke bg-white shadow-default dark:border-dark-3 dark:bg-gray-800 p-6">
                     <h3 className="text-xl font-bold border-b pb-4 mb-4 dark:text-white">Customer Information</h3>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-4 gap-x-6">
-                    <div>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">Full Name</p>
-                        <p className="font-semibold">{order.customer_name || 'N/A'}</p>
-                    </div>
-                    
-                    <div>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">WhatsApp Number</p>
-                        <p className="font-semibold">{order.whatsapp_number || 'N/A'}</p>
-                    </div>
-
-                    <div>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">Alternate Contact</p>
-                        <p className="font-semibold">{order.alternate_contact || 'N/A'}</p>
-                    </div>
-                    {order.address && order.address.trim() !== '' ? (
-                        <div className="sm:col-span-2">
-                            <p className="text-sm text-gray-500 dark:text-gray-400">Address</p>
-                            <p className="font-semibold">{order.address}</p>
+                        <div>
+                            <p className="text-sm text-gray-500 dark:text-gray-400">Full Name</p>
+                            <p className="font-semibold">{order.customer_name || 'N/A'}</p>
                         </div>
-                    ) : (
-                        <>
-                            <div>
-                                <p className="text-sm text-gray-500 dark:text-gray-400">City</p>
-                                <p className="font-semibold">{order.city || 'N/A'}</p>
-                            </div>
-                            
-                            <div>
-                                <p className="text-sm text-gray-500 dark:text-gray-400">Area</p>
-                                <p className="font-semibold">{order.area || 'N/A'}</p>
-                            </div>
-                            
-                            <div>
-                                <p className="text-sm text-gray-500 dark:text-gray-400">Zone / Block</p>
-                                <p className="font-semibold">{order.zone || order.block || 'N/A'}</p>
-                            </div>
-                            
-                            <div>
-                                <p className="text-sm text-gray-500 dark:text-gray-400">House No / Street</p>
-                                <p className="font-semibold">
-                                    {[
-                                        order.house_no || null,
-                                        order.street || null
-                                    ].filter(Boolean).join(', ') || 'N/A'}
-                                </p>
-                            </div>
-                        </>
-                    )}
-                    <div>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">Gender</p>
-                        <p className="font-semibold">{order.gender || 'N/A'}</p>
-                    </div>
-                    
-                    <div>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">Residential Type</p>
-                        <p className="font-semibold">{order.residential_type || 'N/A'}</p>
-                    </div>
 
-                    <div className="sm:col-span-2">
-                        <p className="text-sm text-gray-500 dark:text-gray-400">Order Notes</p>
-                        <p className="font-semibold whitespace-pre-wrap">{order.order_notes || 'N/A'}</p>
+                        <div>
+                            <p className="text-sm text-gray-500 dark:text-gray-400">WhatsApp Number</p>
+                            <p className="font-semibold">{order.whatsapp_number || 'N/A'}</p>
+                        </div>
+
+                        <div>
+                            <p className="text-sm text-gray-500 dark:text-gray-400">Alternate Contact</p>
+                            <p className="font-semibold">{order.alternate_contact || 'N/A'}</p>
+                        </div>
+                        {order.address && order.address.trim() !== '' ? (
+                            <div className="sm:col-span-2">
+                                <p className="text-sm text-gray-500 dark:text-gray-400">Address</p>
+                                <p className="font-semibold">{order.address}</p>
+                            </div>
+                        ) : (
+                            <>
+                                <div>
+                                    <p className="text-sm text-gray-500 dark:text-gray-400">City</p>
+                                    <p className="font-semibold">{order.city || 'N/A'}</p>
+                                </div>
+
+                                <div>
+                                    <p className="text-sm text-gray-500 dark:text-gray-400">Area</p>
+                                    <p className="font-semibold">{order.area || 'N/A'}</p>
+                                </div>
+
+                                <div>
+                                    <p className="text-sm text-gray-500 dark:text-gray-400">Zone / Block</p>
+                                    <p className="font-semibold">{order.zone || order.block || 'N/A'}</p>
+                                </div>
+
+                                <div>
+                                    <p className="text-sm text-gray-500 dark:text-gray-400">House No / Street</p>
+                                    <p className="font-semibold">
+                                        {[
+                                            order.house_no || null,
+                                            order.street || null
+                                        ].filter(Boolean).join(', ') || 'N/A'}
+                                    </p>
+                                </div>
+                            </>
+                        )}
+                        <div>
+                            <p className="text-sm text-gray-500 dark:text-gray-400">Gender</p>
+                            <p className="font-semibold">{order.gender || 'N/A'}</p>
+                        </div>
+
+                        <div>
+                            <p className="text-sm text-gray-500 dark:text-gray-400">Residential Type</p>
+                            <p className="font-semibold">{order.residential_type || 'N/A'}</p>
+                        </div>
+
+                        <div className="sm:col-span-2">
+                            <p className="text-sm text-gray-500 dark:text-gray-400">Order Notes</p>
+                            <p className="font-semibold whitespace-pre-wrap">{order.order_notes || 'N/A'}</p>
+                        </div>
                     </div>
-                </div>
                 </div>
 
                 {/* Order Info Card */}
@@ -507,6 +597,73 @@ export default function OrderDetailsPage() {
                         >
                             {isSubmitting ? 'Processing...' : 'Confirm Cancellation'}
                         </button>
+                    </div>
+                </div>
+            </Modal>
+            <Modal open={handoverModalOpen} onClose={() => setHandoverModalOpen(false)}>
+                <div className="rounded-2xl bg-white p-8 shadow-xl dark:bg-gray-800 max-w-lg w-full">
+                    <h2 className="text-2xl font-bold mb-4 dark:text-white">Stock Handover</h2>
+                    <p className="mb-6 text-gray-600 dark:text-gray-400 text-sm">
+                        Please select the IMEI/Serial of the product from your inventory and verify with the delivery officer's OTP.
+                    </p>
+
+                    <div className="space-y-4">
+                        <div>
+                            <label className="block text-sm font-medium mb-1 dark:text-gray-300">Select IMEI/Serial:</label>
+                            <select
+                                value={selectedImei}
+                                onChange={(e) => setSelectedImei(e.target.value)}
+                                className="w-full rounded-lg border border-stroke bg-transparent px-4 py-3 outline-none focus:border-primary dark:border-dark-3 text-sm"
+                            >
+                                <option value="">Select IMEI/Serial</option>
+                                {inventoryItems
+                                    .filter(item => item.product_name === order.product_name && item.status === 'In Stock')
+                                    .map(item => (
+                                        <option key={item.id} value={item.imei_serial}>
+                                            {item.imei_serial}
+                                        </option>
+                                    ))}
+                            </select>
+                        </div>
+
+                        {!otpSent ? (
+                            <button
+                                onClick={initiateHandover}
+                                disabled={isSubmitting || !selectedImei}
+                                className="w-full bg-primary text-white rounded-lg py-3 text-sm font-bold shadow-md hover:bg-primary/90 disabled:opacity-50"
+                            >
+                                {isSubmitting ? 'Sending OTP...' : 'Send OTP to Delivery Officer'}
+                            </button>
+                        ) : (
+                            <div>
+                                <label className="block text-sm font-medium mb-1 dark:text-gray-300">Enter Handover OTP:</label>
+                                <input
+                                    type="text"
+                                    maxLength={5}
+                                    value={handoverOtp}
+                                    onChange={(e) => setHandoverOtp(e.target.value)}
+                                    placeholder="Enter 5-digit OTP"
+                                    className="w-full rounded-lg border border-stroke bg-transparent px-4 py-3 outline-none focus:border-primary dark:border-dark-3 text-sm"
+                                />
+                                <button
+                                    onClick={completeHandover}
+                                    disabled={isSubmitting || handoverOtp.length !== 5}
+                                    className="w-full bg-green-600 text-white rounded-lg py-3 text-sm font-bold shadow-md hover:bg-opacity-90 disabled:opacity-50 mt-4"
+                                >
+                                    {isSubmitting ? 'Verifying...' : 'Verify & Complete Handover'}
+                                </button>
+                                <button
+                                    onClick={initiateHandover}
+                                    className="w-full text-xs text-primary mt-2 hover:underline"
+                                >
+                                    Resend OTP
+                                </button>
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="flex justify-end gap-3 pt-6 border-t mt-6 dark:border-dark-3 text-sm">
+                        <button onClick={() => setHandoverModalOpen(false)} className="rounded border border-stroke px-6 py-2 hover:bg-gray-50 dark:border-dark-3 dark:hover:bg-dark-2 transition-colors">Close</button>
                     </div>
                 </div>
             </Modal>

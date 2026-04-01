@@ -64,8 +64,11 @@ interface Order {
 
 interface OrderListProps {
   forcedStatus?: string
+  forcedChannel?: string
   hideActions?: boolean
   hideSelection?: boolean
+  onRowSelectionChange?: (selectedOrders: Order[]) => void
+  customTopBarActions?: React.ReactNode
 }
 
 interface User {
@@ -86,7 +89,7 @@ interface PaginationInfo {
 // ─────────────────────────────────────────────────────────────────────────────
 // Main Component
 // ─────────────────────────────────────────────────────────────────────────────
-const OrderList = ({ forcedStatus, hideActions, hideSelection }: OrderListProps) => {
+const OrderList = ({ forcedStatus, forcedChannel, hideActions, hideSelection, onRowSelectionChange, customTopBarActions }: OrderListProps) => {
   const router = useRouter()
   const [orders, setOrders] = useState<Order[]>([])
   const [pagination, setPagination] = useState<PaginationInfo>({
@@ -155,6 +158,10 @@ const OrderList = ({ forcedStatus, hideActions, hideSelection }: OrderListProps)
         if (!statusFilter) {
           params.append('status', 'new,pending')
         }
+      }
+
+      if (forcedChannel) {
+        params.append('channel', forcedChannel)
       }
 
       if (dateRange !== 'All') {
@@ -523,6 +530,11 @@ const OrderList = ({ forcedStatus, hideActions, hideSelection }: OrderListProps)
             className += ' bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300';
             break;
 
+          case 'ready_for_pickup':
+            label = 'Ready for Pickup';
+            className += ' bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300';
+            break;
+
           case 'picked':
             label = 'Picked';
             className += ' bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300';
@@ -530,6 +542,11 @@ const OrderList = ({ forcedStatus, hideActions, hideSelection }: OrderListProps)
 
           case 'cancelled':
             label = 'Cancelled';
+            className += ' bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300';
+            break;
+
+          case 'expired':
+            label = 'Expired';
             className += ' bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300';
             break;
 
@@ -744,6 +761,7 @@ const OrderList = ({ forcedStatus, hideActions, hideSelection }: OrderListProps)
   const table = useReactTable({
     data: orders,
     columns,
+    getRowId: (row) => String(row.id),
     state: {
       globalFilter,
       columnFilters,
@@ -758,7 +776,7 @@ const OrderList = ({ forcedStatus, hideActions, hideSelection }: OrderListProps)
     manualPagination: true,
     manualSorting: true,
     manualFiltering: true,
-    enableRowSelection: true,
+    enableRowSelection: !hideSelection,
     onGlobalFilterChange: setGlobalFilter,
     onColumnFiltersChange: setColumnFilters,
     onSortingChange: setSorting,
@@ -779,8 +797,14 @@ const OrderList = ({ forcedStatus, hideActions, hideSelection }: OrderListProps)
     getPaginationRowModel: getPaginationRowModel(),
   })
 
-  const selectedCount = Object.keys(rowSelection).length
+  useEffect(() => {
+    if (!onRowSelectionChange) return
+    const selectedIds = Object.keys(rowSelection).map((key) => Number(key))
+    const selectedOrders = orders.filter((order) => selectedIds.includes(order.id))
+    onRowSelectionChange(selectedOrders)
+  }, [rowSelection, orders, onRowSelectionChange])
 
+  const selectedCount = Object.keys(rowSelection).length
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <section className="data-table-common rounded-[10px] bg-white shadow-1 dark:bg-gray-dark dark:shadow-card">
@@ -853,6 +877,12 @@ const OrderList = ({ forcedStatus, hideActions, hideSelection }: OrderListProps)
               ))}
             </select>
           </div>
+
+          {customTopBarActions && (
+            <div className="flex items-center">
+              {customTopBarActions}
+            </div>
+          )}
         </div>
       </div>
 

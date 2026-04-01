@@ -27,6 +27,7 @@ import { cn } from "@/lib/utils";
 import { createPortal } from "react-dom";
 import { useRef } from "react";
 import Pagination from "../common/Pagination";
+import { toast } from "react-hot-toast";
 
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
@@ -372,67 +373,75 @@ const UsersTable = () => {
     setEditModalOpen(true);
   };
 
-  const handleUpdate = async () => {
-    if (!selectedUser?.id) return;
-    setIsSubmitting(true);
+const handleUpdate = async () => {
+  if (!selectedUser?.id) return;
+  setIsSubmitting(true);
 
-    try {
-      const token = Cookies.get("auth_token");
+  try {
+    const token = Cookies.get("auth_token");
 
-      // Create FormData instead of JSON
-      const formDataToSend = new FormData();
+    const formDataToSend = new FormData();
 
-      // Add all regular text / select / textarea fields
-      Object.entries(formData).forEach(([key, value]) => {
-        // Skip file objects — we add them separately below
-        if (key === "imageFile" || key === "coverImageFile") return;
-
-        // Only append if value is defined and not null/undefined
-        if (value !== undefined && value !== null) {
-          formDataToSend.append(key, String(value)); // convert numbers/booleans to string
+    Object.entries(formData).forEach(([key, value]) => {
+      if (key === "imageFile" || key === "coverImageFile") return;
+      
+      if (key === "password") {
+        if (value && typeof value === 'string' && value.trim() !== '') {
+          formDataToSend.append(key, String(value));
         }
-      });
-
-      // Add files if they were selected
-      if (formData.image) {
-        formDataToSend.append("image", formData.image);
       }
-
-      if (formData.coverImage) {
-        formDataToSend.append("coverImage", formData.coverImage);
+      else if (key === "outlet_id") {
+        formDataToSend.append(key, value ? String(value) : '');
+      } 
+      else if (value !== undefined && value !== null) {
+        formDataToSend.append(key, String(value));
       }
+    });
 
-      const res = await fetch(
-        `${BACKEND_URL}/api/users/${selectedUser.id}/edit`,
-        {
-          method: "PATCH",
-          headers: {
-            // IMPORTANT: Do NOT set Content-Type manually
-            // Browser will set multipart/form-data + correct boundary automatically
-            Authorization: `Bearer ${token}`,
-          },
-          body: formDataToSend,
-        }
-      );
-
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.message || "Update failed");
-      }
-
-      await fetchUsers();
-      setEditModalOpen(false);
-
-      // Optional: show success message / toast
-      // alert("User updated successfully!");
-    } catch (err: any) {
-      console.error("Update error:", err);
-      // Optional: show error to user
-      alert(err.message || "Failed to update user");
-    } finally {
-      setIsSubmitting(false);
+    if (formData.image) {
+      formDataToSend.append("image", formData.image);
     }
-  };
+
+    if (formData.coverImage) {
+      formDataToSend.append("coverImage", formData.coverImage);
+    }
+
+    for (let pair of formDataToSend.entries()) {
+      if (pair[0] === 'password') {
+        console.log(pair[0] + ': [HIDDEN]');
+      } else {
+        console.log(pair[0] + ': ' + pair[1]);
+      }
+    }
+
+    const res = await fetch(
+      `${BACKEND_URL}/api/users/${selectedUser.id}/edit`,
+      {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: formDataToSend,
+      }
+    );
+
+    const responseData = await res.json();
+    
+    if (!res.ok) {
+      throw new Error(responseData.error?.message || "Update failed");
+    }
+
+    await fetchUsers();
+    setEditModalOpen(false);
+    toast.success("User updated successfully!");
+    
+  } catch (err: any) {
+    console.error("Update error:", err);
+    toast.error(err.message || "Failed to update user");
+  } finally {
+    setIsSubmitting(false);
+  }
+};
 
   const handleDelete = (id: number) => {
     setSelectedUser({ id } as User);
@@ -453,7 +462,7 @@ const UsersTable = () => {
       setDeleteModalOpen(false);
     } catch (err) {
       console.error(err);
-      alert("Failed to delete user");
+      toast.error("Failed to delete user");
     } finally {
       setIsSubmitting(false);
     }
