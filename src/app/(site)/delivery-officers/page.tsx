@@ -661,13 +661,22 @@ const fetchAllDeliveries = async () => {
                       </svg>
                     </button>
                     {expandedSections.attendance && (
-                      <div className="border-t border-stroke dark:border-strokedark px-6 py-4">
-                        <OfficerAttendanceHistory
-                          dailyStats={officerStats.daily_stats}
-                          expectedDailyHours={officerStats.expected_daily_hours}
-                          title="Daily Breakdown"
-                        />
-                      </div>
+                        <div className="border-t border-stroke dark:border-strokedark p-6">
+                            <OfficerAttendanceHistory 
+                                dailyStats={officerStats.daily_stats.map(day => {
+                                    // If already in new format, keep as is
+                                    if ('sessions' in day) return day as any;
+                                    // Convert legacy format to new format
+                                    const { date, online_hours, worked_hours, offline_during_work_hours } = day;
+                                    return {
+                                        date,
+                                        sessions: [],
+                                        // Optionally, you could push a synthetic session here if you want to show legacy data
+                                    };
+                                })}
+                                expectedDailyHours={officerStats.expected_daily_hours}
+                            />
+                        </div>
                     )}
                   </div>
                 )}

@@ -5,6 +5,8 @@ import Cookies from 'js-cookie'
 import { cn } from '@/lib/utils'
 import toast from "react-hot-toast";
 import Loader from '@/components/common/Loader';
+import dayjs from "dayjs";
+import utc from "dayjs/plugin/utc";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL
 
@@ -186,6 +188,25 @@ interface EditHistory {
   edited_at: string
 }
 
+  dayjs.extend(utc);
+
+  const formatDateTimeUTC = (value?: string): string => {
+    if (!value) return "Not set";
+
+    const parsed = dayjs.utc(value);
+
+    return parsed.isValid() ? parsed.format("MMM D, YYYY h:mm A") : value;
+  };
+
+  const formatDateTimeLocal = (value?: string): string => {
+    if (!value) return "Not set";
+
+    const parsed = dayjs(value);
+
+    return parsed.isValid() ? parsed.format("MMM D, YYYY h:mm A") : value;
+  };
+
+
 // Helper function to check if value should be displayed
 const shouldDisplay = (value: any): boolean => {
   if (value === null || value === undefined) return false
@@ -319,7 +340,7 @@ const EditableField = ({
                   <div key={history.id} className="text-xs border-b border-gray-100 dark:border-gray-700 pb-2">
                     <div className="flex justify-between text-gray-600 dark:text-gray-400">
                       <span className="font-medium">{history.edited_by_name}</span>
-                      <span>{new Date(history.edited_at).toLocaleString()}</span>
+                      <span>{formatDateTimeUTC(history.edited_at)}</span>
                     </div>
                     <div className="mt-1 text-gray-700 dark:text-gray-300">
                       <span className="line-through text-red-500">{history.old_value || '(empty)'}</span>
@@ -368,7 +389,7 @@ function DocumentCard({ doc }: { doc: VerificationData['documents'][number] }) {
         </h4>
         <div className="mb-3 text-xs text-gray-500 dark:text-gray-400 space-y-1">
           <p>Type: <span className="font-medium capitalize">{doc.document_type.replace('_', ' ')}</span></p>
-          <p>Uploaded: <span className="font-medium">{new Date(doc.uploaded_at).toLocaleString()}</span></p>
+          <p>Uploaded: <span className="font-medium">{formatDateTimeUTC(doc.uploaded_at)}</span></p>
         </div>
         <div className="relative aspect-[4/3] overflow-hidden rounded-md bg-gray-100 dark:bg-gray-700">
           <img
@@ -773,10 +794,10 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
               </div>
             </div>
           )}
-          <Field label="Start Time" value={data.start_time ? new Date(data.start_time).toLocaleString() : null} />
-          <Field label="End Time" value={data.end_time ? new Date(data.end_time).toLocaleString() : null} />
-          <Field label="Created At" value={data.created_at ? new Date(data.created_at).toLocaleString() : null} />
-          <Field label="Updated At" value={data.updated_at ? new Date(data.updated_at).toLocaleString() : null} />
+          <Field label="Start Time" value={data.start_time ? formatDateTimeUTC(data.start_time) : null} />
+          <Field label="End Time" value={data.end_time ? formatDateTimeUTC(data.end_time) : null} />
+          <Field label="Created At" value={data.created_at ? formatDateTimeLocal(data.created_at) : null} />
+          <Field label="Updated At" value={data.updated_at ? formatDateTimeLocal(data.updated_at) : null} />
           {(data as any).home_location_required && (
             <div className="col-span-full mt-4">
               <div className={cn(
@@ -1468,7 +1489,7 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
                         <td className="px-4 py-2">{loc.latitude}</td>
                         <td className="px-4 py-2">{loc.longitude}</td>
                         <td className="px-4 py-2">{loc.accuracy ? `${loc.accuracy} meters` : '—'}</td>
-                        <td className="px-4 py-2">{new Date(loc.timestamp).toLocaleString()}</td>
+                        <td className="px-4 py-2">{formatDateTimeUTC(loc.timestamp)}</td>
                         <td className="px-4 py-2">
                           <a
                             href={`https://www.google.com/maps/search/?api=1&query=${loc.latitude},${loc.longitude}`}
@@ -1516,7 +1537,7 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
                         </div>
                       </div>
                       <Field label="Address" value={loc.address} />
-                      <Field label="Captured At" value={loc.created_at ? new Date(loc.created_at).toLocaleString() : null} />
+                      <Field label="Captured At" value={loc.created_at ? formatDateTimeUTC(loc.created_at) : null} />
                     </div>
 
                     {loc.photos && loc.photos.length > 0 && (

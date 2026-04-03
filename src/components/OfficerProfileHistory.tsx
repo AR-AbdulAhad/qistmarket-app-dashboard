@@ -22,17 +22,19 @@ interface OfficerProfileHistoryProps {
   title?: string;
 }
 
-// Helper function to convert 24-hour time to 12-hour format
-const convertTo12HourFormat = (time24: string | undefined): string => {
-  if (!time24) return 'Not set';
-  try {
-    const [hours, minutes] = time24.split(':').map(Number);
-    const period = hours >= 12 ? 'PM' : 'AM';
-    const hours12 = hours % 12 || 12;
-    return `${hours12}:${minutes.toString().padStart(2, '0')} ${period}`;
-  } catch {
-    return time24;
+// Convert 24-hour time (HH:MM) to 12-hour format
+const convertTo12HourFormat = (time?: string): string => {
+  if (!time) return "Not set";
+
+  // Agar full datetime aa raha ho
+  if (time.includes(" ")) {
+    const parsed = dayjs(time);
+    return parsed.isValid() ? parsed.format("h:mm A") : time;
   }
+
+  // Agar sirf HH:mm:ss ya HH:mm ho
+  const parsed = dayjs(`2000-01-01T${time}`);
+  return parsed.isValid() ? parsed.format("h:mm A") : time;
 };
 
 export const OfficerProfileHistory: React.FC<OfficerProfileHistoryProps> = ({
@@ -89,7 +91,7 @@ export const OfficerProfileHistory: React.FC<OfficerProfileHistoryProps> = ({
                     <div className="flex items-start justify-between bg-white p-2.5 rounded border border-blue-100">
                       <span className="text-gray-700 font-medium">🏍️ Bike KM Range:</span>
                       <span className="font-medium text-right">
-                        <span className="block text-gray-500 line-through text-xs mb-1">
+                        <span className="block text-gray-500 text-xs mb-1">
                           Previous: {entry.previous.bike_km_range} km
                         </span>
                         <span className="block text-green-600 font-bold">
@@ -105,7 +107,7 @@ export const OfficerProfileHistory: React.FC<OfficerProfileHistoryProps> = ({
                     <div className="flex items-start justify-between bg-white p-2.5 rounded border border-blue-100">
                       <span className="text-gray-700 font-medium">⏰ Working Hours:</span>
                       <span className="font-medium text-right">
-                        <span className="block text-gray-500 line-through text-xs mb-1">
+                        <span className="block text-gray-500 text-xs mb-1">
                           Previous: {convertTo12HourFormat(entry.previous.working_hours_start)} - {convertTo12HourFormat(entry.previous.working_hours_end)}
                         </span>
                         <span className="block text-green-600 font-bold">
