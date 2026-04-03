@@ -3,10 +3,14 @@ import { useEffect, useState } from 'react'
 import { use } from 'react'
 import Cookies from 'js-cookie'
 import { cn } from '@/lib/utils'
+import { Modal } from '@/components/Modal/Modal'
+
+
 import toast from "react-hot-toast";
 import Loader from '@/components/common/Loader';
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
+import { useAuth } from '../../../../../contexts/AuthContext'
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL
 
@@ -496,10 +500,34 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
   const [data, setData] = useState<VerificationData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [currentUser, setCurrentUser] = useState<{id: number, name: string} | null>(null)
+  const [currentUser, setCurrentUser] = useState<{id: number, name: string, username: string} | null>(null)
   const [decision, setDecision] = useState<'approve' | 'reject' | null>(null)
   const [remarks, setRemarks] = useState('')
   const [submitting, setSubmitting] = useState(false)
+
+  // Modal state for location handling
+  const [modalOpen, setModalOpen] = useState(false)
+  const [modalOfficerType, setModalOfficerType] = useState<'vo' | 'do' | null>(null)
+  const [officerIdInput, setOfficerIdInput] = useState('')
+  // Officer details are in the loaded data, not fetched
+  const [officerDetails, setOfficerDetails] = useState<any>(null)
+  const [locationRequestPending, setLocationRequestPending] = useState(false)
+    const { user } = useAuth();
+  // Set officer details from loaded data when officerIdInput changes
+  useEffect(() => {
+    if (!modalOpen || !officerIdInput || !modalOfficerType) {
+      setOfficerDetails(null);
+      return;
+    }
+    // Officer info is in data.verification_officer or data.delivery_officer (if present)
+    if (modalOfficerType === 'vo' && data?.verification_officer && String(data.verification_officer_id) === officerIdInput) {
+      setOfficerDetails(data.verification_officer);
+    } else if (modalOfficerType === 'do' && (data as any).delivery_officer && String((data as any).delivery_officer_id) === officerIdInput) {
+      setOfficerDetails((data as any).delivery_officer);
+    } else {
+      setOfficerDetails(null);
+    }
+  }, [officerIdInput, modalOfficerType, modalOpen, data]);
 
   // Fetch data
   useEffect(() => {
@@ -521,7 +549,8 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
             if (userJson.success && userJson.user) {
               setCurrentUser({
                 id: userJson.user.id,
-                name: userJson.user.full_name
+                name: userJson.user.full_name,
+                username: userJson.user.username
               })
               console.log('Current user:', userJson.user)
             }
@@ -746,9 +775,7 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
 
   const approves = data.reviews ? data.reviews.filter(r => r.approved).length : 0
   const percentage = approves * 30
-  const hasReviewed = data.reviews.some(
-    (r) => r.reviewer.username === data.verification_officer.username
-  )
+  const hasReviewed = data.reviews.some((r) => r.reviewer.username === user?.username)
 
   return (
     <section className="rounded-[10px] bg-white p-8 shadow-1 dark:bg-gray-dark dark:shadow-card">
@@ -820,32 +847,109 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
       {/* Location Management Actions (For Outlet/Admin) */}
       {(data as any).home_location_required && !(data as any).home_location_verified && (
         <div className="mb-12 rounded-xl border border-warning bg-warning/5 p-6 dark:border-warning/30">
-          <h3 className="mb-4 text-xl font-semibold text-warning">Location Handling Required</h3>
-          <p className="mb-6 text-gray-600 dark:text-gray-400 text-sm">
-            This verification requires a customer home location capture. Please choose an option below to assign an officer.
+          <div className="flex items-center gap-3 mb-4">
+            <span className="text-2xl">📍</span>
+            <h3 className="text-xl font-bold text-yellow-700 dark:text-yellow-300">Home Location Assignment Required</h3>
+            {(locationRequestPending || data.status === 'location_capture_pending') && (
+              <span className="ml-auto flex items-center gap-2 px-3 py-1 rounded-full bg-yellow-200 text-yellow-900 font-semibold text-sm animate-pulse">
+                <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path></svg>
+                Pending Assignment
+              </span>
+            )}
+          </div>
+          <p className="mb-6 text-gray-700 dark:text-gray-300 text-sm">
+            This verification requires a customer home location capture. Assign an officer to proceed. Once a request is sent, you cannot assign again until the current request is resolved.
           </p>
           <div className="flex flex-wrap gap-4">
+            {data.verification_officer && (
+              <button
+                onClick={() => {
+                  setModalOfficerType('vo');
+                  setModalOpen(true);
+                }}
+                className={cn(
+                  "rounded-lg px-6 py-2.5 font-semibold shadow-sm transition-colors",
+                  locationRequestPending || data.status === 'location_capture_pending'
+                    ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                    : "bg-primary text-white hover:bg-primary/90"
+                )}
+                disabled={locationRequestPending || data.status === 'location_capture_pending'}
+              >
+                Option 1: Send to Verification Officer
+              </button>
+            )}
+            {(data as any).delivery_officer && (
+              <button
+                onClick={() => {
+                  setModalOfficerType('do');
+                  setModalOpen(true);
+                }}
+                className={cn(
+                  "rounded-lg px-6 py-2.5 font-semibold shadow-sm transition-colors",
+                  locationRequestPending || data.status === 'location_capture_pending'
+                    ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                    : "bg-dark text-white hover:bg-dark/90"
+                )}
+                disabled={locationRequestPending || data.status === 'location_capture_pending'}
+              >
+                Option 2: Send to Delivery Officer
+              </button>
+            )}
+          </div>
+          {(locationRequestPending || data.status === 'location_capture_pending') && (
+            <div className="mt-6 flex items-center gap-2 text-yellow-800 dark:text-yellow-200 text-base font-medium">
+              <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path></svg>
+              Officer assignment is pending. Please wait for completion before assigning again.
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Officer Selection Modal */}
+      <Modal open={modalOpen} onClose={() => setModalOpen(false)}>
+        <div className="rounded-2xl bg-white p-8 shadow-xl dark:bg-gray-800">
+          <h2 className="text-lg font-bold mb-4">
+            {modalOfficerType === 'vo' ? 'Send to Verification Officer' : 'Send to Delivery Officer'}
+          </h2>
+          {modalOfficerType === 'vo' && data.verification_officer && (
+            <div className="mb-4 p-3 rounded bg-gray-100 dark:bg-gray-800">
+              <div className="font-semibold">Officer Details:</div>
+              <div>Name: {data.verification_officer.full_name}</div>
+              <div>Username: {data.verification_officer.username}</div>
+            </div>
+          )}
+          {modalOfficerType === 'do' && (data as any).delivery_officer && (
+            <div className="mb-4 p-3 rounded bg-gray-100 dark:bg-gray-800">
+              <div className="font-semibold">Officer Details:</div>
+              <div>Name: {(data as any).delivery_officer.full_name}</div>
+              <div>Username: {(data as any).delivery_officer.username}</div>
+            </div>
+          )}
+          <div className="flex gap-4">
             <button
-              onClick={() => {
-                const officerId = prompt("Enter Verification Officer ID:");
-                if (officerId) handleLocationAction('send-to-vo', officerId);
+              className="bg-primary text-white px-4 py-2 rounded"
+              onClick={async () => {
+                setLocationRequestPending(true);
+                setModalOpen(false);
+                await handleLocationAction(
+                  modalOfficerType === 'vo' ? 'send-to-vo' : 'send-to-do',
+                  modalOfficerType === 'vo' ? String(data.verification_officer_id) : String((data as any).delivery_officer_id)
+                );
+                setLocationRequestPending(false);
               }}
-              className="rounded-lg bg-primary px-6 py-2.5 text-white hover:bg-primary/90 transition-colors shadow-sm"
+              disabled={locationRequestPending || (modalOfficerType === 'vo' && !data.verification_officer) || (modalOfficerType === 'do' && !(data as any).delivery_officer)}
             >
-              Option 1: Send to Verification Officer
+              Confirm & Send
             </button>
             <button
-              onClick={() => {
-                const officerId = prompt("Enter Delivery Officer ID:");
-                if (officerId) handleLocationAction('send-to-do', officerId);
-              }}
-              className="rounded-lg bg-dark px-6 py-2.5 text-white hover:bg-dark/90 transition-colors shadow-sm"
+              className="bg-gray-300 px-4 py-2 rounded"
+              onClick={() => setModalOpen(false)}
             >
-              Option 2: Send to Delivery Officer
+              Cancel
             </button>
           </div>
         </div>
-      )}
+      </Modal>
 
       {/* Verification Reviews */}
       <div className="mb-12">
@@ -886,7 +990,7 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
                     </p>
                   )}
                   <p className="text-sm text-gray-500 dark:text-gray-400">
-                    Date: {new Date(review.created_at).toLocaleString()}
+                    Date: {formatDateTimeUTC(review.created_at)}
                   </p>
                 </div>
               ))}
@@ -895,7 +999,7 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
         )}
 
         {/* Review Submission Form */}
-        {data.status === 'completed' && (
+        {data.order.status === 'completed' && (
           <div className="mt-10 rounded-lg border border-primary bg-primary/5 p-6 dark:border-blue-500/30 dark:bg-blue-950/20">
             <h3 className="mb-6 text-2xl font-semibold text-primary dark:text-blue-400">
               Submit Your Review
