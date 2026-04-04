@@ -225,18 +225,13 @@ export const NAV_DATA = [
         items: [],
       },
       {
-        title: "Outlet Orders",
-        icon: Icons.CreateOrderSquareIcon,
-        url: "/outlet/orders",
-        items: [],
-      },
-      {
         title: "Inventory",
         icon: Icons.HomeIcon,
         items: [
           { title: "Stock List", url: "/outlet/inventory" },
           { title: "Add Stock", url: "/outlet/inventory/add" },
           { title: "Stock Transfers", url: "/outlet/inventory/transfers" },
+          { title: "Transfer History", url: "/outlet/inventory/transfers/history" },
         ],
       },
       {
@@ -251,18 +246,6 @@ export const NAV_DATA = [
         title: "Expenses",
         icon: Icons.HomeIcon,
         url: "/outlet/expenses",
-        items: [],
-      },
-      {
-        title: "Delivery",
-        icon: Icons.CreateOrderSquareIcon,
-        url: "/outlet/delivery",
-        items: [],
-      },
-      {
-        title: "Handover History",
-        icon: Icons.HomeIcon,
-        url: "/outlet/handover-history",
         items: [],
       },
       {

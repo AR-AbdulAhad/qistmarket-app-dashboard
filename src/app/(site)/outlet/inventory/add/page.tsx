@@ -1,8 +1,10 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useCallback, useEffect } from "react";
 import Cookies from "js-cookie";
+import { PlusCircle, Trash2, Save, ArrowLeft } from "lucide-react";
+import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
 
 const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
 const getAuthHeaders = () => ({
@@ -10,103 +12,265 @@ const getAuthHeaders = () => ({
     "Content-Type": "application/json",
 });
 
-export default function AddInventoryPage() {
+interface ItemRow {
+    id: string;
+    product_name: string;
+    category: string;
+    imei_serial: string;
+    color_variant: string;
+    quantity: string;
+    purchase_price: string;
+    status: string;
+}
+
+export default function AddInventoryBulkPage() {
     const router = useRouter();
-    const [form, setForm] = useState({
+    
+    const createEmptyRow = (): ItemRow => ({
+        id: Math.random().toString(36).substring(7),
         product_name: "",
         category: "",
         imei_serial: "",
+        color_variant: "",
+        quantity: "1",
         purchase_price: "",
-        installment_price: "",
+        status: "In Stock"
     });
+
+    const [items, setItems] = useState<ItemRow[]>([createEmptyRow()]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
     const [success, setSuccess] = useState("");
 
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-        setForm({ ...form, [e.target.name]: e.target.value });
+    const handleChange = (id: string, field: keyof ItemRow, value: string) => {
+        setItems(items.map(item => {
+            if (item.id === id) {
+                let updated = { ...item, [field]: value };
+                
+                // Real-world enforcement rules:
+                if (field === 'imei_serial' && value.trim() !== '') {
+                    updated.quantity = "1";
+                }
+                if (field === 'quantity' && parseInt(value) > 1) {
+                    updated.imei_serial = "";
+                }
+                
+                return updated;
+            }
+            return item;
+        }));
         setError("");
     };
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!form.product_name || !form.imei_serial || !form.purchase_price || !form.installment_price) {
-            setError("Please fill all required fields.");
+    const addRow = () => {
+        setItems([...items, createEmptyRow()]);
+    };
+
+    const removeRow = (id: string) => {
+        if (items.length === 1) return; // Prevent removing last row
+        setItems(items.filter(item => item.id !== id));
+    };
+
+    const handleSubmit = async () => {
+        // Validation
+        const validItems = items.filter(i => i.product_name && i.imei_serial && i.purchase_price);
+        
+        if (validItems.length === 0) {
+            setError("Please fill out at least one complete product row.");
             return;
         }
+
+        const payload = validItems.map(item => ({
+            product_name: item.product_name,
+            category: item.category,
+            imei_serial: item.imei_serial,
+            color_variant: item.color_variant,
+            quantity: item.quantity,
+            purchase_price: parseFloat(item.purchase_price),
+            status: item.status
+        }));
+
         setLoading(true);
         try {
             const res = await fetch(`${API_BASE}/api/outlet/inventory`, {
                 method: "POST",
                 headers: getAuthHeaders(),
-                body: JSON.stringify({
-                    ...form,
-                    purchase_price: parseFloat(form.purchase_price),
-                    installment_price: parseFloat(form.installment_price),
-                }),
+                body: JSON.stringify({ items: payload }),
             });
             const data = await res.json();
             if (data.success) {
-                setSuccess("Item added to inventory successfully!");
+                setSuccess(`Successfully added ${data.count} items to inventory!`);
                 setTimeout(() => router.push("/outlet/inventory"), 1500);
             } else {
-                setError(data.message || "Failed to add item.");
+                setError(data.message || "Failed to add items.");
             }
         } catch (e) {
-            setError("Network error.");
+            setError("Network error. Could not connect to API.");
         } finally {
             setLoading(false);
         }
     };
 
-    const categories = ["Smartphone", "Tablet", "Laptop", "Accessories", "Other"];
+    const [categories, setCategories] = useState<string[]>([]);
+
+    useEffect(() => {
+        const fetchCategories = async () => {
+            try {
+                const res = await fetch("https://api.qistmarket.pk/api/categories");
+                const data = await res.json();
+                if (data && Array.isArray(data)) {
+                    // Assuming the API returns an array directly based on my previous check
+                    setCategories(data.map((c: any) => c.name));
+                } else if (data && data.categories && Array.isArray(data.categories)) {
+                    // Or if it's nested
+                    setCategories(data.categories.map((c: any) => c.name));
+                }
+            } catch (err) {
+                console.error("Failed to fetch categories:", err);
+                // Fallback categories if API fails
+                setCategories(["Smartphone", "Tablet", "Laptop", "Accessories", "Home Appliances", "Other"]);
+            }
+        };
+        fetchCategories();
+    }, []);
 
     return (
-        <div className="p-6 max-w-2xl mx-auto">
-            <div className="mb-6">
-                <h1 className="text-2xl font-bold text-gray-800 dark:text-white">Add Inventory Stock</h1>
-                <p className="text-gray-500 dark:text-gray-400 mt-1">Add a new product to your outlet's inventory</p>
+        <div className="mx-auto max-w-7xl">
+            <Breadcrumb pageName="Bulk Add Inventory" />
+
+            <div className="mb-6 flex justify-between items-center">
+                <div>
+                    <h1 className="text-2xl font-bold text-gray-800 dark:text-white">Bulk Add Stock</h1>
+                    <p className="text-gray-500 dark:text-gray-400 mt-1 text-sm">Add multiple products to your inventory at once.</p>
+                </div>
+                <button onClick={() => router.back()} className="flex items-center gap-2 text-primary hover:underline font-medium">
+                    <ArrowLeft size={18} /> Back to Stock
+                </button>
             </div>
 
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow border border-gray-100 dark:border-gray-700 p-6">
-                {error && <div className="mb-4 p-3 rounded-lg bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400 text-sm">{error}</div>}
-                {success && <div className="mb-4 p-3 rounded-lg bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400 text-sm">{success}</div>}
+            <div className="bg-white dark:bg-boxdark rounded-xl shadow border border-stroke dark:border-strokedark p-6">
+                {error && <div className="mb-4 p-4 rounded-lg bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400 font-medium text-sm border border-red-200 dark:border-red-800">{error}</div>}
+                {success && <div className="mb-4 p-4 rounded-lg bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400 font-medium text-sm border border-green-200 dark:border-green-800">{success}</div>}
 
-                <form onSubmit={handleSubmit} className="space-y-5">
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Product Name *</label>
-                        <input name="product_name" value={form.product_name} onChange={handleChange} placeholder="e.g. Samsung Galaxy A54" className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 text-sm bg-white dark:bg-gray-700 text-gray-800 dark:text-white" />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Category</label>
-                        <select name="category" value={form.category} onChange={handleChange} className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 text-sm bg-white dark:bg-gray-700 text-gray-800 dark:text-white">
-                            <option value="">Select Category</option>
-                            {categories.map(c => <option key={c} value={c}>{c}</option>)}
-                        </select>
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">IMEI / Serial Number *</label>
-                        <input name="imei_serial" value={form.imei_serial} onChange={handleChange} placeholder="Enter IMEI or Serial Number" className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 text-sm font-mono bg-white dark:bg-gray-700 text-gray-800 dark:text-white" />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Purchase Price (PKR) *</label>
-                            <input name="purchase_price" type="number" value={form.purchase_price} onChange={handleChange} placeholder="0" className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 text-sm bg-white dark:bg-gray-700 text-gray-800 dark:text-white" />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Installment Price (PKR) *</label>
-                            <input name="installment_price" type="number" value={form.installment_price} onChange={handleChange} placeholder="0" className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 text-sm bg-white dark:bg-gray-700 text-gray-800 dark:text-white" />
-                        </div>
-                    </div>
-                    <div className="flex gap-3 pt-2">
-                        <button type="submit" disabled={loading} className="bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white px-6 py-2 rounded-lg text-sm font-medium">
-                            {loading ? "Saving..." : "Add to Inventory"}
-                        </button>
-                        <button type="button" onClick={() => router.back()} className="border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 px-6 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-700">
-                            Cancel
-                        </button>
-                    </div>
-                </form>
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                        <thead>
+                            <tr className="bg-gray-50 dark:bg-meta-4 text-sm font-semibold text-gray-700 dark:text-gray-200 uppercase tracking-wide">
+                                <th className="px-4 py-3 border-b border-stroke dark:border-strokedark rounded-tl-lg">Category</th>
+                                <th className="px-4 py-3 border-b border-stroke dark:border-strokedark">Product Name *</th>
+                                <th className="px-4 py-3 border-b border-stroke dark:border-strokedark">Color / Variant</th>
+                                <th className="px-4 py-3 border-b border-stroke dark:border-strokedark">IMEI / Serial</th>
+                                <th className="px-4 py-3 border-b border-stroke dark:border-strokedark text-center">Qty</th>
+                                <th className="px-4 py-3 border-b border-stroke dark:border-strokedark">Purchase Price *</th>
+                                <th className="px-4 py-3 border-b border-stroke dark:border-strokedark">Status *</th>
+                                <th className="px-4 py-3 border-b border-stroke dark:border-strokedark text-center rounded-tr-lg">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-stroke dark:divide-strokedark">
+                            {items.map((item, index) => (
+                                <tr key={item.id} className="hover:bg-gray-50 dark:hover:bg-meta-4/30 transition-colors">
+                                    <td className="p-3">
+                                        <select 
+                                            value={item.category} 
+                                            onChange={(e) => handleChange(item.id, 'category', e.target.value)} 
+                                            className="w-full border border-stroke dark:border-strokedark rounded-lg px-3 py-2 text-sm bg-transparent outline-none focus:border-primary focus:ring-1 focus:ring-primary dark:bg-form-input dark:text-white"
+                                        >
+                                            <option value="">Select...</option>
+                                            {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                                        </select>
+                                    </td>
+                                    <td className="p-3">
+                                        <input 
+                                            type="text"
+                                            value={item.product_name} 
+                                            onChange={(e) => handleChange(item.id, 'product_name', e.target.value)} 
+                                            placeholder="e.g. Galaxy A54" 
+                                            className="w-full border border-stroke dark:border-strokedark rounded-lg px-3 py-2 text-sm bg-transparent outline-none focus:border-primary focus:ring-1 focus:ring-primary dark:bg-form-input dark:text-white" 
+                                        />
+                                    </td>
+                                    <td className="p-3">
+                                        <input 
+                                            type="text"
+                                            value={item.color_variant} 
+                                            onChange={(e) => handleChange(item.id, 'color_variant', e.target.value)} 
+                                            placeholder="e.g. Black" 
+                                            className="w-full border border-stroke dark:border-strokedark rounded-lg px-3 py-2 text-sm bg-transparent outline-none focus:border-primary dark:bg-form-input dark:text-white" 
+                                        />
+                                    </td>
+                                    <td className="p-3">
+                                        <input 
+                                            type="text"
+                                            value={item.imei_serial} 
+                                            onChange={(e) => handleChange(item.id, 'imei_serial', e.target.value)} 
+                                            placeholder="Optional Barcode" 
+                                            title="Cannot use IMEI if Quantity > 1"
+                                            disabled={parseInt(item.quantity) > 1}
+                                            className="w-full border border-stroke dark:border-strokedark rounded-lg px-3 py-2 text-sm bg-transparent outline-none focus:border-primary disabled:opacity-50 dark:bg-form-input dark:text-white" 
+                                        />
+                                    </td>
+                                    <td className="p-3">
+                                        <input 
+                                            type="number"
+                                            min="1"
+                                            value={item.quantity} 
+                                            onChange={(e) => handleChange(item.id, 'quantity', e.target.value)} 
+                                            title="Must be 1 if IMEI exists"
+                                            disabled={item.imei_serial.trim().length > 0}
+                                            className="w-16 text-center border border-stroke dark:border-strokedark rounded-lg px-2 py-2 text-sm bg-transparent outline-none focus:border-primary disabled:opacity-50 dark:bg-form-input dark:text-white" 
+                                        />
+                                    </td>
+                                    <td className="p-3">
+                                        <input 
+                                            type="number"
+                                            value={item.purchase_price} 
+                                            onChange={(e) => handleChange(item.id, 'purchase_price', e.target.value)} 
+                                            placeholder="PKR" 
+                                            className="w-full border border-stroke dark:border-strokedark rounded-lg px-3 py-2 text-sm bg-transparent outline-none focus:border-primary dark:bg-form-input dark:text-white" 
+                                        />
+                                    </td>
+                                    <td className="p-3">
+                                        <select 
+                                            value={item.status} 
+                                            onChange={(e) => handleChange(item.id, 'status', e.target.value)} 
+                                            className="w-full border border-stroke dark:border-strokedark rounded-lg px-3 py-2 text-sm bg-transparent outline-none focus:border-primary focus:ring-1 focus:ring-primary dark:bg-form-input dark:text-white"
+                                        >
+                                            <option value="In Stock">In Stock</option>
+                                            <option value="Out Of Stock">Out Of Stock</option>
+                                        </select>
+                                    </td>
+                                    <td className="p-3 text-center">
+                                        <button 
+                                            title="Remove Row"
+                                            onClick={() => removeRow(item.id)} 
+                                            disabled={items.length === 1}
+                                            className="p-2 text-gray-400 hover:text-danger hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                                        >
+                                            <Trash2 size={18} />
+                                        </button>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+
+                <div className="mt-4 flex justify-between items-center bg-gray-50 dark:bg-meta-4/20 p-4 rounded-b-xl border-t border-stroke dark:border-strokedark">
+                    <button 
+                        onClick={addRow} 
+                        className="flex items-center gap-2 text-primary font-medium hover:bg-primary/10 px-4 py-2 rounded-lg transition-colors text-sm"
+                    >
+                        <PlusCircle size={18} /> Add Another Item
+                    </button>
+                    
+                    <button 
+                        onClick={handleSubmit} 
+                        disabled={loading} 
+                        className="flex items-center gap-2 bg-primary hover:bg-opacity-90 disabled:opacity-60 text-white px-8 py-2.5 rounded-lg text-sm font-bold shadow-md transition-all"
+                    >
+                        <Save size={18} />
+                        {loading ? "Saving Stock..." : "Save All to Inventory"}
+                    </button>
+                </div>
             </div>
         </div>
     );
