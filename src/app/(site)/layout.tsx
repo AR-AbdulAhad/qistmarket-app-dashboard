@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Sidebar } from "@/components/Layouts/sidebar";
 import { Header } from "@/components/Layouts/header";
 import type { PropsWithChildren } from "react";
@@ -10,10 +10,13 @@ import { SidebarProvider } from "@/components/Layouts/sidebar/sidebar-context";
 import io, { Socket } from "socket.io-client";
 import Cookies from "js-cookie";
 import { toast } from "react-hot-toast";
+import { CashSubmissionPopup } from "@/components/CashSubmissionPopup";
 
 let socket: Socket | null = null;
 
 export default function Layout({ children }: PropsWithChildren) {
+  const [socketInstance, setSocketInstance] = useState<Socket | null>(null);
+
   useEffect(() => {
     if (typeof window === "undefined") return;
 
@@ -59,6 +62,8 @@ export default function Layout({ children }: PropsWithChildren) {
       console.warn("Socket connection error:", err.message);
     });
 
+    setSocketInstance(socket);
+
     return () => {
       if (socket) {
         socket.disconnect();
@@ -82,6 +87,9 @@ export default function Layout({ children }: PropsWithChildren) {
                 {children}
               </main>
             </div>
+            
+            {/* Global OTP Popup for Cash Submission */}
+            <CashSubmissionPopup socket={socketInstance} />
           </div>
         </SidebarProvider>
       </ProtectedRoute>

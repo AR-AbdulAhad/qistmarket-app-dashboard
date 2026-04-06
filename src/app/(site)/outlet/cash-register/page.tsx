@@ -2,6 +2,11 @@
 
 import { useEffect, useState } from "react";
 import Cookies from "js-cookie";
+import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
+import { 
+    CreditCard, ArrowUpRight, CheckCircle2, TrendingUp, AlertCircle, Calculator, ScrollText, DollarSign, Wallet
+} from "lucide-react";
+import Loader from "@/components/common/Loader";
 
 const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
 const getAuthHeaders = () => ({
@@ -18,6 +23,7 @@ type Register = {
     cash_from_recovery: number;
     cash_from_delivery: number;
     expenses: number;
+    vendor_payments: number;
     closing_cash: number;
 };
 
@@ -55,77 +61,116 @@ export default function CashRegisterPage() {
         { key: "cash_from_recovery", label: "Cash from Recovery Officers" },
         { key: "cash_from_delivery", label: "Cash from Delivery Officers" },
         { key: "expenses", label: "Expenses (–)" },
+        { key: "vendor_payments", label: "Vendor Payments (–)" },
         { key: "closing_cash", label: "Closing Cash" },
     ];
 
     const latest = registers[0];
 
+    if (loading) return <Loader text="Loading Cash Register..." />;
+
     return (
-        <div className="p-6 max-w-5xl mx-auto">
-            <div className="flex items-center justify-between mb-6">
+        <div className="mx-auto max-w-7xl">
+            <Breadcrumb pageName="Cash Register (Daybook)" />
+
+            <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-800 dark:text-white">Cash Register</h1>
-                    <p className="text-gray-500 dark:text-gray-400 mt-1">Daily cash balance calculation</p>
+                    <h1 className="text-2xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
+                        <Wallet className="text-primary" /> Cash Register & Daybook
+                    </h1>
+                    <p className="text-sm text-gray-400 mt-1">Daily physical cash balance and transaction summary</p>
                 </div>
-                <button onClick={handleCalculate} disabled={calculating} className="bg-green-600 hover:bg-green-700 disabled:opacity-60 text-white px-4 py-2 rounded-lg text-sm font-medium">
-                    {calculating ? "Calculating..." : "🔄 Calculate Today"}
+                <button 
+                    onClick={handleCalculate} 
+                    disabled={calculating} 
+                    className="bg-primary hover:bg-opacity-90 disabled:opacity-60 text-white px-6 py-2.5 rounded-xl text-sm font-black flex items-center gap-2 shadow-lg transition-all active:scale-95"
+                >
+                    <Calculator size={18} className={calculating ? "animate-spin" : ""} /> 
+                    {calculating ? "Processing..." : "Sync Daily Ledger"}
                 </button>
             </div>
 
-            {message && <div className="mb-4 p-3 rounded-lg bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400 text-sm">{message}</div>}
+            {message && <div className="mb-6 p-4 rounded-xl bg-green-50 text-green-600 dark:bg-green-900/20 dark:text-green-400 text-xs font-bold border border-green-100 flex items-center gap-2 animate-head-shake"><CheckCircle2 size={16} /> {message}</div>}
 
             {/* Formula Card */}
-            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4 mb-6 text-sm text-blue-800 dark:text-blue-300">
-                <strong>Formula:</strong> Opening Cash + Down Payments + Installments Received + Cash from Recovery Officers + Cash from Delivery Officers – Expenses = Closing Cash
+            <div className="bg-primary/5 border border-primary/20 rounded-2xl p-5 mb-8 text-sm text-primary flex items-start gap-3">
+                <AlertCircle className="shrink-0 mt-0.5" size={18} />
+                <div>
+                    <strong className="font-black uppercase tracking-widest text-[11px] block mb-1">Standard Accounting Formula:</strong>
+                    <span className="font-bold">Opening Cash + (Down Payments + Installments Received + Delivery Cash + Recovery Cash) – (Expenses + Vendor Payments) = Closing Cash</span>
+                </div>
             </div>
-
-            {loading ? (
-                <div className="flex items-center justify-center py-16"><div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div></div>
-            ) : (
                 <>
                     {/* Today's summary */}
                     {latest && (
-                        <div className="bg-white dark:bg-gray-800 rounded-xl shadow border border-gray-100 dark:border-gray-700 p-6 mb-6">
-                            <h2 className="font-semibold text-gray-700 dark:text-gray-300 mb-4">
-                                Latest Register — {new Date(latest.date).toLocaleDateString()}
+                        <div className="mb-8">
+                            <h2 className="text-xs font-black uppercase tracking-widest text-gray-500 flex items-center gap-2 mb-4 ml-1">
+                                <TrendingUp size={14} /> Master Ledger — {new Date(latest.date).toLocaleDateString("en-PK", { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}
                             </h2>
-                            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-                                {fields.map(f => (
-                                    <div key={f.key} className={`rounded-lg p-4 ${f.key === "closing_cash" ? "bg-green-50 dark:bg-green-900/20 col-span-2 sm:col-span-1" : "bg-gray-50 dark:bg-gray-700"}`}>
-                                        <p className="text-xs text-gray-500 dark:text-gray-400">{f.label}</p>
-                                        <p className={`text-lg font-bold mt-1 ${f.key === "closing_cash" ? "text-green-700 dark:text-green-400" : f.key === "expenses" ? "text-red-600 dark:text-red-400" : "text-gray-800 dark:text-white"}`}>
-                                            PKR {((latest as any)[f.key] || 0).toLocaleString()}
-                                        </p>
-                                    </div>
-                                ))}
+                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-4">
+                                {fields.map(f => {
+                                    const isClosing = f.key === "closing_cash";
+                                    const isOutflow = f.key === "expenses" || f.key === "vendor_payments";
+                                    const isOpening = f.key === "opening_cash";
+
+                                    return (
+                                        <div key={f.key} className={`rounded-2xl p-4 border shadow-sm ${
+                                            isClosing ? "bg-green-50 dark:bg-green-900/20 col-span-2 sm:col-span-1 lg:col-span-2 xl:col-span-1 border-green-200 dark:border-green-800/30 border-l-4 border-l-green-500" : 
+                                            isOutflow ? "bg-red-50 dark:bg-red-900/10 border-red-100 dark:border-red-900/20 border-l-4 border-l-red-500" : 
+                                            isOpening ? "bg-white dark:bg-boxdark border-stroke dark:border-strokedark border-l-4 border-l-primary" :
+                                            "bg-white dark:bg-boxdark border-stroke dark:border-strokedark"
+                                        }`}>
+                                            <div className="text-[10px] uppercase font-black tracking-widest mb-1 text-gray-500 dark:text-gray-400 opacity-80">{f.label}</div>
+                                            <div className={`text-xl font-black tabular-nums ${
+                                                isClosing ? "text-green-600 dark:text-green-400 text-2xl" : 
+                                                isOutflow ? "text-red-500 dark:text-red-400" : 
+                                                isOpening ? "text-primary" :
+                                                "text-gray-800 dark:text-white"
+                                            }`}>
+                                                PKR {((latest as any)[f.key] || 0).toLocaleString()}
+                                            </div>
+                                        </div>
+                                    )
+                                })}
                             </div>
                         </div>
                     )}
 
                     {/* History */}
-                    <div className="bg-white dark:bg-gray-800 rounded-xl shadow border border-gray-100 dark:border-gray-700 overflow-hidden">
-                        <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-700">
-                            <h2 className="font-semibold text-gray-700 dark:text-gray-300">Register History</h2>
+                    <div className="bg-white dark:bg-boxdark rounded-2xl shadow-sm border border-stroke dark:border-strokedark overflow-hidden mb-20">
+                        <div className="px-5 py-4 border-b border-stroke dark:border-strokedark bg-gray-50 dark:bg-meta-4">
+                            <h2 className="text-xs font-black uppercase tracking-widest text-gray-500 flex items-center gap-2">
+                                <ScrollText size={14} /> Register Archives
+                            </h2>
                         </div>
                         <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
-                                <thead><tr className="bg-gray-50 dark:bg-gray-700 text-left">
-                                    <th className="px-5 py-3 text-gray-600 dark:text-gray-300 font-medium">Date</th>
-                                    <th className="px-5 py-3 text-gray-600 dark:text-gray-300 font-medium">Opening</th>
-                                    <th className="px-5 py-3 text-gray-600 dark:text-gray-300 font-medium">Installments</th>
-                                    <th className="px-5 py-3 text-gray-600 dark:text-gray-300 font-medium">Expenses</th>
-                                    <th className="px-5 py-3 text-gray-600 dark:text-gray-300 font-medium">Closing</th>
-                                </tr></thead>
-                                <tbody>
+                            <table className="w-full text-xs text-left">
+                                <thead className="bg-white dark:bg-boxdark border-b border-stroke dark:border-strokedark z-10 shadow-sm">
+                                    <tr className="text-gray-400 font-bold uppercase tracking-wider text-[10px]">
+                                        <th className="px-5 py-4">Date</th>
+                                        <th className="px-5 py-4 text-right">Opening</th>
+                                        <th className="px-5 py-4 text-right">Installments</th>
+                                        <th className="px-5 py-4 text-right">Expenses</th>
+                                        <th className="px-5 py-4 text-right">Vendors</th>
+                                        <th className="px-5 py-4 text-right">Closing</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-stroke dark:divide-strokedark">
                                     {registers.length === 0 ? (
-                                        <tr><td colSpan={5} className="text-center py-10 text-gray-500">No register entries yet. Click Calculate Today to create one.</td></tr>
+                                        <tr>
+                                            <td colSpan={6} className="text-center py-20 text-gray-400 opacity-60">
+                                                <DollarSign size={40} className="mx-auto mb-4" />
+                                                <div className="font-bold uppercase tracking-widest text-xs">No register entries found.</div>
+                                            </td>
+                                        </tr>
                                     ) : registers.map((r) => (
-                                        <tr key={r.id} className="border-t border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750">
-                                            <td className="px-5 py-3 text-gray-700 dark:text-gray-300">{new Date(r.date).toLocaleDateString()}</td>
-                                            <td className="px-5 py-3 text-gray-700 dark:text-gray-300">PKR {r.opening_cash.toLocaleString()}</td>
-                                            <td className="px-5 py-3 text-gray-700 dark:text-gray-300">PKR {r.installments_received.toLocaleString()}</td>
-                                            <td className="px-5 py-3 text-red-600 dark:text-red-400">PKR {r.expenses.toLocaleString()}</td>
-                                            <td className="px-5 py-3 font-bold text-green-700 dark:text-green-400">PKR {r.closing_cash.toLocaleString()}</td>
+                                        <tr key={r.id} className="hover:bg-gray-50 dark:hover:bg-meta-4/20 transition-all font-medium">
+                                            <td className="px-5 py-4 text-gray-800 dark:text-white font-bold">{new Date(r.date).toLocaleDateString("en-PK", { day: '2-digit', month: 'short', year: 'numeric' })}</td>
+                                            <td className="px-5 py-4 text-right text-gray-500 tabular-nums">PKR {r.opening_cash?.toLocaleString()}</td>
+                                            <td className="px-5 py-4 text-right text-gray-500 tabular-nums">PKR {r.installments_received?.toLocaleString()}</td>
+                                            <td className="px-5 py-4 text-right text-red-500 dark:text-red-400 tabular-nums">PKR {r.expenses?.toLocaleString()}</td>
+                                            <td className="px-5 py-4 text-right text-red-500 dark:text-red-400 tabular-nums">PKR {(r.vendor_payments || 0).toLocaleString()}</td>
+                                            <td className="px-5 py-4 text-right font-black text-green-600 dark:text-green-400 tabular-nums text-sm bg-green-50/50 dark:bg-green-900/10">PKR {r.closing_cash?.toLocaleString()}</td>
                                         </tr>
                                     ))}
                                 </tbody>
@@ -133,7 +178,6 @@ export default function CashRegisterPage() {
                         </div>
                     </div>
                 </>
-            )}
         </div>
     );
 }

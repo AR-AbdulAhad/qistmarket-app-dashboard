@@ -255,6 +255,20 @@ export const NAV_DATA = [
         items: [],
       },
       {
+        title: "Cash In Hand",
+        icon: Icons.HomeIcon,
+        items: [
+          { title: "Pending Collections", url: "/outlet/cash-in-hand" },
+          { title: "Collection History", url: "/outlet/cash-in-hand/history" },
+        ],
+      },
+      {
+        title: "Returns",
+        icon: Icons.HomeIcon,
+        url: "/outlet/returns",
+        items: [],
+      },
+      {
         title: "Outlet Reports",
         icon: Icons.HomeIcon,
         url: "/outlet/reports",
