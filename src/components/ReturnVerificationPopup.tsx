@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { X, CheckCircle2, PackageCheck } from "lucide-react";
+import { X, CheckCircle2, PackageCheck, Info } from "lucide-react";
 
 interface ReturnVerificationPopupProps {
     isOpen: boolean;
@@ -7,10 +7,18 @@ interface ReturnVerificationPopupProps {
     recordId: number;
     orderRef: string;
     officerName: string;
+    productName?: string;
+    color?: string;
+    variant?: string;
+    advance?: number | string;
     onSuccess: () => void;
 }
 
-const ReturnVerificationPopup: React.FC<ReturnVerificationPopupProps> = ({ isOpen, onClose, recordId, orderRef, officerName, onSuccess }) => {
+const ReturnVerificationPopup: React.FC<ReturnVerificationPopupProps> = ({ 
+    isOpen, onClose, recordId, orderRef, officerName, 
+    productName, color, variant, advance,
+    onSuccess 
+}) => {
     const [otp, setOtp] = useState(["", "", "", ""]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -47,7 +55,7 @@ const ReturnVerificationPopup: React.FC<ReturnVerificationPopupProps> = ({ isOpe
         setError(null);
 
         try {
-            const token = document.cookie.split("; ").find(row => row.startsWith("token="))?.split("=")[1];
+            const token = document.cookie.split("; ").find(row => row.startsWith("auth_token="))?.split("=")[1];
             const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
 
             const res = await fetch(`${API_BASE}/api/outlet/verify-return-otp`, {
@@ -81,7 +89,7 @@ const ReturnVerificationPopup: React.FC<ReturnVerificationPopupProps> = ({ isOpe
             <div className="bg-white dark:bg-boxdark rounded-2xl shadow-xl w-full max-w-sm overflow-hidden animate-fade-in-up">
                 <div className="bg-primary/10 px-6 py-5 flex items-center justify-between border-b border-primary/20">
                     <h3 className="font-bold text-primary flex items-center gap-2">
-                        <PackageCheck size={20} /> Verify Return
+                        <PackageCheck size={20} /> Verify Customer OTP
                     </h3>
                     <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-white transition">
                         <X size={20} />
@@ -89,8 +97,38 @@ const ReturnVerificationPopup: React.FC<ReturnVerificationPopupProps> = ({ isOpe
                 </div>
                 
                 <div className="p-6">
+                    {/* Delivered Product Snapshot Section */}
+                    {productName && (
+                        <div className="mb-6 p-4 bg-gray-50 dark:bg-meta-4/20 rounded-xl border border-stroke dark:border-strokedark shadow-inner">
+                            <h4 className="text-[10px] font-black uppercase tracking-widest text-primary mb-3 flex items-center gap-1.5">
+                                <Info size={12} /> Delivered Product Snapshot
+                            </h4>
+                            <div className="space-y-2">
+                                <div className="flex justify-between items-center text-xs">
+                                    <span className="text-gray-500 font-medium">Product</span>
+                                    <span className="font-bold text-gray-800 dark:text-white line-clamp-1">{productName}</span>
+                                </div>
+                                <div className="flex justify-between items-center text-xs">
+                                    <span className="text-gray-500 font-medium">Specifications</span>
+                                    <div className="flex gap-1">
+                                        <span className="bg-white dark:bg-boxdark px-1.5 py-0.5 rounded border border-stroke dark:border-strokedark text-[10px] font-bold">{color || 'N/A'}</span>
+                                        <span className="bg-white dark:bg-boxdark px-1.5 py-0.5 rounded border border-stroke dark:border-strokedark text-[10px] font-bold">{variant || 'N/A'}</span>
+                                    </div>
+                                </div>
+                                <div className="flex justify-between items-center text-xs">
+                                    <span className="text-gray-500 font-medium">Advance Amount</span>
+                                    <span className="text-success font-black tracking-tight font-mono">Rs. {Number(advance)?.toLocaleString()}</span>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     <p className="text-sm text-center text-gray-500 dark:text-gray-400 mb-6 font-medium">
-                        Enter the 4-digit OTP from <strong>{officerName}</strong> to receive stock back for <span className="font-bold border-b border-dashed border-gray-400 pb-0.5">{orderRef}</span>.
+                        {officerName === 'Outlet' ? (
+                            <>Enter the 4-digit OTP sent to the customer for <span className="font-bold border-b border-dashed border-gray-400 pb-0.5">{orderRef}</span>.</>
+                        ) : (
+                            <>Enter the 4-digit OTP from <strong>{officerName}</strong> to receive stock back for <span className="font-bold border-b border-dashed border-gray-400 pb-0.5">{orderRef}</span>.</>
+                        )}
                     </p>
 
                     <div className="flex justify-center gap-3 mb-6">

@@ -11,6 +11,7 @@ import io, { Socket } from "socket.io-client";
 import Cookies from "js-cookie";
 import { toast } from "react-hot-toast";
 import { CashSubmissionPopup } from "@/components/CashSubmissionPopup";
+import { ReturnExchangePopup } from "@/components/ReturnExchangePopup";
 
 let socket: Socket | null = null;
 
@@ -90,6 +91,8 @@ export default function Layout({ children }: PropsWithChildren) {
             
             {/* Global OTP Popup for Cash Submission */}
             <CashSubmissionPopup socket={socketInstance} />
+            {/* Global OTP Popup for Return/Exchange */}
+            <ReturnExchangePopup socket={socketInstance} />
           </div>
         </SidebarProvider>
       </ProtectedRoute>
