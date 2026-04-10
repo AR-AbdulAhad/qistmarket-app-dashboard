@@ -25,7 +25,7 @@ type CashEntry = {
     product_name: string;
     imei_serial: string;
     color_variant: string;
-    delivery_officer: {
+    officer: {
         full_name: string;
         phone: string;
     };
@@ -73,7 +73,7 @@ export default function CashHistoryPage() {
 
     const filteredEntries = useMemo(() => {
         return entries.filter(e =>
-            e.delivery_officer.full_name?.toLowerCase().includes(search.toLowerCase()) ||
+            e.officer?.full_name?.toLowerCase().includes(search.toLowerCase()) ||
             e.order.order_ref?.toLowerCase().includes(search.toLowerCase()) ||
             e.product_name?.toLowerCase().includes(search.toLowerCase()) ||
             e.customer_name?.toLowerCase().includes(search.toLowerCase()) ||
@@ -229,11 +229,11 @@ export default function CashHistoryPage() {
                                     <td className="px-6 py-4">
                                         <div className="flex items-center gap-3">
                                             <div className="w-8 h-8 rounded-full bg-gray-100 dark:bg-meta-4 flex items-center justify-center text-gray-500 text-xs font-bold">
-                                                {entry.delivery_officer.full_name.charAt(0)}
+                                                {entry.officer?.full_name?.charAt(0) || '?'}
                                             </div>
                                             <div>
-                                                <p className="text-sm font-bold text-gray-700 dark:text-gray-300 truncate max-w-[120px]">{entry.delivery_officer.full_name}</p>
-                                                <p className="text-[10px] text-gray-500">{entry.delivery_officer.phone}</p>
+                                                <p className="text-sm font-bold text-gray-700 dark:text-gray-300 truncate max-w-[120px]">{entry.officer?.full_name || 'Unknown'}</p>
+                                                <p className="text-[10px] text-gray-500">{entry.officer?.phone || 'N/A'}</p>
                                             </div>
                                         </div>
                                     </td>

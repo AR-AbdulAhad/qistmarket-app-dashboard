@@ -23,7 +23,7 @@ type CashEntry = {
     product_name: string;
     imei_serial: string;
     color_variant: string;
-    delivery_officer: {
+    officer: {
         full_name: string;
         phone: string;
     };
@@ -76,7 +76,7 @@ export default function PendingCashPage() {
 
     const groupedData = useMemo(() => {
         const filtered = entries.filter(e =>
-            e.delivery_officer.full_name?.toLowerCase().includes(search.toLowerCase()) ||
+            e.officer?.full_name?.toLowerCase().includes(search.toLowerCase()) ||
             e.order.order_ref?.toLowerCase().includes(search.toLowerCase()) ||
             e.product_name?.toLowerCase().includes(search.toLowerCase()) ||
             e.customer_name?.toLowerCase().includes(search.toLowerCase())
@@ -84,11 +84,11 @@ export default function PendingCashPage() {
 
         const groups: Record<string, GroupedOfficer> = {};
         filtered.forEach(e => {
-            const name = e.delivery_officer.full_name;
+            const name = e.officer?.full_name || 'Unknown Officer';
             if (!groups[name]) {
                 groups[name] = {
                     officer_name: name,
-                    officer_phone: e.delivery_officer.phone,
+                    officer_phone: e.officer?.phone || 'N/A',
                     total_amount: 0,
                     entries: [],
                     last_activity: e.created_at

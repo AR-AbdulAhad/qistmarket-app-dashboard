@@ -27,72 +27,104 @@ interface AdvancePayment {
   amount: number
   paid: boolean
   paidAt: string | null
+  paymentMethod: string | null
   status: string
-  paidVia: string | null
 }
 
 interface InstallmentEntry {
   monthNumber: number
-  dueDate: string
-  yearMonth: string
+  dueDate: string | null
   dueAmount: number
   paidAmount: number
   remainingAmount: number
   status: string
   paidAt: string | null
+  paymentMethod: string | null
 }
 
-interface OrderLedgerSummary {
-  totalDue: number
-  totalPaid: number
-  totalRemaining: number
+interface LedgerSummary {
+  totalInstallmentDue: number
+  totalInstallmentPaid: number
+  totalInstallmentRemaining: number
+  grandTotalDue: number
+  grandTotalPaid: number
+  grandTotalRemaining: number
   paidInstallments: number
   pendingInstallments: number
+  installmentsStarted: boolean
+  firstInstallmentDate: string | null
 }
 
-interface OrderLedgerHistory {
-  advancePayment: AdvancePayment
-  installmentLedger: InstallmentEntry[]
-  summary: OrderLedgerSummary
+interface OrderLedger {
+  advance_payment: AdvancePayment
+  installment_ledger: InstallmentEntry[]
+  ledger_token: string | null
+  summary: LedgerSummary
+}
+
+interface ProductDetails {
+  product_name: string | null
+  imei_serial: string | null
+  color_variant: string | null
+}
+
+interface SelectedPlan {
+  advance?: number
+  totalPrice?: number
+  monthlyAmount?: number
+  monthly_amount?: number
+  months?: number
+  isActive?: boolean
+  [key: string]: unknown
+}
+
+interface OrderPlan {
+  selected_plan: SelectedPlan | null
+  advance_amount: number
+  monthly_amount: number
+  months: number
+  total_plan_value: number
 }
 
 interface CustomerOrder {
   order_id: number
   order_ref: string
   token_number: string
-  product_name: string
-  total_amount: number
-  advance_amount: number
-  monthly_amount: number
-  months: number
   status: string
-  created_at: string
   is_delivered: boolean
-  delivered_at: string | null
+  delivery_date: string | null
+  created_at: string
   verification_status: string | null
-  ledgerHistory: OrderLedgerHistory
+  product_details: ProductDetails
+  plan: OrderPlan
+  ledger: OrderLedger
 }
 
 interface CustomerLedgerSummary {
-  totalOrders: number;
-  paidOrders: number;
-  pendingOrders: number;
-  totalAdvanceReceived: number;
-  totalPendingAmount: number;
+  totalOrders: number
+  totalAdvanceReceived: number
+  totalPaid: number
+  totalRemaining: number
 }
 
 interface CustomerInfo {
-  name: string;
-  whatsapp_number: string;
-  address: string;
-  city: string | null;
-  area: string | null;
+  name: string
+  father_husband_name: string | null
+  cnic_number: string | null
+  whatsapp_number: string
+  telephone_number: string | null
+  present_address: string | null
+  permanent_address: string | null
+  nearest_location: string | null
+  city: string | null
+  area: string | null
+  profile_photo: string | null
 }
 
 interface CustomerGroup {
-  customer: CustomerInfo;
-  ledgerSummary: CustomerLedgerSummary;
-  orders?: CustomerOrder[];
+  customer: CustomerInfo
+  ledgerSummary: CustomerLedgerSummary
+  orders: CustomerOrder[]
 }
 
 interface PaginationInfo {
@@ -105,56 +137,67 @@ interface PaginationInfo {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────────────────────────────────────
+const fmt = (n: number) => `Rs. ${Number(n).toLocaleString()}`
+
+const fmtDate = (d: string | null) =>
+  d
+    ? new Date(d).toLocaleDateString(undefined, {
+        year: 'numeric',
+        month: 'short',
+        day: '2-digit',
+      })
+    : '-'
+
+const statusBadge = (status: string) => {
+  const map: Record<string, string> = {
+    paid:    'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
+    overdue: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
+    pending: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300',
+  }
+  return map[status] ?? 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200'
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Main Component
 // ─────────────────────────────────────────────────────────────────────────────
 const CustomerList = () => {
-  const [customers, setCustomers] = useState<CustomerGroup[]>([])
-  const [pagination, setPagination] = useState<PaginationInfo>({
-    page: 1,
-    limit: 10,
-    total: 0,
-    totalPages: 1,
-    hasNext: false,
-    hasPrev: false,
+  const [customers, setCustomers]         = useState<CustomerGroup[]>([])
+  const [pagination, setPagination]       = useState<PaginationInfo>({
+    page: 1, limit: 10, total: 0, totalPages: 1, hasNext: false, hasPrev: false,
   })
-  const [globalFilter, setGlobalFilter] = useState('')
+  const [totalOrders, setTotalOrders]     = useState(0)
+  const [globalFilter, setGlobalFilter]   = useState('')
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
-  const [sorting, setSorting] = useState<SortingState>([{ id: 'customer_name', desc: false }])
-  const [loading, setLoading] = useState(false)
-
-  // View details modal state
-  const [detailsOpen, setDetailsOpen] = useState(false)
+  const [sorting, setSorting]             = useState<SortingState>([{ id: 'customer_name', desc: false }])
+  const [loading, setLoading]             = useState(false)
+  const [detailsOpen, setDetailsOpen]     = useState(false)
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerGroup | null>(null)
 
   // ── Data Fetching ──────────────────────────────────────────────────────────
-  const fetchCustomers = async () => {
+  const fetchCustomers = async (page = pagination.page, limit = pagination.limit, search = globalFilter) => {
     setLoading(true)
     try {
       const token = Cookies.get('auth_token')
       if (!token) return
 
       const params = new URLSearchParams({
-        page: pagination.page.toString(),
-        limit: pagination.limit.toString(),
-        search: globalFilter.trim(),
-        sortBy: sorting[0]?.id || 'customer_name',
-        sortDir: sorting[0]?.desc ? 'desc' : 'asc',
-      })
-
-      columnFilters.forEach((f) => {
-        if (f.id && f.value) params.append(f.id, String(f.value))
+        page:   page.toString(),
+        limit:  limit.toString(),
+        search: search.trim(),
       })
 
       const res = await fetch(`${BACKEND_URL}/api/customers?${params}`, {
         headers: { Authorization: `Bearer ${token}` },
       })
-
       if (!res.ok) throw new Error('Failed to fetch customers')
       const json = await res.json()
 
       if (json.success && json.data) {
-        setCustomers(json.data.customers)
+        setCustomers(json.data.customers ?? [])
         setPagination(json.data.pagination)
+        setTotalOrders(json.data.totalOrders ?? 0)
       }
     } catch (err) {
       console.error(err)
@@ -163,18 +206,28 @@ const CustomerList = () => {
     }
   }
 
-  useEffect(() => {
-    fetchCustomers()
-  }, [pagination.page, pagination.limit, globalFilter, columnFilters, sorting])
+  // Fetch on mount
+  useEffect(() => { fetchCustomers(1, pagination.limit, globalFilter) }, [])
 
-  const openDetails = (customer: CustomerGroup) => {
-    setSelectedCustomer(customer)
-    setDetailsOpen(true)
+  // Search — debounced, reset to page 1
+  useEffect(() => {
+    const t = setTimeout(() => {
+      fetchCustomers(1, pagination.limit, globalFilter)
+    }, 400)
+    return () => clearTimeout(t)
+  }, [globalFilter])
+
+  const openDetails  = (c: CustomerGroup) => { setSelectedCustomer(c); setDetailsOpen(true) }
+  const closeDetails = () => { setDetailsOpen(false); setSelectedCustomer(null) }
+
+  const handlePageChange = (page: number) => {
+    setPagination((p) => ({ ...p, page }))
+    fetchCustomers(page, pagination.limit, globalFilter)
   }
 
-  const closeDetails = () => {
-    setDetailsOpen(false)
-    setSelectedCustomer(null)
+  const handleLimitChange = (limit: number) => {
+    setPagination((p) => ({ ...p, limit, page: 1 }))
+    fetchCustomers(1, limit, globalFilter)
   }
 
   // ── Columns ────────────────────────────────────────────────────────────────
@@ -192,6 +245,12 @@ const CustomerList = () => {
       enableColumnFilter: true,
     },
     {
+      id: 'cnic_number',
+      accessorFn: (row) => row.customer.cnic_number || '-',
+      header: 'CNIC',
+      enableColumnFilter: true,
+    },
+    {
       id: 'city',
       accessorFn: (row) => row.customer.city || 'N/A',
       header: 'City',
@@ -206,44 +265,33 @@ const CustomerList = () => {
     {
       id: 'total_orders',
       accessorFn: (row) => row.ledgerSummary.totalOrders,
-      header: 'Total Orders',
+      header: 'Orders',
       enableColumnFilter: false,
       cell: ({ getValue }) => (
-        <div className="rounded-lg bg-gray-100 px-2 py-1 text-center font-medium">
+        <div className="rounded-lg bg-gray-100 px-2 py-1 text-center font-medium dark:bg-gray-700 dark:text-gray-200">
           {Number(getValue())}
         </div>
       ),
     },
     {
-      id: 'paid_orders',
-      accessorFn: (row) => row.ledgerSummary.paidOrders,
-      header: 'Paid Orders',
+      id: 'total_paid',
+      accessorFn: (row) => row.ledgerSummary.totalPaid,
+      header: 'Total Paid',
       enableColumnFilter: false,
       cell: ({ getValue }) => (
-        <div className="rounded-lg bg-green-100 px-2 py-1 text-center font-medium text-green-800">
-          {Number(getValue())}
+        <div className="font-semibold text-emerald-600 dark:text-emerald-400">
+          {fmt(Number(getValue()))}
         </div>
       ),
     },
     {
-      id: 'pending_orders',
-      accessorFn: (row) => row.ledgerSummary.pendingOrders,
-      header: 'Pending Orders',
-      enableColumnFilter: false,
-      cell: ({ getValue }) => (
-        <div className="rounded-lg bg-orange-100 px-2 py-1 text-center font-medium text-orange-800">
-          {Number(getValue())}
-        </div>
-      ),
-    },
-    {
-      id: 'total_due',
-      accessorFn: (row) => row.ledgerSummary.totalPendingAmount,
+      id: 'total_remaining',
+      accessorFn: (row) => row.ledgerSummary.totalRemaining,
       header: 'Total Due',
       enableColumnFilter: false,
       cell: ({ getValue }) => (
         <div className="font-semibold text-red-500">
-          Rs. {Number(getValue()).toLocaleString()}
+          {fmt(Number(getValue()))}
         </div>
       ),
     },
@@ -270,91 +318,79 @@ const CustomerList = () => {
       globalFilter,
       columnFilters,
       sorting,
-      pagination: {
-        pageIndex: pagination.page - 1,
-        pageSize: pagination.limit,
-      },
+      pagination: { pageIndex: pagination.page - 1, pageSize: pagination.limit },
     },
-    pageCount: pagination.totalPages,
-    manualPagination: true,
-    manualSorting: true,
-    manualFiltering: true,
+    pageCount:          pagination.totalPages,
+    manualPagination:   true,
+    manualSorting:      true,
+    manualFiltering:    true,
     enableRowSelection: false,
-    onGlobalFilterChange: setGlobalFilter,
+    onGlobalFilterChange:  setGlobalFilter,
     onColumnFiltersChange: setColumnFilters,
-    onSortingChange: setSorting,
+    onSortingChange:       setSorting,
     onPaginationChange: (updater) => {
-      const newState =
-        typeof updater === 'function'
-          ? updater({ pageIndex: pagination.page - 1, pageSize: pagination.limit })
-          : updater
-      setPagination((prev) => ({
-        ...prev,
-        page: newState.pageIndex + 1,
-        limit: newState.pageSize,
-      }))
+      const next = typeof updater === 'function'
+        ? updater({ pageIndex: pagination.page - 1, pageSize: pagination.limit })
+        : updater
+      handlePageChange(next.pageIndex + 1)
     },
-    getCoreRowModel: getCoreRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-    getSortedRowModel: getSortedRowModel(),
+    getCoreRowModel:       getCoreRowModel(),
+    getFilteredRowModel:   getFilteredRowModel(),
+    getSortedRowModel:     getSortedRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
   })
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <section className="data-table-common rounded-[10px] bg-white shadow-1 dark:bg-gray-dark dark:shadow-card">
-      {/* Top bar - same style as OrderList */}
-      <div className="flex justify-between px-7.5 py-4.5">
+      {/* Top bar */}
+      <div className="flex flex-wrap items-center justify-between gap-4 px-7.5 py-4.5">
         <div className="relative z-20 w-full max-w-[414px]">
           <input
             type="text"
             value={globalFilter || ''}
             onChange={(e) => {
               setGlobalFilter(e.target.value)
-              setPagination((p) => ({ ...p, page: 1 }))
             }}
             className="w-full rounded-lg border border-stroke bg-transparent px-5 py-2.5 outline-none focus:border-[#ff3d3d]"
-            placeholder="Search here..."
+            placeholder="Search by name, WhatsApp, CNIC, city..."
           />
           <button className="absolute right-0 top-0 flex h-11.5 w-11.5 items-center justify-center rounded-r-md bg-[#ff3d3d] text-white">
             <SearchIcon className="size-4.5" />
           </button>
         </div>
 
-        <div className="flex items-center font-medium gap-4">
-          <div className="flex items-center">
+        <div className="flex items-center gap-6">
+          <div className="flex items-center text-sm text-gray-600 dark:text-gray-300">
             <p className="pl-2 font-medium text-dark dark:text-current">Per Page:</p>
             <select
               value={pagination.limit}
-              onChange={(e) =>
-                setPagination((p) => ({
-                  ...p,
-                  limit: Number(e.target.value),
-                  page: 1,
-                }))
-              }
-              className="bg-transparent pl-2.5"
+              onChange={(e) => handleLimitChange(Number(e.target.value))}
+              className="bg-transparent pl-2.5 font-medium"
             >
-              {[5, 10, 15, 20, 50].map((size) => (
-                <option key={size} value={size}>
-                  {size}
-                </option>
+              {[5, 10, 15, 20, 50].map((s) => (
+                <option key={s} value={s}>{s}</option>
               ))}
             </select>
+          </div>
+          <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-300">
+            <span>
+              Customers: <strong className="text-dark dark:text-white">{pagination.total}</strong>
+            </span>
+            <span>
+              Orders: <strong className="text-dark dark:text-white">{totalOrders}</strong>
+            </span>
           </div>
         </div>
       </div>
 
-      {/* Table - same layout as OrderList */}
+      {/* Table */}
       <div className="grid grid-cols-1 overflow-x-auto">
         <table className="datatable-table datatable-one !border-collapse px-4 md:px-8">
           <thead className="border-separate px-4">
-            {table.getHeaderGroups().map((headerGroup) => (
-              <tr
-                className="border-t border-stroke dark:border-dark-3"
-                key={headerGroup.id}
-              >
-                {headerGroup.headers.map((header) => (
+            {table.getHeaderGroups().map((hg) => (
+              <tr className="border-t border-stroke dark:border-dark-3" key={hg.id}>
+                {hg.headers.map((header) => (
                   <th key={header.id} className="whitespace-nowrap px-3 py-4 align-top">
                     <div className="flex min-h-[70px] flex-col">
                       <div
@@ -371,13 +407,12 @@ const CustomerList = () => {
                           </div>
                         )}
                       </div>
-
                       {header.column.getCanFilter() && header.column.id !== 'select' && (
                         <div className="mt-2">
                           <ColumnFilter
                             column={{
                               filterValue: header.column.getFilterValue() as string,
-                              setFilter: header.column.setFilterValue,
+                              setFilter:   header.column.setFilterValue,
                             }}
                           />
                         </div>
@@ -404,10 +439,7 @@ const CustomerList = () => {
               </tr>
             ) : (
               table.getRowModel().rows.map((row) => (
-                <tr
-                  className="border-t border-stroke dark:border-dark-3"
-                  key={row.id}
-                >
+                <tr className="border-t border-stroke dark:border-dark-3" key={row.id}>
                   {row.getVisibleCells().map((cell) => (
                     <td key={cell.id} className="truncate px-3 py-3">
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
@@ -420,21 +452,20 @@ const CustomerList = () => {
         </table>
       </div>
 
-      {/* Pagination - shared style with OrderList */}
+      {/* Pagination footer */}
       <div className="flex items-center justify-between px-7.5 py-7">
         <Pagination
           currentPage={pagination.page}
           totalPages={pagination.totalPages}
-          onPageChange={(page) => setPagination((p) => ({ ...p, page }))}
+          onPageChange={handlePageChange}
           isLoading={loading}
         />
-
         <p className="font-medium text-dark dark:text-white">
-          Showing page {pagination.page} of {pagination.totalPages} ({pagination.total} records)
+          Showing page {pagination.page} of {pagination.totalPages} ({pagination.total} customers)
         </p>
       </div>
 
-      {/* View Details Modal */}
+      {/* ── View Details Modal ─────────────────────────────────────────────── */}
       <Modal
         open={detailsOpen}
         onClose={closeDetails}
@@ -442,221 +473,257 @@ const CustomerList = () => {
       >
         {selectedCustomer && (
           <div className="space-y-6">
-            <div className="flex flex-col gap-2 border-b border-stroke pb-4 dark:border-dark-3">
-              <h2 className="text-xl font-semibold text-dark dark:text-white">
-                {selectedCustomer.customer.name}
-              </h2>
-              <div className="text-sm text-gray-600 dark:text-gray-300">
-                <p>WhatsApp: {selectedCustomer.customer.whatsapp_number}</p>
-                <p>
-                  Address: {selectedCustomer.customer.address || '-'}
-                  {selectedCustomer.customer.area ? `, ${selectedCustomer.customer.area}` : ''}
-                  {selectedCustomer.customer.city ? `, ${selectedCustomer.customer.city}` : ''}
-                </p>
-              </div>
-              <div className="mt-2 flex flex-wrap gap-4 text-sm">
-                <span className="rounded-full bg-gray-100 px-3 py-1 text-gray-700 dark:bg-dark-3 dark:text-gray-200">
-                  Total Orders: <strong>{selectedCustomer.ledgerSummary.totalOrders}</strong>
-                </span>
-                <span className="rounded-full bg-green-100 px-3 py-1 text-green-800 dark:bg-green-900/30 dark:text-green-300">
-                  Paid Orders: <strong>{selectedCustomer.ledgerSummary.paidOrders}</strong>
-                </span>
-                <span className="rounded-full bg-orange-100 px-3 py-1 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300">
-                  Pending Orders: <strong>{selectedCustomer.ledgerSummary.pendingOrders}</strong>
-                </span>
-                <span className="rounded-full bg-red-100 px-3 py-1 text-red-800 dark:bg-red-900/30 dark:text-red-300">
-                  Total Due: <strong>Rs. {selectedCustomer.ledgerSummary.totalPendingAmount.toLocaleString()}</strong>
-                </span>
+            {/* Customer header */}
+            <div className="flex gap-4 border-b border-stroke pb-5 dark:border-dark-3">
+              {selectedCustomer.customer.profile_photo ? (
+                <img
+                  src={selectedCustomer.customer.profile_photo}
+                  alt="Profile"
+                  className="h-16 w-16 flex-shrink-0 rounded-full object-cover ring-2 ring-[#ff3d3d]"
+                />
+              ) : (
+                <div className="flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-full bg-gray-100 text-2xl font-bold text-gray-400 dark:bg-dark-3">
+                  {selectedCustomer.customer.name.charAt(0).toUpperCase()}
+                </div>
+              )}
+              <div className="flex-1 space-y-1">
+                <h2 className="text-xl font-semibold text-dark dark:text-white">
+                  {selectedCustomer.customer.name}
+                </h2>
+                {selectedCustomer.customer.father_husband_name && (
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    S/O, D/O, W/O:{' '}
+                    <span className="font-medium text-dark dark:text-white">
+                      {selectedCustomer.customer.father_husband_name}
+                    </span>
+                  </p>
+                )}
+                <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-gray-600 dark:text-gray-300">
+                  <span>📞 {selectedCustomer.customer.whatsapp_number}</span>
+                  {selectedCustomer.customer.telephone_number &&
+                    selectedCustomer.customer.telephone_number !== selectedCustomer.customer.whatsapp_number && (
+                      <span>☎️ {selectedCustomer.customer.telephone_number}</span>
+                    )}
+                  {selectedCustomer.customer.cnic_number && (
+                    <span>🪪 {selectedCustomer.customer.cnic_number}</span>
+                  )}
+                </div>
+                {selectedCustomer.customer.present_address && (
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    📍 {selectedCustomer.customer.present_address}
+                    {selectedCustomer.customer.area  ? `, ${selectedCustomer.customer.area}`  : ''}
+                    {selectedCustomer.customer.city  ? `, ${selectedCustomer.customer.city}`  : ''}
+                  </p>
+                )}
+                {selectedCustomer.customer.nearest_location && (
+                  <p className="text-xs text-gray-400 dark:text-gray-500">
+                    Nearest Location: {selectedCustomer.customer.nearest_location}
+                  </p>
+                )}
               </div>
             </div>
 
+            {/* Ledger summary pills */}
+            <div className="flex flex-wrap gap-3 text-sm">
+              <span className="rounded-full bg-gray-100 px-3 py-1 text-gray-700 dark:bg-dark-3 dark:text-gray-200">
+                Orders: <strong>{selectedCustomer.ledgerSummary.totalOrders}</strong>
+              </span>
+              <span className="rounded-full bg-blue-100 px-3 py-1 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
+                Advance Received: <strong>{fmt(selectedCustomer.ledgerSummary.totalAdvanceReceived)}</strong>
+              </span>
+              <span className="rounded-full bg-emerald-100 px-3 py-1 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300">
+                Total Paid: <strong>{fmt(selectedCustomer.ledgerSummary.totalPaid)}</strong>
+              </span>
+              <span className="rounded-full bg-red-100 px-3 py-1 text-red-800 dark:bg-red-900/30 dark:text-red-300">
+                Total Remaining: <strong>{fmt(selectedCustomer.ledgerSummary.totalRemaining)}</strong>
+              </span>
+            </div>
+
+            {/* Orders list */}
             <div>
-              <h3 className="mb-3 text-lg font-semibold text-dark dark:text-white">
-                Orders & Ledger
-              </h3>
-              {(!selectedCustomer.orders || selectedCustomer.orders.length === 0) ? (
-                <p className="text-sm text-gray-500 dark:text-gray-400">
-                  No orders found for this customer.
-                </p>
+              <h3 className="mb-3 text-lg font-semibold text-dark dark:text-white">Orders & Ledger</h3>
+              {selectedCustomer.orders.length === 0 ? (
+                <p className="text-sm text-gray-500 dark:text-gray-400">No orders found.</p>
               ) : (
-                <div className="max-h-[420px] space-y-3 overflow-y-auto pr-2 custom-scrollbar">
+                <div className="max-h-[480px] space-y-4 overflow-y-auto pr-2 custom-scrollbar">
                   {selectedCustomer.orders.map((order) => (
                     <div
                       key={order.order_id}
                       className="rounded-xl border border-stroke bg-gray-50 p-4 text-sm dark:border-dark-3 dark:bg-dark-3"
                     >
-                      <div className="flex flex-wrap items-center justify-between gap-3">
+                      {/* Order header */}
+                      <div className="flex flex-wrap items-start justify-between gap-3">
                         <div>
                           <p className="font-semibold text-dark dark:text-white">
-                            {order.product_name}
+                            {order.product_details.product_name || 'Product N/A'}
                           </p>
                           <p className="text-xs text-gray-500 dark:text-gray-400">
-                            Order Ref: {order.order_ref} • Token: {order.token_number}
+                            Ref: {order.order_ref} • Token: {order.token_number}
                           </p>
-                          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                            Created:{' '}
-                            {new Date(order.created_at).toLocaleDateString(undefined, {
-                              year: 'numeric',
-                              month: 'short',
-                              day: '2-digit',
-                            })}
+                          {order.product_details.imei_serial && (
+                            <p className="text-xs text-gray-500 dark:text-gray-400">
+                              IMEI / Serial: {order.product_details.imei_serial}
+                            </p>
+                          )}
+                          {order.product_details.color_variant && (
+                            <p className="text-xs text-gray-500 dark:text-gray-400">
+                              Color: {order.product_details.color_variant}
+                            </p>
+                          )}
+                          <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
+                            Created: {fmtDate(order.created_at)}
                           </p>
                         </div>
-
                         <div className="flex flex-wrap gap-2">
-                          <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-700 dark:bg-gray-700 dark:text-gray-200">
-                            Status: {order.status}
+                          <span className="rounded-full bg-gray-200 px-2.5 py-0.5 text-xs font-medium text-gray-700 dark:bg-gray-700 dark:text-gray-200">
+                            {order.status}
                           </span>
                           {order.is_delivered && (
-                            <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300">
-                              Delivered
+                            <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300">
+                              ✓ Delivered {fmtDate(order.delivery_date)}
                             </span>
                           )}
-                          {order.delivered_at && (
-                            <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300">
-                              Delivered At:{' '}
-                              {new Date(order.delivered_at).toLocaleDateString(undefined, {
-                                year: 'numeric',
-                                month: 'short',
-                                day: '2-digit',
-                              })}
+                          {order.verification_status && (
+                            <span className="rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
+                              Verification: {order.verification_status}
                             </span>
                           )}
                         </div>
                       </div>
 
-                      <div className="mt-3 grid gap-3 md:grid-cols-4">
+                      {/* Plan info */}
+                      <div className="mt-3 grid gap-3 sm:grid-cols-4">
                         <div>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">
-                            Total Amount
-                          </p>
-                          <p className="text-sm font-semibold text-dark dark:text-white">
-                            Rs. {order.total_amount.toLocaleString()}
+                          <p className="text-xs text-gray-500 dark:text-gray-400">Advance</p>
+                          <p className="font-semibold text-dark dark:text-white">
+                            {fmt(order.plan.advance_amount)}
                           </p>
                         </div>
                         <div>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">
-                            Advance
-                          </p>
-                          <p className="text-sm font-semibold text-dark dark:text-white">
-                            Rs. {order.advance_amount.toLocaleString()}
+                          <p className="text-xs text-gray-500 dark:text-gray-400">Monthly / Months</p>
+                          <p className="font-semibold text-dark dark:text-white">
+                            {fmt(order.plan.monthly_amount)} × {order.plan.months}
                           </p>
                         </div>
                         <div>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">
-                            Monthly / Months
-                          </p>
-                          <p className="text-sm font-semibold text-dark dark:text-white">
-                            Rs. {order.monthly_amount.toLocaleString()} / {order.months}
+                          <p className="text-xs text-gray-500 dark:text-gray-400">Total Plan Value</p>
+                          <p className="font-semibold text-dark dark:text-white">
+                            {fmt(order.plan.total_plan_value)}
                           </p>
                         </div>
                         <div>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">
-                            Ledger (Paid / Remaining)
+                          <p className="text-xs text-gray-500 dark:text-gray-400">Grand Remaining</p>
+                          <p className="font-semibold text-red-500">
+                            {fmt(order.ledger.summary.grandTotalRemaining)}
                           </p>
-                          <p className="text-sm font-semibold text-dark dark:text-white">
-                            Rs. {order.ledgerHistory.summary.totalPaid.toLocaleString()} /{' '}
-                            Rs. {order.ledgerHistory.summary.totalRemaining.toLocaleString()}
-                          </p>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">
-                            Installments: {order.ledgerHistory.summary.paidInstallments} paid /{' '}
-                            {order.ledgerHistory.summary.pendingInstallments} pending
+                          <p className="text-xs text-gray-400 dark:text-gray-500">
+                            {order.ledger.summary.paidInstallments} paid /{' '}
+                            {order.ledger.summary.pendingInstallments} pending
                           </p>
                         </div>
                       </div>
 
-                      {/* Advance payment & installments breakdown */}
+                      {/* Grand totals strip */}
+                      <div className="mt-2 flex flex-wrap gap-4 rounded-lg bg-white px-3 py-2 text-xs dark:bg-gray-900">
+                        <span className="text-gray-500 dark:text-gray-400">
+                          Grand Due:{' '}
+                          <span className="font-semibold text-dark dark:text-white">
+                            {fmt(order.ledger.summary.grandTotalDue)}
+                          </span>
+                        </span>
+                        <span className="text-gray-500 dark:text-gray-400">
+                          Grand Paid:{' '}
+                          <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                            {fmt(order.ledger.summary.grandTotalPaid)}
+                          </span>
+                        </span>
+                        <span className="text-gray-500 dark:text-gray-400">
+                          Inst. Due:{' '}
+                          <span className="font-semibold text-dark dark:text-white">
+                            {fmt(order.ledger.summary.totalInstallmentDue)}
+                          </span>
+                        </span>
+                        <span className="text-gray-500 dark:text-gray-400">
+                          Inst. Paid:{' '}
+                          <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                            {fmt(order.ledger.summary.totalInstallmentPaid)}
+                          </span>
+                        </span>
+                        <span className="text-gray-500 dark:text-gray-400">
+                          Inst. Remaining:{' '}
+                          <span className="font-semibold text-red-500">
+                            {fmt(order.ledger.summary.totalInstallmentRemaining)}
+                          </span>
+                        </span>
+                      </div>
+
+                      {/* Advance + installments */}
                       <div className="mt-4 grid gap-4 md:grid-cols-3">
                         <div className="rounded-lg bg-white p-3 dark:bg-gray-900">
                           <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
                             Advance Payment
                           </h4>
                           <p className="text-sm text-gray-700 dark:text-gray-200">
-                            Amount:{' '}
-                            <span className="font-semibold">
-                              Rs. {order.ledgerHistory.advancePayment.amount.toLocaleString()}
-                            </span>
+                            Amount: <span className="font-semibold">{fmt(order.ledger.advance_payment.amount)}</span>
                           </p>
                           <p className="text-sm text-gray-700 dark:text-gray-200">
                             Status:{' '}
-                            <span
-                              className={`font-semibold ${
-                                order.ledgerHistory.advancePayment.paid
-                                  ? 'text-emerald-600 dark:text-emerald-300'
-                                  : 'text-orange-600 dark:text-orange-300'
-                              }`}
-                            >
-                              {order.ledgerHistory.advancePayment.status}
+                            <span className={`font-semibold ${order.ledger.advance_payment.paid ? 'text-emerald-600 dark:text-emerald-400' : 'text-orange-600 dark:text-orange-400'}`}>
+                              {order.ledger.advance_payment.status}
                             </span>
                           </p>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">
-                            Paid Via:{' '}
-                            {order.ledgerHistory.advancePayment.paidVia || '-'}
-                          </p>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">
-                            Paid At:{' '}
-                            {order.ledgerHistory.advancePayment.paidAt
-                              ? new Date(order.ledgerHistory.advancePayment.paidAt).toLocaleString()
-                              : '-'}
-                          </p>
+                          {order.ledger.advance_payment.paymentMethod && (
+                            <p className="text-xs text-gray-500 dark:text-gray-400">
+                              Via: {order.ledger.advance_payment.paymentMethod}
+                            </p>
+                          )}
+                          {order.ledger.advance_payment.paidAt && (
+                            <p className="text-xs text-gray-500 dark:text-gray-400">
+                              Paid At: {new Date(order.ledger.advance_payment.paidAt).toLocaleString()}
+                            </p>
+                          )}
                         </div>
 
                         <div className="rounded-lg bg-white p-3 dark:bg-gray-900 md:col-span-2">
-                          <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                            Installments Timeline
-                          </h4>
-                          {order.ledgerHistory.installmentLedger.length === 0 ? (
-                            <p className="text-xs text-gray-500 dark:text-gray-400">
-                              No installments configured for this order.
-                            </p>
+                          <div className="mb-2 flex items-center justify-between">
+                            <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                              Installments Timeline
+                            </h4>
+                            {order.ledger.ledger_token && (
+                              <span className="rounded bg-gray-100 px-2 py-0.5 font-mono text-[10px] text-gray-500 dark:bg-gray-800 dark:text-gray-400">
+                                #{order.ledger.ledger_token}
+                              </span>
+                            )}
+                          </div>
+                          {order.ledger.installment_ledger.length === 0 ? (
+                            <p className="text-xs text-gray-500 dark:text-gray-400">No installments configured.</p>
                           ) : (
-                            <div className="max-h-40 overflow-y-auto pr-1 custom-scrollbar">
+                            <div className="max-h-44 overflow-y-auto pr-1 custom-scrollbar">
                               <table className="w-full text-xs">
                                 <thead>
-                                  <tr className="border-b border-stroke text-[11px] uppercase text-gray-500 dark:border-dark-3 dark:text-gray-400">
-                                    <th className="pb-1 pr-2 text-left">Month</th>
+                                  <tr className="border-b border-stroke text-[10px] uppercase text-gray-500 dark:border-dark-3 dark:text-gray-400">
+                                    <th className="pb-1 pr-2 text-left">#</th>
                                     <th className="pb-1 pr-2 text-left">Due Date</th>
                                     <th className="pb-1 pr-2 text-right">Due</th>
                                     <th className="pb-1 pr-2 text-right">Paid</th>
-                                    <th className="pb-1 pr-2 text-right">Remaining</th>
+                                    <th className="pb-1 pr-2 text-right">Rem.</th>
                                     <th className="pb-1 text-right">Status</th>
                                   </tr>
                                 </thead>
                                 <tbody>
-                                  {order.ledgerHistory.installmentLedger.map((inst) => (
-                                    <tr
-                                      key={inst.monthNumber}
-                                      className="border-b border-stroke last:border-0 dark:border-dark-3"
-                                    >
-                                      <td className="py-1 pr-2">
-                                        #{inst.monthNumber}
-                                      </td>
-                                      <td className="py-1 pr-2">
-                                        {inst.dueDate}
+                                  {order.ledger.installment_ledger.map((inst, i) => (
+                                    <tr key={i} className="border-b border-stroke last:border-0 dark:border-dark-3">
+                                      <td className="py-1 pr-2">#{inst.monthNumber}</td>
+                                      <td className="py-1 pr-2">{fmtDate(inst.dueDate)}</td>
+                                      <td className="py-1 pr-2 text-right">{fmt(inst.dueAmount)}</td>
+                                      <td className="py-1 pr-2 text-right">
+                                        {inst.paidAmount > 0 ? fmt(inst.paidAmount) : '-'}
                                       </td>
                                       <td className="py-1 pr-2 text-right">
-                                        Rs. {inst.dueAmount.toLocaleString()}
-                                      </td>
-                                      <td className="py-1 pr-2 text-right">
-                                        {inst.paidAmount > 0
-                                          ? `Rs. ${inst.paidAmount.toLocaleString()}`
-                                          : '-'}
-                                      </td>
-                                      <td className="py-1 pr-2 text-right">
-                                        {inst.remainingAmount > 0
-                                          ? `Rs. ${inst.remainingAmount.toLocaleString()}`
-                                          : '-'}
+                                        {inst.remainingAmount > 0 ? fmt(inst.remainingAmount) : '-'}
                                       </td>
                                       <td className="py-1 text-right">
-                                        <span
-                                          className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                                            inst.status === 'paid'
-                                              ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
-                                              : inst.status === 'overdue'
-                                                ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
-                                                : 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300'
-                                          }`}
-                                        >
+                                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${statusBadge(inst.status)}`}>
                                           {inst.status}
                                         </span>
                                       </td>

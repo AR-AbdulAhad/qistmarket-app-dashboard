@@ -269,10 +269,32 @@ export const NAV_DATA = [
         items: [],
       },
       {
+        title: "Installments",
+        icon: Icons.HomeIcon,
+        url: "/outlet/installments",
+        items: [],
+      },
+      {
         title: "Outlet Reports",
         icon: Icons.HomeIcon,
         url: "/outlet/reports",
         items: [],
+      },
+    ],
+  },
+  {
+    label: "RECOVERY PORTAL",
+    allowedRoles: ["recovery officer", "recovery_officer"],
+    items: [
+      {
+        title: "My Recovery Orders",
+        url: "/recovery-portal",
+        icon: Icons.HomeIcon,
+      },
+      {
+        title: "My Cash In Hand",
+        url: "/outlet/cash-in-hand",
+        icon: Icons.HomeIcon,
       },
     ],
   },
