@@ -4,7 +4,7 @@ import { Logo } from "@/components/logo";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { use, useEffect, useState } from "react";
 import { NAV_DATA } from "./data";
 import { ArrowLeftIcon, ChevronUp } from "./icons";
 import { MenuItem } from "./menu-item";
@@ -40,15 +40,21 @@ export function Sidebar() {
   // Filter navigation data based on user role
   const filteredNavData = NAV_DATA.filter((section) => {
     const userRole = user?.role?.toLowerCase() || "";
-    const allowedRoles = ["csr", "sale officer", "sales officer", "sale_officer", "sales_officer"];
+    const allowedRoles = ["sales officer"];
 
-    // If user is CSR / Sale Officer, show only CSR PORTAL
     if (allowedRoles.includes(userRole)) {
       return section.label === "CSR PORTAL";
     }
 
     // Hide Outlet Portal from Admin and Super Admin
     if (section.label === "OUTLET PORTAL" && (userRole === "admin" || userRole === "super admin")) {
+      return false;
+    }
+    if (section.label === "CSR PORTAL" && (userRole === "admin" || userRole === "super admin" || userRole === "branch user")) {
+      return false;
+    }
+
+    if (section.label === "MAIN MENU" && userRole === "branch user") {
       return false;
     }
 

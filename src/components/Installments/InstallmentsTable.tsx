@@ -13,6 +13,7 @@ type InstallmentRow = {
     status: string;
     paidAt: string | null;
     paymentMethod: string | null;
+    arrears?: number;
 };
 
 type OrderInstallment = {
@@ -95,7 +96,12 @@ export default function InstallmentsTable({ data, onPay }: Props) {
                                                     <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">
                                                         {pkr(nextPending.dueAmount)}
                                                     </p>
-                                                    <p className="text-[10px] text-gray-500">
+                                                    {nextPending.arrears ? (
+                                                        <p className="text-[10px] text-red-500 font-medium mt-0.5">
+                                                            Included Arrears: {pkr(nextPending.arrears)}
+                                                        </p>
+                                                    ) : null}
+                                                    <p className="text-[10px] text-gray-500 mt-1">
                                                         {nextPending.label} · {nextPending.dueDate ? new Date(nextPending.dueDate).toLocaleDateString('en-PK') : 'N/A'}
                                                     </p>
                                                 </div>
@@ -202,6 +208,11 @@ export default function InstallmentsTable({ data, onPay }: Props) {
                                                                         <p className="text-sm font-extrabold text-gray-800 dark:text-gray-200 mt-0.5">
                                                                             {pkr(inst.dueAmount)}
                                                                         </p>
+                                                                        {inst.arrears ? (
+                                                                            <p className="text-[9px] text-red-500 font-medium mt-0.5">
+                                                                                Included Arrears: {pkr(inst.arrears)}
+                                                                            </p>
+                                                                        ) : null}
                                                                     </div>
                                                                     {isPaid ? (
                                                                         <div className="bg-green-100 dark:bg-green-900/30 p-1 rounded-full flex-shrink-0">

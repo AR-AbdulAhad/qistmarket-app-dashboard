@@ -1,6 +1,169 @@
 import { SVGProps } from "react";
+import {
+  Users,
+  ClipboardCheck,
+  Archive,
+  RotateCcw,
+  Truck,
+  ShieldCheck,
+  UserCircle,
+  Bell,
+  UserPlus,
+  MapPin,
+  MessageSquare,
+  BarChart3,
+  LayoutDashboard,
+  PlusSquare,
+  Globe,
+  Search,
+  DollarSign,
+  Activity,
+  Clock,
+  Store,
+  Package,
+  Handshake,
+  CreditCard,
+  Calculator,
+  Banknote,
+  Undo2,
+  Hash,
+  FileText,
+  Lock,
+  Ban,
+  AlertTriangle,
+  CheckCircle2,
+} from "lucide-react";
 
 export type PropsType = SVGProps<SVGSVGElement>;
+
+export function UsersIcon(props: PropsType) {
+  return <Users {...(props as any)} />;
+}
+
+export function BanIcon(props: PropsType) {
+  return <Ban {...(props as any)} />;
+}
+
+export function AlertTriangleIcon(props: PropsType) {
+  return <AlertTriangle {...(props as any)} />;
+}
+
+export function CheckCircleIcon(props: PropsType) {
+  return <CheckCircle2 {...(props as any)} />;
+}
+
+export function ClipboardCheckIcon(props: PropsType) {
+  return <ClipboardCheck {...(props as any)} />;
+}
+
+export function ArchiveIcon(props: PropsType) {
+  return <Archive {...(props as any)} />;
+}
+
+export function RotateCcwIcon(props: PropsType) {
+  return <RotateCcw {...(props as any)} />;
+}
+
+export function TruckIcon(props: PropsType) {
+  return <Truck {...(props as any)} />;
+}
+
+export function ShieldCheckIcon(props: PropsType) {
+  return <ShieldCheck {...(props as any)} />;
+}
+
+export function UserCircleIcon(props: PropsType) {
+  return <UserCircle {...(props as any)} />;
+}
+
+export function BellIcon(props: PropsType) {
+  return <Bell {...(props as any)} />;
+}
+
+export function UserPlusIcon(props: PropsType) {
+  return <UserPlus {...(props as any)} />;
+}
+
+export function MapPinIcon(props: PropsType) {
+  return <MapPin {...(props as any)} />;
+}
+
+export function MessageSquareIcon(props: PropsType) {
+  return <MessageSquare {...(props as any)} />;
+}
+
+export function BarChartIcon(props: PropsType) {
+  return <BarChart3 {...(props as any)} />;
+}
+
+export function LayoutDashboardIcon(props: PropsType) {
+  return <LayoutDashboard {...(props as any)} />;
+}
+
+export function PlusSquareIcon(props: PropsType) {
+  return <PlusSquare {...(props as any)} />;
+}
+
+export function GlobeIcon(props: PropsType) {
+  return <Globe {...(props as any)} />;
+}
+
+export function SearchIcon(props: PropsType) {
+  return <Search {...(props as any)} />;
+}
+
+export function DollarSignIcon(props: PropsType) {
+  return <DollarSign {...(props as any)} />;
+}
+
+export function ActivityIcon(props: PropsType) {
+  return <Activity {...(props as any)} />;
+}
+
+export function ClockIcon(props: PropsType) {
+  return <Clock {...(props as any)} />;
+}
+
+export function StoreIcon(props: PropsType) {
+  return <Store {...(props as any)} />;
+}
+
+export function PackageIcon(props: PropsType) {
+  return <Package {...(props as any)} />;
+}
+
+export function HandshakeIcon(props: PropsType) {
+  return <Handshake {...(props as any)} />;
+}
+
+export function CreditCardIcon(props: PropsType) {
+  return <CreditCard {...(props as any)} />;
+}
+
+export function CalculatorIcon(props: PropsType) {
+  return <Calculator {...(props as any)} />;
+}
+
+export function BanknoteIcon(props: PropsType) {
+  return <Banknote {...(props as any)} />;
+}
+
+export function UndoIcon(props: PropsType) {
+  return <Undo2 {...(props as any)} />;
+}
+
+export function HashIcon(props: PropsType) {
+  return <Hash {...(props as any)} />;
+}
+
+export function FileTextIcon(props: PropsType) {
+  return <FileText {...(props as any)} />;
+}
+
+export function LockIcon(props: PropsType) {
+  return <Lock {...(props as any)} />;
+}
+
 
 export function ChevronUp(props: PropsType) {
   return (

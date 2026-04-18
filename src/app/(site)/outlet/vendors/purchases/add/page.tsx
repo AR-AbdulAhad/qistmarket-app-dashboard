@@ -7,10 +7,12 @@ import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
 import { 
     Plus, Trash2, ShoppingCart, 
     Save, Calendar, FileText, AlertCircle, 
-    CheckCircle2, Building2, Package, Upload, HelpCircle, Download
+    CheckCircle2, Building2, Package, Upload, HelpCircle, Download,
+    Maximize2, Minimize2, X
 } from "lucide-react";
 import Papa from "papaparse";
 import Loader from "@/components/common/Loader";
+import SearchableSelect from "@/components/common/SearchableSelect";
 
 const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
 const getAuthHeaders = () => ({
@@ -35,13 +37,57 @@ export default function AddVendorPurchasePage() {
     const [error, setError] = useState("");
     const [success, setSuccess] = useState("");
 
+    const [vendorId, setVendorId] = useState<string>("");
     const [vendorName, setVendorName] = useState("");
     const [purchaseDate, setPurchaseDate] = useState(new Date().toISOString().split('T')[0]);
+    const [dueDate, setDueDate] = useState("");
     const [notes, setNotes] = useState("");
+    const [isFullView, setIsFullView] = useState(false);
+    const [vendors, setVendors] = useState<any[]>([]);
+    const [categories, setCategories] = useState<string[]>([]);
+    const [allProducts, setAllProducts] = useState<any[]>([]);
 
     const [items, setItems] = useState<PurchaseItemInput[]>([
         { tempId: Math.random().toString(), product_name: "", category: "", color_variant: "", imei_serial: "", quantity: 1, unit_price: 0 }
     ]);
+
+    useEffect(() => {
+        const fetchData = async () => {
+            try {
+                const headers = getAuthHeaders();
+                const [vRes, pRes] = await Promise.all([
+                    fetch(`${API_BASE}/api/outlet/vendors`, { headers }),
+                    fetch(`${API_BASE}/api/products`, { headers })
+                ]);
+                const vData = await vRes.json();
+                const pData = await pRes.json();
+
+                if (vData.success) setVendors(vData.vendors);
+                if (pData.success) {
+                    setAllProducts(pData.data);
+                    const cats = Array.from(new Set(pData.data.map((p: any) => p.category_name))) as string[];
+                    setCategories(cats.sort());
+                }
+            } catch (err) {
+                console.error("Failed to fetch initial data:", err);
+            }
+        };
+        fetchData();
+    }, []);
+
+    const handleProductSelectByRow = (tempId: string, product: any) => {
+        setItems(items.map(i => {
+            if (i.tempId === tempId) {
+                return {
+                    ...i,
+                    product_name: product.name,
+                    category: product.category_name,
+                    color_variant: product.color_variant || ""
+                };
+            }
+            return i;
+        }));
+    };
 
     const [importing, setImporting] = useState(false);
 
@@ -150,8 +196,10 @@ export default function AddVendorPurchasePage() {
                 method: "POST",
                 headers: getAuthHeaders(),
                 body: JSON.stringify({
+                    vendor_id: vendorId,
                     vendor_name: vendorName,
                     purchase_date: purchaseDate,
+                    due_date: dueDate || null,
                     notes,
                     items: items.map(({ tempId, ...rest }) => rest)
                 }),
@@ -228,14 +276,16 @@ export default function AddVendorPurchasePage() {
                             
                             <div className="space-y-4">
                                 <div>
-                                    <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Vendor Name *</label>
-                                    <input 
-                                        type="text" 
-                                        required
-                                        value={vendorName}
-                                        onChange={(e) => setVendorName(e.target.value)}
-                                        placeholder="Enter vendor or supplier name..."
-                                        className="w-full px-5 py-3 rounded-2xl bg-gray-50 dark:bg-meta-4 border border-stroke dark:border-strokedark outline-none focus:border-primary text-sm font-bold transition-all"
+                                    <SearchableSelect
+                                        label="Vendor Name *"
+                                        options={vendors.map(v => ({ label: v.name, value: v.id.toString() }))}
+                                        value={vendorId}
+                                        onChange={(val, opt) => {
+                                            setVendorId(val);
+                                            if (opt) setVendorName(opt.label);
+                                            else setVendorName(val); // Custom name
+                                        }}
+                                        placeholder="Select or type vendor..."
                                     />
                                 </div>
                                 <div>
@@ -247,6 +297,18 @@ export default function AddVendorPurchasePage() {
                                             value={purchaseDate}
                                             onChange={(e) => setPurchaseDate(e.target.value)}
                                             className="w-full pl-12 pr-5 py-3 rounded-2xl bg-gray-50 dark:bg-meta-4 border border-stroke dark:border-strokedark outline-none focus:border-primary text-sm font-bold transition-all"
+                                        />
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1 text-red-500">Payment Due Date</label>
+                                    <div className="relative">
+                                        <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-red-400" size={16} />
+                                        <input 
+                                            type="date" 
+                                            value={dueDate}
+                                            onChange={(e) => setDueDate(e.target.value)}
+                                            className="w-full pl-12 pr-5 py-3 rounded-2xl bg-red-50/50 dark:bg-meta-4 border border-red-200 dark:border-strokedark outline-none focus:border-red-500 text-sm font-bold transition-all"
                                         />
                                     </div>
                                 </div>
@@ -319,6 +381,14 @@ export default function AddVendorPurchasePage() {
                                     </label>
                                     <button 
                                         type="button"
+                                        onClick={() => setIsFullView(true)}
+                                        className="p-2 rounded-xl bg-gray-100 text-gray-500 hover:bg-primary/10 hover:text-primary transition-all active:scale-90"
+                                        title="Full Screen View"
+                                    >
+                                        <Maximize2 size={16} />
+                                    </button>
+                                    <button 
+                                        type="button"
                                         onClick={addItem}
                                         className="px-4 py-2 rounded-xl text-xs font-black bg-primary/10 text-primary hover:bg-primary hover:text-white transition-all flex items-center gap-2 active:scale-95"
                                     >
@@ -345,19 +415,31 @@ export default function AddVendorPurchasePage() {
                                             <tr key={item.tempId} className="group hover:bg-gray-50/50 dark:hover:bg-meta-4/20 transition-all">
                                                 <td className="p-3 font-mono text-gray-300 font-black">{index + 1}</td>
                                                 <td className="p-3 space-y-2">
-                                                    <input 
-                                                        type="text" 
+                                                    <SearchableSelect
+                                                        options={!item.category ? [] : allProducts
+                                                            .filter(p => !item.category || p.category_name === item.category)
+                                                            .map(p => ({ label: p.name, value: p.name, ...p }))
+                                                        }
                                                         value={item.product_name}
-                                                        onChange={(e) => updateItem(item.tempId, "product_name", e.target.value)}
-                                                        placeholder="Product name..."
-                                                        className="w-full bg-transparent outline-none font-bold text-sm text-gray-800 dark:text-white placeholder:text-gray-300 dark:placeholder:text-gray-600 p-0"
+                                                        allowCustom={true}
+                                                        disabled={!item.category}
+                                                        onChange={(val, opt) => {
+                                                            if (opt) {
+                                                                handleProductSelectByRow(item.tempId, opt);
+                                                            } else {
+                                                                updateItem(item.tempId, "product_name", val);
+                                                            }
+                                                        }}
+                                                        placeholder={!item.category ? "Select Cat..." : "Product..."}
+                                                        className="border-none p-0 ring-0 focus:ring-0"
                                                     />
-                                                    <input 
-                                                        type="text" 
+                                                    <SearchableSelect
+                                                        options={categories.map(c => ({ label: c, value: c }))}
                                                         value={item.category}
-                                                        onChange={(e) => updateItem(item.tempId, "category", e.target.value)}
-                                                        placeholder="Category (e.g. Smartphone)"
-                                                        className="w-full bg-transparent outline-none text-[10px] text-gray-400 placeholder:text-gray-300 uppercase tracking-wider p-0"
+                                                        allowCustom={true}
+                                                        onChange={(val) => updateItem(item.tempId, "category", val)}
+                                                        placeholder="Category..."
+                                                        className="border-none p-0 opacity-70 scale-90 -ml-2"
                                                     />
                                                 </td>
                                                 <td className="p-3">
@@ -427,6 +509,172 @@ export default function AddVendorPurchasePage() {
                     </div>
                 </div>
             </form>
+            {/* FULL VIEW MODAL */}
+            {isFullView && (
+                <div className="fixed inset-0 z-[9999] bg-white dark:bg-boxdark flex flex-col p-6 animate-fadeIn">
+                    <div className="flex items-center justify-between mb-8 border-b dark:border-strokedark pb-6">
+                        <div className="flex items-center gap-4">
+                            <button 
+                                onClick={() => setIsFullView(false)}
+                                className="p-2 hover:bg-gray-100 dark:hover:bg-meta-4 rounded-full transition-all"
+                            >
+                                <Minimize2 size={24} className="text-gray-400" />
+                            </button>
+                            <div>
+                                <h2 className="text-xl font-black text-black dark:text-white flex items-center gap-2">
+                                    <ShoppingCart className="text-primary" /> Purchase Items Master List
+                                </h2>
+                                <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">{vendorName || "Unselected Vendor"} · {items.length} records</p>
+                            </div>
+                        </div>
+
+                        <div className="flex items-center gap-6">
+                            <div className="text-right">
+                                <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none">Total Value</div>
+                                <div className="text-2xl font-black text-primary tabular-nums">PKR {totalAmount.toLocaleString()}</div>
+                            </div>
+                            <div className="h-10 w-[1px] bg-stroke dark:bg-strokedark" />
+                            <div className="flex items-center gap-3">
+                                <button 
+                                    type="button" 
+                                    onClick={() => setIsFullView(false)}
+                                    className="px-6 py-2.5 rounded-xl text-sm font-bold text-gray-500 hover:bg-gray-100 transition-all active:scale-95"
+                                >
+                                    Cancel
+                                </button>
+                                <button 
+                                    type="submit" 
+                                    disabled={saving}
+                                    onClick={(e) => { e.preventDefault(); handleSubmit(e as any); }}
+                                    className="bg-primary hover:bg-opacity-90 text-white px-10 py-3 rounded-xl text-sm font-black flex items-center gap-2 shadow-lg shadow-primary/20 transition-all active:scale-95 disabled:opacity-50"
+                                >
+                                    {saving ? <div className="w-4 h-4 border-2 border-white border-t-transparent animate-spin rounded-full" /> : <Save size={18} />}
+                                    {saving ? "Saving..." : "Save Purchase"}
+                                </button>
+                                <button 
+                                    type="button"
+                                    onClick={() => setIsFullView(false)}
+                                    className="p-3 bg-gray-100 dark:bg-meta-4 text-gray-500 rounded-xl hover:text-red-500 transition-all"
+                                >
+                                    <X size={20} />
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="flex-1 overflow-auto px-1">
+                        <table className="w-full text-left border-collapse text-sm">
+                            <thead className="sticky top-0 bg-white dark:bg-boxdark z-20">
+                                <tr className="bg-gray-50 dark:bg-meta-4 text-[10px] uppercase font-black tracking-widest text-gray-400 shadow-sm">
+                                    <th className="p-4 w-12 border-b border-stroke dark:border-strokedark">#</th>
+                                    <th className="p-4 border-b border-stroke dark:border-strokedark">Product Info</th>
+                                    <th className="p-4 border-b border-stroke dark:border-strokedark">Variant Details</th>
+                                    <th className="p-4 border-b border-stroke dark:border-strokedark">IMEI / Serial</th>
+                                    <th className="p-4 w-24 text-center border-b border-stroke dark:border-strokedark">Quantity</th>
+                                    <th className="p-4 w-40 text-right border-b border-stroke dark:border-strokedark">Unit Price</th>
+                                    <th className="p-4 w-12 border-b border-stroke dark:border-strokedark" />
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-stroke/50 dark:divide-strokedark/50">
+                                {items.map((item, index) => (
+                                    <tr key={item.tempId} className="group hover:bg-gray-50/50 dark:hover:bg-meta-4/20 transition-all">
+                                        <td className="p-4 font-mono text-gray-300 font-black">{index + 1}</td>
+                                        <td className="p-4 space-y-3">
+                                            <SearchableSelect
+                                                label="Category"
+                                                options={categories.map(c => ({ label: c, value: c }))}
+                                                value={item.category}
+                                                allowCustom={true}
+                                                onChange={(val) => updateItem(item.tempId, "category", val)}
+                                                placeholder="Choose or Type..."
+                                                className="scale-90 origin-left"
+                                            />
+                                            <SearchableSelect
+                                                label="Product Name"
+                                                options={!item.category ? [] : allProducts
+                                                    .filter(p => !item.category || p.category_name === item.category)
+                                                    .map(p => ({ label: p.name, value: p.name, ...p }))
+                                                }
+                                                value={item.product_name}
+                                                allowCustom={true}
+                                                disabled={!item.category}
+                                                onChange={(val, opt) => {
+                                                    if (opt) handleProductSelectByRow(item.tempId, opt);
+                                                    else updateItem(item.tempId, "product_name", val);
+                                                }}
+                                                placeholder="Search or Type..."
+                                            />
+                                        </td>
+                                        <td className="p-4">
+                                            <label className="block text-[8px] font-black text-gray-400 uppercase mb-1">Color / Specs</label>
+                                            <input 
+                                                type="text" 
+                                                value={item.color_variant}
+                                                onChange={(e) => updateItem(item.tempId, "color_variant", e.target.value)}
+                                                placeholder="e.g. 128GB Black"
+                                                className="w-full bg-gray-50 dark:bg-meta-4 border border-stroke dark:border-strokedark rounded-xl px-4 py-3 outline-none focus:border-primary text-sm font-bold"
+                                            />
+                                        </td>
+                                        <td className="p-4 font-mono">
+                                            <label className="block text-[8px] font-black text-gray-400 uppercase mb-1">Serial Number</label>
+                                            <input 
+                                                type="text" 
+                                                value={item.imei_serial}
+                                                onChange={(e) => updateItem(item.tempId, "imei_serial", e.target.value)}
+                                                placeholder="Scan Device..."
+                                                className="w-full bg-gray-50 dark:bg-meta-4 border border-stroke dark:border-strokedark rounded-xl px-4 py-3 outline-none focus:border-primary text-sm font-bold text-gray-600 dark:text-gray-400"
+                                            />
+                                        </td>
+                                        <td className="p-4 text-center">
+                                            <input 
+                                                type="number" 
+                                                min="1"
+                                                value={item.quantity}
+                                                onChange={(e) => updateItem(item.tempId, "quantity", parseInt(e.target.value))}
+                                                disabled={item.imei_serial.trim().length > 0}
+                                                className="w-16 bg-gray-50 dark:bg-meta-4 border border-stroke dark:border-strokedark rounded-xl py-3 outline-none text-center font-black text-primary disabled:opacity-30"
+                                            />
+                                        </td>
+                                        <td className="p-4 text-right">
+                                            <div className="relative">
+                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 font-black">PKR</span>
+                                                <input 
+                                                    type="number" 
+                                                    value={item.unit_price || ""}
+                                                    onChange={(e) => updateItem(item.tempId, "unit_price", parseFloat(e.target.value))}
+                                                    placeholder="0"
+                                                    className="w-full bg-gray-50 dark:bg-meta-4 border border-stroke dark:border-strokedark rounded-xl pl-10 pr-4 py-3 outline-none text-right font-black text-gray-800 dark:text-white"
+                                                />
+                                            </div>
+                                            <div className="text-[10px] text-gray-400 font-bold mt-2 px-1">Total: PKR {(item.quantity * item.unit_price).toLocaleString()}</div>
+                                        </td>
+                                        <td className="p-4 text-right">
+                                            <button 
+                                                type="button"
+                                                onClick={() => removeItem(item.tempId)}
+                                                className="p-3 text-gray-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 rounded-xl transition-all"
+                                            >
+                                                <Trash2 size={18} />
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
+                                <tr>
+                                    <td colSpan={7} className="p-4">
+                                        <button 
+                                            type="button"
+                                            onClick={addItem}
+                                            className="w-full py-4 rounded-2xl border-2 border-dashed border-stroke dark:border-strokedark text-gray-400 hover:border-primary hover:text-primary transition-all font-black uppercase tracking-widest text-xs flex items-center justify-center gap-2"
+                                        >
+                                            <Plus size={16} /> Add Another Row to Invoice
+                                        </button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

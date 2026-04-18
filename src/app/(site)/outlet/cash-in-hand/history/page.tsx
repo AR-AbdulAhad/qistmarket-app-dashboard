@@ -21,10 +21,7 @@ type CashEntry = {
     status: string;
     created_at: string;
     payment_method: string;
-    customer_name: string;
-    product_name: string;
-    imei_serial: string;
-    color_variant: string;
+    cash_type: string;
     officer: {
         full_name: string;
         phone: string;
@@ -43,10 +40,14 @@ export default function CashHistoryPage() {
     const [search, setSearch] = useState("");
     const [dateFrom, setDateFrom] = useState("");
     const [dateTo, setDateTo] = useState("");
+    const [page, setPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
+    const [totalVerifiedAmount, setTotalVerifiedAmount] = useState(0);
+    const [totalRecordsCount, setTotalRecordsCount] = useState(0);
 
     useEffect(() => {
         fetchHistory();
-    }, []);
+    }, [page]);
 
     const fetchHistory = async () => {
         setLoading(true);
@@ -55,6 +56,8 @@ export default function CashHistoryPage() {
             const params = new URLSearchParams();
             if (dateFrom) params.append("date_from", dateFrom);
             if (dateTo) params.append("date_to", dateTo);
+            params.append("page", page.toString());
+            params.append("limit", "10");
 
             if (params.toString()) url += `?${params.toString()}`;
 
@@ -62,6 +65,11 @@ export default function CashHistoryPage() {
             const data = await res.json();
             if (data.success) {
                 setEntries(data.data);
+                setTotalVerifiedAmount(data.totalAmount || 0);
+                if (data.pagination) {
+                    setTotalPages(data.pagination.pages);
+                    setTotalRecordsCount(data.pagination.total);
+                }
             }
         } catch (error) {
             console.error(error);
@@ -74,9 +82,8 @@ export default function CashHistoryPage() {
     const filteredEntries = useMemo(() => {
         return entries.filter(e =>
             e.officer?.full_name?.toLowerCase().includes(search.toLowerCase()) ||
-            e.order.order_ref?.toLowerCase().includes(search.toLowerCase()) ||
-            e.product_name?.toLowerCase().includes(search.toLowerCase()) ||
-            e.customer_name?.toLowerCase().includes(search.toLowerCase()) ||
+            e.order?.order_ref?.toLowerCase().includes(search.toLowerCase()) ||
+            e.cash_type?.toLowerCase().includes(search.toLowerCase()) ||
             e.payment_method?.toLowerCase().includes(search.toLowerCase())
         );
     }, [entries, search]);
@@ -129,7 +136,7 @@ export default function CashHistoryPage() {
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                             <input
                                 type="text"
-                                placeholder="Officer, Order, Product..."
+                                placeholder="Officer, Order Ref, Type..."
                                 value={search}
                                 onChange={(e) => setSearch(e.target.value)}
                                 className="w-full pl-10 pr-4 py-2.5 bg-gray-50 dark:bg-form-input border border-stroke dark:border-strokedark rounded-lg text-sm focus:border-primary outline-none"
@@ -158,7 +165,7 @@ export default function CashHistoryPage() {
                     </div>
 
                     <button
-                        onClick={fetchHistory}
+                        onClick={() => { setPage(1); fetchHistory(); }}
                         className="bg-gray-100 dark:bg-meta-4 hover:bg-gray-200 dark:hover:bg-opacity-80 text-gray-700 dark:text-gray-200 py-2.5 rounded-lg text-sm font-bold flex items-center justify-center gap-2 transition-colors border border-gray-200 dark:border-strokedark"
                     >
                         <Filter size={16} /> Apply Filters
@@ -171,7 +178,7 @@ export default function CashHistoryPage() {
                 <div className="bg-white dark:bg-boxdark p-5 rounded-2xl border border-stroke dark:border-strokedark shadow-sm">
                     <p className="text-xs font-black text-gray-400 uppercase tracking-widest mb-1">Total Verified</p>
                     <div className="flex items-center justify-between">
-                        <p className="text-2xl font-black text-primary">PKR {totalCollected.toLocaleString()}</p>
+                        <p className="text-2xl font-black text-primary">PKR {totalVerifiedAmount.toLocaleString()}</p>
                         <div className="p-2 bg-primary/10 rounded-lg text-primary">
                             <DollarSign size={20} />
                         </div>
@@ -180,7 +187,7 @@ export default function CashHistoryPage() {
                 <div className="bg-white dark:bg-boxdark p-5 rounded-2xl border border-stroke dark:border-strokedark shadow-sm">
                     <p className="text-xs font-black text-gray-400 uppercase tracking-widest mb-1">Collections</p>
                     <div className="flex items-center justify-between">
-                        <p className="text-2xl font-black text-gray-800 dark:text-white">{filteredEntries.length}</p>
+                        <p className="text-2xl font-black text-gray-800 dark:text-white">{totalRecordsCount.toLocaleString()}</p>
                         <div className="p-2 bg-green-100 dark:bg-green-900/20 rounded-lg text-green-600">
                             <RefreshCw size={20} />
                         </div>
@@ -196,8 +203,8 @@ export default function CashHistoryPage() {
                             <tr className="bg-gray-50 dark:bg-meta-4 border-b border-stroke dark:border-strokedark">
                                 <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">Date & Time</th>
                                 <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">Officer</th>
-                                <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">Customer</th>
-                                <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">Product Details</th>
+                                <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">Order Ref</th>
+                                <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">Cash Type</th>
                                 <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest text-right">Amount</th>
                                 <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest text-center">Status</th>
                             </tr>
@@ -238,21 +245,15 @@ export default function CashHistoryPage() {
                                         </div>
                                     </td>
                                     <td className="px-6 py-4">
-                                        <div className="min-w-[150px]">
-                                            <p className="text-sm font-bold text-gray-800 dark:text-gray-200">{entry.customer_name}</p>
-                                            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-tighter italic">#{entry.order?.order_ref || "N/A"}</p>
+                                        <div className="min-w-[100px]">
+                                            <p className="text-sm font-bold text-gray-800 dark:text-gray-200">#{entry.order?.order_ref || "N/A"}</p>
                                         </div>
                                     </td>
                                     <td className="px-6 py-4">
-                                        <div className="min-w-[200px]">
+                                        <div className="min-w-[150px]">
                                             <div className="flex items-center gap-2 mb-1">
-                                                <Package size={14} className="text-gray-400" />
-                                                <p className="text-xs font-bold text-gray-700 dark:text-gray-300 truncate">{entry.product_name}</p>
-                                            </div>
-                                            <div className="flex gap-2 text-[9px] text-gray-500 uppercase font-black tracking-widest bg-gray-50 dark:bg-meta-4 p-1 px-2 rounded-lg border border-gray-100 dark:border-strokedark w-fit">
-                                               <span>IMEI: {entry.imei_serial || "N/A"}</span>
-                                               <span className="text-primary">•</span>
-                                               <span>{entry.color_variant || "Standard"}</span>
+                                                <DollarSign size={14} className="text-primary" />
+                                                <p className="text-xs font-bold text-gray-700 dark:text-gray-300 truncate">{entry.cash_type || 'Advance amount payment'}</p>
                                             </div>
                                         </div>
                                     </td>
@@ -271,6 +272,24 @@ export default function CashHistoryPage() {
                         </tbody>
                     </table>
                 </div>
+            </div>
+
+            <div className="flex justify-center items-center gap-4 mt-6">
+                <button 
+                    disabled={page <= 1}
+                    onClick={() => setPage(p => Math.max(1, p - 1))}
+                    className="px-4 py-2 bg-white dark:bg-boxdark border border-stroke dark:border-strokedark rounded-lg text-sm font-bold text-gray-700 dark:text-gray-300 disabled:opacity-50 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                >
+                    Previous
+                </button>
+                <span className="text-sm font-bold text-gray-500 dark:text-gray-400">Page {page} of {totalPages}</span>
+                <button 
+                    disabled={page >= totalPages}
+                    onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                    className="px-4 py-2 bg-white dark:bg-boxdark border border-stroke dark:border-strokedark rounded-lg text-sm font-bold text-gray-700 dark:text-gray-300 disabled:opacity-50 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                >
+                    Next
+                </button>
             </div>
         </div>
     );

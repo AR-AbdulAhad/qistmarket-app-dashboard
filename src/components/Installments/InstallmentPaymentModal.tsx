@@ -39,18 +39,47 @@ export default function InstallmentPaymentModal({ open, onClose, onSuccess, orde
     const [feedback, setFeedback] = useState("");
     const [paymentMethod, setPaymentMethod] = useState("Cash");
     const [fuelCharge, setFuelCharge] = useState(0);
+    const [paymentAmount, setPaymentAmount] = useState<number>(0);
     const [loading, setLoading] = useState(false);
+    const [qrData, setQrData] = useState<{qr_string: string, qr_image_base64: string, amount: number} | null>(null);
+    const [generatingQr, setGeneratingQr] = useState(false);
 
     // Reset state when modal opens
     useEffect(() => {
         if (open) {
-            setIsOtpSent(false);
+            // If Recovery Officer, OTP is still required. If Outlet Manager, we skip OTP state.
+            setIsOtpSent(!isRecoveryOfficer);
             setOtp("");
             setFeedback("");
             setPaymentMethod("Cash");
             setFuelCharge(0);
+            setPaymentAmount(installment?.dueAmount || 0);
+            setQrData(null);
         }
-    }, [open]);
+    }, [open, isRecoveryOfficer, installment]);
+
+    // Check for existing QR code silently if method is Online
+    useEffect(() => {
+        if (open && paymentMethod === "Online" && !isRecoveryOfficer && installment && !qrData) {
+            const checkSavedQr = async () => {
+                setGeneratingQr(true);
+                try {
+                    const res = await fetch(`${API_BASE}/api/outlet/installment/check-smartpay-qr?order_id=${orderId}&month_number=${installment.monthNumber}`, {
+                        headers: getAuthHeaders()
+                    });
+                    const data = await res.json();
+                    if (data.success && data.data) {
+                        setQrData(data.data);
+                    }
+                } catch (e) {
+                    console.error("Failed to check saved QR", e);
+                } finally {
+                    setGeneratingQr(false);
+                }
+            };
+            checkSavedQr();
+        }
+    }, [open, paymentMethod, isRecoveryOfficer, installment, orderId, qrData]);
 
     const handleSendOtp = async () => {
         setLoading(true);
@@ -79,8 +108,37 @@ export default function InstallmentPaymentModal({ open, onClose, onSuccess, orde
         }
     };
 
+    const handleGenerateQr = async (forceRegenerate = false) => {
+        if (!installment) return;
+        setGeneratingQr(true);
+        try {
+            const res = await fetch(`${API_BASE}/api/outlet/installment/generate-smartpay-qr`, {
+                method: "POST",
+                headers: getAuthHeaders(),
+                body: JSON.stringify({
+                    order_id: orderId,
+                    month_number: installment.monthNumber,
+                    amount: paymentAmount,
+                    force_regenerate: forceRegenerate
+                }),
+            });
+            const data = await res.json();
+            if (data.success && data.data) {
+                setQrData(data.data);
+                toast.success(forceRegenerate ? "QR Regenerated" : "SmartPay QR ready for customer scan");
+            } else {
+                toast.error(data.message || "Failed to generate QR");
+            }
+        } catch (e) {
+            console.error(e);
+            toast.error("Error communicating with payment gateway");
+        } finally {
+            setGeneratingQr(false);
+        }
+    };
+
     const handleVerifyAndPay = async () => {
-        if (!otp) return toast.error("Please enter OTP");
+        if (isRecoveryOfficer && !otp) return toast.error("Please enter OTP");
         if (!feedback) return toast.error("Please enter customer feedback");
 
         setLoading(true);
@@ -108,7 +166,7 @@ export default function InstallmentPaymentModal({ open, onClose, onSuccess, orde
                     body: JSON.stringify({
                         order_id: orderId,
                         month_number: installment?.monthNumber,
-                        amount: installment?.dueAmount,
+                        amount: paymentAmount,
                         feedback,
                         payment_method: paymentMethod,
                         fuelCharges: fuelCharge
@@ -124,17 +182,16 @@ export default function InstallmentPaymentModal({ open, onClose, onSuccess, orde
                     toast.error(submitData.message || "Payment submission failed");
                 }
             } else {
-                // Logic for Outlet Managers (Combined)
+                // Logic for Outlet Managers (Combined, NO OTP required)
                 const res = await fetch(`${API_BASE}/api/outlet/installment/verify-and-pay`, {
                     method: "POST",
                     headers: getAuthHeaders(),
                     body: JSON.stringify({
                         order_id: orderId,
                         month_number: installment?.monthNumber,
-                        amount: installment?.dueAmount,
-                        otp,
+                        amount: paymentAmount,
                         feedback,
-                        payment_method: paymentMethod,
+                        payment_method: paymentMethod, // Cash or Online
                     }),
                 });
                 const data = await res.json();
@@ -181,7 +238,7 @@ export default function InstallmentPaymentModal({ open, onClose, onSuccess, orde
                     </div>
                 </div>
 
-                {!isOtpSent ? (
+                {!isOtpSent && isRecoveryOfficer ? (
                     <div className="text-center py-4">
                         <p className="text-gray-600 dark:text-gray-400 mb-6 px-4">An OTP will be sent to the customer's registered WhatsApp number for verification.</p>
                         <button
@@ -195,16 +252,33 @@ export default function InstallmentPaymentModal({ open, onClose, onSuccess, orde
                 ) : (
                     <div className="space-y-4 animate-fade-in max-h-[60vh] overflow-y-auto px-1">
                         <div>
-                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Enter Verification OTP</label>
+                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1 flex justify-between">
+                                <span>Collection Amount</span>
+                                <span className="text-blue-500 font-normal normal-case opacity-80 text-[10px]">Editable for Partial Payment</span>
+                            </label>
                             <input
-                                type="text"
-                                value={otp}
-                                onChange={(e) => setOtp(e.target.value)}
-                                className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 focus:ring-2 focus:ring-blue-500 outline-none transition-all dark:text-white"
-                                placeholder="4-6 digit OTP"
-                                maxLength={6}
+                                type="number"
+                                min="1"
+                                max={installment.dueAmount}
+                                value={paymentAmount || ''}
+                                onChange={(e) => setPaymentAmount(parseFloat(e.target.value))}
+                                className="w-full px-4 py-3 rounded-xl border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/30 font-bold focus:ring-2 focus:ring-blue-500 outline-none transition-all text-blue-700 dark:text-blue-400"
+                                placeholder="Amount in PKR"
                             />
                         </div>
+                        {isRecoveryOfficer && (
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Enter Verification OTP</label>
+                                <input
+                                    type="text"
+                                    value={otp}
+                                    onChange={(e) => setOtp(e.target.value)}
+                                    className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 focus:ring-2 focus:ring-blue-500 outline-none transition-all dark:text-white"
+                                    placeholder="4-6 digit OTP"
+                                    maxLength={6}
+                                />
+                            </div>
+                        )}
 
                         <div className="grid grid-cols-2 gap-4">
                             <div>
@@ -242,19 +316,62 @@ export default function InstallmentPaymentModal({ open, onClose, onSuccess, orde
                             />
                         </div>
 
+                        {paymentMethod === "Online" && !isRecoveryOfficer && (
+                            <div className="bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl p-6 text-center">
+                                {!qrData ? (
+                                    <>
+                                        <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                                            Request a SmartPay QR code for the customer to scan and pay the installment directly.
+                                        </p>
+                                        <button
+                                            onClick={() => handleGenerateQr(false)}
+                                            disabled={generatingQr}
+                                            className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 px-6 rounded-lg transition-all shadow-md active:scale-95 disabled:opacity-50 text-sm"
+                                        >
+                                            {generatingQr ? "Contacting Payment Gateway..." : "Generate SmartPay QR"}
+                                        </button>
+                                    </>
+                                ) : (
+                                    <div className="flex flex-col items-center animate-fade-in">
+                                        <p className="text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Scan QR to Pay PKR {qrData.amount.toLocaleString()}</p>
+                                        <div className="p-2 bg-white rounded-xl shadow-sm border mb-4">
+                                            <img src={qrData.qr_image_base64} alt="SmartPay QR" className="w-56 h-56 object-contain" />
+                                        </div>
+                                        <button
+                                            onClick={() => handleGenerateQr(true)}
+                                            disabled={generatingQr}
+                                            className="text-xs text-blue-500 hover:text-blue-700 underline underline-offset-2 disabled:opacity-50"
+                                        >
+                                            {generatingQr ? "Regenerating..." : "QR Not Working? Regenerate"}
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
                         <div className="pt-4 flex gap-3">
                             <button
-                                onClick={() => setIsOtpSent(false)}
+                                onClick={() => {
+                                    if(isRecoveryOfficer) setIsOtpSent(false);
+                                    else onClose();
+                                }}
                                 className="flex-1 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 font-semibold py-3 px-4 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-all"
                             >
-                                Back
+                                {isRecoveryOfficer ? "Back" : "Cancel"}
                             </button>
                             <button
                                 onClick={handleVerifyAndPay}
-                                disabled={loading}
-                                className="flex-[2] bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-4 rounded-xl transition-all shadow-lg shadow-green-200 dark:shadow-none disabled:opacity-50"
+                                disabled={loading || (!isRecoveryOfficer && paymentMethod === 'Online' && !qrData)}
+                                className={`flex-[2] text-white font-semibold py-3 px-4 rounded-xl transition-all shadow-lg dark:shadow-none disabled:opacity-50 ${
+                                    paymentMethod === 'Online' ? 'bg-primary hover:bg-opacity-90 shadow-primary/30' : 'bg-green-600 hover:bg-green-700 shadow-green-200'
+                                }`}
                             >
-                                {loading ? "Processing..." : "Verify & Collect PKR " + (installment.dueAmount + (isRecoveryOfficer ? fuelCharge : 0)).toLocaleString()}
+                                {loading 
+                                    ? "Processing..." 
+                                    : paymentMethod === 'Online' 
+                                        ? "Confirm Payment Received" 
+                                        : "Verify & Collect PKR " + (installment.dueAmount + (isRecoveryOfficer ? fuelCharge : 0)).toLocaleString()
+                                }
                             </button>
                         </div>
                     </div>

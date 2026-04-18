@@ -88,7 +88,7 @@ export default function Layout({ children }: PropsWithChildren) {
                 {children}
               </main>
             </div>
-            
+
             {/* Global OTP Popup for Cash Submission */}
             <CashSubmissionPopup socket={socketInstance} />
             {/* Global OTP Popup for Return/Exchange */}

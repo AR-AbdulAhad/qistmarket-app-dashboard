@@ -3,9 +3,9 @@
 import { useEffect, useState, useMemo } from "react";
 import Cookies from "js-cookie";
 import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
-import { 
-    CreditCard, Plus, Search, Filter, 
-    History, TrendingUp, AlertCircle, 
+import {
+    CreditCard, Plus, Search, Filter,
+    History, TrendingUp, AlertCircle,
     CheckCircle2, Building2, Calendar,
     ChevronRight, Wallet, ArrowUpRight, ShoppingCart
 } from "lucide-react";
@@ -42,6 +42,7 @@ interface BasicPurchase {
     vendor_name: string;
     total_amount: number;
     balance: number;
+    due_date?: string;
 }
 
 export default function VendorPaymentsPage() {
@@ -49,7 +50,7 @@ export default function VendorPaymentsPage() {
     const [summary, setSummary] = useState<VendorSummary[]>([]);
     const [payments, setPayments] = useState<Payment[]>([]);
     const [purchases, setPurchases] = useState<BasicPurchase[]>([]);
-    
+
     const [showModal, setShowModal] = useState(false);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState("");
@@ -63,8 +64,8 @@ export default function VendorPaymentsPage() {
         notes: ""
     });
 
-    useEffect(() => { 
-        fetchData(); 
+    useEffect(() => {
+        fetchData();
     }, []);
 
     const fetchData = async () => {
@@ -75,7 +76,7 @@ export default function VendorPaymentsPage() {
                 fetch(`${API_BASE}/api/outlet/vendors/payments`, { headers: getAuthHeaders() }),
                 fetch(`${API_BASE}/api/outlet/vendors/purchases`, { headers: getAuthHeaders() }),
             ]);
-            
+
             const [sumData, payData, purData] = await Promise.all([
                 sumRes.json(), payRes.json(), purRes.json()
             ]);
@@ -96,7 +97,7 @@ export default function VendorPaymentsPage() {
     const handleRecordPayment = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!form.purchase_id || !form.amount) return setError("Please select an invoice and enter amount.");
-        
+
         setSaving(true);
         setError("");
         setSuccess("");
@@ -133,8 +134,8 @@ export default function VendorPaymentsPage() {
     const selectedPurchase = purchases.find(p => p.id === parseInt(form.purchase_id));
 
     const globalStats = useMemo(() => {
-        const totalOwed = summary.reduce((s, v) => s + (v._sum.balance || 0), 0);
-        const totalPaid = summary.reduce((s, v) => s + (v._sum.paid_amount || 0), 0);
+        const totalOwed = summary.reduce((s, v) => s + (v?._sum?.balance || 0), 0);
+        const totalPaid = summary.reduce((s, v) => s + (v?._sum?.paid_amount || 0), 0);
         return { totalOwed, totalPaid };
     }, [summary]);
 
@@ -152,7 +153,7 @@ export default function VendorPaymentsPage() {
                     </h1>
                     <p className="text-sm text-gray-400 mt-1">Settle outstanding balances and track payment history</p>
                 </div>
-                <button 
+                <button
                     onClick={() => {
                         setShowModal(true);
                         setError("");
@@ -192,10 +193,14 @@ export default function VendorPaymentsPage() {
                         </div>
                         <div className="flex-1 min-w-0">
                             <div className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-0.5">Top Vendor Liability</div>
-                            <div className="text-lg font-black truncate">{summary.sort((a,b) => (b._sum.balance||0) - (a._sum.balance||0))[0].vendor_name}</div>
+                            <div className="text-lg font-black truncate">
+                                {summary.sort((a, b) => ((b?._sum?.balance || 0) - (a?._sum?.balance || 0)))[0]?.vendor_name || 'N/A'}
+                            </div>
                         </div>
                         <div className="text-right">
-                            <div className="text-lg font-black text-red-600 tabular-nums">PKR {(summary.sort((a,b) => (b._sum.balance||0) - (a._sum.balance||0))[0]._sum.balance||0).toLocaleString()}</div>
+                            <div className="text-lg font-black text-red-600 tabular-nums">
+                                PKR {(summary.sort((a, b) => ((b?._sum?.balance || 0) - (a?._sum?.balance || 0)))[0]?._sum?.balance || 0).toLocaleString()}
+                            </div>
                             <div className="text-[10px] text-gray-400 uppercase font-black tracking-widest">Pending Balance</div>
                         </div>
                         <ArrowUpRight className="absolute -right-2 -top-2 text-gray-300 opacity-10" size={100} />
@@ -290,18 +295,17 @@ export default function VendorPaymentsPage() {
                                                 <div className="text-[10px] text-gray-400 italic">Invoice Ref: Settle Partial</div>
                                             </td>
                                             <td className="p-4">
-                                                <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${
-                                                    p.payment_method === 'Cash' ? 'bg-green-100 text-green-700 dark:bg-green-900/30' :
-                                                    p.payment_method === 'Bank Transfer' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30' :
-                                                    'bg-violet-100 text-violet-700 dark:bg-violet-900/30'
-                                                }`}>
+                                                <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${p.payment_method === 'Cash' ? 'bg-green-100 text-green-700 dark:bg-green-900/30' :
+                                                        p.payment_method === 'Bank Transfer' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30' :
+                                                            'bg-violet-100 text-violet-700 dark:bg-violet-900/30'
+                                                    }`}>
                                                     {p.payment_method}
                                                 </span>
                                             </td>
                                             <td className="p-4 text-right">
                                                 <div className="font-black text-primary text-sm tabular-nums">PKR {p.amount.toLocaleString()}</div>
                                                 <div className="text-[10px] text-gray-400 font-bold uppercase flex items-center justify-end gap-1">
-                                                     Process Complete <CheckCircle2 size={10} className="text-green-500" />
+                                                    Process Complete <CheckCircle2 size={10} className="text-green-500" />
                                                 </div>
                                             </td>
                                         </tr>
@@ -335,7 +339,7 @@ export default function VendorPaymentsPage() {
                                     <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Select Purchase Invoice *</label>
                                     <div className="relative">
                                         <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-                                        <select 
+                                        <select
                                             value={form.purchase_id}
                                             onChange={e => setForm({ ...form, purchase_id: e.target.value, amount: purchases.find(p => p.id === parseInt(e.target.value))?.balance.toString() || "" })}
                                             className="w-full pl-12 pr-5 py-3 rounded-2xl bg-gray-50 dark:bg-meta-4 border border-stroke dark:border-strokedark outline-none focus:border-primary text-sm font-bold transition-all appearance-none"
@@ -343,7 +347,7 @@ export default function VendorPaymentsPage() {
                                             <option value="">Choose an outstanding invoice...</option>
                                             {purchases.map(p => (
                                                 <option key={p.id} value={p.id}>
-                                                    {p.invoice_number} — {p.vendor_name} (Bal: PKR {p.balance.toLocaleString()})
+                                                    {p.invoice_number} — {p.vendor_name} (Bal: PKR {p.balance.toLocaleString()} | Due: {p.due_date ? new Date(p.due_date).toLocaleDateString() : 'N/A'})
                                                 </option>
                                             ))}
                                         </select>
@@ -361,8 +365,8 @@ export default function VendorPaymentsPage() {
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="col-span-1">
                                         <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Payment Amount (PKR) *</label>
-                                        <input 
-                                            type="number" 
+                                        <input
+                                            type="number"
                                             value={form.amount}
                                             onChange={e => setForm({ ...form, amount: e.target.value })}
                                             placeholder="0.00"
@@ -371,19 +375,19 @@ export default function VendorPaymentsPage() {
                                     </div>
                                     <div className="col-span-1">
                                         <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Method</label>
-                                        <select 
+                                        <select
                                             value={form.payment_method}
                                             onChange={e => setForm({ ...form, payment_method: e.target.value })}
                                             className="w-full px-5 py-3 rounded-2xl bg-gray-50 dark:bg-meta-4 border border-stroke dark:border-strokedark outline-none focus:border-primary text-sm font-bold transition-all appearance-none"
                                         >
-                                            {["Cash", "Bank Transfer", "Easypaisa", "JazzCash", "Check"].map(m => <option key={m}>{m}</option>)}
+                                            {["Cash"].map(m => <option key={m}>{m}</option>)}
                                         </select>
                                     </div>
                                 </div>
 
                                 <div>
                                     <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Payment Notes</label>
-                                    <textarea 
+                                    <textarea
                                         value={form.notes}
                                         onChange={e => setForm({ ...form, notes: e.target.value })}
                                         placeholder="Reference details, check number..."
@@ -394,15 +398,15 @@ export default function VendorPaymentsPage() {
                             </div>
 
                             <div className="pt-4 flex gap-3">
-                                <button 
-                                    type="button" 
+                                <button
+                                    type="button"
                                     onClick={() => !saving && setShowModal(false)}
                                     className="flex-1 py-3.5 rounded-2xl text-sm font-black text-gray-400 hover:bg-gray-100 transition-all uppercase tracking-widest"
                                 >
                                     Cancel
                                 </button>
-                                <button 
-                                    type="submit" 
+                                <button
+                                    type="submit"
                                     disabled={saving}
                                     className="flex-1 bg-primary text-white py-3.5 rounded-2xl text-sm font-black shadow-lg shadow-primary/20 transition-all active:scale-95 disabled:opacity-50 uppercase tracking-widest"
                                 >

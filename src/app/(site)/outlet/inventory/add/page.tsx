@@ -5,6 +5,7 @@ import { useState, useCallback, useEffect } from "react";
 import Cookies from "js-cookie";
 import { PlusCircle, Trash2, Save, ArrowLeft } from "lucide-react";
 import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
+import SearchableSelect from "@/components/common/SearchableSelect";
 
 const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
 const getAuthHeaders = () => ({
@@ -16,11 +17,13 @@ interface ItemRow {
     id: string;
     product_name: string;
     category: string;
+    subcategory?: string;
     imei_serial: string;
     color_variant: string;
     quantity: string;
     purchase_price: string;
     status: string;
+    installment_plans?: any[];
 }
 
 export default function AddInventoryBulkPage() {
@@ -87,7 +90,8 @@ export default function AddInventoryBulkPage() {
             color_variant: item.color_variant,
             quantity: item.quantity,
             purchase_price: parseFloat(item.purchase_price),
-            status: item.status
+            status: item.status,
+            installment_plans: item.installment_plans
         }));
 
         setLoading(true);
@@ -112,27 +116,43 @@ export default function AddInventoryBulkPage() {
     };
 
     const [categories, setCategories] = useState<string[]>([]);
+    const [allProducts, setAllProducts] = useState<any[]>([]);
 
     useEffect(() => {
-        const fetchCategories = async () => {
+        const fetchStockData = async () => {
             try {
-                const res = await fetch("https://api.qistmarket.pk/api/categories");
-                const data = await res.json();
-                if (data && Array.isArray(data)) {
-                    // Assuming the API returns an array directly based on my previous check
-                    setCategories(data.map((c: any) => c.name));
-                } else if (data && data.categories && Array.isArray(data.categories)) {
-                    // Or if it's nested
-                    setCategories(data.categories.map((c: any) => c.name));
+                const token = Cookies.get("auth_token");
+                const resp = await fetch(`${API_BASE}/api/products`, {
+                  headers: { Authorization: `Bearer ${token}` }
+                });
+                const data = await resp.json();
+                if (data.success) {
+                    setAllProducts(data.data);
+                    const uniqueCategories = Array.from(new Set(data.data.map((p: any) => p.category_name))) as string[];
+                    setCategories(uniqueCategories.sort());
                 }
             } catch (err) {
-                console.error("Failed to fetch categories:", err);
-                // Fallback categories if API fails
+                console.error("Failed to fetch products for auto-fill:", err);
                 setCategories(["Smartphone", "Tablet", "Laptop", "Accessories", "Home Appliances", "Other"]);
             }
         };
-        fetchCategories();
+        fetchStockData();
     }, []);
+
+    const handleProductSelect = (id: string, product: any) => {
+        setItems(items.map(item => {
+            if (item.id === id) {
+                return {
+                    ...item,
+                    product_name: product.name,
+                    category: product.category_name,
+                    subcategory: product.subcategory_name,
+                    installment_plans: product.ProductInstallments?.filter((p: any) => p.isActive) || []
+                };
+            }
+            return item;
+        }));
+    };
 
     return (
         <div className="mx-auto max-w-7xl">
@@ -169,23 +189,32 @@ export default function AddInventoryBulkPage() {
                         <tbody className="divide-y divide-stroke dark:divide-strokedark">
                             {items.map((item, index) => (
                                 <tr key={item.id} className="hover:bg-gray-50 dark:hover:bg-meta-4/30 transition-colors">
-                                    <td className="p-3">
-                                        <select 
-                                            value={item.category} 
-                                            onChange={(e) => handleChange(item.id, 'category', e.target.value)} 
-                                            className="w-full border border-stroke dark:border-strokedark rounded-lg px-3 py-2 text-sm bg-transparent outline-none focus:border-primary focus:ring-1 focus:ring-primary dark:bg-form-input dark:text-white"
-                                        >
-                                            <option value="">Select...</option>
-                                            {categories.map(c => <option key={c} value={c}>{c}</option>)}
-                                        </select>
+                                    <td className="p-3 min-w-[150px]">
+                                        <SearchableSelect
+                                            options={categories.map(c => ({ label: c, value: c }))}
+                                            value={item.category}
+                                            onChange={(val) => handleChange(item.id, 'category', val)}
+                                            placeholder="Cat..."
+                                            allowCustom={true}
+                                        />
                                     </td>
-                                    <td className="p-3">
-                                        <input 
-                                            type="text"
-                                            value={item.product_name} 
-                                            onChange={(e) => handleChange(item.id, 'product_name', e.target.value)} 
-                                            placeholder="e.g. Galaxy A54" 
-                                            className="w-full border border-stroke dark:border-strokedark rounded-lg px-3 py-2 text-sm bg-transparent outline-none focus:border-primary focus:ring-1 focus:ring-primary dark:bg-form-input dark:text-white" 
+                                    <td className="p-3 min-w-[200px]">
+                                        <SearchableSelect
+                                            options={!item.category ? [] : allProducts
+                                                .filter(p => !item.category || p.category_name === item.category)
+                                                .map(p => ({ label: p.name, value: p.name, ...p }))
+                                            }
+                                            value={item.product_name}
+                                            disabled={!item.category}
+                                            onChange={(val, opt) => {
+                                                if (opt) {
+                                                    handleProductSelect(item.id, opt);
+                                                } else {
+                                                    handleChange(item.id, 'product_name', val);
+                                                }
+                                            }}
+                                            placeholder={!item.category ? "Select Cat..." : "Product..."}
+                                            allowCustom={true}
                                         />
                                     </td>
                                     <td className="p-3">

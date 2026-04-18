@@ -13,12 +13,13 @@ interface CashSubmissionData {
   payment_method: string;
   otp: string;
   entries: {
-    customer_name: string;
+    customer_name?: string;
     order_ref: string;
-    product_name: string;
-    imei: string;
-    color: string;
+    product_name?: string;
+    imei?: string;
+    color?: string;
     amount: number;
+    cash_type?: string;
   }[];
 }
 
@@ -31,7 +32,7 @@ export function CashSubmissionPopup({ socket }: { socket: any }) {
   useEffect(() => {
     if (!socket) return;
 
-    console.log("Socket listener attached to cash_submission_requested");
+    console.log("Socket listener attached to cash_submission_otp");
 
     const handleRequest = (payload: CashSubmissionData) => {
       console.log("Cash submission request received:", payload);
@@ -39,9 +40,9 @@ export function CashSubmissionPopup({ socket }: { socket: any }) {
       setIsOpen(true);
     };
 
-    socket.on("cash_submission_requested", handleRequest);
+    socket.on("cash_submission_otp", handleRequest);
     return () => {
-      socket.off("cash_submission_requested", handleRequest);
+      socket.off("cash_submission_otp", handleRequest);
     };
   }, [socket]);
 
@@ -124,19 +125,17 @@ export function CashSubmissionPopup({ socket }: { socket: any }) {
           </div>
 
           <div>
-            <p className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-3 pl-1">Delivery Snapshots:</p>
+            <p className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-3 pl-1">Submission Breakdown:</p>
             <div className="max-h-40 overflow-y-auto space-y-2 scrollbar-hide">
               {data.entries.map((entry, idx) => (
-                <div key={idx} className="p-3 bg-white dark:bg-gray-900 rounded-xl border border-gray-50 dark:border-gray-800 shadow-sm">
-                  <div className="flex justify-between items-start mb-1">
-                    <span className="text-[11px] font-bold text-gray-800 dark:text-white truncate pr-2">{entry.customer_name}</span>
-                    <span className="text-[11px] font-black text-primary">PKR {entry.amount.toLocaleString()}</span>
+                <div key={idx} className="p-3 bg-white dark:bg-gray-900 rounded-xl border border-gray-50 dark:border-gray-800 shadow-sm flex items-center justify-between">
+                  <div>
+                    <span className="text-[11px] font-bold text-gray-800 dark:text-white block pb-1">
+                       {entry.cash_type || 'Advance amount payment'}
+                    </span>
+                    <span className="text-[10px] text-gray-400">Reference: {entry.order_ref}</span>
                   </div>
-                  <p className="text-[10px] text-gray-500 dark:text-gray-400 truncate mb-1">#{entry.order_ref} - {entry.product_name}</p>
-                  <div className="flex justify-between items-center text-[9px] bg-gray-50 dark:bg-gray-800 p-1 px-2 rounded font-bold text-gray-400">
-                    <span>IMEI: {entry.imei || "N/A"}</span>
-                    <span className="text-gray-300 dark:text-gray-600">{entry.color || ""}</span>
-                  </div>
+                  <span className="text-sm font-black text-primary">PKR {entry.amount.toLocaleString()}</span>
                 </div>
               ))}
             </div>

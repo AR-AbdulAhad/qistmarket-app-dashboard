@@ -40,6 +40,7 @@ interface InstallmentEntry {
   status: string
   paidAt: string | null
   paymentMethod: string | null
+  arrears?: number
 }
 
 interface LedgerSummary {
@@ -715,7 +716,14 @@ const CustomerList = () => {
                                     <tr key={i} className="border-b border-stroke last:border-0 dark:border-dark-3">
                                       <td className="py-1 pr-2">#{inst.monthNumber}</td>
                                       <td className="py-1 pr-2">{fmtDate(inst.dueDate)}</td>
-                                      <td className="py-1 pr-2 text-right">{fmt(inst.dueAmount)}</td>
+                                      <td className="py-1 pr-2 text-right">
+                                        <div className="font-semibold">{fmt(inst.dueAmount)}</div>
+                                        {inst.arrears ? (
+                                          <div className="text-[9px] font-medium text-red-500 whitespace-nowrap">
+                                            Inc. Arrears: {fmt(inst.arrears)}
+                                          </div>
+                                        ) : null}
+                                      </td>
                                       <td className="py-1 pr-2 text-right">
                                         {inst.paidAmount > 0 ? fmt(inst.paidAmount) : '-'}
                                       </td>

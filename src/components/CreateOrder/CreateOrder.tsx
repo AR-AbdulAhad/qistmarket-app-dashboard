@@ -1,13 +1,15 @@
 'use client'
 
 import React, { useState, useRef, useEffect } from 'react';
-import { ShoppingBag, Globe, MessageSquare, Building, Users } from 'lucide-react';
+import { ShoppingBag, Globe, MessageSquare, Building, Users, Search, ChevronDown, Check, X, Phone, User as UserIcon, MapPin, AlertCircle, Calculator } from 'lucide-react';
 import toast from "react-hot-toast";
 import Cookies from "js-cookie";
+import { useAuth } from "../../../contexts/AuthContext";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
 
 const CreateOrders: React.FC = () => {
+  const { user } = useAuth();
   const [formData, setFormData] = useState({
     customer_name: '',
     whatsapp_number: '',
@@ -33,6 +35,7 @@ const CreateOrders: React.FC = () => {
 
   const [isManualAddress, setIsManualAddress] = useState(false);
   const [isCustomProduct, setIsCustomProduct] = useState(false);
+  const [isCustomProductNoPricing, setIsCustomProductNoPricing] = useState(false);
 
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
   const [selectedPlan, setSelectedPlan] = useState<any>(null);
@@ -44,17 +47,63 @@ const CreateOrders: React.FC = () => {
   const [selectedSubcategory, setSelectedSubcategory] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  // Searchable Select States
+  const [areaSearchTerm, setAreaSearchTerm] = useState('');
+  const [isAreaDropdownOpen, setIsAreaDropdownOpen] = useState(false);
+  const [productSearchTerm, setProductSearchTerm] = useState('');
+  const [isProductDropdownOpen, setIsProductDropdownOpen] = useState(false);
+
+  // Calculator States
+  const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
+  const [calcCategory, setCalcCategory] = useState('');
+  const [calcPrice, setCalcPrice] = useState('');
+  const [calcResults, setCalcResults] = useState<any[]>([]);
+  const [allCategories, setAllCategories] = useState<any[]>([]);
+
   const nameRef = useRef<HTMLInputElement>(null);
   const whatsappRef = useRef<HTMLInputElement>(null);
   const addressRef = useRef<HTMLInputElement>(null);
   const cityRef = useRef<HTMLSelectElement>(null);
-  const areaRef = useRef<HTMLSelectElement>(null);
+  const areaRef = useRef<HTMLButtonElement>(null);
   const genderRef = useRef<HTMLSelectElement>(null);
   const maritalRef = useRef<HTMLSelectElement>(null);
   const residentialRef = useRef<HTMLSelectElement>(null);
   const channelRef = useRef<HTMLDivElement>(null);
+  
+  // Refs for click-outside detection
+  const areaDropdownRef = useRef<HTMLDivElement>(null);
+  const productDropdownRef = useRef<HTMLDivElement>(null);
 
   const [addressHierarchy, setAddressHierarchy] = useState<any[]>([]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      // Close Area dropdown if clicked outside
+      if (areaDropdownRef.current && !areaDropdownRef.current.contains(event.target as Node)) {
+        setIsAreaDropdownOpen(false);
+      }
+      // Close Product dropdown if clicked outside
+      if (productDropdownRef.current && !productDropdownRef.current.contains(event.target as Node)) {
+        setIsProductDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const resp = await fetch('https://api.qistmarket.pk/api/categories');
+        const data = await resp.json();
+        setAllCategories(Array.isArray(data) ? data : []);
+      } catch (err) {
+        console.error("Error fetching categories:", err);
+      }
+    };
+    fetchCategories();
+  }, []);
 
   useEffect(() => {
     const fetchHierarchy = async () => {
@@ -66,6 +115,8 @@ const CreateOrders: React.FC = () => {
         const data = await resp.json();
         if (data.success) {
           setAddressHierarchy(data.data);
+          // Set default city to Karachi
+          setFormData(prev => ({ ...prev, city: 'Karachi' }));
         }
       } catch (err) {
         console.error("Error fetching address hierarchy:", err);
@@ -94,45 +145,110 @@ const CreateOrders: React.FC = () => {
     fetchProducts();
   }, []);
 
-  useEffect(() => {
-    if (selectedCategory) {
-      const filteredSubcats = Array.from(new Set(
-        products
-          .filter(p => p.category_name === selectedCategory)
-          .map(p => p.subcategory_name)
-      )) as string[];
-      setSubcategories(filteredSubcats.sort());
-      setSelectedSubcategory('');
-      setSelectedProduct(null);
+  // Round up logic
+  const roundUp = (val: number) => Math.ceil(val / 50) * 50;
+
+  const calculateInstallments = (category: string, price: number) => {
+    const cat = category.toLowerCase().trim();
+    let plans = [];
+
+    if (cat === 'mobiles' && price <= 50000) {
+      plans = [
+        { months: 3, profit: 0.20, advance: 0.35 },
+        { months: 6, profit: 0.35, advance: 0.25 },
+        { months: 9, profit: 0.45, advance: 0.20 },
+        { months: 12, profit: 0.55, advance: 0.15 },
+      ];
+    } else if (price > 50000 && price <= 100000) {
+      plans = [
+        { months: 3, profit: 0.20, advance: 0.40 },
+        { months: 6, profit: 0.35, advance: 0.35 },
+        { months: 9, profit: 0.45, advance: 0.30 },
+        { months: 12, profit: 0.55, advance: 0.25 },
+      ];
+    } else if (price > 100000) {
+      plans = [
+        { months: 3, profit: 0.20, advance: 0.40 },
+        { months: 6, profit: 0.35, advance: 0.35 },
+        { months: 9, profit: 0.45, advance: 0.30 },
+        { months: 12, profit: 0.55, advance: 0.25 },
+        { months: 24, profit: 0.85, advance: 0.25 },
+      ];
     } else {
-      setSubcategories([]);
+      // General fallbacks for other categories
+      plans = [
+        { months: 3, profit: 0.22, advance: 0.40 },
+        { months: 6, profit: 0.38, advance: 0.35 },
+        { months: 9, profit: 0.48, advance: 0.30 },
+        { months: 12, profit: 0.60, advance: 0.25 },
+      ];
     }
-  }, [selectedCategory, products]);
 
-  // ────────────────────────────────────────────────
-  // Hardcoded data (same as your original)
-  // ────────────────────────────────────────────────
+    const calculated = plans.map(p => {
+      const adv = roundUp(price * p.advance);
+      const rem = price - adv;
+      const profit = roundUp(rem * p.profit);
+      const total = rem + profit;
+      const monthly = roundUp(total / p.months);
+      const fullTotal = adv + (monthly * p.months);
+      return { ...p, advanceAmount: adv, monthlyAmount: monthly, totalPrice: fullTotal };
+    });
 
-  // No longer hardcoded
-  // const citiesData: Record<string, string[]> = { ... };
+    setCalcResults(calculated);
+  };
 
+  // Filter channels based on role
+  // Sales Officer (8): WhatsApp, Referral, Call
+  // Outlet User (5): Referral, Branch
+  // Admin (4): Own
+  // Form Analyzer (9): WhatsApp, Referral
+  const getFilteredChannels = () => {
+    const defaultChannels = [
+      { id: 'website', name: 'Website', icon: Globe, description: 'Website orders' },
+      { id: 'whatsapp', name: 'WhatsApp', icon: MessageSquare, description: 'WhatsApp messages' },
+      { id: 'branch', name: 'Branch', icon: Building, description: 'Physical branches' },
+      { id: 'referral', name: 'Referral', icon: Users, description: 'Customer referrals' },
+      { id: 'call', name: 'Call', icon: Phone, description: 'Phone calls' },
+      { id: 'own', name: 'Own', icon: Building, description: 'Admin own orders' },
+    ];
 
-  const channels = [
-    { id: 'website', name: 'Website', icon: Globe, description: 'Orders placed through the official website' },
-    { id: 'whatsapp', name: 'WhatsApp', icon: MessageSquare, description: 'Orders received via WhatsApp messages' },
-    { id: 'branch', name: 'Branch', icon: Building, description: 'In-person orders at physical branches' },
-    { id: 'referral', name: 'Referral', icon: Users, description: 'Orders from customer referrals or repeats' },
-  ];
+    const roleId = Number(user?.role_id);
+    if (roleId === 8 || roleId === 3) { // SO or RO
+      return defaultChannels.filter(c => ['whatsapp', 'referral', 'call'].includes(c.id));
+    }
+    if (roleId === 5) { // Outlet User
+      return defaultChannels.filter(c => ['referral', 'branch'].includes(c.id));
+    }
+    if (roleId === 4) { // Admin
+      return defaultChannels.filter(c => ['own'].includes(c.id));
+    }
+    if (roleId === 9) { // Form Analyzer
+      return defaultChannels.filter(c => ['whatsapp', 'referral'].includes(c.id));
+    }
+    return defaultChannels.filter(c => ['website', 'whatsapp', 'branch', 'referral'].includes(c.id)); // Default
+  };
+
+  const channels = getFilteredChannels();
 
   const genderOptions = ['Male', 'Female', 'Unidentified'];
   const maritalOptions = ['Single', 'Married', 'Divorced', 'Widowed'];
   const residentialOptions = ['Own', 'Rented', 'With Family'];
 
-  // Get zones for selected city
-  const zonesForCity = formData.city ? addressHierarchy.find(c => c.name === formData.city)?.zones || [] : [];
+  // Get all areas for Karachi (since city is fixed)
+  const karachiData = addressHierarchy.find(c => c.name === 'Karachi');
+  const allKarachiAreas = karachiData ? karachiData.zones.flatMap((z: any) => z.areas.map((a: any) => ({ ...a, zoneName: z.name }))) : [];
 
-  // Get areas for selected zone
-  const areasForZone = formData.zone ? zonesForCity.find((z: any) => z.name === formData.zone)?.areas || [] : [];
+  const handleAreaSelect = (area: any) => {
+    setFormData(prev => ({ 
+      ...prev, 
+      area: area.name, 
+      zone: area.zoneName 
+    }));
+    setAreaSearchTerm(area.name);
+    setIsAreaDropdownOpen(false);
+    if (errors.area) setErrors(prev => ({ ...prev, area: '' }));
+    if (errors.zone) setErrors(prev => ({ ...prev, zone: '' }));
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -150,6 +266,9 @@ const CreateOrders: React.FC = () => {
     setSelectedProduct(product);
     setSelectedPlan(null);
     setFormData(prev => ({ ...prev, product_name: product.name }));
+    setProductSearchTerm(product.name);
+    setIsProductDropdownOpen(false);
+    if (errors.product) setErrors(prev => ({ ...prev, product: '' }));
   };
 
   const handlePlanSelect = (plan: any) => {
@@ -174,27 +293,27 @@ const CreateOrders: React.FC = () => {
     if (isManualAddress) {
       if (!formData.address.trim()) newErrors.address = 'Address is required';
     } else {
-      if (!formData.zone) newErrors.zone = 'Zone is required';
       if (!formData.area) newErrors.area = 'Area is required';
+      // Zone auto-filled from Area
     }
 
     if (!formData.city) newErrors.city = 'City is required';
-    if (formData.city && !formData.area) newErrors.area = 'Area is required';
 
-    // New fields - making them required (as per previous backend validation)
     if (!formData.gender) newErrors.gender = 'Gender is required';
-    if (!formData.marital_status) newErrors.marital_status = 'Marital status is required';
-    if (!formData.residential_type) newErrors.residential_type = 'Residential type is required';
+    // Marital and Residential now optional as per user request
 
     if (!isCustomProduct) {
       if (!selectedProduct) newErrors.product = 'Product is required';
       if (!selectedPlan) newErrors.plan = 'Installment plan is required';
     } else {
       if (!formData.product_name.trim()) newErrors.product_name = 'Product name is required';
-      if (!formData.total_amount || isNaN(Number(formData.total_amount))) newErrors.total_amount = 'Total amount is required';
-      if (!formData.advance_amount || isNaN(Number(formData.advance_amount))) newErrors.advance_amount = 'Advance amount is required';
-      if (!formData.monthly_amount || isNaN(Number(formData.monthly_amount))) newErrors.monthly_amount = 'Monthly amount is required';
-      if (!formData.months || isNaN(Number(formData.months))) newErrors.months = 'Months is required';
+      
+      if (!isCustomProductNoPricing) {
+        if (!formData.total_amount || isNaN(Number(formData.total_amount))) newErrors.total_amount = 'Total amount is required';
+        if (!formData.advance_amount || isNaN(Number(formData.advance_amount))) newErrors.advance_amount = 'Advance amount is required';
+        if (!formData.monthly_amount || isNaN(Number(formData.monthly_amount))) newErrors.monthly_amount = 'Monthly amount is required';
+        if (!formData.months || isNaN(Number(formData.months))) newErrors.months = 'Months is required';
+      }
     }
     if (!formData.channel) newErrors.channel = 'Channel is required';
 
@@ -236,13 +355,14 @@ const CreateOrders: React.FC = () => {
         street: formData.street,
         house_no: formData.house_no,
         gender: formData.gender,
-        marital_status: formData.marital_status,
-        residential_type: formData.residential_type,
+        marital_status: formData.marital_status || null,
+        residential_type: formData.residential_type || null,
         product_name: formData.product_name.trim(),
-        total_amount: formData.total_amount,
-        advance_amount: formData.advance_amount,
-        monthly_amount: formData.monthly_amount,
-        months: formData.months,
+        // If no pricing, send 0 to maintain schema consistency
+        total_amount: isCustomProductNoPricing ? '0' : formData.total_amount,
+        advance_amount: isCustomProductNoPricing ? '0' : formData.advance_amount,
+        monthly_amount: isCustomProductNoPricing ? '0' : formData.monthly_amount,
+        months: isCustomProductNoPricing ? '0' : formData.months,
         channel: formData.channel,
         order_notes: formData.order_notes.trim() || null,
       };
@@ -272,8 +392,11 @@ const CreateOrders: React.FC = () => {
       });
       setIsManualAddress(false);
       setIsCustomProduct(false);
+      setIsCustomProductNoPricing(false);
       setSelectedProduct(null);
       setSelectedPlan(null);
+      setAreaSearchTerm('');
+      setProductSearchTerm('');
       setErrors({});
 
     } catch (error: any) {
@@ -294,248 +417,225 @@ const CreateOrders: React.FC = () => {
             {/* ────────────────────────────────────────────────
                 Customer Information (with new fields)
             ──────────────────────────────────────────────── */}
-            <section className="border-b pb-6">
-              <h2 className="text-xl font-semibold text-gray-800 mb-6">Customer Information</h2>
+            {/* ────────────────────────────────────────────────
+                Customer Information
+            ──────────────────────────────────────────────── */}
+            <section className="border-b pb-8">
+              <div className="flex items-center gap-3 mb-8">
+                <div className="p-2 bg-red-50 rounded-lg">
+                  <UserIcon className="w-5 h-5 text-red-600" />
+                </div>
+                <h2 className="text-xl font-bold text-gray-900">Customer Details</h2>
+              </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Customer Name <span className="text-red-600">*</span></label>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Full Name <span className="text-red-500">*</span></label>
                   <input
                     ref={nameRef}
                     type="text"
                     name="customer_name"
                     value={formData.customer_name}
                     onChange={handleChange}
-                    className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-red-500 outline-none transition ${errors.customer_name ? 'border-red-500' : 'border-gray-300'}`}
-                    placeholder="Enter full name"
+                    className={`w-full px-4 py-3 border rounded-xl focus:ring-4 focus:ring-red-100 outline-none transition-all ${errors.customer_name ? 'border-red-500 bg-red-50' : 'border-gray-200 focus:border-red-500'}`}
+                    placeholder="Enter customer's full name"
                   />
-                  {errors.customer_name && <p className="text-red-600 text-sm mt-1">{errors.customer_name}</p>}
+                  {errors.customer_name && <p className="text-red-500 text-xs mt-1.5 flex items-center gap-1"><AlertCircle className="w-3 h-3" /> {errors.customer_name}</p>}
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">WhatsApp Number <span className="text-red-600">*</span></label>
-                  <input
-                    ref={whatsappRef}
-                    type="tel"
-                    name="whatsapp_number"
-                    value={formData.whatsapp_number}
-                    onChange={handleChange}
-                    className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-red-500 outline-none transition ${errors.whatsapp_number ? 'border-red-500' : 'border-gray-300'}`}
-                    placeholder="03001234567"
-                  />
-                  {errors.whatsapp_number && <p className="text-red-600 text-sm mt-1">{errors.whatsapp_number}</p>}
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">WhatsApp Number <span className="text-red-500">*</span></label>
+                  <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-medium">+92</span>
+                    <input
+                      ref={whatsappRef}
+                      type="tel"
+                      name="whatsapp_number"
+                      value={formData.whatsapp_number}
+                      onChange={handleChange}
+                      className={`w-full pl-12 pr-4 py-3 border rounded-xl focus:ring-4 focus:ring-red-100 outline-none transition-all ${errors.whatsapp_number ? 'border-red-500 bg-red-50' : 'border-gray-200 focus:border-red-500'}`}
+                      placeholder="3001234567"
+                    />
+                  </div>
+                  {errors.whatsapp_number && <p className="text-red-500 text-xs mt-1.5 flex items-center gap-1"><AlertCircle className="w-3 h-3" /> {errors.whatsapp_number}</p>}
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Alternate Contact</label>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Alternate Contact <span className="text-gray-400 font-normal">(Optional)</span></label>
                   <input
                     type="tel"
                     name="alternate_contact"
                     value={formData.alternate_contact}
                     onChange={handleChange}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none transition"
-                    placeholder="Optional alternate number"
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-4 focus:ring-red-100 focus:border-red-500 outline-none transition-all"
+                    placeholder="Secondary contact number"
                   />
                 </div>
 
-                <div className="md:col-span-2 space-y-4">
-                  <div className="flex items-center justify-between">
-                    <label className="block text-sm font-medium text-gray-700">Address Information <span className="text-red-600">*</span></label>
-                    <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-600">
-                      <input
-                        type="checkbox"
-                        checked={isManualAddress}
-                        onChange={(e) => setIsManualAddress(e.target.checked)}
-                        className="rounded text-red-600 focus:ring-red-500"
-                      />
-                      Manual Entry
-                    </label>
-                  </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Gender <span className="text-red-500">*</span></label>
+                  <select
+                    ref={genderRef}
+                    name="gender"
+                    value={formData.gender}
+                    onChange={handleChange}
+                    className={`w-full px-4 py-3 border rounded-xl focus:ring-4 focus:ring-red-100 outline-none transition-all appearance-none bg-no-repeat bg-[right_1rem_center] ${errors.gender ? 'border-red-500 bg-red-50' : 'border-gray-200 focus:border-red-500'}`}
+                    style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236B7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")` }}
+                  >
+                    <option value="">Select Gender</option>
+                    {genderOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                  </select>
+                  {errors.gender && <p className="text-red-500 text-xs mt-1.5 flex items-center gap-1"><AlertCircle className="w-3 h-3" /> {errors.gender}</p>}
+                </div>
+              </div>
+            </section>
 
-                  {isManualAddress ? (
+            {/* ────────────────────────────────────────────────
+                Address Information
+            ──────────────────────────────────────────────── */}
+            <section className="border-b pb-8">
+              <div className="flex items-center justify-between mb-8">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-emerald-50 rounded-lg">
+                    <MapPin className="w-5 h-5 text-emerald-600" />
+                  </div>
+                  <h2 className="text-xl font-bold text-gray-900">Address & Location</h2>
+                </div>
+                <label className="flex items-center gap-2 cursor-pointer group">
+                  <div className={`w-10 h-6 flex items-center rounded-full p-1 transition-colors ${isManualAddress ? 'bg-red-500' : 'bg-gray-200'}`}>
+                    <div className={`bg-white w-4 h-4 rounded-full shadow-sm transform transition-transform ${isManualAddress ? 'translate-x-4' : 'translate-x-0'}`} />
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={isManualAddress}
+                    onChange={(e) => setIsManualAddress(e.target.checked)}
+                    className="sr-only"
+                  />
+                  <span className="text-sm font-medium text-gray-600 group-hover:text-red-600 transition-colors">Manual Address Entry</span>
+                </label>
+              </div>
+
+              {isManualAddress ? (
+                <div className="space-y-6">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">City</label>
+                    <input
+                      type="text"
+                      value="Karachi"
+                      disabled
+                      className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-500 cursor-not-allowed"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Full Address <span className="text-red-500">*</span></label>
                     <input
                       ref={addressRef}
                       type="text"
                       name="address"
                       value={formData.address}
                       onChange={handleChange}
-                      className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-red-500 outline-none transition ${errors.address ? 'border-red-500' : 'border-gray-300'}`}
-                      placeholder="Full Address (House #, Street, Block, Area, etc.)"
+                      className={`w-full px-4 py-3 border rounded-xl focus:ring-4 focus:ring-red-100 outline-none transition-all ${errors.address ? 'border-red-500' : 'border-gray-200 focus:border-red-500'}`}
+                      placeholder="Block, Street, House No, Landmark etc."
                     />
-                  ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <select
-                          name="zone"
-                          value={formData.zone}
-                          onChange={handleChange}
-                          className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-red-500 outline-none transition ${errors.zone ? 'border-red-500' : 'border-gray-300'}`}
-                        >
-                          <option value="">Select Zone</option>
-                          {zonesForCity.map((zone: any) => (
-                            <option key={zone.id} value={zone.name}>{zone.name}</option>
-                          ))}
-                        </select>
-                        {errors.zone && <p className="text-red-600 text-sm mt-1">{errors.zone}</p>}
-                      </div>
-                      <div>
-                        <select
-                          name="area"
-                          value={formData.area}
-                          onChange={handleChange}
-                          className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-red-500 outline-none transition ${errors.area ? 'border-red-500' : 'border-gray-300'}`}
-                        >
-                          <option value="">Select Area</option>
-                          {areasForZone.map((area: any) => (
-                            <option key={area.id} value={area.name}>{area.name}</option>
-                          ))}
-                        </select>
-                        {errors.area && <p className="text-red-600 text-sm mt-1">{errors.area}</p>}
-                      </div>
-                      <div>
-                        <input
-                          type="text"
-                          name="block"
-                          value={formData.block}
-                          onChange={handleChange}
-                          placeholder="Block / Sector"
-                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none transition"
-                        />
-                      </div>
-                      <div>
-                        <input
-                          type="text"
-                          name="street"
-                          value={formData.street}
-                          onChange={handleChange}
-                          placeholder="Street"
-                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none transition"
-                        />
-                      </div>
-                      <div className="md:col-span-2">
-                        <input
-                          type="text"
-                          name="house_no"
-                          value={formData.house_no}
-                          onChange={handleChange}
-                          placeholder="House No / Appartment #"
-                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none transition"
-                        />
-                      </div>
+                    {errors.address && <p className="text-red-500 text-xs mt-1.5 flex items-center gap-1"><AlertCircle className="w-3 h-3" /> {errors.address}</p>}
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">City</label>
+                    <div className="px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-500 font-medium">
+                      Karachi
                     </div>
-                  )}
-                  {errors.address && isManualAddress && <p className="text-red-600 text-sm mt-1">{errors.address}</p>}
-                </div>
+                  </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">City <span className="text-red-600">*</span></label>
-                  <select
-                    ref={cityRef}
-                    name="city"
-                    value={formData.city}
-                    onChange={handleChange}
-                    className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-red-500 outline-none transition ${errors.city ? 'border-red-500' : 'border-gray-300'}`}
-                  >
-                    <option value="">Select City</option>
-                    {addressHierarchy.map(city => (
-                      <option key={city.id} value={city.name}>{city.name}</option>
-                    ))}
-                  </select>
-                  {errors.city && <p className="text-red-600 text-sm mt-1">{errors.city}</p>}
-                </div>
+                  {/* Searchable Area Select */}
+                  <div className="relative" ref={areaDropdownRef}>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Search Area <span className="text-red-500">*</span></label>
+                    <div className="relative">
+                      <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                      <input
+                        type="text"
+                        placeholder="Search area (e.g. North Nazimabad)"
+                        value={areaSearchTerm}
+                        onChange={(e) => {
+                          setAreaSearchTerm(e.target.value);
+                          setIsAreaDropdownOpen(true);
+                        }}
+                        onFocus={() => setIsAreaDropdownOpen(true)}
+                        className={`w-full pl-11 pr-10 py-3 border rounded-xl focus:ring-4 focus:ring-red-100 outline-none transition-all ${errors.area ? 'border-red-500 bg-red-50' : 'border-gray-200 focus:border-red-500'}`}
+                      />
+                      <button 
+                        type="button"
+                        onClick={() => setIsAreaDropdownOpen(!isAreaDropdownOpen)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-gray-100 rounded-lg transition-colors"
+                      >
+                        <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${isAreaDropdownOpen ? 'rotate-180' : ''}`} />
+                      </button>
+                    </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Area <span className="text-red-600">*</span></label>
-                  <select
-                    ref={areaRef}
-                    name="area"
-                    value={formData.area}
-                    onChange={handleChange}
-                    disabled={!formData.city}
-                    className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-red-500 outline-none transition disabled:bg-gray-100 ${errors.area ? 'border-red-500' : 'border-gray-300'}`}
-                  >
-                    <option value="">Select Area</option>
-                    {/* Fallback areas for backward compatibility or simple selection */}
-                    {zonesForCity.flatMap((z: any) => z.areas).map((area: any) => (
-                      <option key={area.id} value={area.name}>{area.name}</option>
-                    ))}
-                  </select>
-                  {errors.area && <p className="text-red-600 text-sm mt-1">{errors.area}</p>}
-                </div>
+                    {isAreaDropdownOpen && (
+                      <div className="absolute z-50 w-full mt-2 bg-white border border-gray-200 rounded-xl shadow-xl max-h-60 overflow-y-auto overflow-x-hidden">
+                        {allKarachiAreas.filter((a: any) => a.name.toLowerCase().includes(areaSearchTerm.toLowerCase())).length > 0 ? (
+                          allKarachiAreas
+                            .filter((a: any) => a.name.toLowerCase().includes(areaSearchTerm.toLowerCase()))
+                            .map((area: any) => (
+                              <button
+                                key={area.id}
+                                type="button"
+                                onClick={() => handleAreaSelect(area)}
+                                className={`w-full px-4 py-3 text-left hover:bg-red-50 transition-colors flex items-center justify-between group ${formData.area === area.name ? 'bg-red-50 text-red-600 font-medium' : 'text-gray-700'}`}
+                              >
+                                <div>
+                                  <div className="truncate">{area.name}</div>
+                                </div>
+                                {formData.area === area.name && <Check className="w-4 h-4" />}
+                              </button>
+                            ))
+                        ) : (
+                          <div className="px-4 py-8 text-center text-gray-500">
+                            <Search className="w-8 h-8 mx-auto mb-2 text-gray-200" />
+                            <p className="text-sm">No areas found for "{areaSearchTerm}"</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
 
-                {/* ── New fields inserted here ── */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Gender <span className="text-red-600">*</span></label>
-                  <select
-                    ref={genderRef}
-                    name="gender"
-                    value={formData.gender}
-                    onChange={handleChange}
-                    className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-red-500 outline-none transition ${errors.gender ? 'border-red-500' : 'border-gray-300'}`}
-                  >
-                    <option value="">Select Gender</option>
-                    {genderOptions.map(opt => (
-                      <option key={opt} value={opt}>{opt}</option>
-                    ))}
-                  </select>
-                  {errors.gender && <p className="text-red-600 text-sm mt-1">{errors.gender}</p>}
+                  <div className="md:col-span-2">
+                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Zone (Auto-detected)</label>
+                    <div className="px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-500 font-medium italic">
+                      {formData.zone || 'Select area to detect zone'}
+                    </div>
+                  </div>
                 </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Marital Status <span className="text-red-600">*</span></label>
-                  <select
-                    ref={maritalRef}
-                    name="marital_status"
-                    value={formData.marital_status}
-                    onChange={handleChange}
-                    className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-red-500 outline-none transition ${errors.marital_status ? 'border-red-500' : 'border-gray-300'}`}
-                  >
-                    <option value="">Select Status</option>
-                    {maritalOptions.map(opt => (
-                      <option key={opt} value={opt}>{opt}</option>
-                    ))}
-                  </select>
-                  {errors.marital_status && <p className="text-red-600 text-sm mt-1">{errors.marital_status}</p>}
-                </div>
-
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Residential Type <span className="text-red-600">*</span></label>
-                  <select
-                    ref={residentialRef}
-                    name="residential_type"
-                    value={formData.residential_type}
-                    onChange={handleChange}
-                    className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-red-500 outline-none transition ${errors.residential_type ? 'border-red-500' : 'border-gray-300'}`}
-                  >
-                    <option value="">Select Type</option>
-                    {residentialOptions.map(opt => (
-                      <option key={opt} value={opt}>{opt}</option>
-                    ))}
-                  </select>
-                  {errors.residential_type && <p className="text-red-600 text-sm mt-1">{errors.residential_type}</p>}
-                </div>
-
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Order Notes</label>
-                  <textarea
-                    name="order_notes"
-                    value={formData.order_notes}
-                    onChange={handleTextAreaChange}
-                    rows={3}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none transition"
-                    placeholder="Optional notes for this order"
-                  />
-                </div>
-              </div>
+              )}
             </section>
 
             {/* ────────────────────────────────────────────────
-                Product & Installment Plan (original style)
+                Product & Installment Plan
             ──────────────────────────────────────────────── */}
-            <section className="border-b pb-6">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-semibold text-gray-800">Product & Installment Plan</h2>
-                <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-600">
+            <section className="border-b pb-8">
+              <div className="flex items-center justify-between mb-8">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-blue-50 rounded-lg">
+                    <ShoppingBag className="w-5 h-5 text-blue-600" />
+                  </div>
+                  <h2 className="text-xl font-bold text-gray-900">Product & Plan</h2>
+                </div>
+                <div className="flex items-center gap-4">
+                  <button
+                    type="button"
+                    onClick={() => setIsCalculatorOpen(true)}
+                    className="flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-700 rounded-xl hover:bg-indigo-100 transition-all font-semibold text-sm border border-indigo-100 shadow-sm"
+                  >
+                    <Calculator className="w-4 h-4" />
+                    Installment Calculator
+                  </button>
+                  <label className="flex items-center gap-2 cursor-pointer group border-l pl-4 border-gray-100">
+                  <div className={`w-10 h-6 flex items-center rounded-full p-1 transition-colors ${isCustomProduct ? 'bg-blue-600' : 'bg-gray-200'}`}>
+                    <div className={`bg-white w-4 h-4 rounded-full shadow-sm transform transition-transform ${isCustomProduct ? 'translate-x-4' : 'translate-x-0'}`} />
+                  </div>
                   <input
                     type="checkbox"
                     checked={isCustomProduct}
@@ -544,168 +644,201 @@ const CreateOrders: React.FC = () => {
                       if (e.target.checked) {
                         setSelectedProduct(null);
                         setSelectedPlan(null);
+                        setProductSearchTerm('');
                         setFormData(prev => ({ ...prev, product_name: '', total_amount: '', advance_amount: '', monthly_amount: '', months: '' }));
                       }
                     }}
-                    className="rounded text-red-600 focus:ring-red-500"
+                    className="sr-only"
                   />
-                  Custom Product
+                  <span className="text-sm font-medium text-gray-600 group-hover:text-blue-600 transition-colors">Custom Product Entry</span>
                 </label>
               </div>
+            </div>
 
-              {isCustomProduct ? (
-                <div className="space-y-6">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Product Name <span className="text-red-600">*</span></label>
-                    <input
-                      type="text"
-                      name="product_name"
-                      value={formData.product_name}
-                      onChange={handleChange}
-                      className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-red-500 outline-none transition ${errors.product_name ? 'border-red-500' : 'border-gray-300'}`}
-                      placeholder="Enter custom product name"
-                    />
-                    {errors.product_name && <p className="text-red-600 text-sm mt-1">{errors.product_name}</p>}
+            {isCustomProduct ? (
+                <div className="space-y-8 p-6 bg-gray-50/50 rounded-2xl border border-gray-100">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-bold text-gray-800">Custom Product Specification</h3>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={!isCustomProductNoPricing}
+                        onChange={(e) => setIsCustomProductNoPricing(!e.target.checked)}
+                        className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4"
+                      />
+                      <span className="text-sm font-medium text-gray-600">Include Custom Pricing</span>
+                    </label>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="grid grid-cols-1 gap-6">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Total Amount <span className="text-red-600">*</span></label>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">Product Name <span className="text-red-500">*</span></label>
                       <input
-                        type="number"
-                        name="total_amount"
-                        value={formData.total_amount}
+                        type="text"
+                        name="product_name"
+                        value={formData.product_name}
                         onChange={handleChange}
-                        className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-red-500 outline-none transition ${errors.total_amount ? 'border-red-500' : 'border-gray-300'}`}
-                        placeholder="0.00"
+                        className={`w-full px-4 py-3 border rounded-xl focus:ring-4 focus:ring-blue-100 outline-none transition-all ${errors.product_name ? 'border-red-500 bg-red-50' : 'border-gray-200 focus:border-blue-500'}`}
+                        placeholder="e.g. iPhone 15 Pro Max 256GB"
                       />
-                      {errors.total_amount && <p className="text-red-600 text-sm mt-1">{errors.total_amount}</p>}
+                      {errors.product_name && <p className="text-red-500 text-xs mt-1.5 flex items-center gap-1"><AlertCircle className="w-3 h-3" /> {errors.product_name}</p>}
                     </div>
 
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Advance Amount <span className="text-red-600">*</span></label>
-                      <input
-                        type="number"
-                        name="advance_amount"
-                        value={formData.advance_amount}
-                        onChange={handleChange}
-                        className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-red-500 outline-none transition ${errors.advance_amount ? 'border-red-500' : 'border-gray-300'}`}
-                        placeholder="0.00"
-                      />
-                      {errors.advance_amount && <p className="text-red-600 text-sm mt-1">{errors.advance_amount}</p>}
-                    </div>
+                    {!isCustomProductNoPricing && (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 animate-in fade-in slide-in-from-top-2 duration-300">
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-700 mb-2">Total Amount <span className="text-red-500">*</span></label>
+                          <div className="relative">
+                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-medium">Rs.</span>
+                            <input
+                              type="number"
+                              name="total_amount"
+                              value={formData.total_amount}
+                              onChange={handleChange}
+                              className={`w-full pl-12 pr-4 py-3 border rounded-xl focus:ring-4 focus:ring-blue-100 outline-none transition-all ${errors.total_amount ? 'border-red-500 bg-red-50' : 'border-gray-200 focus:border-blue-500'}`}
+                              placeholder="0"
+                            />
+                          </div>
+                          {errors.total_amount && <p className="text-red-500 text-xs mt-1.5 flex items-center gap-1"><AlertCircle className="w-3 h-3" /> {errors.total_amount}</p>}
+                        </div>
 
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Monthly Amount <span className="text-red-600">*</span></label>
-                      <input
-                        type="number"
-                        name="monthly_amount"
-                        value={formData.monthly_amount}
-                        onChange={handleChange}
-                        className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-red-500 outline-none transition ${errors.monthly_amount ? 'border-red-500' : 'border-gray-300'}`}
-                        placeholder="0.00"
-                      />
-                      {errors.monthly_amount && <p className="text-red-600 text-sm mt-1">{errors.monthly_amount}</p>}
-                    </div>
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-700 mb-2">Advance <span className="text-red-500">*</span></label>
+                          <div className="relative">
+                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-medium">Rs.</span>
+                            <input
+                              type="number"
+                              name="advance_amount"
+                              value={formData.advance_amount}
+                              onChange={handleChange}
+                              className={`w-full pl-12 pr-4 py-3 border rounded-xl focus:ring-4 focus:ring-blue-100 outline-none transition-all ${errors.advance_amount ? 'border-red-500 bg-red-50' : 'border-gray-200 focus:border-blue-500'}`}
+                              placeholder="0"
+                            />
+                          </div>
+                          {errors.advance_amount && <p className="text-red-500 text-xs mt-1.5 flex items-center gap-1"><AlertCircle className="w-3 h-3" /> {errors.advance_amount}</p>}
+                        </div>
 
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Duration (Months) <span className="text-red-600">*</span></label>
-                      <input
-                        type="number"
-                        name="months"
-                        value={formData.months}
-                        onChange={handleChange}
-                        className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-red-500 outline-none transition ${errors.months ? 'border-red-500' : 'border-gray-300'}`}
-                        placeholder="e.g. 12"
-                      />
-                      {errors.months && <p className="text-red-600 text-sm mt-1">{errors.months}</p>}
-                    </div>
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-700 mb-2">Monthly <span className="text-red-500">*</span></label>
+                          <div className="relative">
+                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-medium">Rs.</span>
+                            <input
+                              type="number"
+                              name="monthly_amount"
+                              value={formData.monthly_amount}
+                              onChange={handleChange}
+                              className={`w-full pl-12 pr-4 py-3 border rounded-xl focus:ring-4 focus:ring-blue-100 outline-none transition-all ${errors.monthly_amount ? 'border-red-500 bg-red-50' : 'border-gray-200 focus:border-blue-500'}`}
+                              placeholder="0"
+                            />
+                          </div>
+                          {errors.monthly_amount && <p className="text-red-500 text-xs mt-1.5 flex items-center gap-1"><AlertCircle className="w-3 h-3" /> {errors.monthly_amount}</p>}
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-700 mb-2">Months <span className="text-red-500">*</span></label>
+                          <select
+                            name="months"
+                            value={formData.months}
+                            onChange={handleChange}
+                            className={`w-full px-4 py-3 border rounded-xl focus:ring-4 focus:ring-blue-100 outline-none transition-all appearance-none bg-no-repeat bg-[right_1rem_center] ${errors.months ? 'border-red-500 bg-red-50' : 'border-gray-200 focus:border-blue-500'}`}
+                            style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236B7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")` }}
+                          >
+                            <option value="">Duration</option>
+                            {[3, 4, 6, 8, 9, 10, 12, 15, 18, 24].map((m: any) => <option key={m} value={m}>{m} Months</option>)}
+                          </select>
+                          {errors.months && <p className="text-red-500 text-xs mt-1.5 flex items-center gap-1"><AlertCircle className="w-3 h-3" /> {errors.months}</p>}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               ) : (
-                <>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Category <span className="text-red-600">*</span></label>
-                      <select
-                        value={selectedCategory}
-                        onChange={(e) => setSelectedCategory(e.target.value)}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none transition"
+                <div className="space-y-8">
+                  <div className="relative" ref={productDropdownRef}>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Search & Select Product <span className="text-red-500">*</span></label>
+                    <div className="relative">
+                      <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                      <input
+                        type="text"
+                        placeholder="Type product name (e.g. Samsung S23)"
+                        value={productSearchTerm}
+                        onChange={(e) => {
+                          setProductSearchTerm(e.target.value);
+                          setIsProductDropdownOpen(true);
+                        }}
+                        onFocus={() => setIsProductDropdownOpen(true)}
+                        className={`w-full pl-11 pr-10 py-3.5 border rounded-xl focus:ring-4 focus:ring-blue-100 outline-none transition-all ${errors.product ? 'border-red-500 bg-red-50' : 'border-gray-200 focus:border-blue-500'}`}
+                      />
+                      <button 
+                        type="button"
+                        onClick={() => setIsProductDropdownOpen(!isProductDropdownOpen)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-gray-100 rounded-lg transition-colors"
                       >
-                        <option value="">Select Category</option>
-                        {categories.map(cat => (
-                          <option key={cat} value={cat}>{cat}</option>
-                        ))}
-                      </select>
+                        <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${isProductDropdownOpen ? 'rotate-180' : ''}`} />
+                      </button>
                     </div>
 
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Subcategory <span className="text-red-600">*</span></label>
-                      <select
-                        value={selectedSubcategory}
-                        onChange={(e) => setSelectedSubcategory(e.target.value)}
-                        disabled={!selectedCategory}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none transition disabled:bg-gray-50"
-                      >
-                        <option value="">Select Subcategory</option>
-                        {subcategories.map(sub => (
-                          <option key={sub} value={sub}>{sub}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-
-                  <div className="mb-6">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Product <span className="text-red-600">*</span></label>
-                    <select
-                      name="product_name"
-                      value={formData.product_name}
-                      disabled={!selectedSubcategory}
-                      onChange={(e) => {
-                        const prod = products.find(p => p.name === e.target.value);
-                        if (prod) handleProductSelect(prod);
-                      }}
-                      className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-red-500 outline-none transition disabled:bg-gray-50 ${errors.product ? 'border-red-500' : 'border-gray-300'}`}
-                    >
-                      <option value="">Select Product</option>
-                      {products
-                        .filter(p => p.category_name === selectedCategory && p.subcategory_name === selectedSubcategory)
-                        .map((p: any) => (
-                          <option key={p.id} value={p.name}>
-                            {p.name}
-                          </option>
-                        ))}
-                    </select>
-                    {errors.product && <p className="text-red-600 text-sm mt-1">{errors.product}</p>}
+                    {isProductDropdownOpen && (
+                      <div className="absolute z-50 w-full mt-2 bg-white border border-gray-200 rounded-xl shadow-2xl max-h-80 overflow-y-auto">
+                        <div className="sticky top-0 bg-gray-50 px-4 py-2 border-b text-[10px] font-bold text-gray-500 uppercase tracking-widest flex justify-between items-center">
+                          <span>Search Results</span>
+                          <button onClick={() => setIsProductDropdownOpen(false)} className="hover:text-red-500 transition-colors"><X className="w-3 h-3" /></button>
+                        </div>
+                        {products.filter((p: any) => p.name.toLowerCase().includes(productSearchTerm.toLowerCase())).length > 0 ? (
+                          products
+                            .filter((p: any) => p.name.toLowerCase().includes(productSearchTerm.toLowerCase()))
+                            .map((p: any) => (
+                              <button
+                                key={p.id}
+                                type="button"
+                                onClick={() => handleProductSelect(p)}
+                                className={`w-full px-4 py-3.5 text-left hover:bg-blue-50 transition-colors flex items-center justify-between group border-b border-gray-50 last:border-0 ${formData.product_name === p.name ? 'bg-blue-50 text-blue-600 font-medium' : 'text-gray-700'}`}
+                              >
+                                <div>
+                                  <div className="truncate">{p.name}</div>
+                                  <div className="text-[10px] text-gray-400 font-normal uppercase tracking-wider">{p.category_name} &bull; {p.subcategory_name}</div>
+                                </div>
+                                {formData.product_name === p.name && <Check className="w-4 h-4" />}
+                              </button>
+                            ))
+                        ) : (
+                          <div className="px-4 py-12 text-center text-gray-500">
+                            <ShoppingBag className="w-10 h-10 mx-auto mb-3 text-gray-200" />
+                            <p className="font-medium text-gray-400">No products found for "{productSearchTerm}"</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    {errors.product && <p className="text-red-500 text-xs mt-1.5 flex items-center gap-1"><AlertCircle className="w-3 h-3" /> {errors.product}</p>}
                   </div>
 
                   {selectedProduct && (
-                    <div>
-                      <div className="flex items-center gap-2 mb-3">
-                        <label className="block text-sm font-medium text-gray-700">Installment Plan <span className="text-red-600">*</span></label>
+                    <div className="animate-in fade-in duration-500">
+                      <div className="flex items-center gap-2 mb-6">
+                        <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider">Available Plans</h3>
                         {selectedProduct.isDeal && (
-                          <span className="bg-red-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full animate-pulse">
-                            DEAL
+                          <span className="bg-red-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full animate-bounce">
+                            HOT DEAL
                           </span>
                         )}
                       </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                         {selectedProduct.ProductInstallments
                           ?.filter((p: any) => p.isActive)
                           .map((plan: any) => (
                             <label
                               key={plan.id}
-                              className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${selectedPlan?.id === plan.id
-                                ? 'border-red-500 bg-red-50 shadow-md ring-1 ring-red-500'
+                              className={`group relative p-6 border-2 rounded-2xl cursor-pointer transition-all duration-300 ${selectedPlan?.id === plan.id
+                                ? 'border-blue-600 bg-blue-50 ring-4 ring-blue-50 shadow-lg scale-[1.02]'
                                 : plan.dealId
-                                  ? 'border-red-400 bg-red-50/50 hover:border-red-500'
-                                  : 'border-gray-200 hover:border-red-300'
-                                } cursor-pointer relative overflow-hidden`}
+                                  ? 'border-red-200 bg-red-50/30 hover:border-red-400'
+                                  : 'border-gray-100 bg-white hover:border-blue-300 hover:shadow-md'
+                                }`}
                             >
                               {plan.dealId && (
-                                <div className="absolute top-0 right-0 bg-red-600 text-white text-[8px] font-bold px-1.5 py-0.5 rounded-bl-lg">
-                                  DEAL PLAN
+                                <div className="absolute -top-3 -right-3 bg-red-600 text-white text-[9px] font-bold px-3 py-1 rounded-full shadow-lg transform rotate-12 group-hover:rotate-0 transition-transform">
+                                  SPECIAL PRICE
                                 </div>
                               )}
 
@@ -716,41 +849,55 @@ const CreateOrders: React.FC = () => {
                                 onChange={() => handlePlanSelect(plan)}
                                 className="sr-only"
                               />
-                              <div className="text-center">
-                                <div className="font-semibold text-lg">{plan.months} Months</div>
-                                <div className="text-sm text-gray-600 mt-1">
-                                  Advance: <span className="font-medium">Rs. {plan.advance.toLocaleString()}</span>
-                                  <br />
-                                  Monthly: <span className="font-medium">Rs. {plan.monthlyAmount.toLocaleString()}</span>
-                                  <br />
-                                  Total: <span className="font-medium">Rs. {plan.totalPrice.toLocaleString()}</span>
+                              <div className="text-center space-y-3">
+                                <div className={`text-2xl font-black ${selectedPlan?.id === plan.id ? 'text-blue-700' : 'text-gray-800'}`}>
+                                  {plan.months} <span className="text-sm font-bold uppercase">Months</span>
+                                </div>
+                                <hr className={`w-12 mx-auto border-t-2 ${selectedPlan?.id === plan.id ? 'border-blue-200' : 'border-gray-100'}`} />
+                                <div className="space-y-1.5">
+                                  <div className="flex justify-between items-center text-xs">
+                                    <span className="text-gray-400">Advance</span>
+                                    <span className="font-bold text-gray-700">Rs. {plan.advance.toLocaleString()}</span>
+                                  </div>
+                                  <div className="flex justify-between items-center text-xs">
+                                    <span className="text-gray-400">Monthly</span>
+                                    <span className="font-bold text-gray-700">Rs. {plan.monthlyAmount.toLocaleString()}</span>
+                                  </div>
+                                  <div className={`mt-3 py-2 rounded-lg font-bold text-sm ${selectedPlan?.id === plan.id ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 group-hover:bg-blue-100 transition-colors'}`}>
+                                    Rs. {plan.totalPrice.toLocaleString()}
+                                  </div>
                                 </div>
                               </div>
                             </label>
                           ))}
                       </div>
-                      {errors.plan && <p className="text-red-600 text-sm mt-2">{errors.plan}</p>}
+                      {errors.plan && <p className="text-red-500 text-xs mt-4 flex items-center gap-1"><AlertCircle className="w-4 h-4" /> {errors.plan}</p>}
                     </div>
                   )}
-                </>
+                </div>
               )}
             </section>
 
             {/* ────────────────────────────────────────────────
-                Order Channel (original style)
+                Order Channel & Notes
             ──────────────────────────────────────────────── */}
-            <section ref={channelRef} className="border-b pb-6">
-              <h2 className="text-xl font-semibold text-gray-800 mb-6">Order Channel <span className="text-red-600">*</span></h2>
+            <section ref={channelRef} className="pb-8">
+              <div className="flex items-center gap-3 mb-8">
+                <div className="p-2 bg-purple-50 rounded-lg">
+                  <Globe className="w-5 h-5 text-purple-600" />
+                </div>
+                <h2 className="text-xl font-bold text-gray-900">Order Channel & Source</h2>
+              </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                {channels.map(ch => {
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                {channels.map((ch: any) => {
                   const Icon = ch.icon;
                   return (
                     <label
                       key={ch.id}
-                      className={`p-5 border-2 rounded-xl cursor-pointer transition-all text-center ${formData.channel === ch.id
-                        ? 'border-red-500 bg-red-50 shadow-sm'
-                        : 'border-gray-200 hover:border-red-300 hover:shadow'
+                      className={`relative flex flex-col items-center justify-center p-6 border-2 rounded-2xl cursor-pointer transition-all duration-300 group ${formData.channel === ch.id
+                        ? 'border-purple-600 bg-purple-50 ring-4 ring-purple-50 scale-[1.02]'
+                        : 'border-gray-100 bg-white hover:border-purple-300 hover:shadow-lg'
                         }`}
                     >
                       <input
@@ -761,31 +908,53 @@ const CreateOrders: React.FC = () => {
                         onChange={handleChange}
                         className="sr-only"
                       />
-                      <Icon className="w-8 h-8 mx-auto mb-3 text-gray-600" />
-                      <div className="font-semibold">{ch.name}</div>
-                      <div className="text-sm text-gray-500 mt-1">{ch.description}</div>
+                      <Icon className={`w-8 h-8 mb-3 transition-colors ${formData.channel === ch.id ? 'text-purple-600' : 'text-gray-400 group-hover:text-purple-400'}`} />
+                      <div className={`font-bold text-sm text-center ${formData.channel === ch.id ? 'text-purple-700' : 'text-gray-600'}`}>{ch.name}</div>
+                      {formData.channel === ch.id && (
+                        <div className="absolute top-2 right-2">
+                          <Check className="w-4 h-4 text-purple-600" />
+                        </div>
+                      )}
                     </label>
                   );
                 })}
               </div>
-              {errors.channel && <p className="text-red-600 text-sm mt-2">{errors.channel}</p>}
+              {errors.channel && <p className="text-red-500 text-xs mt-2 flex items-center gap-1"><AlertCircle className="w-4 h-4" /> {errors.channel}</p>}
+
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Internal Order Notes <span className="text-gray-400 font-normal">(Optional)</span></label>
+                <textarea
+                  name="order_notes"
+                  value={formData.order_notes}
+                  onChange={(e: any) => handleTextAreaChange(e)}
+                  rows={4}
+                  className="w-full px-4 py-3 border border-gray-200 rounded-2xl focus:ring-4 focus:ring-purple-100 focus:border-purple-500 outline-none transition-all resize-none"
+                  placeholder="Add any specific instructions, special cases, or context for verification team..."
+                />
+              </div>
             </section>
 
             {/* ────────────────────────────────────────────────
-                Actions (original button sizes & layout)
+                Actions
             ──────────────────────────────────────────────── */}
-            <div className="flex flex-col sm:flex-row gap-4 pt-4">
+            <div className="flex flex-col sm:flex-row gap-4 pt-8">
               <button
                 type="submit"
                 disabled={loading}
-                className="flex-1 bg-red-600 text-white py-3.5 rounded-lg font-semibold hover:bg-red-700 transition disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                className="flex-[2] bg-red-600 text-white py-4 rounded-2xl font-bold hover:bg-red-700 hover:shadow-xl hover:shadow-red-100 transition-all disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-3 text-lg"
               >
                 {loading ? (
                   <>
-                    <span className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full"></span>
-                    Creating...
+                    <span className="animate-spin h-5 w-5 border-3 border-white border-t-transparent rounded-full font-bold"></span>
+                    Processing Order...
                   </>
-                ) : 'Create Order'}
+                ) : (
+                  <>
+                    <ShoppingBag className="w-5 h-5" />
+                    Finalize Order Booking
+                  </>
+                )}
               </button>
 
               <button
@@ -798,13 +967,13 @@ const CreateOrders: React.FC = () => {
                     product_name: '', total_amount: '', advance_amount: '', monthly_amount: '', months: '', channel: '',
                     order_notes: ''
                   });
+                  setAreaSearchTerm('');
+                  setProductSearchTerm('');
                   setSelectedProduct(null);
                   setSelectedPlan(null);
-                  setIsManualAddress(false);
-                  setIsCustomProduct(false);
                   setErrors({});
                 }}
-                className="px-8 py-3.5 border-2 border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 transition"
+                className="flex-1 px-6 py-4 border-2 border-gray-200 text-gray-500 font-bold rounded-2xl hover:bg-gray-50 hover:text-gray-700 transition-all"
               >
                 Clear Form
               </button>
@@ -812,6 +981,131 @@ const CreateOrders: React.FC = () => {
           </form>
         </div>
       </div>
+
+      {/* ────────────────────────────────────────────────
+          Installment Calculator Modal (Slide-over style)
+      ──────────────────────────────────────────────── */}
+      {isCalculatorOpen && (
+        <div className="fixed inset-0 z-[100] overflow-hidden">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity" onClick={() => setIsCalculatorOpen(false)} />
+          
+          <div className="absolute inset-y-0 right-0 max-w-full flex pl-10 sm:pl-16">
+            <div className="w-screen max-w-xl animate-in slide-in-from-right duration-500">
+              <div className="h-full flex flex-col bg-white shadow-2xl overflow-y-auto rounded-l-3xl">
+                <div className="px-6 py-8 border-b bg-indigo-600 text-white">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-white/20 rounded-xl">
+                        <Calculator className="w-6 h-6 text-white" />
+                      </div>
+                      <div>
+                        <h2 className="text-xl font-bold">Installment Calculator</h2>
+                        <p className="text-indigo-100 text-xs">Official Marking logic</p>
+                      </div>
+                    </div>
+                    <button onClick={() => setIsCalculatorOpen(false)} className="p-2 hover:bg-white/10 rounded-full transition-colors">
+                      <X className="w-6 h-6" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="p-8 space-y-8">
+                  {/* Category Selection */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-3 uppercase tracking-wider">Product Category</label>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                      {['Mobiles', 'Laptops', 'Led Tv', 'Refrigerator', 'Washing Machine', 'Air Conditionar', 'Small Appliances', 'Microwave Oven', 'Water Dispenser', 'Fans', 'Bikes', 'Deep Freezer', 'Batteries', 'Mattress', 'Tyres', 'Smart Watches', 'Tablet', 'Solar'].map((cat) => (
+                        <button
+                          key={cat}
+                          type="button"
+                          onClick={() => {
+                            setCalcCategory(cat);
+                            if (calcPrice) calculateInstallments(cat, parseFloat(calcPrice));
+                          }}
+                          className={`px-3 py-3 text-[11px] font-bold rounded-xl border transition-all ${calcCategory === cat ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg' : 'bg-gray-50 border-gray-100 text-gray-600 hover:border-indigo-200'}`}
+                        >
+                          {cat}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Price Input */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-3 uppercase tracking-wider">Product Price (Net Cash)</label>
+                    <div className="relative">
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold">Rs.</span>
+                      <input
+                        type="number"
+                        placeholder="e.g. 50000"
+                        value={calcPrice}
+                        onChange={(e) => {
+                          setCalcPrice(e.target.value);
+                          if (calcCategory) calculateInstallments(calcCategory, parseFloat(e.target.value) || 0);
+                        }}
+                        className="w-full pl-12 pr-4 py-4 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-600 outline-none transition-all text-xl font-bold text-gray-800"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Results Table */}
+                  {calcResults.length > 0 ? (
+                    <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                      <h3 className="text-sm font-bold text-gray-500 uppercase tracking-widest">Matched Plans</h3>
+                      <div className="grid gap-4">
+                        {calcResults.map((plan, idx) => (
+                          <div 
+                            key={idx} 
+                            className="bg-white border-2 border-gray-50 rounded-2xl p-5 hover:border-indigo-600 transition-all group relative overflow-hidden"
+                          >
+                            <div className="flex justify-between items-center relative z-10">
+                              <div>
+                                <div className="text-xs font-bold text-indigo-600 uppercase mb-1">{plan.months} Months Plan</div>
+                                <div className="text-2xl font-black text-gray-900 leading-none">Rs. {plan.monthlyAmount.toLocaleString()} <span className="text-xs font-medium text-gray-400">/ month</span></div>
+                              </div>
+                              <div className="text-right">
+                                <div className="text-[10px] font-bold text-gray-400 uppercase mb-1">Advance Needed</div>
+                                <div className="text-lg font-bold text-gray-800 leading-none">Rs. {plan.advanceAmount.toLocaleString()}</div>
+                              </div>
+                            </div>
+                            
+                            <div className="mt-4 pt-4 border-t border-gray-50 flex items-center justify-between text-[11px] font-bold text-gray-400">
+                                <div>Markup: {(plan.profit * 100).toFixed(0)}% &bull; Total: Rs. {plan.totalPrice.toLocaleString()}</div>
+                                <button 
+                                  onClick={() => {
+                                    setFormData(prev => ({
+                                      ...prev,
+                                      product_name: `Custom ${calcCategory} Product`,
+                                      total_amount: (parseFloat(calcPrice) || 0).toString(),
+                                      advance_amount: plan.advanceAmount.toString(),
+                                      monthly_amount: plan.monthlyAmount.toString(),
+                                      months: plan.months.toString()
+                                    }));
+                                    setIsCustomProduct(true);
+                                    setIsCalculatorOpen(false);
+                                    toast.success("Plan applied to form!");
+                                  }}
+                                  className="px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-indigo-600 transition-colors"
+                                >
+                                  Apply Plan
+                                </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : calcPrice && (
+                    <div className="p-12 text-center bg-gray-50 rounded-3xl border-2 border-dashed border-gray-200">
+                       <Calculator className="w-12 h-12 mx-auto mb-4 text-gray-200" />
+                       <p className="text-gray-400 font-medium italic">Please select a category to see plans</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

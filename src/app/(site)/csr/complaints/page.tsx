@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
 import toast from "react-hot-toast";
 import Cookies from "js-cookie";
+import { Search, Image as ImageIcon, X, CheckSquare, Clock } from "lucide-react";
 
 interface ComplaintItem {
   id: number;
@@ -15,26 +16,54 @@ interface ComplaintItem {
   status: string;
   resolution_note: string | null;
   created_at: string;
+  media_urls: string[] | null;
+  created_by?: { full_name: string; role?: { name: string } };
+  assigned_to?: { full_name: string };
 }
 
 export default function CsrComplaintsPage() {
+  const [activeTab, setActiveTab] = useState<"my" | "all" | "new">("all");
+  const [search, setSearch] = useState("");
+  
+  // Form State
   const [customerName, setCustomerName] = useState("");
   const [customerCnic, setCustomerCnic] = useState("");
   const [mobileNumber, setMobileNumber] = useState("");
   const [description, setDescription] = useState("");
-  const [complaints, setComplaints] = useState<ComplaintItem[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [media, setMedia] = useState<File[]>([]);
+  const [mediaPreviews, setMediaPreviews] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
 
-  const loadComplaints = async () => {
+  // List State
+  const [complaints, setComplaints] = useState<ComplaintItem[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+
+  // Resolve State
+  const [selectedComplaint, setSelectedComplaint] = useState<ComplaintItem | null>(null);
+  const [resolveNote, setResolveNote] = useState("");
+  const [resolveStatus, setResolveStatus] = useState("Pending");
+  const [resolving, setResolving] = useState(false);
+
+  const loadComplaints = async (currentPage = page, currentTab = activeTab, searchTerm = search) => {
     setLoading(true);
     try {
       const token = Cookies.get("auth_token");
-      const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/complaints`, {
+      const url = new URL(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/complaints`);
+      url.searchParams.append("page", String(currentPage));
+      if (searchTerm) url.searchParams.append("search", searchTerm);
+      if (currentTab === "my") url.searchParams.append("my_only", "true");
+
+      const res = await fetch(url.toString(), {
         headers: { Authorization: `Bearer ${token}` },
       });
       const json = await res.json();
-      if (json.success) setComplaints(json.data.complaints || []);
+      if (json.success) {
+        setComplaints(json.data.complaints || []);
+        setTotalPages(json.data.pagination.totalPages || 1);
+        setPage(json.data.pagination.page);
+      }
     } catch (error) {
       console.error(error);
       toast.error("Unable to load complaints.");
@@ -44,39 +73,78 @@ export default function CsrComplaintsPage() {
   };
 
   useEffect(() => {
-    loadComplaints();
+    if (activeTab !== "new") {
+      loadComplaints(1, activeTab, search);
+    }
+  }, [activeTab]);
+
+  useEffect(() => {
+    // Cleanup preview URLs on unmount
+    return () => {
+      mediaPreviews.forEach((url) => URL.revokeObjectURL(url));
+    };
   }, []);
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    loadComplaints(1, activeTab, search);
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (media.length + files.length > 5) {
+      toast.error("You can only upload up to 5 images.");
+      return;
+    }
+
+    const newFiles = [...media, ...files];
+    const newPreviews = [...mediaPreviews, ...files.map((f) => URL.createObjectURL(f))];
+    
+    setMedia(newFiles);
+    setMediaPreviews(newPreviews);
+  };
+
+  const removeFile = (index: number) => {
+    URL.revokeObjectURL(mediaPreviews[index]);
+    setMedia(media.filter((_, i) => i !== index));
+    setMediaPreviews(mediaPreviews.filter((_, i) => i !== index));
+  };
 
   const submitComplaint = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!customerName.trim() || !mobileNumber.trim() || !description.trim()) {
-      toast.error("Please fill customer name, mobile number, and description.");
+    if (!customerName.trim() || !customerCnic.trim() || !mobileNumber.trim() || !description.trim()) {
+      toast.error("Please fill Name, CNIC, Mobile, and Description.");
       return;
     }
     setSubmitting(true);
     try {
       const token = Cookies.get("auth_token");
+      const formData = new FormData();
+      formData.append("customer_name", customerName.trim());
+      if (customerCnic) formData.append("customer_cnic", customerCnic.trim());
+      formData.append("mobile_number", mobileNumber.trim());
+      formData.append("description", description.trim());
+      
+      media.forEach((file) => {
+        formData.append("media", file);
+      });
+
       const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/complaints`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          customer_name: customerName.trim(),
-          customer_cnic: customerCnic.trim() || null,
-          mobile_number: mobileNumber.trim(),
-          description: description.trim(),
-        }),
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.message || "Failed to submit complaint.");
+      
       toast.success("Complaint submitted successfully.");
       setCustomerName("");
       setCustomerCnic("");
       setMobileNumber("");
       setDescription("");
-      loadComplaints();
+      setMedia([]);
+      setMediaPreviews([]);
+      setActiveTab("all");
     } catch (error: any) {
       console.error(error);
       toast.error(error?.message || "Unable to submit complaint.");
@@ -85,14 +153,65 @@ export default function CsrComplaintsPage() {
     }
   };
 
+  const handleUpdateStatus = async () => {
+    if (!selectedComplaint) return;
+    setResolving(true);
+    try {
+      const token = Cookies.get("auth_token");
+      const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/complaints/${selectedComplaint.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          status: resolveStatus,
+          resolution_note: resolveNote.trim(),
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.message || "Failed to update complaint.");
+      toast.success("Complaint updated successfully.");
+      setSelectedComplaint(null);
+      loadComplaints();
+    } catch (error: any) {
+      console.error(error);
+      toast.error(error?.message || "Failed to update complaint.");
+    } finally {
+      setResolving(false);
+    }
+  };
+
   return (
     <div className="mx-auto w-full max-w-7xl">
-      <Breadcrumb pageName="Complaints" />
-      <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
-        <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-slate-900">
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Record a Complaint</h2>
+      <Breadcrumb pageName="CSR Complaints Dashboard" />
+      
+      <div className="mb-6 flex gap-2 border-b border-gray-200 dark:border-gray-800">
+        <button
+          onClick={() => setActiveTab("all")}
+          className={`pb-3 px-4 text-sm font-medium transition-colors ${activeTab === 'all' ? 'border-b-2 border-[#ff3d3d] text-[#ff3d3d]' : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'}`}
+        >
+          All Complaints
+        </button>
+        <button
+          onClick={() => setActiveTab("my")}
+          className={`pb-3 px-4 text-sm font-medium transition-colors ${activeTab === 'my' ? 'border-b-2 border-[#ff3d3d] text-[#ff3d3d]' : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'}`}
+        >
+          My Complaints
+        </button>
+        <button
+          onClick={() => setActiveTab("new")}
+          className={`pb-3 px-4 text-sm font-medium transition-colors ${activeTab === 'new' ? 'border-b-2 border-[#ff3d3d] text-[#ff3d3d]' : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'}`}
+        >
+          + File Complaint
+        </button>
+      </div>
+
+      {activeTab === "new" ? (
+        <section className="mx-auto max-w-3xl rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-slate-900">
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Record a New Complaint</h2>
           <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-            Create a complaint record for website or customer issues. CSR can resolve and add feedback once solved.
+            Fill in the details below to escalate a customer issue. You can attach up to 5 images.
           </p>
 
           <form onSubmit={submitComplaint} className="mt-6 space-y-4">
@@ -108,7 +227,7 @@ export default function CsrComplaintsPage() {
                 type="text"
                 value={customerCnic}
                 onChange={(e) => setCustomerCnic(e.target.value)}
-                placeholder="Customer CNIC (optional)"
+                placeholder="Customer CNIC"
                 className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 outline-none focus:border-[#ff3d3d] focus:ring-2 focus:ring-[#ff3d3d]/20 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
               />
             </div>
@@ -116,54 +235,250 @@ export default function CsrComplaintsPage() {
               type="text"
               value={mobileNumber}
               onChange={(e) => setMobileNumber(e.target.value)}
-              placeholder="Mobile Number"
+              placeholder="Mobile Number (Format: 03xxxxxxxxx)"
               className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 outline-none focus:border-[#ff3d3d] focus:ring-2 focus:ring-[#ff3d3d]/20 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
             />
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={5}
-              placeholder="Complaint description"
+              placeholder="Complaint description in detail..."
               className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 outline-none focus:border-[#ff3d3d] focus:ring-2 focus:ring-[#ff3d3d]/20 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
             />
+            <div>
+              <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Attach Media (Max 5 images)
+              </label>
+              <div className="flex flex-wrap gap-4 mb-4">
+                {mediaPreviews.map((url, i) => (
+                  <div key={i} className="relative h-24 w-24 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 shadow-sm group">
+                    <img src={url} alt="preview" className="h-full w-full object-cover transition duration-300 group-hover:scale-110" />
+                    <button
+                      type="button"
+                      onClick={() => removeFile(i)}
+                      className="absolute right-1 top-1 rounded-full bg-black/60 p-1 text-white hover:bg-black transition"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                ))}
+                
+                {media.length < 5 && (
+                  <label className="flex h-24 w-24 cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 hover:bg-gray-100 transition dark:border-gray-700 dark:bg-gray-800 dark:hover:bg-gray-700">
+                    <ImageIcon className="h-5 w-5 text-gray-400 mb-1" />
+                    <span className="text-[10px] text-gray-500">Pick image</span>
+                    <input
+                      type="file"
+                      multiple
+                      accept="image/*"
+                      onChange={handleFileChange}
+                      className="hidden"
+                    />
+                  </label>
+                )}
+              </div>
+              {media.length > 0 && <p className="mt-2 text-xs text-gray-400">Selected {media.length} of 5 images.</p>}
+            </div>
             <button
               type="submit"
               disabled={submitting}
-              className="inline-flex items-center justify-center rounded-lg bg-[#ff3d3d] px-6 py-3 text-sm font-semibold text-white transition hover:bg-red-600 disabled:cursor-not-allowed disabled:bg-gray-300"
+              className="w-full rounded-lg bg-[#ff3d3d] px-6 py-3 text-sm font-semibold text-white transition hover:bg-red-600 disabled:cursor-not-allowed disabled:bg-gray-300 dark:disabled:bg-gray-700 mt-4"
             >
-              {submitting ? "Submitting..." : "Submit Complaint"}
+              {submitting ? "Uploading..." : "Submit Complaint"}
             </button>
           </form>
         </section>
-
+      ) : (
         <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-slate-900">
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Recent Complaints</h2>
-          <div className="mt-6 space-y-4">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+              {activeTab === 'all' ? 'Global Complaints' : 'My Complaints'}
+            </h2>
+            <form onSubmit={handleSearch} className="relative w-full sm:w-72">
+              <input
+                type="text"
+                placeholder="Search by ID, Name or Mobile..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full rounded-full border border-gray-300 bg-gray-50 py-2 pl-10 pr-4 text-sm outline-none focus:border-[#ff3d3d] focus:ring-1 focus:ring-[#ff3d3d] dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+              />
+              <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+            </form>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {loading ? (
-              Array.from({ length: 3 }).map((_, idx) => (
-                <div key={idx} className="h-24 animate-pulse rounded-2xl bg-gray-100 dark:bg-gray-800" />
+              Array.from({ length: 6 }).map((_, idx) => (
+                <div key={idx} className="h-40 animate-pulse rounded-2xl bg-gray-100 dark:bg-gray-800" />
               ))
             ) : complaints.length ? (
               complaints.map((item) => (
-                <div key={item.id} className="rounded-2xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-medium text-gray-900 dark:text-white">{item.customer_name}</p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">{item.complaint_id} · {item.mobile_number}</p>
+                <div key={item.id} className="flex flex-col justify-between rounded-2xl border border-gray-200 bg-white p-5 shadow-sm transition hover:shadow-md dark:border-gray-700 dark:bg-gray-900">
+                  <div>
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <h3 className="font-semibold text-gray-900 dark:text-white">{item.customer_name}</h3>
+                        <p className="text-xs text-gray-500">{item.complaint_id} • {item.mobile_number}</p>
+                      </div>
+                      <span className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                        item.status === 'Solved' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' :
+                        item.status === 'Pending' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300' :
+                        'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300'
+                      }`}>
+                        {item.status}
+                      </span>
                     </div>
-                    <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">{item.status}</span>
+                    <p className="mt-3 text-sm text-gray-600 line-clamp-3 dark:text-gray-300">{item.description}</p>
+                    
+                    {item.media_urls && item.media_urls.length > 0 && (
+                      <div className="mt-3 flex items-center gap-1 text-xs text-blue-500">
+                        <ImageIcon className="h-3 w-3" /> {item.media_urls.length} Attachments
+                      </div>
+                    )}
                   </div>
-                  <p className="mt-3 text-sm text-gray-600 dark:text-gray-300">{item.description}</p>
+                  
+                  <div className="mt-4 flex items-center gap-2 pt-4 border-t border-gray-100 dark:border-gray-800">
+                    <button
+                      onClick={() => {
+                        setSelectedComplaint(item);
+                        setResolveStatus(item.status);
+                        setResolveNote(item.resolution_note || "");
+                      }}
+                      className="w-full rounded-lg bg-gray-100 py-2 text-sm font-medium text-gray-900 transition hover:bg-gray-200 dark:bg-gray-800 dark:text-white dark:hover:bg-gray-700"
+                    >
+                      View & Resolve
+                    </button>
+                  </div>
                 </div>
               ))
             ) : (
-              <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-6 text-center text-gray-500 dark:border-gray-700 dark:bg-gray-900">
-                No complaints recorded yet.
+              <div className="col-span-full rounded-2xl border border-dashed border-gray-300 py-12 text-center text-gray-500 dark:border-gray-700">
+                No complaints found.
               </div>
             )}
           </div>
+          
+          {totalPages > 1 && (
+            <div className="mt-6 flex justify-center gap-2">
+              <button
+                disabled={page === 1}
+                onClick={() => loadComplaints(page - 1)}
+                className="rounded-lg border border-gray-300 px-4 py-2 text-sm disabled:opacity-50 dark:border-gray-700 dark:text-white"
+              >
+                Prev
+              </button>
+              <span className="flex items-center px-4 text-sm text-gray-500">
+                Page {page} of {totalPages}
+              </span>
+              <button
+                disabled={page === totalPages}
+                onClick={() => loadComplaints(page + 1)}
+                className="rounded-lg border border-gray-300 px-4 py-2 text-sm disabled:opacity-50 dark:border-gray-700 dark:text-white"
+              >
+                Next
+              </button>
+            </div>
+          )}
         </section>
-      </div>
+      )}
+
+      {/* Resolve Modal */}
+      {selectedComplaint && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-slate-900 flex flex-col max-h-[90vh]">
+            <div className="flex items-center justify-between border-b border-gray-100 p-6 dark:border-gray-800">
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white">Complaint Details</h3>
+              <button
+                onClick={() => setSelectedComplaint(null)}
+                className="rounded-full p-2 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            
+            <div className="overflow-y-auto p-6 scrollbar-hide flex-1">
+              <div className="grid gap-6 md:grid-cols-2">
+                <div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">Customer</p>
+                  <p className="font-medium text-gray-900 dark:text-white">{selectedComplaint.customer_name}</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-300">{selectedComplaint.mobile_number} {selectedComplaint.customer_cnic && `• ${selectedComplaint.customer_cnic}`}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">Reported By</p>
+                  <p className="font-medium text-gray-900 dark:text-white">{selectedComplaint.created_by?.full_name || 'Anonymous'}</p>
+                  <p className="text-xs text-gray-400">{new Date(selectedComplaint.created_at).toLocaleString()}</p>
+                </div>
+              </div>
+              
+              <div className="mt-6 rounded-xl bg-gray-50 p-4 dark:bg-gray-800/50">
+                <p className="text-sm text-gray-800 dark:text-gray-200 whitespace-pre-wrap">{selectedComplaint.description}</p>
+              </div>
+
+              {selectedComplaint.media_urls && selectedComplaint.media_urls.length > 0 && (
+                <div className="mt-6">
+                  <p className="text-sm font-semibold mb-3 text-gray-900 dark:text-white">Attachments</p>
+                  <div className="flex gap-3 overflow-x-auto pb-2">
+                    {selectedComplaint.media_urls.map((url, i) => (
+                      <a key={i} href={url} target="_blank" rel="noreferrer" className="flex-shrink-0 relative group rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 block w-24 h-24">
+                        <img src={url} alt={`attachment-${i}`} className="w-full h-full object-cover transition duration-300 group-hover:scale-110" />
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <hr className="my-6 border-gray-200 dark:border-gray-800" />
+              
+              <h4 className="font-semibold text-gray-900 dark:text-white flex items-center gap-2 mb-4">
+                <CheckSquare className="h-4 w-4" /> Resolution Action
+              </h4>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="mb-1 block text-sm text-gray-600 dark:text-gray-400">Update Status</label>
+                  <select
+                    value={resolveStatus}
+                    onChange={(e) => setResolveStatus(e.target.value)}
+                    className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 outline-none focus:border-[#ff3d3d] dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                  >
+                    <option value="New">New</option>
+                    <option value="Assigned">Assigned</option>
+                    <option value="Pending">Pending</option>
+                    <option value="Solved">Solved</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm text-gray-600 dark:text-gray-400">Resolution Note</label>
+                  <textarea
+                    value={resolveNote}
+                    onChange={(e) => setResolveNote(e.target.value)}
+                    rows={3}
+                    placeholder="Describe how the complaint was handled..."
+                    className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 outline-none focus:border-[#ff3d3d] dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-gray-50 border-t border-gray-200 p-6 flex justify-end gap-3 dark:bg-gray-800/50 dark:border-gray-700">
+              <button
+                onClick={() => setSelectedComplaint(null)}
+                className="rounded-lg px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200 dark:text-gray-300 dark:hover:bg-gray-700 transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleUpdateStatus}
+                disabled={resolving}
+                className="rounded-lg bg-[#ff3d3d] px-6 py-2 text-sm font-medium text-white hover:bg-red-600 transition disabled:opacity-50"
+              >
+                {resolving ? "Saving..." : "Save Changes"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+

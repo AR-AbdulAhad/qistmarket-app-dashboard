@@ -80,59 +80,59 @@ function DocumentCard({ doc }: { doc: any }) {
 }
 
 function LocationPhotoCard({ photo, label }: { photo: { file_url: string, uploaded_at: string }, label: string }) {
-  const [isModalOpen, setIsModalOpen] = useState(false)
+    const [isModalOpen, setIsModalOpen] = useState(false)
 
-  return (
-    <>
-      <div
-        onClick={() => setIsModalOpen(true)}
-        className="group relative overflow-hidden rounded-lg border border-stroke bg-white p-4 shadow-sm transition-all hover:shadow-md dark:border-dark-3 dark:bg-gray-800 cursor-pointer"
-      >
-        <h4 className="mb-2 font-medium text-gray-800 dark:text-gray-200">
-          {label} - Location Photo
-        </h4>
-        <div className="mb-3 text-xs text-gray-500 dark:text-gray-400">
-          <p>Uploaded: {new Date(photo.uploaded_at).toLocaleString()}</p>
-        </div>
-        <div className="relative aspect-[4/3] overflow-hidden rounded-md bg-gray-100 dark:bg-gray-700">
-          <img
-            src={photo.file_url}
-            alt={`Location photo for ${label}`}
-            className="h-full w-full object-cover transition-transform group-hover:scale-105"
-          />
-        </div>
-        <div className="mt-3 inline-flex items-center text-sm font-medium text-[#ff3d3d] hover:underline">
-          Click to view full size →
-        </div>
-      </div>
-
-      {isModalOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75 p-4"
-          onClick={() => setIsModalOpen(false)}
-        >
-          <div
-            className="relative max-w-4xl max-h-[90vh] overflow-hidden rounded-lg bg-white dark:bg-gray-800"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button
-              onClick={() => setIsModalOpen(false)}
-              className="absolute right-2 top-2 z-10 rounded-full bg-black bg-opacity-50 p-2 text-white hover:bg-opacity-70"
+    return (
+        <>
+            <div
+                onClick={() => setIsModalOpen(true)}
+                className="group relative overflow-hidden rounded-lg border border-stroke bg-white p-4 shadow-sm transition-all hover:shadow-md dark:border-dark-3 dark:bg-gray-800 cursor-pointer"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-            <img
-              src={photo.file_url}
-              alt={`Location photo for ${label}`}
-              className="max-h-[90vh] w-auto object-contain"
-            />
-          </div>
-        </div>
-      )}
-    </>
-  )
+                <h4 className="mb-2 font-medium text-gray-800 dark:text-gray-200">
+                    {label} - Location Photo
+                </h4>
+                <div className="mb-3 text-xs text-gray-500 dark:text-gray-400">
+                    <p>Uploaded: {new Date(photo.uploaded_at).toLocaleString()}</p>
+                </div>
+                <div className="relative aspect-[4/3] overflow-hidden rounded-md bg-gray-100 dark:bg-gray-700">
+                    <img
+                        src={photo.file_url}
+                        alt={`Location photo for ${label}`}
+                        className="h-full w-full object-cover transition-transform group-hover:scale-105"
+                    />
+                </div>
+                <div className="mt-3 inline-flex items-center text-sm font-medium text-[#ff3d3d] hover:underline">
+                    Click to view full size →
+                </div>
+            </div>
+
+            {isModalOpen && (
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75 p-4"
+                    onClick={() => setIsModalOpen(false)}
+                >
+                    <div
+                        className="relative max-w-4xl max-h-[90vh] overflow-hidden rounded-lg bg-white dark:bg-gray-800"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <button
+                            onClick={() => setIsModalOpen(false)}
+                            className="absolute right-2 top-2 z-10 rounded-full bg-black bg-opacity-50 p-2 text-white hover:bg-opacity-70"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                        <img
+                            src={photo.file_url}
+                            alt={`Location photo for ${label}`}
+                            className="max-h-[90vh] w-auto object-contain"
+                        />
+                    </div>
+                </div>
+            )}
+        </>
+    )
 }
 
 // --- Verification Data Types (copied from verification page) ---
@@ -739,209 +739,209 @@ export default function OrderDetailsPage() {
                             </div>
                         </Modal>
 
-                                                {/* Purchaser Details (view-only, verification page order/logic) */}
-                                                {verification.purchaser && Object.values(verification.purchaser).some(val => shouldDisplay(val)) && (
-                                                    <div className="mb-12">
-                                                        <h2 className="mb-4 text-2xl font-semibold text-dark dark:text-white">Purchaser Details</h2>
-                                                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-                                                            <ReadOnlyField label="Name" value={verification.purchaser.name} />
-                                                            <ReadOnlyField label="Father/Husband Name" value={verification.purchaser.father_husband_name} />
-                                                            {shouldDisplay(verification.purchaser.present_address) && (
-                                                                <ReadOnlyField label="Present Address" value={`${verification.purchaser.present_address}${verification.purchaser.present_zone ? `\nZone: ${verification.purchaser.present_zone}` : ''}${verification.purchaser.present_area ? `\nArea: ${verification.purchaser.present_area}` : ''}${verification.purchaser.present_block ? `\nBlock: ${verification.purchaser.present_block}` : ''}${verification.purchaser.present_street ? `\nStreet: ${verification.purchaser.present_street}` : ''}${verification.purchaser.present_house_no ? `\nHouse No: ${verification.purchaser.present_house_no}` : ''}`} />
-                                                            )}
-                                                            {shouldDisplay(verification.purchaser.permanent_address) && (
-                                                                <ReadOnlyField label="Permanent Address" value={`${verification.purchaser.permanent_address}${verification.purchaser.permanent_zone ? `\nZone: ${verification.purchaser.permanent_zone}` : ''}${verification.purchaser.permanent_area ? `\nArea: ${verification.purchaser.permanent_area}` : ''}${verification.purchaser.permanent_block ? `\nBlock: ${verification.purchaser.permanent_block}` : ''}${verification.purchaser.permanent_street ? `\nStreet: ${verification.purchaser.permanent_street}` : ''}${verification.purchaser.permanent_house_no ? `\nHouse No: ${verification.purchaser.permanent_house_no}` : ''}`} />
-                                                            )}
-                                                            <ReadOnlyField label="CNIC Number" value={verification.purchaser.cnic_number} />
-                                                            <ReadOnlyField label="Telephone Number" value={verification.purchaser.telephone_number} />
-                                                            <ReadOnlyField label="Employment Type" value={verification.purchaser.employment_type} />
-                                                            <ReadOnlyField label="Job Type" value={verification.purchaser.job_type} />
-                                                            <ReadOnlyField label="Employer Name" value={verification.purchaser.employer_name} />
-                                                            <ReadOnlyField label="Employer Address" value={verification.purchaser.employer_address} />
-                                                            <ReadOnlyField label="Designation" value={verification.purchaser.designation} />
-                                                            <ReadOnlyField label="Official Number" value={verification.purchaser.official_number} />
-                                                            <ReadOnlyField label="Business Name" value={verification.purchaser.business_name} />
-                                                            <ReadOnlyField label="Established Since" value={verification.purchaser.established_since} />
-                                                            <ReadOnlyField label="Business Address" value={verification.purchaser.business_address} />
-                                                            <ReadOnlyField label="Net Income" value={verification.purchaser.net_income} />
-                                                            <ReadOnlyField label="Years in Company" value={verification.purchaser.years_in_company} />
-                                                            <ReadOnlyField label="Gross Salary" value={verification.purchaser.gross_salary} />
-                                                            <ReadOnlyField label="Nearest Location" value={verification.purchaser.nearest_location} />
-                                                            <ReadOnlyField label="Verified" value={verification.purchaser.is_verified} />
-                                                        </div>
-                                                        {/* Purchaser Documents */}
-                                                        {verification.documents.filter((doc: any) => doc.person_type === 'purchaser').length > 0 && (
-                                                            <div className="mt-8">
-                                                                <h3 className="mb-4 text-xl font-semibold text-blue-700 dark:text-blue-400">Purchaser Uploaded Documents</h3>
-                                                                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                                                                    {verification.documents.filter((doc: any) => doc.person_type === 'purchaser').map((doc: any) => (
-                                                                        <DocumentCard key={doc.id} doc={doc} />
-                                                                    ))}
-                                                                </div>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                )}
+                        {/* Purchaser Details (view-only, verification page order/logic) */}
+                        {verification.purchaser && Object.values(verification.purchaser).some(val => shouldDisplay(val)) && (
+                            <div className="mb-12">
+                                <h2 className="mb-4 text-2xl font-semibold text-dark dark:text-white">Purchaser Details</h2>
+                                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+                                    <ReadOnlyField label="Name" value={verification.purchaser.name} />
+                                    <ReadOnlyField label="Father/Husband Name" value={verification.purchaser.father_husband_name} />
+                                    {shouldDisplay(verification.purchaser.present_address) && (
+                                        <ReadOnlyField label="Present Address" value={`${verification.purchaser.present_address}${verification.purchaser.present_zone ? `\nZone: ${verification.purchaser.present_zone}` : ''}${verification.purchaser.present_area ? `\nArea: ${verification.purchaser.present_area}` : ''}${verification.purchaser.present_block ? `\nBlock: ${verification.purchaser.present_block}` : ''}${verification.purchaser.present_street ? `\nStreet: ${verification.purchaser.present_street}` : ''}${verification.purchaser.present_house_no ? `\nHouse No: ${verification.purchaser.present_house_no}` : ''}`} />
+                                    )}
+                                    {shouldDisplay(verification.purchaser.permanent_address) && (
+                                        <ReadOnlyField label="Permanent Address" value={`${verification.purchaser.permanent_address}${verification.purchaser.permanent_zone ? `\nZone: ${verification.purchaser.permanent_zone}` : ''}${verification.purchaser.permanent_area ? `\nArea: ${verification.purchaser.permanent_area}` : ''}${verification.purchaser.permanent_block ? `\nBlock: ${verification.purchaser.permanent_block}` : ''}${verification.purchaser.permanent_street ? `\nStreet: ${verification.purchaser.permanent_street}` : ''}${verification.purchaser.permanent_house_no ? `\nHouse No: ${verification.purchaser.permanent_house_no}` : ''}`} />
+                                    )}
+                                    <ReadOnlyField label="CNIC Number" value={verification.purchaser.cnic_number} />
+                                    <ReadOnlyField label="Telephone Number" value={verification.purchaser.telephone_number} />
+                                    <ReadOnlyField label="Employment Type" value={verification.purchaser.employment_type} />
+                                    <ReadOnlyField label="Job Type" value={verification.purchaser.job_type} />
+                                    <ReadOnlyField label="Employer Name" value={verification.purchaser.employer_name} />
+                                    <ReadOnlyField label="Employer Address" value={verification.purchaser.employer_address} />
+                                    <ReadOnlyField label="Designation" value={verification.purchaser.designation} />
+                                    <ReadOnlyField label="Official Number" value={verification.purchaser.official_number} />
+                                    <ReadOnlyField label="Business Name" value={verification.purchaser.business_name} />
+                                    <ReadOnlyField label="Established Since" value={verification.purchaser.established_since} />
+                                    <ReadOnlyField label="Business Address" value={verification.purchaser.business_address} />
+                                    <ReadOnlyField label="Net Income" value={verification.purchaser.net_income} />
+                                    <ReadOnlyField label="Years in Company" value={verification.purchaser.years_in_company} />
+                                    <ReadOnlyField label="Gross Salary" value={verification.purchaser.gross_salary} />
+                                    <ReadOnlyField label="Nearest Location" value={verification.purchaser.nearest_location} />
+                                    <ReadOnlyField label="Verified" value={verification.purchaser.is_verified} />
+                                </div>
+                                {/* Purchaser Documents */}
+                                {verification.documents.filter((doc: any) => doc.person_type === 'purchaser').length > 0 && (
+                                    <div className="mt-8">
+                                        <h3 className="mb-4 text-xl font-semibold text-blue-700 dark:text-blue-400">Purchaser Uploaded Documents</h3>
+                                        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                                            {verification.documents.filter((doc: any) => doc.person_type === 'purchaser').map((doc: any) => (
+                                                <DocumentCard key={doc.id} doc={doc} />
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
 
-                                                {/* Grantors (view-only, verification page order/logic) */}
-                                                {verification.grantors && verification.grantors.map((grantor: any) => {
-                                                    const hasGrantorData = Object.values(grantor).some(val => shouldDisplay(val));
-                                                    const hasDocuments = verification.documents.filter((doc: any) => doc.person_type === `grantor${grantor.grantor_number}`).length > 0;
-                                                    if (!hasGrantorData && !hasDocuments) return null;
-                                                    return (
-                                                        <div key={grantor.id} className="mb-16">
-                                                            <h2 className="mb-4 text-2xl font-semibold text-dark dark:text-white">Grantor {grantor.grantor_number} Details</h2>
-                                                            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-                                                                <ReadOnlyField label="Name" value={grantor.name} />
-                                                                <ReadOnlyField label="Father/Husband Name" value={grantor.father_husband_name} />
-                                                                {shouldDisplay(grantor.present_address) && (
-                                                                    <ReadOnlyField label="Present Address" value={`${grantor.present_address}${grantor.present_zone ? `\nZone: ${grantor.present_zone}` : ''}${grantor.present_area ? `\nArea: ${grantor.present_area}` : ''}${grantor.present_block ? `\nBlock: ${grantor.present_block}` : ''}${grantor.present_street ? `\nStreet: ${grantor.present_street}` : ''}${grantor.present_house_no ? `\nHouse No: ${grantor.present_house_no}` : ''}`} />
+                        {/* Grantors (view-only, verification page order/logic) */}
+                        {verification.grantors && verification.grantors.map((grantor: any) => {
+                            const hasGrantorData = Object.values(grantor).some(val => shouldDisplay(val));
+                            const hasDocuments = verification.documents.filter((doc: any) => doc.person_type === `grantor${grantor.grantor_number}`).length > 0;
+                            if (!hasGrantorData && !hasDocuments) return null;
+                            return (
+                                <div key={grantor.id} className="mb-16">
+                                    <h2 className="mb-4 text-2xl font-semibold text-dark dark:text-white">Grantor {grantor.grantor_number} Details</h2>
+                                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+                                        <ReadOnlyField label="Name" value={grantor.name} />
+                                        <ReadOnlyField label="Father/Husband Name" value={grantor.father_husband_name} />
+                                        {shouldDisplay(grantor.present_address) && (
+                                            <ReadOnlyField label="Present Address" value={`${grantor.present_address}${grantor.present_zone ? `\nZone: ${grantor.present_zone}` : ''}${grantor.present_area ? `\nArea: ${grantor.present_area}` : ''}${grantor.present_block ? `\nBlock: ${grantor.present_block}` : ''}${grantor.present_street ? `\nStreet: ${grantor.present_street}` : ''}${grantor.present_house_no ? `\nHouse No: ${grantor.present_house_no}` : ''}`} />
+                                        )}
+                                        {shouldDisplay(grantor.permanent_address) && (
+                                            <ReadOnlyField label="Permanent Address" value={`${grantor.permanent_address}${grantor.permanent_zone ? `\nZone: ${grantor.permanent_zone}` : ''}${grantor.permanent_area ? `\nArea: ${grantor.permanent_area}` : ''}${grantor.permanent_block ? `\nBlock: ${grantor.permanent_block}` : ''}${grantor.permanent_street ? `\nStreet: ${grantor.permanent_street}` : ''}${grantor.permanent_house_no ? `\nHouse No: ${grantor.permanent_house_no}` : ''}`} />
+                                        )}
+                                        <ReadOnlyField label="CNIC Number" value={grantor.cnic_number} />
+                                        <ReadOnlyField label="Telephone Number" value={grantor.telephone_number} />
+                                        <ReadOnlyField label="Employment Type" value={grantor.employment_type} />
+                                        <ReadOnlyField label="Job Type" value={grantor.job_type} />
+                                        <ReadOnlyField label="Designation" value={grantor.designation} />
+                                        <ReadOnlyField label="Official Number" value={grantor.official_number} />
+                                        <ReadOnlyField label="Office Address" value={grantor.office_address} />
+                                        <ReadOnlyField label="Company Name" value={grantor.company_name} />
+                                        <ReadOnlyField label="Years in Company" value={grantor.years_in_company} />
+                                        <ReadOnlyField label="Monthly Income" value={grantor.monthly_income} />
+                                        <ReadOnlyField label="Business Name" value={grantor.business_name} />
+                                        <ReadOnlyField label="Established Since" value={grantor.established_since} />
+                                        <ReadOnlyField label="Business Address" value={grantor.business_address} />
+                                        <ReadOnlyField label="Net Income" value={grantor.net_income} />
+                                        <ReadOnlyField label="Full Residential Address" value={grantor.full_residential_address} />
+                                        <ReadOnlyField label="Relationship" value={grantor.relationship} />
+                                        <ReadOnlyField label="Nearest Location" value={grantor.nearest_location} />
+                                        <ReadOnlyField label="Verified" value={grantor.is_verified} />
+                                    </div>
+                                    {/* Grantor Documents */}
+                                    {hasDocuments && (
+                                        <div className="mt-8">
+                                            <h3 className="mb-4 text-xl font-semibold text-indigo-700 dark:text-indigo-400">Grantor {grantor.grantor_number} Uploaded Documents</h3>
+                                            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                                                {verification.documents.filter((doc: any) => doc.person_type === `grantor${grantor.grantor_number}`).map((doc: any) => (
+                                                    <DocumentCard key={doc.id} doc={doc} />
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })}
+
+                        {/* Next of Kin (view-only, verification page order/logic) */}
+                        {verification.nextOfKin && Object.values(verification.nextOfKin).some(val => shouldDisplay(val)) && (
+                            <div className="mb-12">
+                                <h2 className="mb-4 text-2xl font-semibold text-dark dark:text-white">Next of Kin Details</h2>
+                                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+                                    <ReadOnlyField label="Name" value={verification.nextOfKin.name} />
+                                    <ReadOnlyField label="CNIC Number" value={verification.nextOfKin.cnic_number} />
+                                    <ReadOnlyField label="Relation" value={verification.nextOfKin.relation} />
+                                    <ReadOnlyField label="Phone Number" value={verification.nextOfKin.phone_number} />
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Locations (view-only, verification page order/logic) */}
+                        {(verification.locations.length > 0 || verification.verification_locations.length > 0) && (
+                            <div className="mb-12">
+                                <h2 className="mb-4 text-2xl font-semibold text-dark dark:text-white">Location Tracking</h2>
+
+                                {verification.locations.length > 0 && (
+                                    <div className="mb-8">
+                                        <h3 className="mb-3 text-xl font-semibold text-dark dark:text-white">GPS Locations</h3>
+                                        <div className="overflow-x-auto">
+                                            <table className="w-full border-collapse">
+                                                <thead>
+                                                    <tr className="border-b border-stroke dark:border-dark-3">
+                                                        <th className="px-4 py-2 text-left">Label</th>
+                                                        <th className="px-4 py-2 text-left">Latitude</th>
+                                                        <th className="px-4 py-2 text-left">Longitude</th>
+                                                        <th className="px-4 py-2 text-left">Accuracy</th>
+                                                        <th className="px-4 py-2 text-left">Timestamp</th>
+                                                        <th className="px-4 py-2 text-left">Actions</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {verification.locations.map((loc) => (
+                                                        <tr key={loc.id} className="border-b border-stroke dark:border-dark-3">
+                                                            <td className="px-4 py-2">{loc.label}</td>
+                                                            <td className="px-4 py-2">{loc.latitude}</td>
+                                                            <td className="px-4 py-2">{loc.longitude}</td>
+                                                            <td className="px-4 py-2">{loc.accuracy ? `${loc.accuracy} meters` : '—'}</td>
+                                                            <td className="px-4 py-2">{formatDateTimeUTC(loc.timestamp)}</td>
+                                                            <td className="px-4 py-2">
+                                                                <a
+                                                                    href={`https://www.google.com/maps/search/?api=1&query=${loc.latitude},${loc.longitude}`}
+                                                                    target="_blank"
+                                                                    rel="noopener noreferrer"
+                                                                    className="text-primary hover:underline font-medium"
+                                                                >
+                                                                    View on Map
+                                                                </a>
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {verification.verification_locations.length > 0 && (
+                                    <div>
+                                        <h3 className="mb-3 text-xl font-semibold text-dark dark:text-white">Location Photos</h3>
+                                        <div className="space-y-6">
+                                            {verification.verification_locations.map((loc) => (
+                                                <div key={loc.id} className="rounded-lg border border-stroke p-4 dark:border-dark-3">
+                                                    <div className="mb-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+                                                        <Field label="Location Type" value={loc.location_type} />
+                                                        <Field label="Label" value={loc.label} />
+                                                        <Field label="Person Type" value={loc.person_type} />
+                                                        <div className="flex flex-col">
+                                                            <label className="block text-sm font-medium text-gray-500 dark:text-gray-400">Coordinates</label>
+                                                            <div className="mt-1 flex items-center gap-3 rounded-lg bg-gray-100 px-4 py-2.5 dark:bg-dark-3">
+                                                                <span className="dark:text-gray-300">
+                                                                    {loc.latitude && loc.longitude ? `${loc.latitude}, ${loc.longitude}` : '—'}
+                                                                </span>
+                                                                {loc.latitude && loc.longitude && (
+                                                                    <a
+                                                                        href={`https://www.google.com/maps/search/?api=1&query=${loc.latitude},${loc.longitude}`}
+                                                                        target="_blank"
+                                                                        rel="noopener noreferrer"
+                                                                        className="text-xs font-bold text-primary hover:underline ml-auto"
+                                                                    >
+                                                                        VIEW ON GOOGLE MAP
+                                                                    </a>
                                                                 )}
-                                                                {shouldDisplay(grantor.permanent_address) && (
-                                                                    <ReadOnlyField label="Permanent Address" value={`${grantor.permanent_address}${grantor.permanent_zone ? `\nZone: ${grantor.permanent_zone}` : ''}${grantor.permanent_area ? `\nArea: ${grantor.permanent_area}` : ''}${grantor.permanent_block ? `\nBlock: ${grantor.permanent_block}` : ''}${grantor.permanent_street ? `\nStreet: ${grantor.permanent_street}` : ''}${grantor.permanent_house_no ? `\nHouse No: ${grantor.permanent_house_no}` : ''}`} />
-                                                                )}
-                                                                <ReadOnlyField label="CNIC Number" value={grantor.cnic_number} />
-                                                                <ReadOnlyField label="Telephone Number" value={grantor.telephone_number} />
-                                                                <ReadOnlyField label="Employment Type" value={grantor.employment_type} />
-                                                                <ReadOnlyField label="Job Type" value={grantor.job_type} />
-                                                                <ReadOnlyField label="Designation" value={grantor.designation} />
-                                                                <ReadOnlyField label="Official Number" value={grantor.official_number} />
-                                                                <ReadOnlyField label="Office Address" value={grantor.office_address} />
-                                                                <ReadOnlyField label="Company Name" value={grantor.company_name} />
-                                                                <ReadOnlyField label="Years in Company" value={grantor.years_in_company} />
-                                                                <ReadOnlyField label="Monthly Income" value={grantor.monthly_income} />
-                                                                <ReadOnlyField label="Business Name" value={grantor.business_name} />
-                                                                <ReadOnlyField label="Established Since" value={grantor.established_since} />
-                                                                <ReadOnlyField label="Business Address" value={grantor.business_address} />
-                                                                <ReadOnlyField label="Net Income" value={grantor.net_income} />
-                                                                <ReadOnlyField label="Full Residential Address" value={grantor.full_residential_address} />
-                                                                <ReadOnlyField label="Relationship" value={grantor.relationship} />
-                                                                <ReadOnlyField label="Nearest Location" value={grantor.nearest_location} />
-                                                                <ReadOnlyField label="Verified" value={grantor.is_verified} />
                                                             </div>
-                                                            {/* Grantor Documents */}
-                                                            {hasDocuments && (
-                                                                <div className="mt-8">
-                                                                    <h3 className="mb-4 text-xl font-semibold text-indigo-700 dark:text-indigo-400">Grantor {grantor.grantor_number} Uploaded Documents</h3>
-                                                                    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                                                                        {verification.documents.filter((doc: any) => doc.person_type === `grantor${grantor.grantor_number}`).map((doc: any) => (
-                                                                            <DocumentCard key={doc.id} doc={doc} />
-                                                                        ))}
-                                                                    </div>
-                                                                </div>
-                                                            )}
                                                         </div>
-                                                    );
-                                                })}
+                                                        <Field label="Address" value={loc.address} />
+                                                        <Field label="Captured At" value={loc.created_at ? formatDateTimeUTC(loc.created_at) : null} />
+                                                    </div>
 
-                                                {/* Next of Kin (view-only, verification page order/logic) */}
-                                                {verification.nextOfKin && Object.values(verification.nextOfKin).some(val => shouldDisplay(val)) && (
-                                                    <div className="mb-12">
-                                                        <h2 className="mb-4 text-2xl font-semibold text-dark dark:text-white">Next of Kin Details</h2>
-                                                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-                                                            <ReadOnlyField label="Name" value={verification.nextOfKin.name} />
-                                                            <ReadOnlyField label="CNIC Number" value={verification.nextOfKin.cnic_number} />
-                                                            <ReadOnlyField label="Relation" value={verification.nextOfKin.relation} />
-                                                            <ReadOnlyField label="Phone Number" value={verification.nextOfKin.phone_number} />
+                                                    {loc.photos && loc.photos.length > 0 && (
+                                                        <div>
+                                                            <h4 className="mb-3 font-medium text-gray-700 dark:text-gray-300">Photos</h4>
+                                                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                                                                {loc.photos.map((photo: any) => (
+                                                                    <LocationPhotoCard key={photo.id} photo={photo} label={loc.label} />
+                                                                ))}
+                                                            </div>
                                                         </div>
-                                                    </div>
-                                                )}
-
-                                                {/* Locations (view-only, verification page order/logic) */}
-                                                {(verification.locations.length > 0 || verification.verification_locations.length > 0) && (
-                                                    <div className="mb-12">
-                                                        <h2 className="mb-4 text-2xl font-semibold text-dark dark:text-white">Location Tracking</h2>
-
-                                                        {verification.locations.length > 0 && (
-                                                            <div className="mb-8">
-                                                                <h3 className="mb-3 text-xl font-semibold text-dark dark:text-white">GPS Locations</h3>
-                                                                <div className="overflow-x-auto">
-                                                                    <table className="w-full border-collapse">
-                                                                        <thead>
-                                                                            <tr className="border-b border-stroke dark:border-dark-3">
-                                                                                <th className="px-4 py-2 text-left">Label</th>
-                                                                                <th className="px-4 py-2 text-left">Latitude</th>
-                                                                                <th className="px-4 py-2 text-left">Longitude</th>
-                                                                                <th className="px-4 py-2 text-left">Accuracy</th>
-                                                                                <th className="px-4 py-2 text-left">Timestamp</th>
-                                                                                <th className="px-4 py-2 text-left">Actions</th>
-                                                                            </tr>
-                                                                        </thead>
-                                                                        <tbody>
-                                                                            {verification.locations.map((loc) => (
-                                                                                <tr key={loc.id} className="border-b border-stroke dark:border-dark-3">
-                                                                                    <td className="px-4 py-2">{loc.label}</td>
-                                                                                    <td className="px-4 py-2">{loc.latitude}</td>
-                                                                                    <td className="px-4 py-2">{loc.longitude}</td>
-                                                                                    <td className="px-4 py-2">{loc.accuracy ? `${loc.accuracy} meters` : '—'}</td>
-                                                                                    <td className="px-4 py-2">{formatDateTimeUTC(loc.timestamp)}</td>
-                                                                                    <td className="px-4 py-2">
-                                                                                        <a
-                                                                                            href={`https://www.google.com/maps/search/?api=1&query=${loc.latitude},${loc.longitude}`}
-                                                                                            target="_blank"
-                                                                                            rel="noopener noreferrer"
-                                                                                            className="text-primary hover:underline font-medium"
-                                                                                        >
-                                                                                            View on Map
-                                                                                        </a>
-                                                                                    </td>
-                                                                                </tr>
-                                                                            ))}
-                                                                        </tbody>
-                                                                    </table>
-                                                                </div>
-                                                            </div>
-                                                        )}
-
-                                                        {verification.verification_locations.length > 0 && (
-                                                            <div>
-                                                                <h3 className="mb-3 text-xl font-semibold text-dark dark:text-white">Location Photos</h3>
-                                                                <div className="space-y-6">
-                                                                    {verification.verification_locations.map((loc) => (
-                                                                        <div key={loc.id} className="rounded-lg border border-stroke p-4 dark:border-dark-3">
-                                                                            <div className="mb-4 grid grid-cols-1 gap-4 md:grid-cols-2">
-                                                                                <Field label="Location Type" value={loc.location_type} />
-                                                                                <Field label="Label" value={loc.label} />
-                                                                                <Field label="Person Type" value={loc.person_type} />
-                                                                                <div className="flex flex-col">
-                                                                                    <label className="block text-sm font-medium text-gray-500 dark:text-gray-400">Coordinates</label>
-                                                                                    <div className="mt-1 flex items-center gap-3 rounded-lg bg-gray-100 px-4 py-2.5 dark:bg-dark-3">
-                                                                                        <span className="dark:text-gray-300">
-                                                                                            {loc.latitude && loc.longitude ? `${loc.latitude}, ${loc.longitude}` : '—'}
-                                                                                        </span>
-                                                                                        {loc.latitude && loc.longitude && (
-                                                                                            <a
-                                                                                                href={`https://www.google.com/maps/search/?api=1&query=${loc.latitude},${loc.longitude}`}
-                                                                                                target="_blank"
-                                                                                                rel="noopener noreferrer"
-                                                                                                className="text-xs font-bold text-primary hover:underline ml-auto"
-                                                                                            >
-                                                                                                VIEW ON GOOGLE MAP
-                                                                                            </a>
-                                                                                        )}
-                                                                                    </div>
-                                                                                </div>
-                                                                                <Field label="Address" value={loc.address} />
-                                                                                <Field label="Captured At" value={loc.created_at ? formatDateTimeUTC(loc.created_at) : null} />
-                                                                            </div>
-
-                                                                            {loc.photos && loc.photos.length > 0 && (
-                                                                                <div>
-                                                                                    <h4 className="mb-3 font-medium text-gray-700 dark:text-gray-300">Photos</h4>
-                                                                                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                                                                                        {loc.photos.map((photo: any) => (
-                                                                                            <LocationPhotoCard key={photo.id} photo={photo} label={loc.label} />
-                                                                                        ))}
-                                                                                    </div>
-                                                                                </div>
-                                                                            )}
-                                                                        </div>
-                                                                    ))}
-                                                                </div>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                )}
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
                 )}
             </div>

@@ -23,6 +23,8 @@ import { createPortal } from 'react-dom'
 import { useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Pagination from '../common/Pagination'
+import { useAuth } from '../../../contexts/AuthContext'
+import { ArrowRightLeft, Send } from 'lucide-react'
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL
 
@@ -51,6 +53,7 @@ interface Order {
   created_at: string
   created_by: { username: string } | null
   assigned_to: { username: string } | null
+  outlet_id?: number | null
   cancelled_reason?: string | null
   cancelled_at?: string | null
   productHistories?: {
@@ -112,6 +115,13 @@ const OrderList = ({ forcedStatus, forcedChannel, hideActions, hideSelection, on
   const [bulkAssignModalOpen, setBulkAssignModalOpen] = useState(false)
   const [bulkUnassignModalOpen, setBulkUnassignModalOpen] = useState(false)
   const [singleUnassignModalOpen, setSingleUnassignModalOpen] = useState(false)
+  const [transferModalOpen, setTransferModalOpen] = useState(false)
+  const [bulkTransferModalOpen, setBulkTransferModalOpen] = useState(false)
+  const [outlets, setOutlets] = useState<any[]>([])
+  const [selectedOutletId, setSelectedOutletId] = useState<number | null>(null)
+  const { user } = useAuth()
+  const userRole = user?.role?.toLowerCase() || ''
+  const isSalesOfficer = userRole === 'sales officer'
 
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
   const [selectedVerifierId, setSelectedVerifierId] = useState<number | null>(null)
@@ -209,12 +219,28 @@ const OrderList = ({ forcedStatus, forcedChannel, hideActions, hideSelection, on
     }
   }
 
+  const fetchOutlets = async () => {
+    try {
+      const token = Cookies.get('auth_token')
+      const res = await fetch(`${BACKEND_URL}/api/all-outlets`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (res.ok) {
+        const json = await res.json()
+        if (json.success) setOutlets(json.data || [])
+      }
+    } catch (err) {
+      console.error('Failed to load outlets', err)
+    }
+  }
+
   useEffect(() => {
     fetchOrders()
   }, [pagination.page, pagination.limit, globalFilter, columnFilters, sorting, dateRange, startDate, endDate])
 
   useEffect(() => {
     fetchVerifiers()
+    fetchOutlets()
   }, [])
 
   useEffect(() => {
@@ -259,6 +285,11 @@ const OrderList = ({ forcedStatus, forcedChannel, hideActions, hideSelection, on
   const handleAssignClick = (order: Order) => {
     setSelectedOrder(order)
     setAssignModalOpen(true)
+  }
+
+  const handleTransferClick = (order: Order) => {
+    setSelectedOrder(order)
+    setTransferModalOpen(true)
   }
 
   const handleUnassignClick = (order: Order) => {
@@ -323,6 +354,10 @@ const OrderList = ({ forcedStatus, forcedChannel, hideActions, hideSelection, on
     setBulkAssignModalOpen(true)
   }
 
+  const handleBulkTransfer = () => {
+    setBulkTransferModalOpen(true)
+  }
+
   const handleBulkUnassign = () => {
     setBulkUnassignModalOpen(true)
   }
@@ -351,6 +386,72 @@ const OrderList = ({ forcedStatus, forcedChannel, hideActions, hideSelection, on
     } catch (err) {
       console.error('Bulk assign error:', err)
       alert('Bulk assign failed')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const confirmTransfer = async () => {
+    if (!selectedOrder || !selectedOutletId) return
+    setIsSubmitting(true)
+    try {
+      const token = Cookies.get('auth_token')
+      const res = await fetch(`${BACKEND_URL}/api/orders/${selectedOrder.id}/transfer`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ outlet_id: selectedOutletId }),
+      })
+
+      if (!res.ok) throw new Error('Transfer failed')
+      await fetchOrders()
+      setTransferModalOpen(false)
+      setSelectedOutletId(null)
+      setSelectedOrder(null)
+    } catch (err) {
+      console.error('Transfer error:', err)
+      alert('Transfer failed')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const confirmBulkTransfer = async () => {
+    if (!selectedOutletId) return
+    const ids = table.getSelectedRowModel().rows
+      .filter((r) => r.original.outlet_id === null)
+      .map((r) => r.original.id)
+    
+    if (ids.length === 0) {
+      alert('Selected orders are already transferred.')
+      setBulkTransferModalOpen(false)
+      setRowSelection({})
+      return
+    }
+
+    setIsSubmitting(true)
+
+    try {
+      const token = Cookies.get('auth_token')
+      const res = await fetch(`${BACKEND_URL}/api/orders/transfer-bulk`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ order_ids: ids, outlet_id: selectedOutletId }),
+      })
+
+      if (!res.ok) throw new Error('Bulk transfer failed')
+      await fetchOrders()
+      setBulkTransferModalOpen(false)
+      setRowSelection({})
+      setSelectedOutletId(null)
+    } catch (err) {
+      console.error('Bulk transfer error:', err)
+      alert('Bulk transfer failed')
     } finally {
       setIsSubmitting(false)
     }
@@ -508,7 +609,9 @@ const OrderList = ({ forcedStatus, forcedChannel, hideActions, hideSelection, on
       header: 'Status',
       enableColumnFilter: true,
       cell: ({ row }) => {
-        const status = row.original.status?.toLowerCase() || '';
+        const order = row.original
+        const isActuallyTransferred = isSalesOfficer && order.outlet_id !== null && order.status?.toLowerCase() === 'pending'
+        const status = order.status?.toLowerCase() || '';
 
         let label = '';
         let className = 'inline-flex px-2.5 py-1 rounded-full text-xs font-medium';
@@ -520,8 +623,13 @@ const OrderList = ({ forcedStatus, forcedChannel, hideActions, hideSelection, on
             break;
 
           case 'pending':
-            label = 'Pending';
-            className += ' bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-300';
+            if (isActuallyTransferred) {
+              label = 'Transferred'
+              className += ' bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300'
+            } else {
+              label = 'Pending'
+              className += ' bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-300'
+            }
             break;
 
           case 'in_progress':
@@ -575,12 +683,12 @@ const OrderList = ({ forcedStatus, forcedChannel, hideActions, hideSelection, on
       header: 'Created By',
       enableColumnFilter: true,
     },
-    {
+    ...(isSalesOfficer ? [] : [{
       id: 'assigned_to',
-      accessorFn: (row) => row.assigned_to?.username || 'Unassigned',
+      accessorFn: (row: Order) => row.assigned_to?.username || 'Unassigned',
       header: 'Assigned To',
       enableColumnFilter: true,
-    },
+    }]),
     {
       id: 'actions',
       header: 'Actions',
@@ -720,30 +828,50 @@ const OrderList = ({ forcedStatus, forcedChannel, hideActions, hideSelection, on
 
                     {!hideActions && (
                       <>
-                        {order.assigned_to ? (
-                          <li>
-                            <button
-                              onClick={() => {
-                                handleUnassignClick(order)
-                                setIsOpen(false)
-                              }}
-                              className="block w-full px-4 py-2.5 text-left hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/30 dark:hover:text-red-400"
-                            >
-                              Unassign
-                            </button>
-                          </li>
+                        {isSalesOfficer ? (
+                          <>
+                            {order.outlet_id === null && (
+                              <li>
+                                <button
+                                  onClick={() => {
+                                    handleTransferClick(order)
+                                    setIsOpen(false)
+                                  }}
+                                  className="block w-full px-4 py-2.5 text-left hover:bg-blue-50 hover:text-blue-600 dark:hover:bg-blue-900/30 dark:hover:text-blue-400 font-bold"
+                                >
+                                  Transfer to Outlet
+                                </button>
+                              </li>
+                            )}
+                          </>
                         ) : (
-                          <li>
-                            <button
-                              onClick={() => {
-                                handleAssignClick(order)
-                                setIsOpen(false)
-                              }}
-                              className="block w-full px-4 py-2.5 text-left hover:bg-[#F5F7FD] hover:text-[#ff3d3d] dark:hover:bg-dark-3"
-                            >
-                              Assign
-                            </button>
-                          </li>
+                          <>
+                            {order.assigned_to ? (
+                              <li>
+                                <button
+                                  onClick={() => {
+                                    handleUnassignClick(order)
+                                    setIsOpen(false)
+                                  }}
+                                  className="block w-full px-4 py-2.5 text-left hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/30 dark:hover:text-red-400"
+                                >
+                                  Unassign
+                                </button>
+                              </li>
+                            ) : (
+                              <li>
+                                <button
+                                  onClick={() => {
+                                    handleAssignClick(order)
+                                    setIsOpen(false)
+                                  }}
+                                  className="block w-full px-4 py-2.5 text-left hover:bg-[#F5F7FD] hover:text-[#ff3d3d] dark:hover:bg-dark-3"
+                                >
+                                  Assign
+                                </button>
+                              </li>
+                            )}
+                          </>
                         )}
                       </>
                     )}
@@ -889,19 +1017,32 @@ const OrderList = ({ forcedStatus, forcedChannel, hideActions, hideSelection, on
       {/* Bulk actions */}
       {selectedCount > 0 && !hideSelection && (
         <div className="px-7.5 pb-4 flex flex-wrap gap-4">
-          <button
-            onClick={handleBulkAssign}
-            className="rounded bg-blue-600 px-5 py-2 text-white hover:bg-blue-700"
-          >
-            Assign Selected ({selectedCount})
-          </button>
+          {!isSalesOfficer && (
+            <>
+              <button
+                onClick={handleBulkAssign}
+                className="rounded bg-blue-600 px-5 py-2 text-white hover:bg-blue-700"
+              >
+                Assign Selected ({selectedCount})
+              </button>
 
-          <button
-            onClick={handleBulkUnassign}
-            className="rounded bg-red-600 px-5 py-2 text-white hover:bg-red-700"
-          >
-            Unassign Selected ({selectedCount})
-          </button>
+              <button
+                onClick={handleBulkUnassign}
+                className="rounded bg-red-600 px-5 py-2 text-white hover:bg-red-700"
+              >
+                Unassign Selected ({selectedCount})
+              </button>
+            </>
+          )}
+
+          {isSalesOfficer && (
+            <button
+              onClick={handleBulkTransfer}
+              className="rounded bg-green-600 px-5 py-2 text-white hover:bg-green-700 font-bold flex items-center gap-2"
+            >
+              <ArrowRightLeft className='w-4 h-4' /> Transfer Selected ({selectedCount})
+            </button>
+          )}
         </div>
       )}
 
@@ -1297,6 +1438,116 @@ const OrderList = ({ forcedStatus, forcedChannel, hideActions, hideSelection, on
             className="rounded bg-red-600 px-6 py-2.5 text-white hover:bg-red-700 disabled:opacity-50"
           >
             {isSubmitting ? 'Unassigning All...' : 'Unassign All'}
+          </button>
+        </div>
+      </Modal>
+
+      {/* Single Transfer Modal */}
+      <Modal
+        open={transferModalOpen}
+        onClose={() => {
+          setTransferModalOpen(false)
+          setSelectedOutletId(null)
+        }}
+        className="max-w-md rounded-2xl bg-white p-8 shadow-xl dark:bg-gray-800"
+      >
+        <h2 className="mb-4 text-xl font-semibold text-dark dark:text-white flex items-center gap-2">
+          <ArrowRightLeft className="w-5 h-5 text-blue-600" /> Transfer to Outlet
+        </h2>
+        <p className="mb-6 text-gray-600 dark:text-gray-300">
+          Transfer order <strong>{selectedOrder?.order_ref}</strong> to a specific branch:
+        </p>
+
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium mb-1.5 dark:text-gray-300">Select Target Outlet:</label>
+            <select
+              value={selectedOutletId ?? ''}
+              onChange={(e) => setSelectedOutletId(Number(e.target.value))}
+              className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2.5 outline-none focus:border-primary dark:border-dark-3 dark:bg-dark-2"
+            >
+              <option value="">Select Branch</option>
+              {outlets.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.name} ({o.code})
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div className="mt-8 flex justify-end gap-4">
+          <button
+            onClick={() => {
+              setTransferModalOpen(false)
+              setSelectedOutletId(null)
+            }}
+            className="rounded border border-stroke px-6 py-2.5 text-dark hover:bg-gray-100 dark:border-dark-3 dark:text-white dark:hover:bg-dark-3 disabled:opacity-50"
+            disabled={isSubmitting}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={confirmTransfer}
+            disabled={!selectedOutletId || isSubmitting}
+            className="rounded bg-blue-600 px-6 py-2.5 text-white hover:bg-blue-700 disabled:opacity-50 font-bold"
+          >
+            {isSubmitting ? 'Transferring...' : 'Transfer Now'}
+          </button>
+        </div>
+      </Modal>
+
+      {/* Bulk Transfer Modal */}
+      <Modal
+        open={bulkTransferModalOpen}
+        onClose={() => {
+          setBulkTransferModalOpen(false)
+          setSelectedOutletId(null)
+        }}
+        className="max-w-md rounded-2xl bg-white p-8 shadow-xl dark:bg-gray-800"
+      >
+        <h2 className="mb-4 text-xl font-semibold text-dark dark:text-white flex items-center gap-2">
+          <Send className="w-5 h-5 text-green-600" /> Bulk Transfer to Outlet
+        </h2>
+        <p className="mb-6 text-gray-600 dark:text-gray-300">
+          Transfer <strong>{selectedCount}</strong> selected orders to a branch:
+        </p>
+
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium mb-1.5 dark:text-gray-300">Select Target Outlet:</label>
+            <select
+              value={selectedOutletId ?? ''}
+              onChange={(e) => setSelectedOutletId(Number(e.target.value))}
+              className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2.5 outline-none focus:border-primary dark:border-dark-3 dark:bg-dark-2"
+            >
+              <option value="">Select Branch</option>
+              {outlets.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.name} ({o.code})
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div className="mt-8 flex justify-end gap-4">
+          <button
+            onClick={() => {
+              setBulkTransferModalOpen(false)
+              setSelectedOutletId(null)
+            }}
+            className="rounded border border-stroke px-6 py-2.5 text-dark hover:bg-gray-100 dark:border-dark-3 dark:text-white dark:hover:bg-dark-3 disabled:opacity-50"
+            disabled={isSubmitting}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={confirmBulkTransfer}
+            disabled={!selectedOutletId || isSubmitting}
+            className="rounded bg-green-600 px-6 py-2.5 text-white hover:bg-green-700 disabled:opacity-50 font-bold"
+          >
+            {isSubmitting ? 'Transferring All...' : 'Transfer Selected'}
           </button>
         </div>
       </Modal>

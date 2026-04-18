@@ -39,6 +39,7 @@ interface Purchase {
     balance: number;
     status: string;
     purchase_date: string;
+    due_date?: string;
     notes?: string;
     items: PurchaseItem[];
 }
@@ -264,6 +265,7 @@ export default function VendorPurchasesPage() {
                                 <th className="p-4 w-10" />
                                 <th className="p-4">Invoice / Date</th>
                                 <th className="p-4">Vendor</th>
+                                <th className="p-4">Due Date</th>
                                 <th className="p-4">Amount</th>
                                 <th className="p-4">Paid</th>
                                 <th className="p-4">Balance</th>
@@ -297,6 +299,14 @@ export default function VendorPurchasesPage() {
                                             <td className="p-4">
                                                 <div className="font-semibold text-gray-700 dark:text-gray-300">{p.vendor_name}</div>
                                                 <div className="text-[10px] text-gray-400 font-mono">ID: #{p.id}</div>
+                                            </td>
+                                            <td className="p-4">
+                                                {p.due_date ? (
+                                                    <div className={`text-xs font-bold ${new Date(p.due_date) < new Date() && p.balance > 0 ? 'text-red-500 animate-pulse' : 'text-gray-500'}`}>
+                                                        {new Date(p.due_date).toLocaleDateString()}
+                                                        {new Date(p.due_date) < new Date() && p.balance > 0 && <span className="block text-[8px] uppercase tracking-tighter">Overdue</span>}
+                                                    </div>
+                                                ) : <span className="text-gray-300">—</span>}
                                             </td>
                                             <td className="p-4 font-black">PKR {p.total_amount.toLocaleString()}</td>
                                             <td className="p-4 text-green-600 dark:text-green-400 font-bold">PKR {p.paid_amount.toLocaleString()}</td>

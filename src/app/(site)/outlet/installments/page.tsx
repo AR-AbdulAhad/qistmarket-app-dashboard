@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import Cookies from "js-cookie";
 import InstallmentsTable from "@/components/Installments/InstallmentsTable";
 import InstallmentPaymentModal from "@/components/Installments/InstallmentPaymentModal";
@@ -12,16 +13,24 @@ const getAuthHeaders = () => {
     return { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
 };
 
-export default function OutletInstallmentsPage() {
+function InstallmentsContent() {
+    const searchParams = useSearchParams();
+    const initialSearch = searchParams.get("search") || "";
+
     const [data, setData] = useState<any[]>([]);
     const [pagination, setPagination] = useState({ total: 0, page: 1, limit: 10, totalPages: 1 });
     const [loading, setLoading] = useState(true);
-    const [search, setSearch] = useState("");
+    const [search, setSearch] = useState(initialSearch);
     
     // Modal state
     const [modalOpen, setModalOpen] = useState(false);
     const [selectedOrder, setSelectedOrder] = useState<any>(null);
     const [selectedInstallment, setSelectedInstallment] = useState<any>(null);
+
+    // Sync search from URL if it changes
+    useEffect(() => {
+        if (initialSearch) setSearch(initialSearch);
+    }, [initialSearch]);
 
     useEffect(() => {
         fetchInstallments();
@@ -118,5 +127,13 @@ export default function OutletInstallmentsPage() {
                 installment={selectedInstallment}
             />
         </div>
+    );
+}
+
+export default function OutletInstallmentsPage() {
+    return (
+        <Suspense fallback={<div className="p-20 text-center">Loading...</div>}>
+            <InstallmentsContent />
+        </Suspense>
     );
 }

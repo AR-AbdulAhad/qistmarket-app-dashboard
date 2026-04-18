@@ -43,30 +43,42 @@ export const NAV_DATA = [
         ],
       },
       {
-        title: "Customers",
-        icon: Icons.HomeIcon,
+        title: "Customers Profiles",
+        icon: Icons.UsersIcon,
         url: "/admin/customers",
         items: [],
       },
       {
+        title: "Blacklisted Accounts",
+        icon: Icons.BanIcon,
+        url: "/admin/customers/blacklist",
+        items: [],
+      },
+      {
+        title: "Cleared Accounts",
+        icon: Icons.CheckCircleIcon,
+        url: "/admin/customers/cleared",
+        items: [],
+      },
+      {
         title: "Orders for Approval",
-        icon: Icons.HomeIcon,
+        icon: Icons.ClipboardCheckIcon,
         url: "/orders-for-approval",
         items: [],
       },
       {
         title: "Approved Order List",
-        icon: Icons.HomeIcon,
+        icon: Icons.ArchiveIcon,
         items: [],
       },
       {
         title: "Recovery Orders",
-        icon: Icons.HomeIcon,
+        icon: Icons.RotateCcwIcon,
         items: [],
       },
       {
         title: "Delivery Officers",
-        icon: Icons.HomeIcon,
+        icon: Icons.TruckIcon,
         items: [
           {
             title: "Officer List",
@@ -80,7 +92,7 @@ export const NAV_DATA = [
       },
       {
         title: "Verification Officers",
-        icon: Icons.HomeIcon,
+        icon: Icons.ShieldCheckIcon,
         items: [
           {
             title: "Officer List",
@@ -94,7 +106,7 @@ export const NAV_DATA = [
       },
       {
         title: "Recovery Officers",
-        icon: Icons.HomeIcon,
+        icon: Icons.UserCircleIcon,
         items: [
           {
             title: "Officer List",
@@ -108,13 +120,13 @@ export const NAV_DATA = [
       },
       {
         title: "Notifications",
-        icon: Icons.HomeIcon,
+        icon: Icons.BellIcon,
         url: "/notifications",
         items: [],
       },
       {
         title: "User Management",
-        icon: Icons.HomeIcon,
+        icon: Icons.UserPlusIcon,
         items: [
           {
             title: "Create Users",
@@ -128,7 +140,7 @@ export const NAV_DATA = [
       },
       {
         title: "Address Management",
-        icon: Icons.HomeIcon,
+        icon: Icons.MapPinIcon,
         items: [
           {
             title: "Cities",
@@ -149,8 +161,22 @@ export const NAV_DATA = [
         ],
       },
       {
+        title: "Complaints",
+        icon: Icons.MessageSquareIcon,
+        items: [
+          {
+            title: "Create Complaint",
+            url: "/admin/complaints",
+          },
+          {
+            title: "All Complaints",
+            url: "/admin/complaints/all",
+          },
+        ],
+      },
+      {
         title: "Reports",
-        icon: Icons.HomeIcon,
+        icon: Icons.BarChartIcon,
         url: "/reports",
         items: [],
       },
@@ -161,55 +187,81 @@ export const NAV_DATA = [
     items: [
       {
         title: "CSR Dashboard",
-        icon: Icons.HomeIcon,
+        icon: Icons.LayoutDashboardIcon,
         url: "/csr/dashboard",
         items: [],
       },
       {
-        title: "Book Order",
+        title: "Orders",
         icon: Icons.CreateOrderSquareIcon,
-        url: "/csr/create-order",
-        items: [],
+        items: [
+          {
+            title: "Create Orders",
+            url: "/csr/create-order",
+          },
+          {
+            title: "Order List",
+            url: "/orders-list",
+          },
+          {
+            title: "Pending Orders",
+            url: "/pending-orders",
+          },
+          {
+            title: "In Progress Orders",
+            url: "/in-progress-orders",
+          },
+          {
+            title: "Cancelled Orders",
+            url: "/cancelled-orders",
+          },
+          {
+            title: "Completed Orders",
+            url: "/completed-orders",
+          },
+          {
+            title: "Delivered Orders",
+            url: "/delivered-orders",
+          },
+          {
+            title: "Expired Orders",
+            url: "/expired-orders",
+          }
+        ],
       },
       {
         title: "Website Orders",
-        icon: Icons.HomeIcon,
+        icon: Icons.GlobeIcon,
         url: "/csr/website-orders",
         items: [],
       },
       {
-        title: "Customer Search",
-        icon: Icons.HomeIcon,
-        url: "/csr/customer-search",
+        title: "Customers Profiles",
+        icon: Icons.UsersIcon,
+        url: "/admin/customers",
         items: [],
       },
       {
-        title: "Clear Accounts",
-        icon: Icons.HomeIcon,
-        url: "/csr/clear-accounts",
+        title: "Blacklisted Accounts",
+        icon: Icons.BanIcon,
+        url: "/admin/customers/blacklist",
         items: [],
       },
       {
-        title: "Order Tracking",
-        icon: Icons.HomeIcon,
-        url: "/csr/order-tracking",
-        items: [],
-      },
-      {
-        title: "Expired Orders",
-        icon: Icons.HomeIcon,
-        url: "/csr/expired-orders",
+        title: "Cleared Accounts",
+        icon: Icons.CheckCircleIcon,
+        url: "/admin/customers/cleared",
         items: [],
       },
       {
         title: "Notifications",
-        icon: Icons.HomeIcon,
+        icon: Icons.BellIcon,
         url: "/notifications",
         items: [],
       },
       {
         title: "Complaints",
-        icon: Icons.HomeIcon,
+        icon: Icons.MessageSquareIcon,
         url: "/csr/complaints",
         items: [],
       },
@@ -220,43 +272,105 @@ export const NAV_DATA = [
     items: [
       {
         title: "Outlet Dashboard",
-        icon: Icons.HomeIcon,
+        icon: Icons.StoreIcon,
         url: "/outlet/dashboard",
         items: [],
       },
       {
+        title: "Orders",
+        icon: Icons.CreateOrderSquareIcon,
+        items: [
+          {
+            title: "Create Orders",
+            url: "/create-orders",
+          },
+          {
+            title: "Order List",
+            url: "/orders-list",
+          },
+          {
+            title: "Pending Orders",
+            url: "/pending-orders",
+          },
+          {
+            title: "In Progress Orders",
+            url: "/in-progress-orders",
+          },
+          {
+            title: "Cancelled Orders",
+            url: "/cancelled-orders",
+          },
+          {
+            title: "Completed Orders",
+            url: "/completed-orders",
+          },
+          {
+            title: "Delivered Orders",
+            url: "/delivered-orders",
+          },
+          {
+            title: "Expired Orders",
+            url: "/expired-orders",
+          }
+        ],
+      },
+      {
+        title: "Customers Profiles",
+        icon: Icons.UsersIcon,
+        url: "/admin/customers",
+        items: [],
+      },
+      {
+        title: "Approved Order List",
+        icon: Icons.ArchiveIcon,
+        items: [],
+      },
+      {
+        title: "Recovery Orders",
+        icon: Icons.RotateCcwIcon,
+        items: [],
+      },
+      {
         title: "Inventory",
-        icon: Icons.HomeIcon,
+        icon: Icons.PackageIcon,
         items: [
           { title: "Stock List", url: "/outlet/inventory" },
-          { title: "Add Stock", url: "/outlet/inventory/add" },
           { title: "Stock Transfers", url: "/outlet/inventory/transfers" },
           { title: "Transfer History", url: "/outlet/inventory/transfers/history" },
         ],
       },
       {
         title: "Vendors",
-        icon: Icons.HomeIcon,
+        icon: Icons.HandshakeIcon,
         items: [
+          { title: "Manage Vendors", url: "/outlet/vendors" },
           { title: "Vendor Purchases", url: "/outlet/vendors/purchases" },
           { title: "Vendor Payments", url: "/outlet/vendors/payments" },
         ],
       },
       {
+        title: "Team Management",
+        icon: Icons.UsersIcon,
+        items: [
+          { title: "Delivery Agents", url: "/outlet/delivery" },
+          { title: "Recovery Officers", url: "/outlet/recovery" },
+        ],
+      },
+      {
         title: "Expenses",
-        icon: Icons.HomeIcon,
+        icon: Icons.CreditCardIcon,
         url: "/outlet/expenses",
         items: [],
       },
       {
         title: "Cash Register",
-        icon: Icons.HomeIcon,
+        icon: Icons.CalculatorIcon,
         url: "/outlet/cash-register",
         items: [],
       },
       {
         title: "Cash In Hand",
-        icon: Icons.HomeIcon,
+        icon: Icons.BanknoteIcon,
         items: [
           { title: "Pending Collections", url: "/outlet/cash-in-hand" },
           { title: "Collection History", url: "/outlet/cash-in-hand/history" },
@@ -264,37 +378,51 @@ export const NAV_DATA = [
       },
       {
         title: "Returns",
-        icon: Icons.HomeIcon,
+        icon: Icons.UndoIcon,
         url: "/outlet/returns",
         items: [],
       },
       {
         title: "Installments",
-        icon: Icons.HomeIcon,
+        icon: Icons.HashIcon,
         url: "/outlet/installments",
         items: [],
       },
       {
+        title: "Blacklisted Accounts",
+        icon: Icons.BanIcon,
+        url: "/admin/customers/blacklist",
+        items: [],
+      },
+      {
+        title: "Cleared Accounts",
+        icon: Icons.CheckCircleIcon,
+        url: "/admin/customers/cleared",
+        items: [],
+      },
+      {
+        title: "Notifications",
+        icon: Icons.BellIcon,
+        url: "/notifications",
+        items: [],
+      },
+      {
+        title: "Complaints",
+        icon: Icons.MessageSquareIcon,
+        url: "/outlet/complaints",
+        items: [],
+      },
+      {
         title: "Outlet Reports",
-        icon: Icons.HomeIcon,
+        icon: Icons.FileTextIcon,
         url: "/outlet/reports",
         items: [],
       },
-    ],
-  },
-  {
-    label: "RECOVERY PORTAL",
-    allowedRoles: ["recovery officer", "recovery_officer"],
-    items: [
       {
-        title: "My Recovery Orders",
-        url: "/recovery-portal",
-        icon: Icons.HomeIcon,
-      },
-      {
-        title: "My Cash In Hand",
-        url: "/outlet/cash-in-hand",
-        icon: Icons.HomeIcon,
+        title: "Security Logs",
+        icon: Icons.LockIcon,
+        url: "/outlet/security-logs",
+        items: [],
       },
     ],
   },

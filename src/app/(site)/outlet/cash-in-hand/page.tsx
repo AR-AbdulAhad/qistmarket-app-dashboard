@@ -17,23 +17,17 @@ const getAuthHeaders = () => ({
 type CashEntry = {
     id: number;
     amount: number;
+    balance: number;
+    submitted_amount: number;
+    cash_type: string;
     status: string;
     created_at: string;
-    customer_name: string;
-    product_name: string;
-    imei_serial: string;
-    color_variant: string;
+    payment_method: string;
     officer: {
         full_name: string;
         phone: string;
     };
-    order: {
-        order_ref: string;
-        delivery?: {
-            selected_plan: any;
-        }
-    };
-    outlet_id?: number | null;
+    outlet?: { name: string } | null;
 };
 
 type GroupedOfficer = {
@@ -77,9 +71,7 @@ export default function PendingCashPage() {
     const groupedData = useMemo(() => {
         const filtered = entries.filter(e =>
             e.officer?.full_name?.toLowerCase().includes(search.toLowerCase()) ||
-            e.order.order_ref?.toLowerCase().includes(search.toLowerCase()) ||
-            e.product_name?.toLowerCase().includes(search.toLowerCase()) ||
-            e.customer_name?.toLowerCase().includes(search.toLowerCase())
+            e.cash_type?.toLowerCase().includes(search.toLowerCase())
         );
 
         const groups: Record<string, GroupedOfficer> = {};
@@ -94,7 +86,7 @@ export default function PendingCashPage() {
                     last_activity: e.created_at
                 };
             }
-            groups[name].total_amount += e.amount;
+            groups[name].total_amount += e.balance;
             groups[name].entries.push(e);
             if (new Date(e.created_at) > new Date(groups[name].last_activity)) {
                 groups[name].last_activity = e.created_at;
@@ -132,7 +124,7 @@ export default function PendingCashPage() {
                     </div>
                     <input
                         type="text"
-                        placeholder="Search by officer name, order ref, product..."
+                        placeholder="Search by officer name, cash type..."
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
                         className="w-full border border-stroke dark:border-strokedark rounded-lg pl-10 pr-4 py-2.5 text-sm bg-gray-50 dark:bg-form-input focus:border-primary outline-none dark:text-white"
@@ -141,7 +133,7 @@ export default function PendingCashPage() {
                 <div className="flex items-center gap-4 text-sm">
                     <div className="flex flex-col items-end">
                         <span className="text-gray-500 dark:text-gray-400">Grand Total Pending</span>
-                        <span className="font-black text-xl text-primary">PKR {entries.reduce((sum, e) => sum + e.amount, 0).toLocaleString()}</span>
+                        <span className="font-black text-xl text-primary">PKR {entries.reduce((sum, e) => sum + e.balance, 0).toLocaleString()}</span>
                     </div>
                 </div>
             </div>
@@ -181,32 +173,7 @@ export default function PendingCashPage() {
                             </div>
 
                             <div className="p-5">
-                                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Delivery Snapshots</p>
-                                <div className="space-y-3 max-h-72 overflow-y-auto pr-2 scrollbar-hide">
-                                    {group.entries.map((item) => (
-                                        <div key={item.id} className="p-4 bg-gray-50/50 dark:bg-meta-4/10 rounded-xl border border-gray-100 dark:border-strokedark/30 group-hover:border-primary/20 transition-colors">
-                                            <div className="flex justify-between items-start mb-2">
-                                                <div className="min-w-0 flex-1">
-                                                    <p className="text-xs font-black text-gray-800 dark:text-gray-200 truncate">{item.customer_name}</p>
-                                                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-tighter italic">#{item.order?.order_ref || "N/A"}</p>
-                                                </div>
-                                                <p className="text-xs font-black text-primary whitespace-nowrap ml-2">PKR {item.amount.toLocaleString()}</p>
-                                            </div>
-                                            <div className="flex flex-col gap-1 text-[10px] text-gray-500 dark:text-gray-400">
-                                                <div className="flex items-center gap-1">
-                                                   <Package size={12} className="text-gray-400" />
-                                                   <span className="font-medium truncate">{item.product_name}</span>
-                                                </div>
-                                                <div className="flex justify-between items-center bg-white dark:bg-boxdark p-1.5 rounded-lg border border-gray-100 dark:border-strokedark/20">
-                                                   <span>IMEI: {item.imei_serial || "N/A"}</span>
-                                                   <span className="bg-gray-100 dark:bg-meta-4 px-1.5 py-0.5 rounded text-[9px] font-bold">{item.color_variant || "Standard"}</span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-
-                                <div className="mt-5 pt-5 border-t border-stroke dark:border-strokedark">
+                                <div>
                                     <div className="flex items-center justify-between p-3 bg-primary/5 rounded-xl border border-primary/20">
                                         <div className="flex items-center gap-2">
                                             <CheckCircle2 size={16} className="text-primary" />

@@ -153,20 +153,14 @@ export default function AddExpenseVoucherPage() {
 
                         <div>
                             <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">Payment Method</label>
-                            <div className="grid grid-cols-2 gap-2 bg-gray-50 dark:bg-meta-4 p-1 rounded-2xl border border-stroke dark:border-strokedark">
+                            <div className="bg-gray-50 dark:bg-meta-4 p-1 rounded-2xl border border-stroke dark:border-strokedark">
                                 <button 
                                     type="button"
                                     onClick={() => setPaymentMethod("Cash")}
-                                    className={`flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-black transition-all ${paymentMethod === 'Cash' ? 'bg-white dark:bg-boxdark shadow-sm text-primary' : 'text-gray-400'}`}
+                                    className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-black transition-all ${paymentMethod === 'Cash' ? 'bg-white dark:bg-boxdark shadow-sm text-primary' : 'text-gray-400'}`}
+                                    disabled
                                 >
                                     <Wallet size={16} /> Cash
-                                </button>
-                                <button 
-                                    type="button"
-                                    onClick={() => setPaymentMethod("Bank/Online")}
-                                    className={`flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-black transition-all ${paymentMethod === 'Bank/Online' ? 'bg-white dark:bg-boxdark shadow-sm text-primary' : 'text-gray-400'}`}
-                                >
-                                    <CreditCard size={16} /> Bank
                                 </button>
                             </div>
                         </div>

@@ -5,7 +5,7 @@ import Link from "next/link";
 import Cookies from "js-cookie";
 import {
     Edit, Trash2, Search, CheckSquare, Square, Package,
-    AlertCircle, RefreshCw, ChevronDown, ChevronRight, Save, X
+    AlertCircle, RefreshCw, ChevronDown, ChevronRight, Save, X, Plus
 } from "lucide-react";
 import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
 
@@ -65,7 +65,14 @@ export default function OutletInventoryPage() {
     const [editingId, setEditingId] = useState<number | null>(null);
     const [editForm, setEditForm] = useState<Partial<InventoryItem>>({});
 
-    useEffect(() => { fetchInventory(); }, []);
+    const [showAddItemModal, setShowAddItemModal] = useState(false);
+    const [selectedGroup, setSelectedGroup] = useState<GroupedItem | null>(null);
+    const [unitRows, setUnitRows] = useState<{ imei_serial: string, color_variant: string, purchase_price: number, quantity: number }[]>([]);
+
+    useEffect(() => { 
+        fetchInventory(); 
+    }, []);
+
 
     const fetchInventory = async () => {
         setLoading(true);
@@ -90,15 +97,20 @@ export default function OutletInventoryPage() {
 
     // Group items by product_name + color_variant
     const grouped = useMemo<GroupedItem[]>(() => {
-        const filtered = inventory.filter(item =>
-            item.product_name?.toLowerCase().includes(search.toLowerCase()) ||
-            item.imei_serial?.toLowerCase().includes(search.toLowerCase()) ||
-            item.category?.toLowerCase().includes(search.toLowerCase()) ||
-            item.color_variant?.toLowerCase().includes(search.toLowerCase())
+        const query = search.toLowerCase();
+        
+        // 1. Filter physically existing inventory
+        const physicalFiltered = inventory.filter(item =>
+            item.product_name?.toLowerCase().includes(query) ||
+            item.imei_serial?.toLowerCase().includes(query) ||
+            item.category?.toLowerCase().includes(query) ||
+            item.color_variant?.toLowerCase().includes(query)
         );
 
         const map = new Map<string, GroupedItem>();
-        for (const item of filtered) {
+
+        // 2. Add all physical items to groups
+        for (const item of physicalFiltered) {
             const key = `${item.product_name}||${item.color_variant || ""}`;
             if (!map.has(key)) {
                 map.set(key, {
@@ -113,11 +125,14 @@ export default function OutletInventoryPage() {
                 });
             }
             const grp = map.get(key)!;
+            // Skeleton records might have quantity 1 but imei_serial null. 
+            // We still count them in totalQty.
             grp.totalQty += item.quantity;
             if (item.status === "In Stock") grp.inStockQty += item.quantity;
             grp.children.push(item);
         }
-        return Array.from(map.values());
+
+        return Array.from(map.values()).sort((a, b) => b.totalQty - a.totalQty);
     }, [inventory, search]);
 
     const toggleExpand = (key: string) => {
@@ -173,15 +188,18 @@ export default function OutletInventoryPage() {
     };
 
     const saveEdit = async (id: number) => {
+        // If it's a quick edit (not in full edit mode), we use the item from inventory state
+        const item = inventory.find(i => i.id === id);
+        const body = editingId === id ? editForm : item;
+
         const res = await fetch(`${API_BASE}/api/outlet/inventory/${id}`, {
             method: "PATCH",
             headers: getAuthHeaders(),
-            body: JSON.stringify(editForm),
+            body: JSON.stringify(body),
         });
         const data = await res.json();
         if (data.success) {
-            setInventory(prev => prev.map(i => i.id === id ? { ...i, ...editForm } as InventoryItem : i));
-            setEditingId(null);
+            if (editingId === id) setEditingId(null);
             showAlert("success", "Item updated.");
         } else {
             showAlert("error", "Update failed.");
@@ -239,6 +257,76 @@ export default function OutletInventoryPage() {
     };
 
     // Overall stats
+    const openAddItem = (grp: GroupedItem) => {
+        setSelectedGroup(grp);
+        setUnitRows([{
+            imei_serial: "",
+            color_variant: grp.color_variant || "",
+            purchase_price: grp.purchase_price || 0,
+            quantity: 1
+        }]);
+        setShowAddItemModal(true);
+    };
+
+    const addUnitRow = () => {
+        if (!selectedGroup) return;
+        setUnitRows([...unitRows, {
+            imei_serial: "",
+            color_variant: selectedGroup.color_variant || "",
+            purchase_price: selectedGroup.purchase_price || 0,
+            quantity: 1
+        }]);
+    };
+
+    const removeUnitRow = (index: number) => {
+        setUnitRows(unitRows.filter((_, i) => i !== index));
+    };
+
+    const updateUnitRow = (index: number, field: string, value: any) => {
+        const newRows = [...unitRows];
+        newRows[index] = { ...newRows[index], [field]: value };
+        // Force qty to 1 if IMEI is present
+        if (field === "imei_serial" && value.trim()) {
+            newRows[index].quantity = 1;
+        }
+        setUnitRows(newRows);
+    };
+
+    const handleAddItem = async () => {
+        if (!selectedGroup || unitRows.length === 0) return;
+        setLoading(true);
+        try {
+            const itemsToCreate = unitRows.map(row => ({
+                product_name: selectedGroup.product_name,
+                category: selectedGroup.category,
+                imei_serial: row.imei_serial.trim() || null,
+                color_variant: row.color_variant,
+                quantity: row.imei_serial.trim() ? 1 : row.quantity,
+                purchase_price: row.purchase_price,
+                status: "In Stock"
+            }));
+
+            const res = await fetch(`${API_BASE}/api/outlet/inventory`, {
+                method: "POST",
+                headers: getAuthHeaders(),
+                body: JSON.stringify({ items: itemsToCreate }),
+            });
+            const data = await res.json();
+            if (data.success) {
+                showAlert("success", `${itemsToCreate.length} unit(s) added.`);
+                fetchInventory();
+                setShowAddItemModal(false);
+            } else {
+                showAlert("error", data.message || "Failed to add.");
+            }
+        } catch {
+            showAlert("error", "Network error.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Overall stats
     const totalItems = inventory.reduce((s, i) => s + i.quantity, 0);
     const totalInStock = inventory.filter(i => i.status === "In Stock").reduce((s, i) => s + i.quantity, 0);
     const totalSold = inventory.filter(i => i.status === "Sold").reduce((s, i) => s + i.quantity, 0);
@@ -271,11 +359,8 @@ export default function OutletInventoryPage() {
                 </div>
                 <div className="flex items-center gap-3">
                     <button onClick={fetchInventory} className="bg-white dark:bg-boxdark border border-stroke dark:border-strokedark text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-meta-4 px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 shadow-sm transition-colors">
-                        <RefreshCw size={16} /> Refresh
+                        <RefreshCw size={16} /> Sync Stock
                     </button>
-                    <Link href="/outlet/inventory/add" className="bg-primary hover:bg-opacity-90 text-white px-6 py-2 rounded-lg text-sm font-bold shadow-md transition-opacity">
-                        + Add Stock
-                    </Link>
                 </div>
             </div>
 
@@ -343,7 +428,7 @@ export default function OutletInventoryPage() {
                                     <th className="px-4 py-4 text-center">Total Qty</th>
                                     <th className="px-4 py-4 text-center">In Stock</th>
                                     <th className="px-4 py-4">Base Price</th>
-                                    <th className="px-4 py-4 text-center w-10">Actions</th>
+                                    <th className="px-4 py-4 text-center">Add / Manage</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -414,12 +499,21 @@ export default function OutletInventoryPage() {
                                                     <span className="font-medium text-gray-700 dark:text-gray-200">PKR {grp.purchase_price?.toLocaleString()}</span>
                                                 </td>
                                                 <td className="px-4 py-4 text-center">
-                                                    <button
-                                                        onClick={() => toggleExpand(grp.key)}
-                                                        className="text-xs text-primary font-semibold hover:underline"
-                                                    >
-                                                        {isExpanded ? "Collapse" : `${grp.children.length} unit${grp.children.length > 1 ? "s" : ""}`}
-                                                    </button>
+                                                    <div className="flex items-center justify-center gap-3">
+                                                        <button 
+                                                            onClick={(e) => { e.stopPropagation(); openAddItem(grp); }}
+                                                            className="p-2 bg-primary/10 text-primary hover:bg-primary/20 rounded-lg transition-colors shadow-sm"
+                                                            title="Add Unit"
+                                                        >
+                                                            <Plus size={16} strokeWidth={3} />
+                                                        </button>
+                                                        <button
+                                                            onClick={(e) => { e.stopPropagation(); toggleExpand(grp.key); }}
+                                                            className="text-xs text-gray-400 font-semibold hover:text-primary transition-colors"
+                                                        >
+                                                            {isExpanded ? "Hide" : `${grp.children.length} unit${grp.children.length > 1 ? "s" : ""}`}
+                                                        </button>
+                                                    </div>
                                                 </td>
                                             </tr>
 
@@ -427,6 +521,10 @@ export default function OutletInventoryPage() {
                                             {isExpanded && grp.children.map((item, idx) => {
                                                 const isEditing = editingId === item.id;
                                                 const isChildSelected = selectedIds.includes(item.id);
+                                                
+                                                // Quick edit state for skeletons
+                                                const hasImei = !!item.imei_serial;
+                                                const hasColor = !!item.color_variant;
 
                                                 return (
                                                     <tr
@@ -453,21 +551,37 @@ export default function OutletInventoryPage() {
                                                             </button>
                                                         </td>
 
-                                                        {/* Product (editable) */}
-                                                        <td className="px-4 py-3" colSpan={isEditing ? 1 : 1}>
+                                                        {/* IMEI / Product Column */}
+                                                        <td className="px-4 py-3">
                                                             {isEditing ? (
                                                                 <input
                                                                     type="text"
-                                                                    value={editForm.product_name || ""}
-                                                                    onChange={e => setEditForm({ ...editForm, product_name: e.target.value })}
+                                                                    value={editForm.imei_serial || ""}
+                                                                    onChange={e => setEditForm({ ...editForm, imei_serial: e.target.value })}
                                                                     className="w-full border rounded px-2 py-1 text-xs dark:bg-form-input dark:border-strokedark outline-none"
                                                                 />
+                                                            ) : !hasImei ? (
+                                                                <div className="flex items-center gap-2">
+                                                                    <input
+                                                                        type="text"
+                                                                        placeholder="Enter IMEI..."
+                                                                        value={item.imei_serial || ""}
+                                                                        onChange={e => {
+                                                                            const val = e.target.value;
+                                                                            setInventory(prev => prev.map(inv => inv.id === item.id ? { ...inv, imei_serial: val } : inv));
+                                                                        }}
+                                                                        onBlur={() => { if(item.imei_serial) saveEdit(item.id); }}
+                                                                        className="w-full font-mono bg-transparent border-b border-stroke dark:border-strokedark outline-none text-xs focus:border-primary px-1"
+                                                                    />
+                                                                    {item.imei_serial && (
+                                                                        <button onClick={() => saveEdit(item.id)} className="text-green-500 hover:text-green-600">
+                                                                            <Save size={12} />
+                                                                        </button>
+                                                                    )}
+                                                                </div>
                                                             ) : (
                                                                 <span className="text-gray-600 dark:text-gray-300 text-xs pl-2">
-                                                                    {item.imei_serial
-                                                                        ? <span className="font-mono bg-gray-100 dark:bg-meta-4 px-2 py-0.5 rounded text-xs border border-gray-200 dark:border-strokedark">{item.imei_serial}</span>
-                                                                        : <span className="text-gray-400 italic text-xs">Generic Batch</span>
-                                                                    }
+                                                                    <span className="font-mono bg-gray-100 dark:bg-meta-4 px-2 py-0.5 rounded text-xs border border-gray-200 dark:border-strokedark">{item.imei_serial}</span>
                                                                 </span>
                                                             )}
                                                         </td>
@@ -496,6 +610,18 @@ export default function OutletInventoryPage() {
                                                                     className="w-32 border rounded px-2 py-1 text-xs dark:bg-form-input dark:border-strokedark outline-none"
                                                                     placeholder="Color/Variant"
                                                                 />
+                                                            ) : !hasColor ? (
+                                                                <input
+                                                                    type="text"
+                                                                    placeholder="Color..."
+                                                                    value={item.color_variant || ""}
+                                                                    onChange={e => {
+                                                                        const val = e.target.value;
+                                                                        setInventory(prev => prev.map(inv => inv.id === item.id ? { ...inv, color_variant: val } : inv));
+                                                                    }}
+                                                                    onBlur={() => { if(item.color_variant) saveEdit(item.id); }}
+                                                                    className="w-full bg-transparent border-b border-stroke dark:border-strokedark outline-none text-xs focus:border-primary px-1"
+                                                                />
                                                             ) : (
                                                                 <span className="text-gray-500 dark:text-gray-400 text-xs">{item.color_variant || "—"}</span>
                                                             )}
@@ -510,10 +636,11 @@ export default function OutletInventoryPage() {
                                                                     value={editForm.quantity || 1}
                                                                     onChange={e => {
                                                                         const base = { ...editForm, quantity: parseInt(e.target.value) || 1 };
-                                                                        if (base.quantity > 1) base.imei_serial = "";
+                                                                        // If it's a serialized record, we lock to 1
+                                                                        if (item.imei_serial) base.quantity = 1;
                                                                         setEditForm(base);
                                                                     }}
-                                                                    disabled={(editForm.imei_serial || "").trim().length > 0}
+                                                                    disabled={!!item.imei_serial}
                                                                     className="w-16 text-center border rounded px-1 py-1 text-xs disabled:opacity-50 dark:bg-form-input dark:border-strokedark outline-none mx-auto"
                                                                 />
                                                             ) : (
@@ -589,6 +716,113 @@ export default function OutletInventoryPage() {
             <div className="mt-4 text-xs text-gray-400 dark:text-gray-500 text-center">
                 {grouped.length} product group{grouped.length !== 1 ? "s" : ""} · {inventory.length} total unit records
             </div>
+
+            {showAddItemModal && selectedGroup && (
+                <div className="fixed inset-0 z-[999] bg-black bg-opacity-60 flex items-center justify-center p-4 backdrop-blur-sm">
+                    <div className="bg-white dark:bg-boxdark rounded-2xl p-6 max-w-4xl w-full shadow-2xl border border-stroke dark:border-strokedark animate-fadeIn flex flex-col max-h-[90vh]">
+                        <div className="flex items-center justify-between mb-4">
+                            <div>
+                                <h3 className="text-xl font-bold text-black dark:text-white">Add Units</h3>
+                                <p className="text-xs text-gray-500 font-medium">{selectedGroup.product_name} ({selectedGroup.category || "General"})</p>
+                            </div>
+                            <button onClick={() => setShowAddItemModal(false)} className="text-gray-400 hover:text-gray-600 transition-colors">
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto px-1">
+                            <table className="w-full text-left border-collapse">
+                                <thead className="sticky top-0 bg-white dark:bg-boxdark z-10 border-b border-stroke dark:border-strokedark">
+                                    <tr className="text-[10px] uppercase tracking-wider font-black text-gray-400">
+                                        <th className="py-3 px-2">IMEI / Serial</th>
+                                        <th className="py-3 px-2">Color / Variant</th>
+                                        <th className="py-3 px-2 w-16 text-center">Qty</th>
+                                        <th className="py-3 px-2 w-32">Price (PKR)</th>
+                                        <th className="py-3 px-2 w-10"></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {unitRows.map((row, idx) => (
+                                        <tr key={idx} className="border-b border-stroke/50 dark:border-strokedark/50 group">
+                                            <td className="py-3 px-2">
+                                                <input 
+                                                    type="text" 
+                                                    placeholder="Scan or Type..."
+                                                    value={row.imei_serial}
+                                                    onChange={e => updateUnitRow(idx, "imei_serial", e.target.value)}
+                                                    className="w-full bg-gray-50 dark:bg-meta-4 border border-stroke dark:border-strokedark rounded-lg px-3 py-2 text-xs focus:border-primary outline-none transition-all font-mono"
+                                                />
+                                            </td>
+                                            <td className="py-3 px-2">
+                                                <input 
+                                                    type="text" 
+                                                    placeholder="Color..."
+                                                    value={row.color_variant}
+                                                    onChange={e => updateUnitRow(idx, "color_variant", e.target.value)}
+                                                    className="w-full bg-gray-50 dark:bg-meta-4 border border-stroke dark:border-strokedark rounded-lg px-3 py-2 text-xs focus:border-primary outline-none transition-all"
+                                                />
+                                            </td>
+                                            <td className="py-3 px-2">
+                                                <input 
+                                                    type="number" 
+                                                    min="1"
+                                                    value={row.quantity}
+                                                    disabled={!!row.imei_serial.trim()}
+                                                    onChange={e => updateUnitRow(idx, "quantity", parseInt(e.target.value) || 1)}
+                                                    className="w-full bg-gray-50 dark:bg-meta-4 border border-stroke dark:border-strokedark rounded-lg px-2 py-2 text-xs text-center focus:border-primary outline-none disabled:opacity-40"
+                                                />
+                                            </td>
+                                            <td className="py-3 px-2">
+                                                <input 
+                                                    type="number" 
+                                                    value={row.purchase_price}
+                                                    onChange={e => updateUnitRow(idx, "purchase_price", parseFloat(e.target.value) || 0)}
+                                                    className="w-full bg-gray-50 dark:bg-meta-4 border border-stroke dark:border-strokedark rounded-lg px-3 py-2 text-xs focus:border-primary outline-none font-bold"
+                                                />
+                                            </td>
+                                            <td className="py-3 px-2 text-center">
+                                                {unitRows.length > 1 && (
+                                                    <button 
+                                                        onClick={() => removeUnitRow(idx)}
+                                                        className="text-gray-400 hover:text-red-500 transition-colors p-1"
+                                                    >
+                                                        <Trash2 size={14} />
+                                                    </button>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+
+                            <button
+                                onClick={addUnitRow}
+                                className="mt-4 flex items-center gap-2 text-primary font-bold text-xs hover:underline px-2"
+                            >
+                                <Plus size={14} />
+                                Add New Row
+                            </button>
+                        </div>
+
+                        <div className="mt-6 flex gap-3 border-t border-stroke dark:border-strokedark pt-6">
+                            <button
+                                onClick={() => setShowAddItemModal(false)}
+                                className="flex-1 border border-stroke dark:border-strokedark text-gray-600 dark:text-gray-300 py-3 rounded-xl font-bold hover:bg-gray-50 dark:hover:bg-meta-4 transition-colors text-sm"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleAddItem}
+                                disabled={loading}
+                                className="flex-2 bg-primary text-white py-3 rounded-xl font-black hover:bg-opacity-90 disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg transition-all text-sm px-12"
+                            >
+                                {loading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Save size={18} />}
+                                Save All Units ({unitRows.length})
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
