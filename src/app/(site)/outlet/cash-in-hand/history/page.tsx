@@ -203,7 +203,6 @@ export default function CashHistoryPage() {
                             <tr className="bg-gray-50 dark:bg-meta-4 border-b border-stroke dark:border-strokedark">
                                 <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">Date & Time</th>
                                 <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">Officer</th>
-                                <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">Order Ref</th>
                                 <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">Cash Type</th>
                                 <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest text-right">Amount</th>
                                 <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest text-center">Status</th>
@@ -242,11 +241,6 @@ export default function CashHistoryPage() {
                                                 <p className="text-sm font-bold text-gray-700 dark:text-gray-300 truncate max-w-[120px]">{entry.officer?.full_name || 'Unknown'}</p>
                                                 <p className="text-[10px] text-gray-500">{entry.officer?.phone || 'N/A'}</p>
                                             </div>
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <div className="min-w-[100px]">
-                                            <p className="text-sm font-bold text-gray-800 dark:text-gray-200">#{entry.order?.order_ref || "N/A"}</p>
                                         </div>
                                     </td>
                                     <td className="px-6 py-4">

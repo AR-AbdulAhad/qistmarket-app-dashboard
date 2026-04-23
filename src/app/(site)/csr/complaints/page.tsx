@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
 import toast from "react-hot-toast";
 import Cookies from "js-cookie";
-import { Search, Image as ImageIcon, X, CheckSquare, Clock } from "lucide-react";
+import { Search, Image as ImageIcon, X, CheckSquare, Clock, Grab } from "lucide-react";
+import CnicSearch from "@/components/complaints/CnicSearch";
 
 interface ComplaintItem {
   id: number;
@@ -21,8 +22,10 @@ interface ComplaintItem {
   assigned_to?: { full_name: string };
 }
 
+type TabType = "unassigned" | "picked" | "solved" | "new";
+
 export default function CsrComplaintsPage() {
-  const [activeTab, setActiveTab] = useState<"my" | "all" | "new">("all");
+  const [activeTab, setActiveTab] = useState<TabType>("unassigned");
   const [search, setSearch] = useState("");
   
   // Form State
@@ -45,15 +48,19 @@ export default function CsrComplaintsPage() {
   const [resolveNote, setResolveNote] = useState("");
   const [resolveStatus, setResolveStatus] = useState("Pending");
   const [resolving, setResolving] = useState(false);
+  const [pickingId, setPickingId] = useState<number | null>(null);
 
   const loadComplaints = async (currentPage = page, currentTab = activeTab, searchTerm = search) => {
+    if (currentTab === "new") return;
     setLoading(true);
     try {
       const token = Cookies.get("auth_token");
       const url = new URL(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/complaints`);
       url.searchParams.append("page", String(currentPage));
       if (searchTerm) url.searchParams.append("search", searchTerm);
-      if (currentTab === "my") url.searchParams.append("my_only", "true");
+      
+      // Use the new tab-based filtering
+      url.searchParams.append("tab", currentTab);
 
       const res = await fetch(url.toString(), {
         headers: { Authorization: `Bearer ${token}` },
@@ -73,13 +80,10 @@ export default function CsrComplaintsPage() {
   };
 
   useEffect(() => {
-    if (activeTab !== "new") {
-      loadComplaints(1, activeTab, search);
-    }
+    loadComplaints(1, activeTab, search);
   }, [activeTab]);
 
   useEffect(() => {
-    // Cleanup preview URLs on unmount
     return () => {
       mediaPreviews.forEach((url) => URL.revokeObjectURL(url));
     };
@@ -108,6 +112,27 @@ export default function CsrComplaintsPage() {
     URL.revokeObjectURL(mediaPreviews[index]);
     setMedia(media.filter((_, i) => i !== index));
     setMediaPreviews(mediaPreviews.filter((_, i) => i !== index));
+  };
+
+  const handlePick = async (id: number) => {
+    setPickingId(id);
+    try {
+      const token = Cookies.get("auth_token");
+      const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/complaints/${id}/pick`, {
+        method: "PUT",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error?.message || "Failed to pick complaint.");
+      
+      toast.success("Complaint picked successfully.");
+      loadComplaints(page, activeTab, search);
+    } catch (error: any) {
+      console.error(error);
+      toast.error(error.message);
+    } finally {
+      setPickingId(null);
+    }
   };
 
   const submitComplaint = async (event: React.FormEvent) => {
@@ -144,7 +169,7 @@ export default function CsrComplaintsPage() {
       setDescription("");
       setMedia([]);
       setMediaPreviews([]);
-      setActiveTab("all");
+      setActiveTab("unassigned");
     } catch (error: any) {
       console.error(error);
       toast.error(error?.message || "Unable to submit complaint.");
@@ -186,18 +211,24 @@ export default function CsrComplaintsPage() {
     <div className="mx-auto w-full max-w-7xl">
       <Breadcrumb pageName="CSR Complaints Dashboard" />
       
-      <div className="mb-6 flex gap-2 border-b border-gray-200 dark:border-gray-800">
+      <div className="mb-6 flex flex-wrap gap-2 border-b border-gray-200 dark:border-gray-800">
         <button
-          onClick={() => setActiveTab("all")}
-          className={`pb-3 px-4 text-sm font-medium transition-colors ${activeTab === 'all' ? 'border-b-2 border-[#ff3d3d] text-[#ff3d3d]' : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'}`}
+          onClick={() => setActiveTab("unassigned")}
+          className={`pb-3 px-4 text-sm font-medium transition-colors ${activeTab === 'unassigned' ? 'border-b-2 border-[#ff3d3d] text-[#ff3d3d]' : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'}`}
         >
-          All Complaints
+          Global (Unassigned)
         </button>
         <button
-          onClick={() => setActiveTab("my")}
-          className={`pb-3 px-4 text-sm font-medium transition-colors ${activeTab === 'my' ? 'border-b-2 border-[#ff3d3d] text-[#ff3d3d]' : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'}`}
+          onClick={() => setActiveTab("picked")}
+          className={`pb-3 px-4 text-sm font-medium transition-colors ${activeTab === 'picked' ? 'border-b-2 border-[#ff3d3d] text-[#ff3d3d]' : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'}`}
         >
-          My Complaints
+          My Picked
+        </button>
+        <button
+          onClick={() => setActiveTab("solved")}
+          className={`pb-3 px-4 text-sm font-medium transition-colors ${activeTab === 'solved' ? 'border-b-2 border-[#ff3d3d] text-[#ff3d3d]' : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'}`}
+        >
+          Solved
         </button>
         <button
           onClick={() => setActiveTab("new")}
@@ -211,11 +242,21 @@ export default function CsrComplaintsPage() {
         <section className="mx-auto max-w-3xl rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-slate-900">
           <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Record a New Complaint</h2>
           <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-            Fill in the details below to escalate a customer issue. You can attach up to 5 images.
+            Search for a customer by CNIC or Name to auto-fill details.
           </p>
 
           <form onSubmit={submitComplaint} className="mt-6 space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">
+              <div className="sm:col-span-2">
+                <label className="mb-2 block text-xs font-medium text-gray-500 uppercase">Search Purchaser</label>
+                <CnicSearch 
+                  onSelect={(p) => {
+                    setCustomerName(p.name);
+                    setCustomerCnic(p.cnic_number);
+                    setMobileNumber(p.telephone_number);
+                  }}
+                />
+              </div>
               <input
                 type="text"
                 value={customerName}
@@ -291,8 +332,8 @@ export default function CsrComplaintsPage() {
       ) : (
         <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-slate-900">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-              {activeTab === 'all' ? 'Global Complaints' : 'My Complaints'}
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white capitalize">
+              {activeTab.replace('_', ' ')} Complaints
             </h2>
             <form onSubmit={handleSearch} className="relative w-full sm:w-72">
               <input
@@ -338,22 +379,33 @@ export default function CsrComplaintsPage() {
                   </div>
                   
                   <div className="mt-4 flex items-center gap-2 pt-4 border-t border-gray-100 dark:border-gray-800">
-                    <button
-                      onClick={() => {
-                        setSelectedComplaint(item);
-                        setResolveStatus(item.status);
-                        setResolveNote(item.resolution_note || "");
-                      }}
-                      className="w-full rounded-lg bg-gray-100 py-2 text-sm font-medium text-gray-900 transition hover:bg-gray-200 dark:bg-gray-800 dark:text-white dark:hover:bg-gray-700"
-                    >
-                      View & Resolve
-                    </button>
+                    {activeTab === 'unassigned' ? (
+                      <button
+                        onClick={() => handlePick(item.id)}
+                        disabled={pickingId === item.id}
+                        className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#ff3d3d] py-2 text-sm font-medium text-white transition hover:bg-red-600 disabled:opacity-50"
+                      >
+                        <Grab className="h-4 w-4" />
+                        {pickingId === item.id ? "Picking..." : "Pick Complaint"}
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => {
+                          setSelectedComplaint(item);
+                          setResolveStatus(item.status);
+                          setResolveNote(item.resolution_note || "");
+                        }}
+                        className="w-full rounded-lg bg-gray-100 py-2 text-sm font-medium text-gray-900 transition hover:bg-gray-200 dark:bg-gray-800 dark:text-white dark:hover:bg-gray-700"
+                      >
+                        {activeTab === 'solved' ? 'View Details' : 'View & Resolve'}
+                      </button>
+                    )}
                   </div>
                 </div>
               ))
             ) : (
               <div className="col-span-full rounded-2xl border border-dashed border-gray-300 py-12 text-center text-gray-500 dark:border-gray-700">
-                No complaints found.
+                No complaints found in this section.
               </div>
             )}
           </div>
@@ -427,37 +479,49 @@ export default function CsrComplaintsPage() {
                 </div>
               )}
 
-              <hr className="my-6 border-gray-200 dark:border-gray-800" />
-              
-              <h4 className="font-semibold text-gray-900 dark:text-white flex items-center gap-2 mb-4">
-                <CheckSquare className="h-4 w-4" /> Resolution Action
-              </h4>
-              
-              <div className="space-y-4">
-                <div>
-                  <label className="mb-1 block text-sm text-gray-600 dark:text-gray-400">Update Status</label>
-                  <select
-                    value={resolveStatus}
-                    onChange={(e) => setResolveStatus(e.target.value)}
-                    className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 outline-none focus:border-[#ff3d3d] dark:border-gray-700 dark:bg-gray-900 dark:text-white"
-                  >
-                    <option value="New">New</option>
-                    <option value="Assigned">Assigned</option>
-                    <option value="Pending">Pending</option>
-                    <option value="Solved">Solved</option>
-                  </select>
+              {activeTab !== 'solved' && (
+                <>
+                  <hr className="my-6 border-gray-200 dark:border-gray-800" />
+                  <h4 className="font-semibold text-gray-900 dark:text-white flex items-center gap-2 mb-4">
+                    <CheckSquare className="h-4 w-4" /> Resolution Action
+                  </h4>
+                  
+                  <div className="space-y-4">
+                    <div>
+                      <label className="mb-1 block text-sm text-gray-600 dark:text-gray-400">Update Status</label>
+                      <select
+                        value={resolveStatus}
+                        onChange={(e) => setResolveStatus(e.target.value)}
+                        className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 outline-none focus:border-[#ff3d3d] dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                      >
+                        <option value="New">New</option>
+                        <option value="Assigned">Assigned</option>
+                        <option value="Pending">Pending</option>
+                        <option value="Solved">Solved</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-sm text-gray-600 dark:text-gray-400">Resolution Note</label>
+                      <textarea
+                        value={resolveNote}
+                        onChange={(e) => setResolveNote(e.target.value)}
+                        rows={3}
+                        placeholder="Describe how the complaint was handled..."
+                        className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 outline-none focus:border-[#ff3d3d] dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {activeTab === 'solved' && selectedComplaint.resolution_note && (
+                <div className="mt-6 border-t pt-4">
+                   <p className="text-xs text-gray-500 dark:text-gray-400 uppercase font-bold tracking-wider mb-2">Resolution Note</p>
+                   <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-xl text-green-800 dark:text-green-300 text-sm italic">
+                      "{selectedComplaint.resolution_note}"
+                   </div>
                 </div>
-                <div>
-                  <label className="mb-1 block text-sm text-gray-600 dark:text-gray-400">Resolution Note</label>
-                  <textarea
-                    value={resolveNote}
-                    onChange={(e) => setResolveNote(e.target.value)}
-                    rows={3}
-                    placeholder="Describe how the complaint was handled..."
-                    className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 outline-none focus:border-[#ff3d3d] dark:border-gray-700 dark:bg-gray-900 dark:text-white"
-                  />
-                </div>
-              </div>
+              )}
             </div>
 
             <div className="bg-gray-50 border-t border-gray-200 p-6 flex justify-end gap-3 dark:bg-gray-800/50 dark:border-gray-700">
@@ -465,15 +529,17 @@ export default function CsrComplaintsPage() {
                 onClick={() => setSelectedComplaint(null)}
                 className="rounded-lg px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200 dark:text-gray-300 dark:hover:bg-gray-700 transition"
               >
-                Cancel
+                Close
               </button>
-              <button
-                onClick={handleUpdateStatus}
-                disabled={resolving}
-                className="rounded-lg bg-[#ff3d3d] px-6 py-2 text-sm font-medium text-white hover:bg-red-600 transition disabled:opacity-50"
-              >
-                {resolving ? "Saving..." : "Save Changes"}
-              </button>
+              {activeTab !== 'solved' && (
+                <button
+                  onClick={handleUpdateStatus}
+                  disabled={resolving}
+                  className="rounded-lg bg-[#ff3d3d] px-6 py-2 text-sm font-medium text-white hover:bg-red-600 transition disabled:opacity-50"
+                >
+                  {resolving ? "Saving..." : "Save Changes"}
+                </button>
+              )}
             </div>
           </div>
         </div>

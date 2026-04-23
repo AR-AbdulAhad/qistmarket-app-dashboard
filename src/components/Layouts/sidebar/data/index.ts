@@ -326,7 +326,7 @@ export const NAV_DATA = [
         items: [],
       },
       {
-        title: "Recovery Orders",
+        title: "Outlet Customers",
         icon: Icons.RotateCcwIcon,
         items: [],
       },
@@ -354,6 +354,7 @@ export const NAV_DATA = [
         items: [
           { title: "Delivery Agents", url: "/outlet/delivery" },
           { title: "Recovery Officers", url: "/outlet/recovery" },
+          { title: "Verification Officers", url: "/outlet/verification" },
         ],
       },
       {

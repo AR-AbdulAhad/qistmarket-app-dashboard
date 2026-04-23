@@ -464,8 +464,8 @@ const CreateUsers: React.FC = () => {
               </div>
             </div>
 
-            {/* Outlet Selection */}
-            {(Number(formData.role_id) === 5 || Number(formData.role_id) === 2 || Number(formData.role_id) === 3 || Number(formData.role_id) === 4 || Number(formData.role_id) === 9) && (
+            {/* Outlet Detection */}
+            {[1, 2, 3, 5].includes(Number(formData.role_id)) && (
               <div className="border-b pb-6">
                 <h2 className="text-xl font-semibold text-gray-800 mb-4">Outlet Assignment</h2>
                 <div>

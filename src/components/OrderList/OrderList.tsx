@@ -593,17 +593,11 @@ const OrderList = ({ forcedStatus, forcedChannel, hideActions, hideSelection, on
       enableColumnFilter: true,
     },
     { accessorKey: 'order_ref', header: 'Order Ref', enableColumnFilter: true },
-    { accessorKey: 'token_number', header: 'Token Number', enableColumnFilter: true },
     { accessorKey: 'customer_name', header: 'Customer Name', enableColumnFilter: true },
     { accessorKey: 'whatsapp_number', header: 'WhatsApp', enableColumnFilter: true },
     { accessorKey: 'city', header: 'City', enableColumnFilter: true },
     { accessorKey: 'area', header: 'Area', enableColumnFilter: true },
-    { accessorKey: 'product_name', header: 'Product', enableColumnFilter: true },
-    {
-      accessorKey: 'advance_amount',
-      header: 'Advance Amount',
-      cell: ({ getValue }) => `Rs. ${Number(getValue()).toLocaleString()}`,
-    },
+    { accessorKey: 'product_name', header: 'Suggested Product', enableColumnFilter: true },
     {
       accessorKey: 'status',
       header: 'Status',

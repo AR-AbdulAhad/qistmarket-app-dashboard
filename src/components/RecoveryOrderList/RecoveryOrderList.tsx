@@ -144,7 +144,7 @@ const RecoveryOrderList = () => {
     const fetchOfficers = async () => {
         try {
             const token = Cookies.get('auth_token')
-            const res = await fetch(`${BACKEND_URL}/api/recovery/officers`, {
+            const res = await fetch(`${BACKEND_URL}/api/users/recovery-officers`, {
                 headers: { Authorization: `Bearer ${token}` },
             })
             const json = await res.json()
@@ -296,8 +296,9 @@ const RecoveryOrderList = () => {
         { accessorKey: 'order_ref', header: 'Order Ref', enableColumnFilter: true },
         { accessorKey: 'customer_name', header: 'Customer', enableColumnFilter: true },
         { accessorKey: 'whatsapp_number', header: 'WhatsApp', enableColumnFilter: true },
+            { accessorKey: 'city', header: 'City', enableColumnFilter: true },
         { accessorKey: 'area', header: 'Area', enableColumnFilter: true },
-        { accessorKey: 'product_name', header: 'Product', enableColumnFilter: true },
+        { accessorKey: 'product_name', header: 'Suggested Product', enableColumnFilter: true },
         {
             accessorKey: 'status',
             header: 'Status',

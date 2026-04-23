@@ -51,6 +51,7 @@ export default function VendorPurchasesPage() {
     const [searchTerm, setSearchTerm] = useState("");
     const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
     const [deletingId, setDeletingId] = useState<number | null>(null);
+    const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
 
     // Advanced Export State
     const [showExportModal, setShowExportModal] = useState(false);
@@ -82,8 +83,14 @@ export default function VendorPurchasesPage() {
         });
     };
 
-    const handleDelete = async (id: number) => {
-        if (!confirm("Are you sure you want to delete this purchase? This will NOT remove items from inventory automatically.")) return;
+    const requestDelete = (id: number) => {
+        setConfirmDeleteId(id);
+    };
+
+    const confirmDelete = async () => {
+        if (!confirmDeleteId) return;
+        const id = confirmDeleteId;
+        setConfirmDeleteId(null);
         setDeletingId(id);
         try {
             const res = await fetch(`${API_BASE}/api/outlet/vendors/purchases/${id}`, {
@@ -330,7 +337,7 @@ export default function VendorPurchasesPage() {
                                                         <Printer size={16} />
                                                     </button>
                                                     <button 
-                                                        onClick={() => handleDelete(p.id)}
+                                                        onClick={() => requestDelete(p.id)}
                                                         disabled={deletingId === p.id}
                                                         className="p-2 hover:bg-red-100 text-red-600 rounded-lg transition-all active:scale-95 disabled:opacity-50"
                                                     >
@@ -495,6 +502,36 @@ export default function VendorPurchasesPage() {
                                 className="w-full bg-primary text-white py-4 rounded-2xl font-black shadow-xl shadow-primary/20 transition-all active:scale-95 flex items-center justify-center gap-2 uppercase tracking-widest"
                             >
                                 <Download size={20} /> Prepare & Download Report
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* CONFIRM DELETE MODAL */}
+            {confirmDeleteId !== null && (
+                <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setConfirmDeleteId(null)} />
+                    <div className="relative w-full max-w-sm bg-white dark:bg-boxdark rounded-[2rem] shadow-2xl p-8 text-center animate-zoom-in border border-stroke dark:border-strokedark">
+                        <div className="w-20 h-20 bg-red-50 dark:bg-red-500/10 text-red-500 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-inner">
+                            <AlertCircle size={40} />
+                        </div>
+                        <h3 className="text-2xl font-black text-gray-800 dark:text-white mb-2 tracking-tight">Delete Invoice?</h3>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mb-8 font-bold leading-relaxed max-w-xs mx-auto">
+                            Are you sure you want to delete this purchase invoice? This action <span className="text-red-500 font-black">cannot be undone</span> and will not automatically remove items from inventory.
+                        </p>
+                        <div className="flex items-center gap-3 w-full">
+                            <button 
+                                onClick={() => setConfirmDeleteId(null)}
+                                className="flex-1 py-3.5 bg-gray-100 dark:bg-meta-4 text-gray-500 dark:text-gray-300 rounded-2xl font-black hover:bg-gray-200 dark:hover:bg-meta-4/80 transition-all active:scale-95 text-sm uppercase tracking-widest"
+                            >
+                                Cancel
+                            </button>
+                            <button 
+                                onClick={confirmDelete}
+                                className="flex-1 py-3.5 bg-red-500 text-white rounded-2xl font-black hover:bg-red-600 shadow-xl shadow-red-500/20 transition-all active:scale-95 text-sm uppercase tracking-widest"
+                            >
+                                Delete
                             </button>
                         </div>
                     </div>

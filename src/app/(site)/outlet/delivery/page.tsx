@@ -1,11 +1,11 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import Cookies from "js-cookie";
 import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
 import { Search, Truck, Phone, User, Package, DollarSign, Eye, RefreshCw } from "lucide-react";
 import { toast } from "react-hot-toast";
-import OfficerDetailsModal from "@/components/Outlet/OfficerDetailsModal";
 
 const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
 
@@ -13,7 +13,7 @@ export default function DeliveryAgentsListing() {
     const [officers, setOfficers] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState("");
-    const [selectedOfficerId, setSelectedOfficerId] = useState<number | null>(null);
+    const router = useRouter();
 
     const fetchOfficers = async () => {
         setLoading(true);
@@ -91,17 +91,11 @@ export default function DeliveryAgentsListing() {
                         <OfficerCard 
                             key={officer.id} 
                             officer={officer} 
-                            onClick={() => setSelectedOfficerId(officer.id)} 
+                            onClick={() => router.push(`/outlet/team/${officer.id}`)} 
                         />
                     ))}
                 </div>
             )}
-
-            <OfficerDetailsModal 
-                isOpen={!!selectedOfficerId} 
-                onClose={() => setSelectedOfficerId(null)} 
-                officerId={selectedOfficerId} 
-            />
         </div>
     );
 }

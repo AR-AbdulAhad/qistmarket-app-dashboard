@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import Cookies from "js-cookie";
 import { Image as ImageIcon, Search, Clock, CheckCircle, AlertCircle, X } from "lucide-react";
+import CnicSearch from "./CnicSearch";
 
 interface ComplaintItem {
   id: number;
@@ -163,10 +164,20 @@ export default function OfficerComplaints() {
         <section className="mx-auto max-w-2xl rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-slate-900">
           <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Record a New Complaint</h2>
           <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-            Report any issues you notice in the field. CSR will review and resolve it.
+            Search for customer CNIC to auto-fill details.
           </p>
 
           <form onSubmit={submitComplaint} className="mt-6 space-y-4">
+            <div>
+               <label className="mb-1 block text-xs font-medium text-gray-500 uppercase">Search Customer</label>
+               <CnicSearch 
+                  onSelect={(p) => {
+                    setCustomerName(p.name);
+                    setCustomerCnic(p.cnic_number);
+                    setMobileNumber(p.telephone_number);
+                  }}
+               />
+            </div>
             <input
               type="text"
               value={customerName}

@@ -60,6 +60,10 @@ const CreateOrders: React.FC = () => {
   const [calcResults, setCalcResults] = useState<any[]>([]);
   const [allCategories, setAllCategories] = useState<any[]>([]);
 
+  // Advance Editing & Ledger States
+  const [advanceOverride, setAdvanceOverride] = useState<number | ''>('');
+  const [ledger, setLedger] = useState<any[]>([]);
+
   const nameRef = useRef<HTMLInputElement>(null);
   const whatsappRef = useRef<HTMLInputElement>(null);
   const addressRef = useRef<HTMLInputElement>(null);
@@ -271,8 +275,52 @@ const CreateOrders: React.FC = () => {
     if (errors.product) setErrors(prev => ({ ...prev, product: '' }));
   };
 
+  const generateLedger = (monthly: number, months: number) => {
+    const schedule = [];
+    const today = new Date();
+    for (let i = 1; i <= months; i++) {
+      const dueDate = new Date(today);
+      dueDate.setMonth(today.getMonth() + i);
+      schedule.push({
+        month: i,
+        date: dueDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
+        amount: monthly
+      });
+    }
+    return schedule;
+  };
+
+  useEffect(() => {
+    if (selectedPlan && advanceOverride !== '') {
+      const newAdvance = Number(advanceOverride);
+      // Valid range: [plan.advance, plan.totalPrice)
+      if (newAdvance >= selectedPlan.advance && newAdvance < selectedPlan.totalPrice) {
+        const remaining = selectedPlan.totalPrice - newAdvance;
+        const newMonthly = roundUp(remaining / selectedPlan.months);
+        
+        setFormData(prev => ({
+          ...prev,
+          advance_amount: newAdvance.toString(),
+          monthly_amount: newMonthly.toString(),
+        }));
+        
+        setLedger(generateLedger(newMonthly, selectedPlan.months));
+      } else if (newAdvance >= selectedPlan.totalPrice) {
+        // If it exceeds total, we zero out the monthly but form validation will block it
+        setFormData(prev => ({
+          ...prev,
+          advance_amount: newAdvance.toString(),
+          monthly_amount: '0',
+        }));
+        setLedger([]);
+      }
+    }
+  }, [advanceOverride, selectedPlan]);
+
   const handlePlanSelect = (plan: any) => {
     setSelectedPlan(plan);
+    setAdvanceOverride(plan.advance);
+    setLedger(generateLedger(plan.monthlyAmount, plan.months));
     setFormData(prev => ({
       ...prev,
       total_amount: plan.totalPrice.toString(),
@@ -305,6 +353,13 @@ const CreateOrders: React.FC = () => {
     if (!isCustomProduct) {
       if (!selectedProduct) newErrors.product = 'Product is required';
       if (!selectedPlan) newErrors.plan = 'Installment plan is required';
+      if (selectedPlan && advanceOverride !== '' && Number(advanceOverride) < selectedPlan.advance) {
+        newErrors.advance_amount = `Advance cannot be less than Rs. ${selectedPlan.advance.toLocaleString()}`;
+        toast.error(newErrors.advance_amount);
+      } else if (selectedPlan && advanceOverride !== '' && Number(advanceOverride) >= selectedPlan.totalPrice) {
+        newErrors.advance_amount = `Advance cannot be equal to or greater than the total price (Rs. ${selectedPlan.totalPrice.toLocaleString()})`;
+        toast.error(newErrors.advance_amount);
+      }
     } else {
       if (!formData.product_name.trim()) newErrors.product_name = 'Product name is required';
       
@@ -395,6 +450,8 @@ const CreateOrders: React.FC = () => {
       setIsCustomProductNoPricing(false);
       setSelectedProduct(null);
       setSelectedPlan(null);
+      setAdvanceOverride('');
+      setLedger([]);
       setAreaSearchTerm('');
       setProductSearchTerm('');
       setErrors({});
@@ -871,6 +928,93 @@ const CreateOrders: React.FC = () => {
                             </label>
                           ))}
                       </div>
+
+                      {selectedPlan && (
+                        <div className="mt-10 p-8 bg-blue-50/50 rounded-3xl border-2 border-blue-100 animate-in fade-in slide-in-from-top-4 duration-500">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
+                            {/* Advance Customization */}
+                            <div className="space-y-4">
+                              <h3 className="text-sm font-bold text-blue-900 uppercase tracking-widest flex items-center gap-2">
+                                <Calculator className="w-4 h-4" />
+                                Customize Advance
+                              </h3>
+                              <div className="bg-white p-6 rounded-2xl border border-blue-200 shadow-sm">
+                                <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Edit Advance (Min: Rs. {selectedPlan.advance.toLocaleString()})</label>
+                                <div className="relative">
+                                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold">Rs.</span>
+                                  <input
+                                    type="number"
+                                    value={advanceOverride}
+                                    onChange={(e) => {
+                                      const val = e.target.value === '' ? '' : Number(e.target.value);
+                                      setAdvanceOverride(val);
+                                    }}
+                                    onBlur={() => {
+                                      // No longer resetting automatically as per user request
+                                    }}
+                                    className={`w-full pl-12 pr-4 py-4 bg-gray-50 border rounded-xl focus:ring-4 outline-none transition-all text-2xl font-black ${advanceOverride !== '' && Number(advanceOverride) < selectedPlan.advance ? 'border-red-500 text-red-600 focus:ring-red-100' : 'border-gray-100 text-blue-950 focus:ring-blue-100 focus:border-blue-600'}`}
+                                  />
+                                </div>
+                                {advanceOverride !== '' && Number(advanceOverride) < selectedPlan.advance && (
+                                  <p className="mt-2 text-xs text-red-500 font-bold flex items-center gap-1 animate-pulse">
+                                    <AlertCircle className="w-3 h-3" /> Advance cannot be less than original plan (Rs. {selectedPlan.advance.toLocaleString()})
+                                  </p>
+                                )}
+                                {advanceOverride !== '' && Number(advanceOverride) >= selectedPlan.totalPrice && (
+                                  <p className="mt-2 text-xs text-red-500 font-bold flex items-center gap-1 animate-pulse">
+                                    <AlertCircle className="w-3 h-3" /> Advance cannot exceed total price (Rs. {selectedPlan.totalPrice.toLocaleString()})
+                                  </p>
+                                )}
+                                <p className="mt-3 text-[11px] text-blue-600 font-medium italic select-none">&bull; Increasing advance will automatically decrease your monthly installment.</p>
+                              </div>
+                            </div>
+                      
+                            {/* Summary Chips */}
+                            <div className="grid grid-cols-2 gap-4 h-full">
+                              <div className="bg-white p-5 rounded-2xl border border-blue-100 shadow-sm flex flex-col justify-center min-h-[140px]">
+                                  <div className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter mb-1 select-none">New Monthly</div>
+                                  <div className="text-2xl font-black text-blue-700">Rs. {Number(formData.monthly_amount).toLocaleString()}</div>
+                              </div>
+                              <div className="bg-white p-5 rounded-2xl border border-blue-100 shadow-sm flex flex-col justify-center min-h-[140px]">
+                                  <div className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter mb-1 select-none">Total Duration</div>
+                                  <div className="text-2xl font-black text-gray-800">{selectedPlan.months} Months</div>
+                              </div>
+                            </div>
+                          </div>
+                      
+                          {/* Monthly Ledger Table */}
+                          <div className="mt-8">
+                            <h3 className="text-sm font-bold text-blue-900 uppercase tracking-widest mb-4 flex items-center gap-2">
+                              <Users className="w-4 h-4 text-blue-600" />
+                              Monthly Installment Ledger
+                            </h3>
+                            <div className="bg-white rounded-2xl border border-blue-100 overflow-hidden shadow-sm">
+                              <table className="w-full text-left">
+                                <thead className="bg-gray-100 text-gray-600 text-[10px] uppercase tracking-widest font-bold">
+                                  <tr>
+                                    <th className="px-6 py-4">Inst. No</th>
+                                    <th className="px-6 py-4">Expected Due Date</th>
+                                    <th className="px-6 py-4 text-right">Amount (PKR)</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-50">
+                                  {ledger.map((item) => (
+                                    <tr key={item.month} className="hover:bg-blue-50/30 transition-colors">
+                                      <td className="px-6 py-4">
+                                        <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center text-[10px] font-black text-blue-600">
+                                          #{item.month}
+                                        </div>
+                                      </td>
+                                      <td className="px-6 py-4 text-[13px] font-semibold text-gray-700">{item.date}</td>
+                                      <td className="px-6 py-4 text-sm font-black text-gray-900 text-right">Rs. {item.amount.toLocaleString()}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                       {errors.plan && <p className="text-red-500 text-xs mt-4 flex items-center gap-1"><AlertCircle className="w-4 h-4" /> {errors.plan}</p>}
                     </div>
                   )}
@@ -971,6 +1115,8 @@ const CreateOrders: React.FC = () => {
                   setProductSearchTerm('');
                   setSelectedProduct(null);
                   setSelectedPlan(null);
+                  setAdvanceOverride('');
+                  setLedger([]);
                   setErrors({});
                 }}
                 className="flex-1 px-6 py-4 border-2 border-gray-200 text-gray-500 font-bold rounded-2xl hover:bg-gray-50 hover:text-gray-700 transition-all"

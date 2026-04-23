@@ -373,75 +373,75 @@ const UsersTable = () => {
     setEditModalOpen(true);
   };
 
-const handleUpdate = async () => {
-  if (!selectedUser?.id) return;
-  setIsSubmitting(true);
+  const handleUpdate = async () => {
+    if (!selectedUser?.id) return;
+    setIsSubmitting(true);
 
-  try {
-    const token = Cookies.get("auth_token");
+    try {
+      const token = Cookies.get("auth_token");
 
-    const formDataToSend = new FormData();
+      const formDataToSend = new FormData();
 
-    Object.entries(formData).forEach(([key, value]) => {
-      if (key === "imageFile" || key === "coverImageFile") return;
-      
-      if (key === "password") {
-        if (value && typeof value === 'string' && value.trim() !== '') {
+      Object.entries(formData).forEach(([key, value]) => {
+        if (key === "imageFile" || key === "coverImageFile") return;
+
+        if (key === "password") {
+          if (value && typeof value === 'string' && value.trim() !== '') {
+            formDataToSend.append(key, String(value));
+          }
+        }
+        else if (key === "outlet_id") {
+          formDataToSend.append(key, value ? String(value) : '');
+        }
+        else if (value !== undefined && value !== null) {
           formDataToSend.append(key, String(value));
         }
+      });
+
+      if (formData.image) {
+        formDataToSend.append("image", formData.image);
       }
-      else if (key === "outlet_id") {
-        formDataToSend.append(key, value ? String(value) : '');
-      } 
-      else if (value !== undefined && value !== null) {
-        formDataToSend.append(key, String(value));
+
+      if (formData.coverImage) {
+        formDataToSend.append("coverImage", formData.coverImage);
       }
-    });
 
-    if (formData.image) {
-      formDataToSend.append("image", formData.image);
-    }
-
-    if (formData.coverImage) {
-      formDataToSend.append("coverImage", formData.coverImage);
-    }
-
-    for (let pair of formDataToSend.entries()) {
-      if (pair[0] === 'password') {
-        console.log(pair[0] + ': [HIDDEN]');
-      } else {
-        console.log(pair[0] + ': ' + pair[1]);
+      for (let pair of formDataToSend.entries()) {
+        if (pair[0] === 'password') {
+          console.log(pair[0] + ': [HIDDEN]');
+        } else {
+          console.log(pair[0] + ': ' + pair[1]);
+        }
       }
-    }
 
-    const res = await fetch(
-      `${BACKEND_URL}/api/users/${selectedUser.id}/edit`,
-      {
-        method: "PATCH",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        body: formDataToSend,
+      const res = await fetch(
+        `${BACKEND_URL}/api/users/${selectedUser.id}/edit`,
+        {
+          method: "PATCH",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          body: formDataToSend,
+        }
+      );
+
+      const responseData = await res.json();
+
+      if (!res.ok) {
+        throw new Error(responseData.error?.message || "Update failed");
       }
-    );
 
-    const responseData = await res.json();
-    
-    if (!res.ok) {
-      throw new Error(responseData.error?.message || "Update failed");
+      await fetchUsers();
+      setEditModalOpen(false);
+      toast.success("User updated successfully!");
+
+    } catch (err: any) {
+      console.error("Update error:", err);
+      toast.error(err.message || "Failed to update user");
+    } finally {
+      setIsSubmitting(false);
     }
-
-    await fetchUsers();
-    setEditModalOpen(false);
-    toast.success("User updated successfully!");
-    
-  } catch (err: any) {
-    console.error("Update error:", err);
-    toast.error(err.message || "Failed to update user");
-  } finally {
-    setIsSubmitting(false);
-  }
-};
+  };
 
   const handleDelete = (id: number) => {
     setSelectedUser({ id } as User);
@@ -805,28 +805,30 @@ const handleUpdate = async () => {
             </select>
           </div>
 
-          <div>
-            <label
-              htmlFor="outlet_id"
-              className="mb-1.5 block text-sm font-medium text-dark dark:text-gray-300"
-            >
-              Assigned Outlet
-            </label>
-            <select
-              id="outlet_id"
-              name="outlet_id"
-              value={formData.outlet_id || ""}
-              onChange={handleInputChange}
-              className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2.5 outline-none focus:border-[#ff3d3d] dark:border-dark-3 dark:bg-dark-2"
-            >
-              <option value="">No Outlet</option>
-              {outlets.map((outlet) => (
-                <option key={outlet.id} value={outlet.id}>
-                  {outlet.name} ({outlet.code})
-                </option>
-              ))}
-            </select>
-          </div>
+          {["Verification Officer", "Delivery Agent", "Recovery Officer", "Branch User"].includes(formData.role || "") && (
+            <div>
+              <label
+                htmlFor="outlet_id"
+                className="mb-1.5 block text-sm font-medium text-dark dark:text-gray-300"
+              >
+                Assigned Outlet
+              </label>
+              <select
+                id="outlet_id"
+                name="outlet_id"
+                value={formData.outlet_id || ""}
+                onChange={handleInputChange}
+                className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2.5 outline-none focus:border-[#ff3d3d] dark:border-dark-3 dark:bg-dark-2"
+              >
+                <option value="">No Outlet</option>
+                {outlets.map((outlet) => (
+                  <option key={outlet.id} value={outlet.id}>
+                    {outlet.name} ({outlet.code})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <div>
             <label

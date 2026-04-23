@@ -24,6 +24,7 @@ import { cn } from '@/lib/utils'
 import { createPortal } from 'react-dom'
 import { useRef } from 'react'
 import Pagination from '../common/Pagination'
+import { useAuth } from '../../../contexts/AuthContext'
 
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL
@@ -31,6 +32,32 @@ const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
 // ─────────────────────────────────────────────────────────────────────────────
+interface UserSelect {
+  id: number
+  username: string
+  full_name: string
+}
+
+interface VerificationNested {
+  id: number
+  status: 'in_progress' | 'completed'
+  start_time: string
+  end_time: string | null
+  is_approved: boolean | null
+  admin_remarks: string | null
+  approved_at: string | null
+  verification_officer: UserSelect
+  approved_by_user: UserSelect | null
+  purchaser: any | null          // adjust type if you have schema
+  grantors: any[]                // adjust type
+  nextOfKin: any | null
+  locations: Array<{ timestamp: string /* + other fields */ }>
+  documents: Array<{ uploaded_at: string /* + other fields */ }>
+  home_location_required: boolean
+  home_location_verified: boolean
+}
+
+
 interface Order {
   id: number
   order_ref: string
@@ -55,7 +82,7 @@ interface Order {
   created_at: string
   created_by: { username: string } | null
   assigned_to: { username: string } | null
-  verification: { status: string }
+  verification: VerificationNested | null
 }
 
 interface User {
@@ -77,6 +104,7 @@ interface PaginationInfo {
 // Main Component
 // ─────────────────────────────────────────────────────────────────────────────
 const ApprovedOrderList = () => {
+  const { user } = useAuth();
   const [orders, setOrders] = useState<Order[]>([])
   const [pagination, setPagination] = useState<PaginationInfo>({
     page: 1,
@@ -352,27 +380,26 @@ const ApprovedOrderList = () => {
       enableColumnFilter: true,
     },
     { accessorKey: 'order_ref', header: 'Order Ref', enableColumnFilter: true },
-    { accessorKey: 'token_number', header: 'Token Number', enableColumnFilter: true },
     { accessorKey: 'customer_name', header: 'Customer Name', enableColumnFilter: true },
     { accessorKey: 'whatsapp_number', header: 'WhatsApp', enableColumnFilter: true },
     { accessorKey: 'city', header: 'City', enableColumnFilter: true },
     { accessorKey: 'area', header: 'Area', enableColumnFilter: true },
-    { accessorKey: 'product_name', header: 'Product', enableColumnFilter: true },
-    {
-      accessorKey: 'advance_amount',
-      header: 'Advance Amount',
-      cell: ({ getValue }) => `Rs. ${Number(getValue()).toLocaleString()}`,
-    },
+    { accessorKey: 'product_name', header: 'Suggested Product', enableColumnFilter: true },
     {
       accessorKey: 'status',
       header: 'Status',
       enableColumnFilter: true,
       cell: ({ row }) => {
-        const status = row.original.status
+        const order = row.original
+        const status = order.status
+        const homeLocationRequired = order.verification?.home_location_required
+        const homeLocationVerified = order.verification?.home_location_verified
+
         return (
+          <div className="flex flex-col gap-1">
           <span
             className={cn(
-              'inline-flex px-2.5 py-1 rounded-full text-xs font-medium',
+              'inline-flex w-fit px-2.5 py-1 rounded-full text-xs font-medium',
               status === 'approved'
                 ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300'
                 : 'bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300'
@@ -380,6 +407,17 @@ const ApprovedOrderList = () => {
           >
             {status === 'approved' ? 'Approved' : 'Picked'}
           </span>
+          {homeLocationRequired && (
+              <span className={cn(
+                "inline-flex w-fit items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold border",
+                homeLocationVerified 
+                  ? "bg-green-50 border-green-200 text-green-700 dark:bg-green-900/20 dark:text-green-400" 
+                  : "bg-red-50 border-red-200 text-red-700 dark:bg-red-900/20 dark:text-red-400 animate-pulse"
+              )}>
+                📍 Home Location {homeLocationVerified ? 'Verified' : 'Required'}
+              </span>
+            )}
+          </div>
         )
       },
     },
@@ -540,6 +578,19 @@ const ApprovedOrderList = () => {
                       </button>
                     </li>
 
+                    {user?.role_id === 5 && !order.delivery_officer && (
+                      <li>
+                        <button
+                          onClick={() => {
+                            router.push(`/orders/${order.id}/self-pickup`);
+                            setIsOpen(false);
+                          }}
+                          className="block w-full px-4 py-2.5 text-left border-t border-gray-50 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/30"
+                        >
+                          Self Pickup
+                        </button>
+                      </li>
+                    )}
                   </ul>
                 </div>,
                 document.body

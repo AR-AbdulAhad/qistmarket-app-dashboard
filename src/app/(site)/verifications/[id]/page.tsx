@@ -11,6 +11,7 @@ import Loader from '@/components/common/Loader';
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
 import { useAuth } from '../../../../../contexts/AuthContext'
+import OrderCustomerInfo from '@/components/common/OrderCustomerInfo'
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL
 
@@ -27,6 +28,16 @@ interface VerificationData {
     id: number
     order_ref: string
     status: string
+    customer_name: string | null,
+    whatsapp_number: string | null,
+    address: string | null,
+    city: string | null,
+    area: string | null,
+    block: string | null,
+    house_no: string | null,
+    street: string | null,
+    zone: string | null,
+    alternate_contact: string | null
   }
   verification_officer: {
     full_name: string
@@ -825,6 +836,7 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
           <Field label="End Time" value={data.end_time ? formatDateTimeUTC(data.end_time) : null} />
           <Field label="Created At" value={data.created_at ? formatDateTimeLocal(data.created_at) : null} />
           <Field label="Updated At" value={data.updated_at ? formatDateTimeLocal(data.updated_at) : null} />
+          <Field label="Verification Feedback" value={(data as any).verification_feedback} />
           {(data as any).home_location_required && (
             <div className="col-span-full mt-4">
               <div className={cn(
@@ -1092,8 +1104,7 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
                     onChange={(e) => setRemarks(e.target.value)}
                     placeholder={decision === 'reject'
                       ? "Please explain why you are rejecting..."
-                      : "Optional notes (not saved when approving)"}
-                    disabled={decision === 'approve'}
+                      : "Optional remarks for approval"}
                   />
                 </div>
 
@@ -1665,6 +1676,8 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
           )}
         </div>
       )}
+
+      <OrderCustomerInfo customerName={data.order.customer_name} whatsappNumber={data.order.whatsapp_number} address={data.order.address} city={data.order.city} area={data.order.area} block={data.order.block} houseNo={data.order.house_no} street={data.order.street} zone={data.order.zone} alternateContact={data.order.alternate_contact} />
     </section>
   )
 }

@@ -11,6 +11,8 @@ import toast from "react-hot-toast";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
 import { useAuth } from '../../../../../contexts/AuthContext';
+import DeliveredProductDetails from '@/components/common/DeliveredProductDetails';
+import RecoveryVisitDetails from '@/components/common/RecoveryVisitDetails';
 
 // --- ReadOnlyField for view-only display (like Field, but always whitespace-pre-wrap) ---
 const ReadOnlyField = ({ label, value, className = "" }: { label: string; value: any; className?: string }) => {
@@ -154,6 +156,7 @@ interface VerificationData {
         full_name: string;
         username: string;
     };
+    verification_feedback: string | 'hello';
     purchaser: any;
     grantors: any[];
     nextOfKin: any;
@@ -232,6 +235,8 @@ interface Order {
     cancelled_at?: string | null;
     created_by: { username: string } | null;
     assigned_to: { username: string } | null;
+    recovery_visits?: any[];
+    recovery_officer_id?: number | null;
     productHistories?: {
         id: number;
         previous_product: string;
@@ -568,7 +573,7 @@ export default function OrderDetailsPage() {
                             <p className="font-semibold">{order.order_ref}</p>
                         </div>
                         <div>
-                            <p className="text-sm text-gray-500 dark:text-gray-400">Product Name</p>
+                            <p className="text-sm text-gray-500 dark:text-gray-400">Suggested Product Name</p>
                             <p className="font-semibold">{order.product_name}</p>
                         </div>
                         <div>
@@ -631,7 +636,12 @@ export default function OrderDetailsPage() {
             <div className="mt-10">
                 <h2 className="text-2xl font-bold mb-4 dark:text-white">Verification & Home Location</h2>
                 {verificationLoading ? (
-                    <Loader text="Loading verification details..." />
+                    <div className="rounded-lg border border-stroke bg-white shadow-default dark:border-dark-3 dark:bg-gray-800 p-8">
+                        <div className="flex items-center justify-center space-x-3">
+                            <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent"></div>
+                            <span className="text-gray-600 dark:text-gray-400">Loading verification details...</span>
+                        </div>
+                    </div>
                 ) : verificationError ? (
                     <div className="text-red-600 py-8">{verificationError}</div>
                 ) : !verification ? (
@@ -648,6 +658,7 @@ export default function OrderDetailsPage() {
                             )}
                             <Field label="Start Time" value={verification.start_time ? formatDateTimeUTC(verification.start_time) : null} />
                             <Field label="End Time" value={verification.end_time ? formatDateTimeUTC(verification.end_time) : null} />
+                            <Field label="Verification Feedback" value={verification.verification_feedback} />
                         </div>
                         {verification.home_location_required && (
                             <div className={cn(
@@ -945,6 +956,19 @@ export default function OrderDetailsPage() {
                     </div>
                 )}
             </div>
+
+            {(order.status === 'delivered') && (
+                <div className="mt-10">
+                    <DeliveredProductDetails orderId={order.id} />
+                </div>
+            )}
+
+            {/* Recovery Visits Section - Show for all orders that might have recovery visits */}
+            {(order.recovery_officer_id) && (
+                <div className="mt-10">
+                    <RecoveryVisitDetails orderId={order.id} />
+                </div>
+            )}
 
             {/* Action Modals (Edit/Cancel) */}
             <Modal open={editModalOpen} onClose={() => setEditModalOpen(false)}>

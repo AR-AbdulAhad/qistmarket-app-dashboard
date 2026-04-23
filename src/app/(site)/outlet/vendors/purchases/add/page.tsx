@@ -25,7 +25,7 @@ interface PurchaseItemInput {
     product_name: string;
     category: string;
     color_variant: string;
-    imei_serial: string;
+    imei_serials: string[];
     quantity: number;
     unit_price: number;
 }
@@ -48,7 +48,7 @@ export default function AddVendorPurchasePage() {
     const [allProducts, setAllProducts] = useState<any[]>([]);
 
     const [items, setItems] = useState<PurchaseItemInput[]>([
-        { tempId: Math.random().toString(), product_name: "", category: "", color_variant: "", imei_serial: "", quantity: 1, unit_price: 0 }
+        { tempId: Math.random().toString(), product_name: "", category: "", color_variant: "", imei_serials: [""], quantity: 1, unit_price: 0 }
     ]);
 
     useEffect(() => {
@@ -97,7 +97,7 @@ export default function AddVendorPurchasePage() {
             product_name: "", 
             category: "", 
             color_variant: "", 
-            imei_serial: "", 
+            imei_serials: [""], 
             quantity: 1, 
             unit_price: 0 
         }]);
@@ -112,11 +112,28 @@ export default function AddVendorPurchasePage() {
         setItems(items.map(i => {
             if (i.tempId === tempId) {
                 const updated = { ...i, [field]: value };
-                // Rule: IMEI locks quantity to 1
-                if (field === "imei_serial" && value.trim().length > 0) {
-                    updated.quantity = 1;
+                if (field === "quantity") {
+                    const qty = parseInt(value) || 1;
+                    let newImeis = [...updated.imei_serials];
+                    if (qty > newImeis.length) {
+                        newImeis = [...newImeis, ...Array(qty - newImeis.length).fill("")];
+                    } else if (qty < newImeis.length) {
+                        newImeis = newImeis.slice(0, qty);
+                    }
+                    updated.imei_serials = newImeis;
                 }
                 return updated;
+            }
+            return i;
+        }));
+    };
+
+    const updateImei = (tempId: string, index: number, value: string) => {
+        setItems(items.map(i => {
+            if (i.tempId === tempId) {
+                const newImeis = [...i.imei_serials];
+                newImeis[index] = value;
+                return { ...i, imei_serials: newImeis };
             }
             return i;
         }));
@@ -133,15 +150,23 @@ export default function AddVendorPurchasePage() {
             header: true,
             skipEmptyLines: true,
             complete: (results) => {
-                const importedItems: PurchaseItemInput[] = results.data.map((row: any) => ({
-                    tempId: Math.random().toString(),
-                    product_name: row.product_name || row.Product || "",
-                    category: row.category || row.Category || "",
-                    color_variant: row.color_variant || row.Variant || row.Color || "",
-                    imei_serial: row.imei_serial || row.IMEI || row.Serial || "",
-                    quantity: parseInt(row.quantity || row.Qty || "1") || 1,
-                    unit_price: parseFloat(row.unit_price || row.Price || row.Rate || "0") || 0,
-                }));
+                const importedItems: PurchaseItemInput[] = results.data.map((row: any) => {
+                    const qty = parseInt(row.quantity || row.Qty || "1") || 1;
+                    const singleImei = row.imei_serial || row.IMEI || row.Serial || "";
+                    let imeisArray = [singleImei];
+                    if (qty > 1) {
+                        imeisArray = [...imeisArray, ...Array(qty - 1).fill("")];
+                    }
+                    return {
+                        tempId: Math.random().toString(),
+                        product_name: row.product_name || row.Product || "",
+                        category: row.category || row.Category || "",
+                        color_variant: row.color_variant || row.Variant || row.Color || "",
+                        imei_serials: imeisArray,
+                        quantity: qty,
+                        unit_price: parseFloat(row.unit_price || row.Price || row.Rate || "0") || 0,
+                    };
+                });
 
                 if (importedItems.length > 0) {
                     setItems(prev => {
@@ -192,6 +217,46 @@ export default function AddVendorPurchasePage() {
         setSuccess("");
 
         try {
+            const apiItems = items.flatMap(item => {
+                const hasImeis = item.imei_serials.some(imei => imei.trim().length > 0);
+                if (hasImeis) {
+                    const validImeis = item.imei_serials.filter(i => i.trim().length > 0);
+                    const records = validImeis.map(imei => ({
+                        product_name: item.product_name,
+                        category: item.category,
+                        color_variant: item.color_variant,
+                        imei_serial: imei.trim(),
+                        quantity: 1,
+                        unit_price: item.unit_price,
+                        total_price: item.unit_price
+                    }));
+
+                    const diff = item.quantity - validImeis.length;
+                    if (diff > 0) {
+                        records.push({
+                            product_name: item.product_name,
+                            category: item.category,
+                            color_variant: item.color_variant,
+                            imei_serial: "",
+                            quantity: diff,
+                            unit_price: item.unit_price,
+                            total_price: item.unit_price * diff
+                        });
+                    }
+                    return records;
+                } else {
+                    return [{
+                        product_name: item.product_name,
+                        category: item.category,
+                        color_variant: item.color_variant,
+                        imei_serial: "",
+                        quantity: item.quantity,
+                        unit_price: item.unit_price,
+                        total_price: item.quantity * item.unit_price
+                    }];
+                }
+            });
+
             const res = await fetch(`${API_BASE}/api/outlet/vendors/purchases`, {
                 method: "POST",
                 headers: getAuthHeaders(),
@@ -201,7 +266,7 @@ export default function AddVendorPurchasePage() {
                     purchase_date: purchaseDate,
                     due_date: dueDate || null,
                     notes,
-                    items: items.map(({ tempId, ...rest }) => rest)
+                    items: apiItems
                 }),
             });
             const data = await res.json();
@@ -452,22 +517,27 @@ export default function AddVendorPurchasePage() {
                                                     />
                                                 </td>
                                                 <td className="p-3">
-                                                    <input 
-                                                        type="text" 
-                                                        value={item.imei_serial}
-                                                        onChange={(e) => updateItem(item.tempId, "imei_serial", e.target.value)}
-                                                        placeholder="Scan IMEI..."
-                                                        className="w-full bg-transparent outline-none font-mono text-gray-600 dark:text-gray-400 placeholder:text-gray-300 p-0"
-                                                    />
+                                                    <div className="space-y-1.5">
+                                                        {item.imei_serials.map((imei, idx) => (
+                                                            <div key={idx} className="relative">
+                                                                <input 
+                                                                    type="text" 
+                                                                    value={imei}
+                                                                    onChange={(e) => updateImei(item.tempId, idx, e.target.value)}
+                                                                    placeholder={`Scan IMEI ${idx + 1}...`}
+                                                                    className="w-full bg-white dark:bg-boxdark border border-stroke dark:border-strokedark rounded-lg px-2 py-1 outline-none focus:border-primary font-mono text-gray-600 dark:text-gray-400 placeholder:text-gray-300 text-xs shadow-sm"
+                                                                />
+                                                            </div>
+                                                        ))}
+                                                    </div>
                                                 </td>
-                                                <td className="p-3 text-center">
+                                                <td className="p-3 text-center align-top pt-4">
                                                     <input 
                                                         type="number" 
                                                         min="1"
                                                         value={item.quantity}
-                                                        onChange={(e) => updateItem(item.tempId, "quantity", parseInt(e.target.value))}
-                                                        disabled={item.imei_serial.trim().length > 0}
-                                                        className="w-12 bg-transparent outline-none text-center font-black text-sm text-primary disabled:opacity-30 p-0"
+                                                        onChange={(e) => updateItem(item.tempId, "quantity", e.target.value)}
+                                                        className="w-16 bg-white dark:bg-boxdark border border-stroke dark:border-strokedark rounded-lg outline-none text-center font-black text-sm text-primary py-1"
                                                     />
                                                 </td>
                                                 <td className="p-3 text-right">
@@ -615,25 +685,33 @@ export default function AddVendorPurchasePage() {
                                                 className="w-full bg-gray-50 dark:bg-meta-4 border border-stroke dark:border-strokedark rounded-xl px-4 py-3 outline-none focus:border-primary text-sm font-bold"
                                             />
                                         </td>
-                                        <td className="p-4 font-mono">
-                                            <label className="block text-[8px] font-black text-gray-400 uppercase mb-1">Serial Number</label>
-                                            <input 
-                                                type="text" 
-                                                value={item.imei_serial}
-                                                onChange={(e) => updateItem(item.tempId, "imei_serial", e.target.value)}
-                                                placeholder="Scan Device..."
-                                                className="w-full bg-gray-50 dark:bg-meta-4 border border-stroke dark:border-strokedark rounded-xl px-4 py-3 outline-none focus:border-primary text-sm font-bold text-gray-600 dark:text-gray-400"
-                                            />
+                                        <td className="p-4 align-top pt-8 font-mono">
+                                            <div className="space-y-2">
+                                                {item.imei_serials.map((imei, idx) => (
+                                                    <div key={idx} className="relative">
+                                                        {item.quantity > 1 && <span className="absolute -left-5 top-3.5 text-[9px] text-gray-400 font-bold">{idx + 1}.</span>}
+                                                        <input 
+                                                            type="text" 
+                                                            value={imei}
+                                                            onChange={(e) => updateImei(item.tempId, idx, e.target.value)}
+                                                            placeholder={`Scan Serial / IMEI ${idx + 1}...`}
+                                                            className="w-full bg-gray-50 dark:bg-meta-4 border border-stroke dark:border-strokedark rounded-xl px-4 py-3 outline-none focus:border-primary text-sm font-bold text-gray-600 dark:text-gray-400 focus:shadow-md transition-all"
+                                                        />
+                                                    </div>
+                                                ))}
+                                            </div>
                                         </td>
-                                        <td className="p-4 text-center">
-                                            <input 
-                                                type="number" 
-                                                min="1"
-                                                value={item.quantity}
-                                                onChange={(e) => updateItem(item.tempId, "quantity", parseInt(e.target.value))}
-                                                disabled={item.imei_serial.trim().length > 0}
-                                                className="w-16 bg-gray-50 dark:bg-meta-4 border border-stroke dark:border-strokedark rounded-xl py-3 outline-none text-center font-black text-primary disabled:opacity-30"
-                                            />
+                                        <td className="p-4 text-center align-top pt-8">
+                                            <div className="flex flex-col items-center justify-center">
+                                                <label className="block text-[8px] font-black text-gray-400 uppercase mb-2">Quantity</label>
+                                                <input 
+                                                    type="number" 
+                                                    min="1"
+                                                    value={item.quantity}
+                                                    onChange={(e) => updateItem(item.tempId, "quantity", e.target.value)}
+                                                    className="w-20 bg-gray-50 dark:bg-meta-4 border border-stroke dark:border-strokedark shadow-inner rounded-xl py-3 outline-none text-center font-black text-primary text-lg"
+                                                />
+                                            </div>
                                         </td>
                                         <td className="p-4 text-right">
                                             <div className="relative">

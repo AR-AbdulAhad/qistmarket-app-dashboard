@@ -217,15 +217,11 @@ const AssignedVerifications = () => {
       header: 'City',
       enableColumnFilter: true,
     },
+    { accessorKey: 'area', header: 'Area', enableColumnFilter: true },
     {
       accessorKey: 'product_name',
-      header: 'Product',
+      header: 'Suggested Product',
       enableColumnFilter: true,
-    },
-    {
-      accessorKey: 'advance_amount',
-      header: 'Advance Amount',
-      cell: ({ getValue }) => `Rs. ${Number(getValue()).toLocaleString()}`,
     },
     {
       accessorKey: 'status',
