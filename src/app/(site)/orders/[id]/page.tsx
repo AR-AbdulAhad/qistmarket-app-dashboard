@@ -462,7 +462,8 @@ export default function OrderDetailsPage() {
             <Breadcrumb pageName={`Order: ${order.order_ref}`} />
 
             <div className="mt-4 flex flex-wrap justify-end gap-3 mb-6 font-medium">
-                <button
+                {order.status !== "delivered" && (
+                    <button
                     onClick={() => {
                         setNewProductName(order.product_name);
                         setSelectedCategory('');
@@ -475,6 +476,8 @@ export default function OrderDetailsPage() {
                 >
                     Edit Item
                 </button>
+                )}
+                {order.status !== "delivered" && order.status !== "cancelled" && order.status !== "rejected" && order.status !== "approved" && (
                 <button
                     onClick={() => {
                         setCancelReason('');
@@ -484,6 +487,7 @@ export default function OrderDetailsPage() {
                 >
                     Cancel Order
                 </button>
+                )}
             </div>
 
             <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">

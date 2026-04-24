@@ -1,78 +1,20 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Sidebar } from "@/components/Layouts/sidebar";
 import { Header } from "@/components/Layouts/header";
 import type { PropsWithChildren } from "react";
 import { AuthProvider } from "../../../contexts/AuthContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { SidebarProvider } from "@/components/Layouts/sidebar/sidebar-context";
-import io, { Socket } from "socket.io-client";
+import { useNotifications } from "../../../contexts/NotificationContext";
 import Cookies from "js-cookie";
 import { toast } from "react-hot-toast";
 import { CashSubmissionPopup } from "@/components/CashSubmissionPopup";
 import { ReturnExchangePopup } from "@/components/ReturnExchangePopup";
 
-let socket: Socket | null = null;
-
 export default function Layout({ children }: PropsWithChildren) {
-  const [socketInstance, setSocketInstance] = useState<Socket | null>(null);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    const token = Cookies.get("auth_token");
-    if (!token) return;
-
-    if (socket && socket.connected) return;
-
-    const backendUrl =
-      process.env.NEXT_PUBLIC_BACKEND_URL;
-
-    socket = io(backendUrl, {
-      reconnection: true,
-      reconnectionAttempts: 5,
-      reconnectionDelay: 1000,
-      transports: ["websocket"],
-    });
-
-    socket.on("connect", () => {
-      console.log("Socket connected:", socket?.id);
-      socket?.emit("join_admin_notifications", token);
-    });
-
-    socket.on("joined_admin_room", (data) => {
-      if (data.success) {
-        console.log("Successfully joined admin notifications room");
-      }
-    });
-
-    socket.on("new_notification", (notif: any) => {
-      toast.success(
-        <div className="flex flex-col gap-1">
-          <strong>{notif.title}</strong>
-          <span>{notif.message}</span>
-        </div>,
-        {
-          duration: 7000,
-        }
-      );
-    });
-
-    socket.on("connect_error", (err) => {
-      console.warn("Socket connection error:", err.message);
-    });
-
-    setSocketInstance(socket);
-
-    return () => {
-      if (socket) {
-        socket.disconnect();
-        socket = null;
-        console.log("Socket disconnected on layout unmount");
-      }
-    };
-  }, []);
+  const { socket: socketInstance } = useNotifications();
 
   return (
     <AuthProvider>

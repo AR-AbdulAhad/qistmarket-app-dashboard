@@ -70,8 +70,8 @@ export function Notification() {
               No notifications yet
             </li>
           ) : (
-            notifications.slice(0, 5).map((item) => (
-              <li key={item.id} role="menuitem">
+            notifications.slice(0, 5).map((item, index) => (
+              <li key={item.id || `header-notif-${index}`} role="menuitem">
                 <Link
                   href="/notifications"
                   onClick={() => {

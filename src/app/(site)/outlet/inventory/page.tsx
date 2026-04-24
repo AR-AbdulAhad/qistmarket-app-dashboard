@@ -51,6 +51,11 @@ export default function OutletInventoryPage() {
     const [inventory, setInventory] = useState<InventoryItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState("");
+    const [page, setPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
+    const [limit] = useState(20);
+    const [totalItemsCount, setTotalItemsCount] = useState(0);
+    const [totalStats, setTotalStats] = useState({ totalStock: 0, inStock: 0, sold: 0 });
 
     // Expanded group keys
     const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set());
@@ -71,16 +76,19 @@ export default function OutletInventoryPage() {
 
     useEffect(() => { 
         fetchInventory(); 
-    }, []);
+    }, [page, search]);
 
 
     const fetchInventory = async () => {
         setLoading(true);
         try {
-            const res = await fetch(`${API_BASE}/api/outlet/inventory`, { headers: getAuthHeaders() });
+            const res = await fetch(`${API_BASE}/api/outlet/inventory?page=${page}&limit=${limit}&search=${encodeURIComponent(search)}`, { headers: getAuthHeaders() });
             const data = await res.json();
             if (data.success) {
                 setInventory(data.inventory);
+                setTotalPages(data.pagination.totalPages);
+                setTotalItemsCount(data.pagination.total);
+                setTotalStats(data.stats);
                 setSelectedIds([]);
             }
         } catch {
@@ -97,27 +105,16 @@ export default function OutletInventoryPage() {
 
     // Group items by product_name + color_variant
     const grouped = useMemo<GroupedItem[]>(() => {
-        const query = search.toLowerCase();
-        
-        // 1. Filter physically existing inventory
-        const physicalFiltered = inventory.filter(item =>
-            item.product_name?.toLowerCase().includes(query) ||
-            item.imei_serial?.toLowerCase().includes(query) ||
-            item.category?.toLowerCase().includes(query) ||
-            item.color_variant?.toLowerCase().includes(query)
-        );
-
         const map = new Map<string, GroupedItem>();
 
-        // 2. Add all physical items to groups
-        for (const item of physicalFiltered) {
-            const key = `${item.product_name}||${item.color_variant || ""}`;
+        for (const item of inventory) {
+            const key = item.product_name; // Group by product name only
             if (!map.has(key)) {
                 map.set(key, {
                     key,
                     product_name: item.product_name,
                     category: item.category,
-                    color_variant: item.color_variant,
+                    color_variant: undefined, // Multiple variants might exist
                     purchase_price: item.purchase_price,
                     totalQty: 0,
                     inStockQty: 0,
@@ -125,15 +122,13 @@ export default function OutletInventoryPage() {
                 });
             }
             const grp = map.get(key)!;
-            // Skeleton records might have quantity 1 but imei_serial null. 
-            // We still count them in totalQty.
             grp.totalQty += item.quantity;
             if (item.status === "In Stock") grp.inStockQty += item.quantity;
             grp.children.push(item);
         }
 
         return Array.from(map.values()).sort((a, b) => b.totalQty - a.totalQty);
-    }, [inventory, search]);
+    }, [inventory]);
 
     const toggleExpand = (key: string) => {
         setExpandedKeys(prev => {
@@ -367,9 +362,9 @@ export default function OutletInventoryPage() {
             {/* Stats Row */}
             <div className="grid grid-cols-3 gap-4 mb-6">
                 {[
-                    { label: "Total Stock", val: totalItems, color: "text-primary" },
-                    { label: "In Stock", val: totalInStock, color: "text-green-600 dark:text-green-400" },
-                    { label: "Sold", val: totalSold, color: "text-blue-600 dark:text-blue-400" },
+                    { label: "Total Stock", val: totalStats.totalStock, color: "text-primary" },
+                    { label: "In Stock", val: totalStats.inStock, color: "text-green-600 dark:text-green-400" },
+                    { label: "Sold", val: totalStats.sold, color: "text-blue-600 dark:text-blue-400" },
                 ].map(s => (
                     <div key={s.label} className="bg-white dark:bg-boxdark border border-stroke dark:border-strokedark rounded-xl p-4 shadow-sm text-center">
                         <div className={`text-2xl font-black ${s.color}`}>{s.val}</div>
@@ -400,9 +395,6 @@ export default function OutletInventoryPage() {
                         <button onClick={() => handleBulkStatusChange("In Stock")} className="px-3 py-1.5 bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400 rounded-md text-xs font-bold">Mark In-Stock</button>
                         <button onClick={() => handleBulkStatusChange("Out Of Stock")} className="px-3 py-1.5 bg-gray-200 text-gray-700 dark:bg-meta-4 dark:text-gray-300 rounded-md text-xs font-bold">Mark Out-of-Stock</button>
                         <button onClick={() => handleBulkStatusChange("Sold")} className="px-3 py-1.5 bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 rounded-md text-xs font-bold">Mark Sold</button>
-                        <button onClick={handleBulkDelete} className="ml-2 px-3 py-1.5 bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-400 flex items-center gap-1 rounded-md text-xs font-bold">
-                            <Trash2 size={13} /> Delete
-                        </button>
                         <button onClick={() => setSelectedIds([])} className="px-2 py-1.5 text-gray-400 hover:text-gray-600 rounded-md text-xs">Clear</button>
                     </div>
                 )}
@@ -428,7 +420,7 @@ export default function OutletInventoryPage() {
                                     <th className="px-4 py-4 text-center">Total Qty</th>
                                     <th className="px-4 py-4 text-center">In Stock</th>
                                     <th className="px-4 py-4">Base Price</th>
-                                    <th className="px-4 py-4 text-center">Add / Manage</th>
+                                    <th className="px-4 py-4 text-center">Units</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -500,13 +492,6 @@ export default function OutletInventoryPage() {
                                                 </td>
                                                 <td className="px-4 py-4 text-center">
                                                     <div className="flex items-center justify-center gap-3">
-                                                        <button 
-                                                            onClick={(e) => { e.stopPropagation(); openAddItem(grp); }}
-                                                            className="p-2 bg-primary/10 text-primary hover:bg-primary/20 rounded-lg transition-colors shadow-sm"
-                                                            title="Add Unit"
-                                                        >
-                                                            <Plus size={16} strokeWidth={3} />
-                                                        </button>
                                                         <button
                                                             onClick={(e) => { e.stopPropagation(); toggleExpand(grp.key); }}
                                                             className="text-xs text-gray-400 font-semibold hover:text-primary transition-colors"
@@ -671,34 +656,15 @@ export default function OutletInventoryPage() {
 
                                                         {/* Actions */}
                                                         <td className="px-4 py-3 text-center">
-                                                            {isEditing ? (
-                                                                <div className="flex items-center justify-center gap-2">
-                                                                    <button onClick={() => saveEdit(item.id)} className="p-1.5 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded">
-                                                                        <Save size={14} />
-                                                                    </button>
-                                                                    <button onClick={() => setEditingId(null)} className="p-1.5 text-gray-400 hover:bg-gray-100 dark:hover:bg-meta-4 rounded">
-                                                                        <X size={14} />
-                                                                    </button>
-                                                                </div>
-                                                            ) : (
-                                                                <div className="flex flex-col items-center gap-1">
-                                                                    {/* Status button */}
-                                                                    <button
-                                                                        onClick={() => toggleStatus(item)}
-                                                                        className={`px-2 py-0.5 rounded-full text-[10px] font-bold hover:scale-105 transition-transform ${STATUS_COLORS[item.status] || "bg-gray-100 text-gray-600"}`}
-                                                                    >
-                                                                        {item.status}
-                                                                    </button>
-                                                                    <div className="flex items-center gap-2 mt-1">
-                                                                        <button onClick={() => startEdit(item)} className="text-gray-400 hover:text-primary transition-colors">
-                                                                            <Edit size={14} />
-                                                                        </button>
-                                                                        <button onClick={() => deleteItem(item.id)} className="text-gray-400 hover:text-danger transition-colors">
-                                                                            <Trash2 size={14} />
-                                                                        </button>
-                                                                    </div>
-                                                                </div>
-                                                            )}
+                                                            <div className="flex flex-col items-center gap-1">
+                                                                {/* Status button */}
+                                                                <button
+                                                                    onClick={() => toggleStatus(item)}
+                                                                    className={`px-2 py-0.5 rounded-full text-[10px] font-bold hover:scale-105 transition-transform ${STATUS_COLORS[item.status] || "bg-gray-100 text-gray-600"}`}
+                                                                >
+                                                                    {item.status}
+                                                                </button>
+                                                            </div>
                                                         </td>
                                                     </tr>
                                                 );
@@ -712,9 +678,45 @@ export default function OutletInventoryPage() {
                 )}
             </div>
 
-            {/* Footer Summary */}
-            <div className="mt-4 text-xs text-gray-400 dark:text-gray-500 text-center">
-                {grouped.length} product group{grouped.length !== 1 ? "s" : ""} · {inventory.length} total unit records
+            {/* Pagination & Summary */}
+            <div className="mt-8 flex flex-col md:flex-row items-center justify-between gap-4 bg-white dark:bg-boxdark p-4 rounded-xl border border-stroke dark:border-strokedark">
+                <div className="text-xs text-gray-400 dark:text-gray-500 font-bold uppercase tracking-widest">
+                    Showing {(page - 1) * limit + 1} to {Math.min(page * limit, totalItemsCount)} of {totalItemsCount} Records
+                </div>
+                
+                <div className="flex items-center gap-2">
+                    <button 
+                        disabled={page === 1}
+                        onClick={() => setPage(p => p - 1)}
+                        className="px-4 py-2 rounded-lg border border-stroke dark:border-strokedark text-sm font-bold disabled:opacity-50 hover:bg-gray-50 dark:hover:bg-meta-4 transition-all"
+                    >
+                        Previous
+                    </button>
+                    {[...Array(totalPages)].map((_, i) => (
+                        <button
+                            key={i}
+                            onClick={() => setPage(i + 1)}
+                            className={`w-10 h-10 rounded-lg text-sm font-bold transition-all ${
+                                page === i + 1 
+                                ? "bg-primary text-white shadow-lg shadow-primary/20" 
+                                : "border border-stroke dark:border-strokedark hover:bg-gray-50 dark:hover:bg-meta-4"
+                            }`}
+                        >
+                            {i + 1}
+                        </button>
+                    )).slice(Math.max(0, page - 3), Math.min(totalPages, page + 2))}
+                    <button 
+                        disabled={page >= totalPages || totalPages === 0}
+                        onClick={() => setPage(p => p + 1)}
+                        className="px-4 py-2 rounded-lg border border-stroke dark:border-strokedark text-sm font-bold disabled:opacity-50 hover:bg-gray-50 dark:hover:bg-meta-4 transition-all"
+                    >
+                        Next
+                    </button>
+                </div>
+
+                <div className="text-xs text-gray-400 dark:text-gray-500">
+                    {grouped.length} product group{grouped.length !== 1 ? "s" : ""} · {inventory.length} units on this page
+                </div>
             </div>
 
             {showAddItemModal && selectedGroup && (

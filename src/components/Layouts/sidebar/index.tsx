@@ -16,6 +16,7 @@ export function Sidebar() {
   const { setIsOpen, isOpen, isMobile, toggleSidebar } = useSidebarContext();
   const [expandedItems, setExpandedItems] = useState<string[]>([]);
   const { user } = useAuth(); // Get current user
+  const userRole = user?.role?.toLowerCase() || "";
 
   const toggleExpanded = (title: string) => {
     setExpandedItems((prev) => (prev.includes(title) ? [] : [title]));
@@ -39,7 +40,6 @@ export function Sidebar() {
 
   // Filter navigation data based on user role
   const filteredNavData = NAV_DATA.filter((section) => {
-    const userRole = user?.role?.toLowerCase() || "";
     const allowedRoles = ["sales officer"];
 
     if (allowedRoles.includes(userRole)) {
@@ -60,7 +60,6 @@ export function Sidebar() {
 
     return true;
   }).map((section) => {
-    const userRole = user?.role?.toLowerCase() || "";
 
     // Filter inner items
     const filteredItems = section.items.filter((item) => {
@@ -102,7 +101,13 @@ export function Sidebar() {
         <div className="flex h-full flex-col py-10 pl-[25px] pr-[7px]">
           <div className="relative pr-4.5">
             <Link
-              href={"/"}
+              href={
+                userRole === "sales officer" 
+                  ? "/csr/dashboard" 
+                  : userRole === "branch user" 
+                    ? "/outlet/dashboard" 
+                    : "/"
+              }
               onClick={() => isMobile && toggleSidebar()}
               className="px-0 py-2.5 min-[850px]:py-0"
             >

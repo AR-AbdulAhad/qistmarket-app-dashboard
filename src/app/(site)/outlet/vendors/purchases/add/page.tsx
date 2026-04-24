@@ -82,7 +82,8 @@ export default function AddVendorPurchasePage() {
                     ...i,
                     product_name: product.name,
                     category: product.category_name,
-                    color_variant: product.color_variant || ""
+                    color_variant: product.color_variant || "",
+                    unit_price: product.price || 0
                 };
             }
             return i;

@@ -350,7 +350,7 @@ export default function VendorPurchasesPage() {
                                         {/* ITEMS EXPANSION */}
                                         {isExpanded && (
                                             <tr className="bg-gray-50/50 dark:bg-meta-4/10">
-                                                <td colSpan={8} className="p-0 border-b border-stroke dark:border-strokedark">
+                                                <td colSpan={9} className="p-0 border-b border-stroke dark:border-strokedark">
                                                     <div className="px-14 py-6">
                                                         <div className="mb-4 flex items-center justify-between">
                                                             <div className="text-xs font-bold text-gray-500 uppercase tracking-widest flex items-center gap-2">

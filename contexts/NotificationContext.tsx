@@ -30,6 +30,7 @@ interface NotificationContextType {
     fetchNotifications: (page?: number, limit?: number, status?: string) => Promise<void>;
     markAsRead: (id: number) => Promise<void>;
     markAllAsRead: () => Promise<void>;
+    socket: Socket | null;
 }
 
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
@@ -126,13 +127,13 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
         newSocket.on("new_notification", (notif: Notification) => {
             setNotifications((prev) => [notif, ...prev]);
             setUnreadCount((prev) => prev + 1);
-            // toast.success(
-            //     <div className="flex flex-col gap-1 text-sm">
-            //         <strong className="font-bold">{notif.title}</strong>
-            //         <span>{notif.message}</span>
-            //     </div>,
-            //     { duration: 5000 }
-            // );
+            toast.success(
+                <div className="flex flex-col gap-1 text-sm">
+                    <strong className="font-bold">{notif.title}</strong>
+                    <span>{notif.message}</span>
+                </div>,
+                { duration: 5000 }
+            );
         });
 
         setSocket(newSocket);
@@ -152,6 +153,7 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
                 fetchNotifications,
                 markAsRead,
                 markAllAsRead,
+                socket,
             }}
         >
             {children}

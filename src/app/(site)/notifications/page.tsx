@@ -101,9 +101,9 @@ const NotificationsPage = () => {
                         </div>
                     ) : (
                         <div className="flex flex-col gap-4">
-                            {notifications.map((notif) => (
+                            {notifications.map((notif, index) => (
                                 <div
-                                    key={notif.id}
+                                    key={notif.id || `notif-${index}`}
                                     className={cn(
                                         "relative flex gap-4 rounded-xl border border-stroke p-4 transition-all dark:border-dark-3 hover:shadow-md",
                                         notif.isRead

@@ -397,21 +397,21 @@ const ApprovedOrderList = () => {
 
         return (
           <div className="flex flex-col gap-1">
-          <span
-            className={cn(
-              'inline-flex w-fit px-2.5 py-1 rounded-full text-xs font-medium',
-              status === 'approved'
-                ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300'
-                : 'bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300'
-            )}
-          >
-            {status === 'approved' ? 'Approved' : 'Picked'}
-          </span>
-          {homeLocationRequired && (
+            <span
+              className={cn(
+                'inline-flex w-fit px-2.5 py-1 rounded-full text-xs font-medium',
+                status === 'approved'
+                  ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300'
+                  : 'bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300'
+              )}
+            >
+              {status === 'approved' ? 'Approved' : 'Picked'}
+            </span>
+            {homeLocationRequired && (
               <span className={cn(
                 "inline-flex w-fit items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold border",
-                homeLocationVerified 
-                  ? "bg-green-50 border-green-200 text-green-700 dark:bg-green-900/20 dark:text-green-400" 
+                homeLocationVerified
+                  ? "bg-green-50 border-green-200 text-green-700 dark:bg-green-900/20 dark:text-green-400"
                   : "bg-red-50 border-red-200 text-red-700 dark:bg-red-900/20 dark:text-red-400 animate-pulse"
               )}>
                 📍 Home Location {homeLocationVerified ? 'Verified' : 'Required'}
@@ -578,7 +578,7 @@ const ApprovedOrderList = () => {
                       </button>
                     </li>
 
-                    {user?.role_id === 5 && !order.delivery_officer && (
+                    {user?.role_id === 5 && !order.delivery_officer && !order.verification?.home_location_required && (
                       <li>
                         <button
                           onClick={() => {

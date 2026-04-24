@@ -60,13 +60,24 @@ export default function TransferHistoryPage() {
     const [transfers, setTransfers] = useState<TransferRecord[]>([]);
     const [activeTab, setActiveTab] = useState<"Delivery Officer" | "Outlet">("Delivery Officer");
     const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set());
+    
+    const [page, setPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
+    const [limit] = useState(20);
+    const [totalItemsCount, setTotalItemsCount] = useState(0);
+    const [search, setSearch] = useState("");
 
     useEffect(() => {
         const fetchHistory = async () => {
+            setLoading(true);
             try {
-                const res = await fetch(`${API_BASE}/api/outlet/inventory/transfers/history`, { headers: getAuthHeaders() });
+                const res = await fetch(`${API_BASE}/api/outlet/inventory/transfers/history?page=${page}&limit=${limit}&search=${encodeURIComponent(search)}`, { headers: getAuthHeaders() });
                 const json = await res.json();
-                if (json.success) setTransfers(json.transfers);
+                if (json.success) {
+                    setTransfers(json.transfers);
+                    setTotalPages(json.pagination.totalPages);
+                    setTotalItemsCount(json.pagination.total);
+                }
             } catch {
                 console.error("Failed to load transfer history");
             } finally {
@@ -74,7 +85,7 @@ export default function TransferHistoryPage() {
             }
         };
         fetchHistory();
-    }, []);
+    }, [page, search]);
 
     const toggleExpand = (key: string) => {
         setExpandedKeys(prev => {
@@ -90,13 +101,14 @@ export default function TransferHistoryPage() {
         const map = new Map<string, GroupedTransfer>();
 
         for (const t of filtered) {
-            const key = `${t.inventory.product_name}||${t.inventory.color_variant || ""}||${t.to_id}`;
+            // Group by product name and recipient
+            const key = `${t.inventory.product_name}||${t.to_id}`;
             if (!map.has(key)) {
                 map.set(key, {
                     key,
                     product_name: t.inventory.product_name,
                     category: t.inventory.category,
-                    color_variant: t.inventory.color_variant,
+                    color_variant: undefined,
                     to_type: t.to_type,
                     recipient_name: t.recipient_name,
                     total_quantity: 0,
@@ -106,7 +118,6 @@ export default function TransferHistoryPage() {
             }
             const grp = map.get(key)!;
             grp.total_quantity += t.quantity_transferred || 1;
-            // Keep latest date
             if (new Date(t.created_at) > new Date(grp.latest_at)) grp.latest_at = t.created_at;
             grp.records.push(t);
         }
@@ -149,22 +160,36 @@ export default function TransferHistoryPage() {
                 )}
             </div>
 
-            {/* Tabs */}
-            <div className="flex gap-4 border-b border-stroke dark:border-strokedark mb-6">
-                {(["Delivery Officer", "Outlet"] as const).map(tab => (
-                    <button
-                        key={tab}
-                        className={`pb-3 border-b-2 text-sm font-semibold transition-colors flex items-center gap-2 ${
-                            activeTab === tab
-                            ? "border-primary text-primary"
-                            : "border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
-                        }`}
-                        onClick={() => { setActiveTab(tab); setExpandedKeys(new Set()); }}
-                    >
-                        {tab === "Delivery Officer" ? <Truck size={16} /> : <Store size={16} />}
-                        {tab === "Delivery Officer" ? "To Delivery Officers" : "To Other Outlets"}
-                    </button>
-                ))}
+            <div className="flex flex-col lg:flex-row gap-4 justify-between items-center mb-6">
+                <div className="flex gap-4 border-b border-stroke dark:border-strokedark flex-1">
+                    {(["Delivery Officer", "Outlet"] as const).map(tab => (
+                        <button
+                            key={tab}
+                            className={`pb-3 border-b-2 text-sm font-semibold transition-colors flex items-center gap-2 ${
+                                activeTab === tab
+                                ? "border-primary text-primary"
+                                : "border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                            }`}
+                            onClick={() => { setActiveTab(tab); setExpandedKeys(new Set()); setPage(1); }}
+                        >
+                            {tab === "Delivery Officer" ? <Truck size={16} /> : <Store size={16} />}
+                            {tab === "Delivery Officer" ? "To Delivery Officers" : "To Other Outlets"}
+                        </button>
+                    ))}
+                </div>
+
+                <div className="relative w-full lg:max-w-xs">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <svg className="fill-body hover:fill-primary dark:fill-bodydark dark:hover:fill-primary" width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M15.7781 14.4938L12.0656 10.7812C12.7969 9.79687 13.2187 8.57812 13.2187 7.28437C13.2187 3.99375 10.5187 1.29375 7.22812 1.29375C3.9375 1.29375 1.2375 3.99375 1.2375 7.28437C1.2375 10.575 3.9375 13.275 7.22812 13.275C8.52187 13.275 9.74062 12.8531 10.725 12.1219L14.4375 15.8344C14.6344 16.0312 14.8875 16.1156 15.1125 16.1156C15.3375 16.1156 15.5906 16.0312 15.7781 15.8344C16.1719 15.4688 16.1719 14.8688 15.7781 14.4938ZM2.72812 7.28437C2.72812 4.78125 4.75312 2.75625 7.25625 2.75625C9.75938 2.75625 11.7844 4.78125 11.7844 7.28437C11.7844 9.7875 9.75938 11.8125 7.25625 11.8125C4.75312 11.8125 2.72812 9.7875 2.72812 7.28437Z" fill=""></path></svg>
+                    </div>
+                    <input
+                        type="text"
+                        placeholder="Search transfers..."
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        className="w-full border border-stroke dark:border-strokedark rounded-lg pl-10 pr-4 py-2 text-sm bg-gray-50 dark:bg-form-input focus:border-primary outline-none dark:text-white"
+                    />
+                </div>
             </div>
 
             {/* Table */}
@@ -185,7 +210,7 @@ export default function TransferHistoryPage() {
                         <tbody>
                             {grouped.length === 0 ? (
                                 <tr>
-                                    <td colSpan={6} className="p-16 text-center text-gray-500 dark:text-gray-400">
+                                    <td colSpan={7} className="p-16 text-center text-gray-500 dark:text-gray-400">
                                         <div className="flex flex-col items-center gap-3 opacity-60">
                                             <Package size={44} />
                                             <span className="font-medium">No transfers to {activeTab}s yet.</span>
@@ -313,8 +338,45 @@ export default function TransferHistoryPage() {
                 </div>
             </div>
 
-            <div className="mt-4 text-xs text-center text-gray-400 dark:text-gray-500">
-                {grouped.length} product group{grouped.length !== 1 ? "s" : ""} · {transfers.filter(t => t.to_type === activeTab).length} total transfer records
+            {/* Pagination & Summary */}
+            <div className="mt-8 flex flex-col md:flex-row items-center justify-between gap-4 bg-white dark:bg-boxdark p-4 rounded-xl border border-stroke dark:border-strokedark">
+                <div className="text-xs text-gray-400 dark:text-gray-500 font-bold uppercase tracking-widest">
+                    Showing {(page - 1) * limit + 1} to {Math.min(page * limit, totalItemsCount)} of {totalItemsCount} Records
+                </div>
+                
+                <div className="flex items-center gap-2">
+                    <button 
+                        disabled={page === 1}
+                        onClick={() => setPage(p => p - 1)}
+                        className="px-4 py-2 rounded-lg border border-stroke dark:border-strokedark text-sm font-bold disabled:opacity-50 hover:bg-gray-50 dark:hover:bg-meta-4 transition-all"
+                    >
+                        Previous
+                    </button>
+                    {[...Array(totalPages)].map((_, i) => (
+                        <button
+                            key={i}
+                            onClick={() => setPage(i + 1)}
+                            className={`w-10 h-10 rounded-lg text-sm font-bold transition-all ${
+                                page === i + 1 
+                                ? "bg-primary text-white shadow-lg shadow-primary/20" 
+                                : "border border-stroke dark:border-strokedark hover:bg-gray-50 dark:hover:bg-meta-4"
+                            }`}
+                        >
+                            {i + 1}
+                        </button>
+                    )).slice(Math.max(0, page - 3), Math.min(totalPages, page + 2))}
+                    <button 
+                        disabled={page >= totalPages || totalPages === 0}
+                        onClick={() => setPage(p => p + 1)}
+                        className="px-4 py-2 rounded-lg border border-stroke dark:border-strokedark text-sm font-bold disabled:opacity-50 hover:bg-gray-50 dark:hover:bg-meta-4 transition-all"
+                    >
+                        Next
+                    </button>
+                </div>
+
+                <div className="text-xs text-gray-400 dark:text-gray-500">
+                    {grouped.length} groups · {transfers.length} records on this page
+                </div>
             </div>
         </div>
     );

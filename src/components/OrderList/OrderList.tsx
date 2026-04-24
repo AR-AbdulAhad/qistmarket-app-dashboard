@@ -684,200 +684,210 @@ const OrderList = ({ forcedStatus, forcedChannel, hideActions, hideSelection, on
       enableColumnFilter: true,
     }]),
     {
-      id: 'actions',
-      header: 'Actions',
-      enableSorting: false,
-      enableColumnFilter: false,
-      cell: ({ row }) => {
-        const order = row.original
+  id: 'actions',
+  header: 'Actions',
+  enableSorting: false,
+  enableColumnFilter: false,
+  cell: ({ row }) => {
+    const order = row.original
+    const orderStatus = order.status?.toLowerCase() || '';
+    
+    // Check if order is cancelled or delivered
+    const isCancelledOrDelivered = orderStatus === 'cancelled' || orderStatus === 'delivered';
 
-        const [isOpen, setIsOpen] = useState(false)
-        const [position, setPosition] = useState({ top: 0, left: 0 })
-        const [openUp, setOpenUp] = useState(false)
+    const [isOpen, setIsOpen] = useState(false)
+    const [position, setPosition] = useState({ top: 0, left: 0 })
+    const [openUp, setOpenUp] = useState(false)
 
-        const triggerRef = useRef<HTMLButtonElement | null>(null)
-        const dropdownRef = useRef<HTMLDivElement | null>(null)
+    const triggerRef = useRef<HTMLButtonElement | null>(null)
+    const dropdownRef = useRef<HTMLDivElement | null>(null)
 
-        const toggleDropdown = () => {
-          if (!triggerRef.current) return
+    const toggleDropdown = () => {
+      if (!triggerRef.current) return
 
-          const rect = triggerRef.current.getBoundingClientRect()
+      const rect = triggerRef.current.getBoundingClientRect()
 
-          const dropdownWidth = 180
-          const dropdownHeight = 120
+      const dropdownWidth = 180
+      const dropdownHeight = 120
 
-          const spaceBelow = window.innerHeight - rect.bottom
-          const spaceRight = window.innerWidth - rect.right
+      const spaceBelow = window.innerHeight - rect.bottom
+      const spaceRight = window.innerWidth - rect.right
 
-          const shouldOpenUp = spaceBelow < dropdownHeight
-          const shouldAlignLeft = spaceRight < dropdownWidth
+      const shouldOpenUp = spaceBelow < dropdownHeight
+      const shouldAlignLeft = spaceRight < dropdownWidth
 
-          setOpenUp(shouldOpenUp)
+      setOpenUp(shouldOpenUp)
 
-          setPosition({
-            top: shouldOpenUp
-              ? rect.top + window.scrollY - 8
-              : rect.bottom + window.scrollY + 6,
-            left: shouldAlignLeft
-              ? rect.left + window.scrollX
-              : rect.right + window.scrollX - dropdownWidth,
-          })
+      setPosition({
+        top: shouldOpenUp
+          ? rect.top + window.scrollY - 8
+          : rect.bottom + window.scrollY + 6,
+        left: shouldAlignLeft
+          ? rect.left + window.scrollX
+          : rect.right + window.scrollX - dropdownWidth,
+      })
 
-          setIsOpen((prev) => !prev)
+      setIsOpen((prev) => !prev)
+    }
+
+    // Outside click + ESC close
+    useEffect(() => {
+      const handleClickOutside = (e: MouseEvent) => {
+        const target = e.target as Node
+
+        if (
+          triggerRef.current &&
+          !triggerRef.current.contains(target) &&
+          dropdownRef.current &&
+          !dropdownRef.current.contains(target)
+        ) {
+          setIsOpen(false)
         }
+      }
 
-        // Outside click + ESC close
-        useEffect(() => {
-          const handleClickOutside = (e: MouseEvent) => {
-            const target = e.target as Node
+      const handleEscape = (e: KeyboardEvent) => {
+        if (e.key === 'Escape') setIsOpen(false)
+      }
 
-            if (
-              triggerRef.current &&
-              !triggerRef.current.contains(target) &&
-              dropdownRef.current &&
-              !dropdownRef.current.contains(target)
-            ) {
-              setIsOpen(false)
-            }
-          }
+      if (isOpen) {
+        document.addEventListener('mousedown', handleClickOutside)
+        document.addEventListener('keydown', handleEscape)
+      }
 
-          const handleEscape = (e: KeyboardEvent) => {
-            if (e.key === 'Escape') setIsOpen(false)
-          }
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside)
+        document.removeEventListener('keydown', handleEscape)
+      }
+    }, [isOpen])
 
-          if (isOpen) {
-            document.addEventListener('mousedown', handleClickOutside)
-            document.addEventListener('keydown', handleEscape)
-          }
+    return (
+      <>
+        <button
+          ref={triggerRef}
+          onClick={toggleDropdown}
+          className="group flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium text-dark shadow-[0_1px_3px_0_rgba(166,175,195,0.4)] hover:text-[#ff3d3d] dark:border dark:border-dark-3 dark:text-white dark:shadow-none"
+        >
+          <span>Actions</span>
+          <ChevronUpIcon
+            className={`size-4 transition-transform ${isOpen ? 'rotate-0' : 'rotate-180'
+              }`}
+          />
+        </button>
 
-          return () => {
-            document.removeEventListener('mousedown', handleClickOutside)
-            document.removeEventListener('keydown', handleEscape)
-          }
-        }, [isOpen])
-
-        return (
-          <>
-            <button
-              ref={triggerRef}
-              onClick={toggleDropdown}
-              className="group flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium text-dark shadow-[0_1px_3px_0_rgba(166,175,195,0.4)] hover:text-[#ff3d3d] dark:border dark:border-dark-3 dark:text-white dark:shadow-none"
+        {isOpen &&
+          createPortal(
+            <div
+              ref={dropdownRef}
+              style={{
+                position: 'absolute',
+                top: position.top,
+                left: position.left,
+                transform: openUp ? 'translateY(-100%)' : 'none',
+              }}
+              className="z-[99999] w-44 rounded-md border border-stroke bg-white shadow-xl dark:border-dark-3 dark:bg-gray-900"
             >
-              <span>Actions</span>
-              <ChevronUpIcon
-                className={`size-4 transition-transform ${isOpen ? 'rotate-0' : 'rotate-180'
-                  }`}
-              />
-            </button>
+              <ul className="overflow-hidden text-sm font-medium">
 
-            {isOpen &&
-              createPortal(
-                <div
-                  ref={dropdownRef}
-                  style={{
-                    position: 'absolute',
-                    top: position.top,
-                    left: position.left,
-                    transform: openUp ? 'translateY(-100%)' : 'none',
-                  }}
-                  className="z-[99999] w-44 rounded-md border border-stroke bg-white shadow-xl dark:border-dark-3 dark:bg-gray-900"
-                >
-                  <ul className="overflow-hidden text-sm font-medium">
+                <li>
+                  <button
+                    onClick={() => {
+                      handleViewClick(order)
+                      setIsOpen(false)
+                    }}
+                    className="block w-full px-4 py-2.5 text-left hover:bg-[#F5F7FD] hover:text-[#ff3d3d] dark:hover:bg-dark-3"
+                  >
+                    View Details
+                  </button>
+                </li>
 
-                    <li>
-                      <button
-                        onClick={() => {
-                          handleViewClick(order)
-                          setIsOpen(false)
-                        }}
-                        className="block w-full px-4 py-2.5 text-left hover:bg-[#F5F7FD] hover:text-[#ff3d3d] dark:hover:bg-dark-3"
-                      >
-                        View Details
-                      </button>
-                    </li>
+                {/* Only show Edit Item if status is NOT cancelled or delivered */}
+                {!isCancelledOrDelivered && (
+                  <li>
+                    <button
+                      onClick={() => {
+                        handleEditClick(order)
+                        setIsOpen(false)
+                      }}
+                      className="block w-full px-4 py-2.5 text-left hover:bg-[#F5F7FD] hover:text-[#ff3d3d] dark:hover:bg-dark-3"
+                    >
+                      Edit Item
+                    </button>
+                  </li>
+                )}
 
-                    <li>
-                      <button
-                        onClick={() => {
-                          handleEditClick(order)
-                          setIsOpen(false)
-                        }}
-                        className="block w-full px-4 py-2.5 text-left hover:bg-[#F5F7FD] hover:text-[#ff3d3d] dark:hover:bg-dark-3"
-                      >
-                        Edit Item
-                      </button>
-                    </li>
+                {/* Only show Cancel Order if status is NOT cancelled or delivered */}
+                {!isCancelledOrDelivered && (
+                  <li>
+                    <button
+                      onClick={() => {
+                        handleCancelClick(order)
+                        setIsOpen(false)
+                      }}
+                      className="block w-full px-4 py-2.5 text-left hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/30 dark:hover:text-red-400"
+                    >
+                      Cancel Order
+                    </button>
+                  </li>
+                )}
 
-                    <li>
-                      <button
-                        onClick={() => {
-                          handleCancelClick(order)
-                          setIsOpen(false)
-                        }}
-                        className="block w-full px-4 py-2.5 text-left hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/30 dark:hover:text-red-400"
-                      >
-                        Cancel Order
-                      </button>
-                    </li>
-
-                    {!hideActions && (
+                {!hideActions && (
+                  <>
+                    {isSalesOfficer ? (
                       <>
-                        {isSalesOfficer ? (
-                          <>
-                            {order.outlet_id === null && (
-                              <li>
-                                <button
-                                  onClick={() => {
-                                    handleTransferClick(order)
-                                    setIsOpen(false)
-                                  }}
-                                  className="block w-full px-4 py-2.5 text-left hover:bg-blue-50 hover:text-blue-600 dark:hover:bg-blue-900/30 dark:hover:text-blue-400 font-bold"
-                                >
-                                  Transfer to Outlet
-                                </button>
-                              </li>
-                            )}
-                          </>
+                        {order.outlet_id === null && (
+                          <li>
+                            <button
+                              onClick={() => {
+                                handleTransferClick(order)
+                                setIsOpen(false)
+                              }}
+                              className="block w-full px-4 py-2.5 text-left hover:bg-blue-50 hover:text-blue-600 dark:hover:bg-blue-900/30 dark:hover:text-blue-400 font-bold"
+                            >
+                              Transfer to Outlet
+                            </button>
+                          </li>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        {order.assigned_to ? (
+                          <li>
+                            <button
+                              onClick={() => {
+                                handleUnassignClick(order)
+                                setIsOpen(false)
+                              }}
+                              className="block w-full px-4 py-2.5 text-left hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/30 dark:hover:text-red-400"
+                            >
+                              Unassign
+                            </button>
+                          </li>
                         ) : (
-                          <>
-                            {order.assigned_to ? (
-                              <li>
-                                <button
-                                  onClick={() => {
-                                    handleUnassignClick(order)
-                                    setIsOpen(false)
-                                  }}
-                                  className="block w-full px-4 py-2.5 text-left hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/30 dark:hover:text-red-400"
-                                >
-                                  Unassign
-                                </button>
-                              </li>
-                            ) : (
-                              <li>
-                                <button
-                                  onClick={() => {
-                                    handleAssignClick(order)
-                                    setIsOpen(false)
-                                  }}
-                                  className="block w-full px-4 py-2.5 text-left hover:bg-[#F5F7FD] hover:text-[#ff3d3d] dark:hover:bg-dark-3"
-                                >
-                                  Assign
-                                </button>
-                              </li>
-                            )}
-                          </>
+                          <li>
+                            <button
+                              onClick={() => {
+                                handleAssignClick(order)
+                                setIsOpen(false)
+                              }}
+                              className="block w-full px-4 py-2.5 text-left hover:bg-[#F5F7FD] hover:text-[#ff3d3d] dark:hover:bg-dark-3"
+                            >
+                              Assign
+                            </button>
+                          </li>
                         )}
                       </>
                     )}
+                  </>
+                )}
 
-                  </ul>
-                </div>,
-                document.body
-              )}
-          </>
-        )
-      },
-    }
+              </ul>
+            </div>,
+            document.body
+          )}
+      </>
+    )
+  },
+}
   ]
 
   const table = useReactTable({

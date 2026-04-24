@@ -164,12 +164,12 @@ export default function GlobalSearch() {
                                                             color="emerald"
                                                             href={`/outlet/orders/${item.id}`}
                                                         />
-                                                        <ActionIconButton 
+                                                        {/* <ActionIconButton 
                                                             icon={<ArrowRight size={16} />} 
                                                             label="Ledger"
                                                             color="indigo"
                                                             href={`/outlet/installments?search=${encodeURIComponent(item.order_ref)}`}
-                                                        />
+                                                        /> */}
                                                     </div>
                                                 </div>
                                             </div>

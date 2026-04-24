@@ -41,7 +41,12 @@ export default function TransfersPage() {
     // Per-item selected IDs and transfer quantities
     const [selectedIds, setSelectedIds] = useState<number[]>([]);
     const [transferQuantities, setTransferQuantities] = useState<{ [id: number]: number }>({});
-    const [editedItems, setEditedItems] = useState<{ [id: number]: { imei_serial?: string, color_variant?: string } }>({});
+    
+    const [page, setPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
+    const [limit] = useState(20);
+    const [totalItemsCount, setTotalItemsCount] = useState(0);
+    const [search, setSearch] = useState("");
 
     // Expanded group keys
     const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set());
@@ -50,27 +55,25 @@ export default function TransfersPage() {
     const [transferType, setTransferType] = useState<"Delivery Officer" | "Outlet">("Delivery Officer");
     const [selectedTargetId, setSelectedTargetId] = useState("");
 
-    // OTP Modal
     const [otpModalOpen, setOtpModalOpen] = useState(false);
     const [otp, setOtp] = useState("");
     const [loading, setLoading] = useState(false);
     const [statusMessage, setStatusMessage] = useState({ type: "", text: "" });
 
-    const [showAddItemModal, setShowAddItemModal] = useState(false);
-    const [selectedGroup, setSelectedGroup] = useState<GroupedItem | null>(null);
-    const [unitRows, setUnitRows] = useState<{ imei_serial: string, color_variant: string, purchase_price: number, quantity: number }[]>([]);
-
     const fetchData = async () => {
         try {
             const [invRes, offRes, outRes] = await Promise.all([
-                fetch(`${API_BASE}/api/outlet/inventory`, { headers: getAuthHeaders() }),
+                fetch(`${API_BASE}/api/outlet/inventory?page=${page}&limit=${limit}&search=${encodeURIComponent(search)}`, { headers: getAuthHeaders() }),
                 fetch(`${API_BASE}/api/orders/outlet/officers`, { headers: getAuthHeaders() }),
                 fetch(`${API_BASE}/api/outlets`, { headers: getAuthHeaders() }),
             ]);
             const [invData, offData, outData] = await Promise.all([invRes.json(), offRes.json(), outRes.json()]);
-            if (invData.success) setInventory(invData.inventory || []);
+            if (invData.success) {
+                setInventory(invData.inventory || []);
+                setTotalPages(invData.pagination.totalPages);
+                setTotalItemsCount(invData.pagination.total);
+            }
             if (offData.success) setOfficers(offData.data || []);
-            // Outlets API returns { success: true, outlets: [...] }
             if (outData.success) setOutlets(outData.outlets || outData.data || []);
         } catch (e) {
             console.error("Error fetching data", e);
@@ -80,7 +83,7 @@ export default function TransfersPage() {
     useEffect(() => {
         fetchData();
         setSelectedTargetId("");
-    }, [transferType]);
+    }, [transferType, page, search]);
 
     // Only In-Stock items
     const inStockItems = useMemo(() => inventory.filter(i => i.status === "In Stock"), [inventory]);
@@ -89,13 +92,13 @@ export default function TransfersPage() {
     const grouped = useMemo<GroupedItem[]>(() => {
         const map = new Map<string, GroupedItem>();
         for (const item of inStockItems) {
-            const key = `${item.product_name}||${item.color_variant || ""}`;
+            const key = item.product_name; // Group by product name only
             if (!map.has(key)) {
                 map.set(key, {
                     key,
                     product_name: item.product_name,
                     category: item.category,
-                    color_variant: item.color_variant,
+                    color_variant: undefined, // Could have multiple variants
                     totalQty: 0,
                     children: [],
                 });
@@ -156,81 +159,6 @@ export default function TransfersPage() {
         }
     };
 
-    const updateEditedItem = (id: number, field: "imei_serial" | "color_variant", val: string) => {
-        setEditedItems(prev => ({
-            ...prev,
-            [id]: { ...prev[id], [field]: val }
-        }));
-    };
-
-    const openAddItem = (grp: GroupedItem) => {
-        setSelectedGroup(grp);
-        setUnitRows([{
-            imei_serial: "",
-            color_variant: grp.color_variant || "",
-            purchase_price: (grp.children[0] as any)?.purchase_price || 0,
-            quantity: 1
-        }]);
-        setShowAddItemModal(true);
-    };
-
-    const addUnitRow = () => {
-        if (!selectedGroup) return;
-        setUnitRows([...unitRows, {
-            imei_serial: "",
-            color_variant: selectedGroup.color_variant || "",
-            purchase_price: (selectedGroup.children[0] as any)?.purchase_price || 0,
-            quantity: 1
-        }]);
-    };
-
-    const removeUnitRow = (index: number) => {
-        setUnitRows(unitRows.filter((_, i) => i !== index));
-    };
-
-    const updateUnitRow = (index: number, field: string, value: any) => {
-        const newRows = [...unitRows];
-        newRows[index] = { ...newRows[index], [field]: value };
-        if (field === "imei_serial" && value.trim()) {
-            newRows[index].quantity = 1;
-        }
-        setUnitRows(newRows);
-    };
-
-    const handleAddItem = async () => {
-        if (!selectedGroup || unitRows.length === 0) return;
-        setLoading(true);
-        try {
-            const itemsToCreate = unitRows.map(row => ({
-                product_name: selectedGroup.product_name,
-                category: selectedGroup.category,
-                imei_serial: row.imei_serial.trim() || null,
-                color_variant: row.color_variant,
-                quantity: row.imei_serial.trim() ? 1 : row.quantity,
-                purchase_price: row.purchase_price,
-                status: "In Stock"
-            }));
-
-            const res = await fetch(`${API_BASE}/api/outlet/inventory`, {
-                method: "POST",
-                headers: getAuthHeaders(),
-                body: JSON.stringify({ items: itemsToCreate }),
-            });
-            const data = await res.json();
-            if (data.success) {
-                setStatusMessage({ type: "success", text: `${itemsToCreate.length} unit(s) added successfully.` });
-                fetchData();
-                setShowAddItemModal(false);
-            } else {
-                setStatusMessage({ type: "error", text: data.message || "Failed to add." });
-            }
-        } catch {
-            setStatusMessage({ type: "error", text: "Network error." });
-        } finally {
-            setLoading(false);
-        }
-    };
-
     const initiateTransfer = async () => {
         if (selectedIds.length === 0 || !selectedTargetId) return;
         setLoading(true);
@@ -263,9 +191,7 @@ export default function TransfersPage() {
         try {
             const payloadArray = selectedIds.map(id => ({ 
                 id, 
-                quantity: transferQuantities[id] || 1,
-                imei_serial: editedItems[id]?.imei_serial,
-                color_variant: editedItems[id]?.color_variant
+                quantity: transferQuantities[id] || 1
             }));
             const res = await fetch(`${API_BASE}/api/outlet/inventory/transfer/verify`, {
                 method: "POST",
@@ -398,13 +324,6 @@ export default function TransfersPage() {
                                             </td>
                                             <td className="p-4 text-center text-xs text-gray-400">
                                                 <div className="flex items-center justify-center gap-3">
-                                                    <button 
-                                                        onClick={(e) => { e.stopPropagation(); openAddItem(grp); }}
-                                                        className="p-1.5 bg-primary/10 text-primary hover:bg-primary/20 rounded transition-colors shadow-sm"
-                                                        title="Add Unit"
-                                                    >
-                                                        <Plus size={14} strokeWidth={3} />
-                                                    </button>
                                                     {someSelected ? (
                                                         <span className="font-bold text-primary">
                                                             {groupIds.filter(id => selectedIds.includes(id)).reduce((s, id) => s + (transferQuantities[id] || 1), 0)} sel.
@@ -440,34 +359,14 @@ export default function TransfersPage() {
 
                                                     {/* IMEI / Generic label */}
                                                     <td className="p-3 pl-8">
-                                                        {item.imei_serial
-                                                            ? <span className="font-mono bg-gray-100 dark:bg-meta-4 px-2 py-0.5 rounded text-xs border border-gray-200 dark:border-strokedark text-gray-700 dark:text-gray-300">{item.imei_serial}</span>
-                                                            : (
-                                                                <input
-                                                                    type="text"
-                                                                    placeholder="Enter IMEI..."
-                                                                    value={editedItems[item.id]?.imei_serial || ""}
-                                                                    onChange={e => updateEditedItem(item.id, "imei_serial", e.target.value)}
-                                                                    className="w-full font-mono bg-transparent border-b border-stroke dark:border-strokedark outline-none text-xs focus:border-primary px-1"
-                                                                />
-                                                            )
-                                                        }
+                                                        <span className="font-mono bg-gray-100 dark:bg-meta-4 px-2 py-0.5 rounded text-xs border border-gray-200 dark:border-strokedark text-gray-700 dark:text-gray-300">
+                                                            {item.imei_serial || "No IMEI"}
+                                                        </span>
                                                     </td>
 
                                                     {/* Variant */}
                                                     <td className="p-3 text-gray-500 text-xs">
-                                                        {item.color_variant
-                                                            ? item.color_variant
-                                                            : (
-                                                                <input
-                                                                    type="text"
-                                                                    placeholder="Color..."
-                                                                    value={editedItems[item.id]?.color_variant || ""}
-                                                                    onChange={e => updateEditedItem(item.id, "color_variant", e.target.value)}
-                                                                    className="w-full bg-transparent border-b border-stroke dark:border-strokedark outline-none text-xs focus:border-primary px-1"
-                                                                />
-                                                            )
-                                                        }
+                                                        {item.color_variant || "—"}
                                                     </td>
 
                                                     {/* Available */}
@@ -559,108 +458,46 @@ export default function TransfersPage() {
                     </div>
                 </div>
             )}
-            {/* Add Unit Modal */}
-            {showAddItemModal && selectedGroup && (
-                <div className="fixed inset-0 z-[999] bg-black bg-opacity-60 flex items-center justify-center p-4 backdrop-blur-sm">
-                    <div className="bg-white dark:bg-boxdark rounded-2xl p-6 max-w-4xl w-full shadow-2xl border border-stroke dark:border-strokedark animate-fadeIn flex flex-col max-h-[90vh]">
-                        <div className="flex items-center justify-between mb-4">
-                            <div>
-                                <h3 className="text-xl font-bold text-black dark:text-white">Add Units to Transfer</h3>
-                                <p className="text-xs text-gray-500 font-medium">{selectedGroup.product_name}</p>
-                            </div>
-                            <button onClick={() => setShowAddItemModal(false)} className="text-gray-400 hover:text-gray-600 transition-colors">
-                                <X size={20} />
-                            </button>
-                        </div>
-
-                        <div className="flex-1 overflow-y-auto px-1">
-                            <table className="w-full text-left border-collapse">
-                                <thead className="sticky top-0 bg-white dark:bg-boxdark z-10 border-b border-stroke dark:border-strokedark">
-                                    <tr className="text-[10px] uppercase tracking-wider font-black text-gray-400">
-                                        <th className="py-3 px-2">IMEI / Serial</th>
-                                        <th className="py-3 px-2">Color / Variant</th>
-                                        <th className="py-3 px-2 w-16 text-center">Qty</th>
-                                        <th className="py-3 px-2 w-32">Price (PKR)</th>
-                                        <th className="py-3 px-2 w-10"></th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {unitRows.map((row, idx) => (
-                                        <tr key={idx} className="border-b border-stroke/50 dark:border-strokedark/50 group">
-                                            <td className="py-3 px-2">
-                                                <input 
-                                                    type="text" 
-                                                    placeholder="Scan or Type..."
-                                                    value={row.imei_serial}
-                                                    onChange={e => updateUnitRow(idx, "imei_serial", e.target.value)}
-                                                    className="w-full bg-gray-50 dark:bg-meta-4 border border-stroke dark:border-strokedark rounded-lg px-3 py-2 text-xs focus:border-primary outline-none transition-all font-mono"
-                                                />
-                                            </td>
-                                            <td className="py-3 px-2">
-                                                <input 
-                                                    type="text" 
-                                                    placeholder="Color..."
-                                                    value={row.color_variant}
-                                                    onChange={e => updateUnitRow(idx, "color_variant", e.target.value)}
-                                                    className="w-full bg-gray-50 dark:bg-meta-4 border border-stroke dark:border-strokedark rounded-lg px-3 py-2 text-xs focus:border-primary outline-none transition-all"
-                                                />
-                                            </td>
-                                            <td className="py-3 px-2">
-                                                <input 
-                                                    type="number" 
-                                                    min="1"
-                                                    value={row.quantity}
-                                                    disabled={!!row.imei_serial.trim()}
-                                                    onChange={e => updateUnitRow(idx, "quantity", parseInt(e.target.value) || 1)}
-                                                    className="w-full bg-gray-50 dark:bg-meta-4 border border-stroke dark:border-strokedark rounded-lg px-2 py-2 text-xs text-center focus:border-primary outline-none disabled:opacity-40"
-                                                />
-                                            </td>
-                                            <td className="py-3 px-2">
-                                                <input 
-                                                    type="number" 
-                                                    value={row.purchase_price}
-                                                    onChange={e => updateUnitRow(idx, "purchase_price", parseFloat(e.target.value) || 0)}
-                                                    className="w-full bg-gray-50 dark:bg-meta-4 border border-stroke dark:border-strokedark rounded-lg px-3 py-2 text-xs focus:border-primary outline-none font-bold"
-                                                />
-                                            </td>
-                                            <td className="py-3 px-2 text-center">
-                                                {unitRows.length > 1 && (
-                                                    <button 
-                                                        onClick={() => removeUnitRow(idx)}
-                                                        className="text-gray-400 hover:text-red-500 transition-colors p-1"
-                                                    >
-                                                        <Trash2 size={14} />
-                                                    </button>
-                                                )}
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-
-                            <button
-                                onClick={addUnitRow}
-                                className="mt-4 flex items-center gap-2 text-primary font-bold text-xs hover:underline px-2"
-                            >
-                                <Plus size={14} />
-                                Add New Row
-                            </button>
-                        </div>
-
-                        <div className="mt-6 flex gap-3 border-t border-stroke dark:border-strokedark pt-6">
-                            <button onClick={() => setShowAddItemModal(false)} className="flex-1 border border-stroke py-3 rounded-xl font-bold text-xs">Cancel</button>
-                            <button
-                                onClick={handleAddItem}
-                                disabled={loading}
-                                className="flex-2 bg-primary text-white py-3 rounded-xl font-black hover:bg-opacity-90 disabled:opacity-50 flex items-center justify-center gap-2 text-sm px-12"
-                            >
-                                {loading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Save size={18} />}
-                                Save & Sync ({unitRows.length})
-                            </button>
-                        </div>
-                    </div>
+            {/* Pagination & Summary Bar */}
+            <div className="mt-8 flex flex-col md:flex-row items-center justify-between gap-4 bg-white dark:bg-boxdark p-4 rounded-xl border border-stroke dark:border-strokedark">
+                <div className="text-xs text-gray-400 dark:text-gray-500 font-bold uppercase tracking-widest">
+                    Showing {(page - 1) * limit + 1} to {Math.min(page * limit, totalItemsCount)} of {totalItemsCount} Stock Items
                 </div>
-            )}
+                
+                <div className="flex items-center gap-2">
+                    <button 
+                        disabled={page === 1}
+                        onClick={() => setPage(p => p - 1)}
+                        className="px-4 py-2 rounded-lg border border-stroke dark:border-strokedark text-sm font-bold disabled:opacity-50 hover:bg-gray-50 dark:hover:bg-meta-4 transition-all"
+                    >
+                        Previous
+                    </button>
+                    {[...Array(totalPages)].map((_, i) => (
+                        <button
+                            key={i}
+                            onClick={() => setPage(i + 1)}
+                            className={`w-10 h-10 rounded-lg text-sm font-bold transition-all ${
+                                page === i + 1 
+                                ? "bg-primary text-white shadow-lg shadow-primary/20" 
+                                : "border border-stroke dark:border-strokedark hover:bg-gray-50 dark:hover:bg-meta-4"
+                            }`}
+                        >
+                            {i + 1}
+                        </button>
+                    )).slice(Math.max(0, page - 3), Math.min(totalPages, page + 2))}
+                    <button 
+                        disabled={page >= totalPages || totalPages === 0}
+                        onClick={() => setPage(p => p + 1)}
+                        className="px-4 py-2 rounded-lg border border-stroke dark:border-strokedark text-sm font-bold disabled:opacity-50 hover:bg-gray-50 dark:hover:bg-meta-4 transition-all"
+                    >
+                        Next
+                    </button>
+                </div>
+
+                <div className="text-xs text-gray-400 dark:text-gray-500">
+                    {totalItemsCount} items available across {totalPages} pages
+                </div>
+            </div>
         </div>
     );
 }

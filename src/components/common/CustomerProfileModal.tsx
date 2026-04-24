@@ -67,16 +67,17 @@ export default function CustomerProfileModal({ open, onClose, data }: ProfileMod
 
     // Dynamic Blacklist Check (90 Days Logic)
     const getBlacklistStatus = () => {
-        // Handle different data structures (Direct ledger or nested in delivery/ledger property)
+        // 1. Priority: Direct DB flag
+        if (purchaser?.is_blacklisted) return true;
+
+        // 2. Fallback: Dynamic calculation (for real-time legacy support)
         const ledger = data?.delivery?.installment_ledger || data?.installment_ledger || data?.ledger?.installment_ledger;
         if (!ledger) return false;
 
         let rows = [];
         try {
-            // Support both direct array and JSON string
             const rawRows = ledger.ledger_rows || ledger.installment_ledger || (Array.isArray(ledger) ? ledger : null);
             if (!rawRows) return false;
-            
             rows = typeof rawRows === 'string' ? JSON.parse(rawRows) : rawRows;
         } catch (e) { return false; }
         
@@ -86,17 +87,14 @@ export default function CustomerProfileModal({ open, onClose, data }: ProfileMod
         const ninetyDaysAgo = new Date(today);
         ninetyDaysAgo.setDate(today.getDate() - 90);
 
-        // Normalize rows (some APIs use monthNumber, some use month)
         const installments = rows.filter((r: any) => (r.month || r.monthNumber) > 0);
         if (installments.length === 0) return false;
 
         const paidCount = installments.filter((r: any) => (r.status === 'paid' || r.status === 'Paid')).length;
         const deliveryDate = new Date(data.delivery?.end_time || data.updated_at || data.created_at);
         
-        // Rule 1: No payments at all for 90 days since delivery
         if (paidCount === 0 && deliveryDate < ninetyDaysAgo) return true;
 
-        // Rule 2: Any specific installment is 90+ days overdue
         const anyVeryOverdue = installments.some((r: any) => {
             const dDate = r.due_date || r.dueDate;
             if (!dDate) return false;
@@ -469,7 +467,7 @@ function FinancialsTab({ orderId, orderRef }: { orderId: number, orderRef: strin
         const fetchLedger = async () => {
             try {
                 const token = Cookies.get("auth_token");
-                const res = await fetch(`${API_BASE}/api/outlet/installments?search=${orderRef}`, {
+                const res = await fetch(`${API_BASE}/api/customers/ledger/${orderRef}`, {
                     headers: { Authorization: `Bearer ${token}` }
                 });
                 const result = await res.json();
