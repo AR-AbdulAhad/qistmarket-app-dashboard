@@ -414,6 +414,15 @@ export const NAV_DATA = [
         items: [],
       },
       {
+        title: "Area Assignments",
+        icon: Icons.MapPinIcon,
+        items: [
+          { title: "Verification Officer", url: "/outlet/area-assignments/verification" },
+          { title: "Delivery Officer", url: "/outlet/area-assignments/delivery" },
+          { title: "Recovery Officer", url: "/outlet/area-assignments/recovery" },
+        ],
+      },
+      {
         title: "Outlet Reports",
         icon: Icons.FileTextIcon,
         url: "/outlet/reports",

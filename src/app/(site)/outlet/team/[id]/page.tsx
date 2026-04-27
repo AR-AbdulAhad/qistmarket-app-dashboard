@@ -243,7 +243,7 @@ export default function OfficerDetailsPage({ params }: { params: Promise<{ id: s
                         <div className="space-y-6">
                             {!details?.assigned_orders || details?.assigned_orders?.length === 0 ? (
                                 <EmptyState 
-                                    icon={<FileText size={48} />} 
+                                    icon={<FileText size={48} />}
                                     title={isRecoveryOfficer ? "No Assigned Recoveries" : "No Assigned Deliveries"} 
                                     subtitle={`This officer has no ${isRecoveryOfficer ? 'recovery' : 'delivery'} tasks assigned.`} 
                                 />

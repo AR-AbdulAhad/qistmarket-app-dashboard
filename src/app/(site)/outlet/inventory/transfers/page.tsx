@@ -56,6 +56,7 @@ export default function TransfersPage() {
     const [selectedTargetId, setSelectedTargetId] = useState("");
 
     const [otpModalOpen, setOtpModalOpen] = useState(false);
+    const [confirmModalOpen, setConfirmModalOpen] = useState(false);
     const [otp, setOtp] = useState("");
     const [loading, setLoading] = useState(false);
     const [statusMessage, setStatusMessage] = useState({ type: "", text: "" });
@@ -159,8 +160,16 @@ export default function TransfersPage() {
         }
     };
 
-    const initiateTransfer = async () => {
+    const initiateTransfer = async (isConfirmed = false) => {
         if (selectedIds.length === 0 || !selectedTargetId) return;
+
+        // Add confirmation for Outlet transfer
+        if (transferType === "Outlet" && !isConfirmed) {
+            setConfirmModalOpen(true);
+            return;
+        }
+
+        setConfirmModalOpen(false);
         setLoading(true);
         setStatusMessage({ type: "", text: "" });
         try {
@@ -172,9 +181,19 @@ export default function TransfersPage() {
             });
             const data = await res.json();
             if (data.success) {
-                setOtpModalOpen(true);
-                setOtp("");
-                setStatusMessage({ type: "success", text: `OTP sent to ${transferType}.` });
+                if (transferType === "Outlet") {
+                    // Immediate success for Outlets
+                    setStatusMessage({ type: "success", text: "Stock transferred successfully." });
+                    setSelectedIds([]);
+                    setTransferQuantities({});
+                    setExpandedKeys(new Set());
+                    fetchData();
+                } else {
+                    // OTP flow for Delivery Officers
+                    setOtpModalOpen(true);
+                    setOtp("");
+                    setStatusMessage({ type: "success", text: `OTP sent to ${transferType}.` });
+                }
             } else {
                 setStatusMessage({ type: "error", text: data.message || "Failed to initiate." });
             }
@@ -244,6 +263,20 @@ export default function TransfersPage() {
                         </p>
                     </div>
                     <div className="flex flex-col sm:flex-row items-center gap-4 w-full md:w-auto">
+                        {/* Search Bar */}
+                        <div className="relative w-full sm:w-64">
+                            <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <svg className="fill-gray-400" width="16" height="16" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M15.7781 14.4938L12.0656 10.7812C12.7969 9.79687 13.2187 8.57812 13.2187 7.28437C13.2187 3.99375 10.5187 1.29375 7.22812 1.29375C3.9375 1.29375 1.2375 3.99375 1.2375 7.28437C1.2375 10.575 3.9375 13.275 7.22812 13.275C8.52187 13.275 9.74062 12.8531 10.725 12.1219L14.4375 15.8344C14.6344 16.0312 14.8875 16.1156 15.1125 16.1156C15.3375 16.1156 15.5906 16.0312 15.7781 15.8344C16.1719 15.4688 16.1719 14.8688 15.7781 14.4938ZM2.72812 7.28437C2.72812 4.78125 4.75312 2.75625 7.25625 2.75625C9.75938 2.75625 11.7844 4.78125 11.7844 7.28437C11.7844 9.7875 9.75938 11.8125 7.25625 11.8125C4.75312 11.8125 2.72812 9.7875 2.72812 7.28437Z" fill=""></path></svg>
+                            </span>
+                            <input
+                                type="text"
+                                placeholder="Search product/IMEI..."
+                                value={search}
+                                onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+                                className="w-full border border-stroke dark:border-strokedark rounded-lg pl-9 pr-4 py-2.5 text-sm bg-gray-50 outline-none focus:border-primary dark:bg-form-input dark:text-white"
+                            />
+                        </div>
+
                         <select
                             value={transferType}
                             onChange={(e) => setTransferType(e.target.value as "Delivery Officer" | "Outlet")}
@@ -407,12 +440,17 @@ export default function TransfersPage() {
                         <p className="text-xs text-gray-400 mt-0.5">Total Units to Transfer: <strong className="text-primary">{totalUnitsSelected}</strong></p>
                     </div>
                     <button
-                        onClick={initiateTransfer}
+                        onClick={() => initiateTransfer()}
                         disabled={selectedIds.length === 0 || !selectedTargetId || loading}
                         className="flex items-center gap-2 bg-primary hover:bg-opacity-90 disabled:opacity-50 disabled:cursor-not-allowed text-white px-8 py-3 rounded-lg text-sm font-bold shadow-md transition-all"
                     >
                         <Send size={18} />
-                        {loading && !otpModalOpen ? "Processing..." : "Send OTP for Transfer"}
+                        {loading && !otpModalOpen 
+                            ? "Processing..." 
+                            : transferType === "Outlet" 
+                                ? "Transfer Stock" 
+                                : "Send OTP for Transfer"
+                        }
                     </button>
                 </div>
             </div>
@@ -458,6 +496,36 @@ export default function TransfersPage() {
                     </div>
                 </div>
             )}
+
+            {/* Confirmation Modal */}
+            {confirmModalOpen && (
+                <div className="fixed inset-0 z-[9999] bg-black bg-opacity-60 flex items-center justify-center p-4 backdrop-blur-sm">
+                    <div className="bg-white dark:bg-boxdark rounded-2xl p-8 max-w-sm w-full shadow-2xl">
+                        <div className="mx-auto w-16 h-16 bg-blue-500/10 rounded-full flex items-center justify-center mb-6 text-blue-500">
+                            <Send size={32} />
+                        </div>
+                        <h3 className="text-2xl font-bold text-center text-black dark:text-white mb-2">Confirm Transfer</h3>
+                        <p className="text-sm text-center text-gray-500 dark:text-gray-400 mb-8 px-4">
+                            Are you sure you want to transfer <strong>{totalUnitsSelected}</strong> unit(s) to the selected Outlet? This action is immediate.
+                        </p>
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => setConfirmModalOpen(false)}
+                                className="flex-1 border border-stroke dark:border-strokedark text-gray-600 dark:text-gray-300 py-3 rounded-xl font-semibold hover:bg-gray-50 dark:hover:bg-meta-4 transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={() => initiateTransfer(true)}
+                                className="flex-1 bg-primary text-white py-3 rounded-xl font-bold hover:bg-opacity-90 flex items-center justify-center gap-2 transition-all"
+                            >
+                                Confirm & Send
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Pagination & Summary Bar */}
             <div className="mt-8 flex flex-col md:flex-row items-center justify-between gap-4 bg-white dark:bg-boxdark p-4 rounded-xl border border-stroke dark:border-strokedark">
                 <div className="text-xs text-gray-400 dark:text-gray-500 font-bold uppercase tracking-widest">

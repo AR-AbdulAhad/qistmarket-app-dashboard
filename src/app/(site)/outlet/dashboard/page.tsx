@@ -6,13 +6,11 @@ import Cookies from "js-cookie";
 import dynamic from "next/dynamic";
 import { ApexOptions } from "apexcharts";
 import {
-  Package, Clock, CheckCircle, XCircle, Truck,
-  TrendingUp, DollarSign, CreditCard, AlertTriangle,
-  BarChart2, ShoppingBag, Users, RefreshCw, ArrowRight,
-  Wallet, Activity, ChevronRight, BoxIcon,
-  LayoutDashboard, ShieldCheck, RotateCcw, FileText,
-  Receipt, UserSquare2
+  Package, Clock, CheckCircle, XCircle, Truck, CreditCard, AlertTriangle, ShoppingBag, RefreshCw, ArrowRight,
+  Wallet, Activity, ChevronRight, BoxIcon, ShieldCheck, FileText,
+  Receipt, UserSquare2, Logs
 } from "lucide-react";
+import { useAuth } from "../../../../../contexts/AuthContext";
 
 const Chart = dynamic(() => import("react-apexcharts"), { ssr: false });
 
@@ -28,8 +26,10 @@ type Stats = {
     todayOrders: number;
     pendingVerification: number;
     approvedOrders: number;
-    rejectedOrders: number;
+    cancelledOrders: number;
     deliveryPending: number;
+    delivered: number;
+    expiredOrders: number;
   };
   performance: {
     dailySales: number;
@@ -112,6 +112,7 @@ const QuickLink = ({ icon: Icon, label, href, color }: { icon: any; label: strin
 };
 
 export default function OutletDashboardPage() {
+  const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -119,13 +120,16 @@ export default function OutletDashboardPage() {
   const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
-    try {
-      const user = localStorage.getItem("user");
-      if (user) {
-        const parsed = JSON.parse(user);
-        setOutletName(parsed.outlet_name || parsed.full_name || "Outlet Portal");
+    if (!authLoading && user) {
+      const userRole = user.role?.toLowerCase();
+      if (userRole === "sales officer") {
+        router.push("/csr/dashboard");
       }
-    } catch {}
+      setOutletName(user.outlet_name || user.full_name || "Outlet Portal");
+    }
+  }, [user, authLoading, router]);
+
+  useEffect(() => {
     fetchStats();
   }, []);
 
@@ -162,7 +166,9 @@ export default function OutletDashboardPage() {
         stats.orders.pendingVerification,
         stats.orders.approvedOrders,
         stats.orders.deliveryPending,
-        stats.orders.rejectedOrders,
+        stats.orders.cancelledOrders,
+        stats.orders.delivered,
+        stats.orders.expiredOrders,
       ]
     : [0, 0, 0, 0, 0];
 
@@ -211,18 +217,18 @@ export default function OutletDashboardPage() {
   };
 
   const quickLinks = [
-    { icon: Package, label: "Orders", href: "/outlet/orders", color: "bg-blue-500" },
+    { icon: Package, label: "Orders", href: "/orders-list", color: "bg-blue-500" },
+    { icon: CheckCircle, label: "Approved Order list", href: "/approved-order-list", color: "bg-blue-500" },
     { icon: BoxIcon, label: "Inventory", href: "/outlet/inventory", color: "bg-violet-500" },
     { icon: CreditCard, label: "Installments", href: "/outlet/installments", color: "bg-emerald-500" },
     { icon: Activity, label: "Recovery", href: "/outlet/recovery", color: "bg-orange-500" },
     { icon: Truck, label: "Delivery", href: "/outlet/delivery", color: "bg-cyan-500" },
     { icon: ShieldCheck, label: "Verification", href: "/outlet/verification", color: "bg-indigo-500" },
     { icon: Wallet, label: "Cash Register", href: "/outlet/cash-register", color: "bg-green-500" },
-    { icon: RotateCcw, label: "Returns", href: "/outlet/returns", color: "bg-red-500" },
     { icon: FileText, label: "Reports", href: "/outlet/reports", color: "bg-slate-600" },
-    { icon: Users, label: "Team", href: "/outlet/team/list", color: "bg-pink-500" },
     { icon: Receipt, label: "Expenses", href: "/outlet/expenses", color: "bg-yellow-500" },
     { icon: UserSquare2, label: "Vendors", href: "/outlet/vendors", color: "bg-teal-500" },
+    { icon: Logs, label: "Security Logs", href: "/outlet/security-logs", color: "bg-gray-500" },
   ];
 
   if (loading) {
@@ -280,34 +286,48 @@ export default function OutletDashboardPage() {
             label="Today's Orders"
             value={stats?.orders.todayOrders ?? 0}
             accent="bg-blue-500"
-            onClick={() => router.push("/outlet/orders")}
+            onClick={() => router.push("/orders-list")}
           />
           <StatCard
             icon={Clock}
             label="Pending Verification"
             value={stats?.orders.pendingVerification ?? 0}
             accent="bg-amber-500"
-            onClick={() => router.push("/outlet/verification")}
+            onClick={() => router.push("/in-progress-orders")}
           />
           <StatCard
             icon={CheckCircle}
             label="Approved Orders"
             value={stats?.orders.approvedOrders ?? 0}
             accent="bg-emerald-500"
-            onClick={() => router.push("/outlet/orders")}
+            onClick={() => router.push("/approved-order-list")}
           />
           <StatCard
             icon={Truck}
             label="Delivery Pending"
             value={stats?.orders.deliveryPending ?? 0}
             accent="bg-violet-500"
-            onClick={() => router.push("/outlet/delivery")}
           />
+            <StatCard
+              icon={CheckCircle}
+              label="Delivered Orders"
+              value={stats?.orders.delivered ?? 0}
+              accent="bg-green-500"
+              onClick={() => router.push("/delivered-orders")}
+            />
           <StatCard
             icon={XCircle}
-            label="Rejected Orders"
-            value={stats?.orders.rejectedOrders ?? 0}
+            label="Cancelled Orders"
+            value={stats?.orders.cancelledOrders ?? 0}
             accent="bg-red-500"
+            onClick={() => router.push("/cancelled-orders")}
+          />
+          <StatCard
+            icon={Clock}
+            label="Expired Orders"
+            value={stats?.orders.expiredOrders ?? 0}
+            accent="bg-amber-800"
+            onClick={() => router.push("/expired-orders")}
           />
         </div>
       </section>

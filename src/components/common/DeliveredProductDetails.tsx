@@ -11,6 +11,103 @@ const formatDateTimeUTC = (value?: string): string => {
     return parsed.isValid() ? parsed.format("MMM D, YYYY h:mm A") : value;
 };
 
+// DeliveryPhotoCard Component - For delivery uploads (similar to RecoveryPhotoCard)
+function DeliveryPhotoCard({ upload, index }: { upload: any; index: number }) {
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    
+    return (
+        <>
+            <div
+                onClick={() => setIsModalOpen(true)}
+                className="group relative overflow-hidden rounded-lg border border-stroke bg-white p-4 shadow-sm transition-all hover:shadow-md dark:border-dark-3 dark:bg-gray-800 cursor-pointer"
+            >
+                <h4 className="mb-2 font-medium text-gray-800 dark:text-gray-200 line-clamp-2">
+                    Delivery Upload #{index + 1}
+                </h4>
+                <div className="mb-3 text-xs text-gray-500 dark:text-gray-400 space-y-1">
+                    {upload.upload_type && (
+                        <p>Type: <span className="font-medium capitalize">{upload.upload_type.replace(/_/g, ' ')}</span></p>
+                    )}
+                    <p>Uploaded: <span className="font-medium">{formatDateTimeUTC(upload.uploaded_at)}</span></p>
+                </div>
+                <div className="relative aspect-[4/3] overflow-hidden rounded-md bg-gray-100 dark:bg-gray-700">
+                    {upload.file_url ? (
+                        <img
+                            src={upload.file_url}
+                            alt={`Delivery upload ${index + 1}`}
+                            className="h-full w-full object-cover transition-transform group-hover:scale-105"
+                        />
+                    ) : (
+                        <div className="flex h-full w-full items-center justify-center text-gray-400 text-xs text-center p-2">
+                            {upload.link ? <span className="text-primary underline font-medium">Document Link</span> : 'No Preview'}
+                        </div>
+                    )}
+                </div>
+                <div className="mt-3 inline-flex items-center text-sm font-medium text-primary hover:underline">
+                    <svg className="mr-1 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
+                    </svg>
+                    View Details →
+                </div>
+            </div>
+            
+            {isModalOpen && (
+                <div
+                    className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 p-4"
+                    onClick={() => setIsModalOpen(false)}
+                >
+                    <div
+                        className="relative max-w-4xl w-full max-h-[90vh] overflow-hidden rounded-lg bg-white dark:bg-gray-800"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <button
+                            onClick={() => setIsModalOpen(false)}
+                            className="absolute right-2 top-2 z-10 rounded-full bg-black bg-opacity-50 p-2 text-white hover:bg-opacity-70 transition-colors"
+                        >
+                            <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                        
+                        <div className="p-4 border-b dark:border-dark-3">
+                            <h3 className="text-xl font-bold dark:text-white">Delivery Upload Details</h3>
+                            <p className="text-sm text-gray-500 capitalize">{upload.upload_type?.replace(/_/g, ' ')}</p>
+                        </div>
+                        
+                        <div className="overflow-auto p-4 max-h-[70vh] flex items-center justify-center bg-gray-50 dark:bg-dark-2">
+                            {upload.file_url ? (
+                                <img
+                                    src={upload.file_url}
+                                    alt="Full size"
+                                    className="max-w-full h-auto shadow-lg rounded"
+                                />
+                            ) : upload.link ? (
+                                <div className="p-8 text-center">
+                                    <p className="mb-4 dark:text-gray-300">This upload is a document link:</p>
+                                    <a 
+                                        href={upload.link} 
+                                        target="_blank" 
+                                        className="inline-block bg-primary text-white px-6 py-2 rounded-lg hover:bg-opacity-90 transition-all shadow-md font-bold"
+                                    >
+                                        Open Document in New Tab
+                                    </a>
+                                </div>
+                            ) : (
+                                <p className="dark:text-gray-400">No preview available</p>
+                            )}
+                        </div>
+                        
+                        <div className="p-4 bg-gray-50 dark:bg-dark-3 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                             <div>Uploaded: {formatDateTimeUTC(upload.uploaded_at)}</div>
+                             {upload.tag && <div>Tag: <span className="font-medium text-dark dark:text-white px-2 py-0.5 bg-gray-200 dark:bg-gray-700 rounded">{upload.tag}</span></div>}
+                        </div>
+                    </div>
+                </div>
+            )}
+        </>
+    );
+}
+
 export default function DeliveredProductDetails({ orderId }: { orderId: string | number }) {
     const [deliveredProduct, setDeliveredProduct] = useState<any>(null);
     const [loading, setLoading] = useState(false);
@@ -220,6 +317,23 @@ export default function DeliveredProductDetails({ orderId }: { orderId: string |
                                     <p className="mt-1 text-dark dark:text-white">{formatDateTimeUTC(deliveredProduct.delivery_details.end_time)}</p>
                                 </div>
                             )}
+                        </div>
+                    </div>
+                )}
+
+                {/* Delivery Uploads Section */}
+                {deliveredProduct.delivery_details?.uploads && deliveredProduct.delivery_details.uploads.length > 0 && (
+                    <div className="mb-6">
+                        <h3 className="mb-3 flex items-center gap-2 text-lg font-semibold text-dark dark:text-white">
+                            <svg className="h-5 w-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                            Delivery Uploads
+                        </h3>
+                        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+                            {deliveredProduct.delivery_details.uploads.map((upload: any, idx: number) => (
+                                <DeliveryPhotoCard key={upload.id || idx} upload={upload} index={idx} />
+                            ))}
                         </div>
                     </div>
                 )}

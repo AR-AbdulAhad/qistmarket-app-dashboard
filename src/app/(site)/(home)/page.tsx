@@ -3,11 +3,14 @@
 import { useEffect, useMemo, useState } from 'react'
 import Cookies from 'js-cookie'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { PaymentsOverviewChart } from '@/components/Charts/payments-overview/chart'
 import { useNotifications } from '../../../../contexts/NotificationContext'
+import { useAuth } from '../../../../contexts/AuthContext'
 
 const BACKEND_URL =
   process.env.NEXT_PUBLIC_BACKEND_URL;
+
 
 type OrderStatus =
   | 'new'
@@ -89,6 +92,19 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null)
 
   const { notifications, unreadCount } = useNotifications()
+  const { user, loading: authLoading } = useAuth()
+  const router = useRouter()
+
+  useEffect(() => {
+    if (!authLoading && user) {
+      const userRole = user.role?.toLowerCase()
+      if (userRole === 'sales officer') {
+        router.push('/csr/dashboard')
+      } else if (userRole === 'branch user') {
+        router.push('/outlet/dashboard')
+      }
+    }
+  }, [user, authLoading, router])
 
   const token = useMemo(() => Cookies.get('auth_token'), [])
 

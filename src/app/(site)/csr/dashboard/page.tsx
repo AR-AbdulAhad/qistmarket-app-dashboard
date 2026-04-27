@@ -3,7 +3,9 @@
 import { useEffect, useState } from "react";
 import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
 import Cookies from "js-cookie";
+import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
+import { useAuth } from "../../../../../contexts/AuthContext";
 import { ApexOptions } from "apexcharts";
 
 const Chart = dynamic(() => import("react-apexcharts"), {
@@ -31,8 +33,19 @@ interface CsrDashboardStats {
 }
 
 export default function CsrDashboardPage() {
+  const { user, loading: authLoading } = useAuth();
+  const router = useRouter();
   const [stats, setStats] = useState<CsrDashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!authLoading && user) {
+      const userRole = user.role?.toLowerCase();
+      if (userRole === "outlet") {
+        router.push("/outlet/dashboard");
+      }
+    }
+  }, [user, authLoading, router]);
   
   // Default to 1st of month to today for a decent view
   const [startDate, setStartDate] = useState(() => {

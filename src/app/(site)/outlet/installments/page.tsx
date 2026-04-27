@@ -171,7 +171,7 @@ function InstallmentsContent() {
             {/* Header & Stats */}
             <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 mb-8">
                 <div className="flex-1">
-                    <h1 className="text-4xl font-black text-gray-900 dark:text-white tracking-tight">Recovery Dashboard</h1>
+                    <h1 className="text-4xl font-black text-gray-900 dark:text-white tracking-tight">Installments Summary</h1>
                     <p className="text-gray-500 dark:text-gray-400 mt-2 font-medium">Tracking {activeTab} installments and collections.</p>
                 </div>
 

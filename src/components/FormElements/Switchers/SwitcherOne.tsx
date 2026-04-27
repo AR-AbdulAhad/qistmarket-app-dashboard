@@ -1,27 +1,29 @@
-import { useState } from "react";
+interface SwitcherOneProps {
+  enabled: boolean;
+  setEnabled: (enabled: boolean) => void;
+  disabled?: boolean;
+}
 
-const SwitcherOne = () => {
-  const [enabled, setEnabled] = useState<boolean>(false);
-
+const SwitcherOne = ({ enabled, setEnabled, disabled }: SwitcherOneProps) => {
   return (
     <div>
       <label
-        htmlFor="toggle1"
-        className="flex cursor-pointer select-none items-center"
+        className={`flex items-center ${disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer select-none'}`}
       >
         <div className="relative">
           <input
             type="checkbox"
-            id="toggle1"
             className="sr-only"
+            checked={enabled}
+            disabled={disabled}
             onChange={() => {
               setEnabled(!enabled);
             }}
           />
-          <div className="block h-8 w-14 rounded-full bg-gray-3 dark:bg-[#5A616B]"></div>
+          <div className={`block h-8 w-14 rounded-full ${enabled ? 'bg-primary' : 'bg-gray-3 dark:bg-[#5A616B]'}`}></div>
           <div
             className={`absolute left-1 top-1 h-6 w-6 rounded-full bg-white shadow-switch-1 transition ${
-              enabled && "!right-1 !translate-x-full !bg-primary dark:!bg-white"
+              enabled && "!right-1 !translate-x-full !bg-white"
             }`}
           ></div>
         </div>

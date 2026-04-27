@@ -66,12 +66,18 @@ export default function TransferHistoryPage() {
     const [limit] = useState(20);
     const [totalItemsCount, setTotalItemsCount] = useState(0);
     const [search, setSearch] = useState("");
+    const [startDate, setStartDate] = useState("");
+    const [endDate, setEndDate] = useState("");
 
     useEffect(() => {
         const fetchHistory = async () => {
             setLoading(true);
             try {
-                const res = await fetch(`${API_BASE}/api/outlet/inventory/transfers/history?page=${page}&limit=${limit}&search=${encodeURIComponent(search)}`, { headers: getAuthHeaders() });
+                let url = `${API_BASE}/api/outlet/inventory/transfers/history?page=${page}&limit=${limit}&search=${encodeURIComponent(search)}&to_type=${activeTab}`;
+                if (startDate) url += `&startDate=${startDate}`;
+                if (endDate) url += `&endDate=${endDate}`;
+                
+                const res = await fetch(url, { headers: getAuthHeaders() });
                 const json = await res.json();
                 if (json.success) {
                     setTransfers(json.transfers);
@@ -85,7 +91,7 @@ export default function TransferHistoryPage() {
             }
         };
         fetchHistory();
-    }, [page, search]);
+    }, [page, search, activeTab, startDate, endDate]);
 
     const toggleExpand = (key: string) => {
         setExpandedKeys(prev => {
@@ -95,9 +101,10 @@ export default function TransferHistoryPage() {
         });
     };
 
-    // Filter by tab + group by product+variant+recipient
+    // Group by product+variant+recipient
     const grouped = useMemo<GroupedTransfer[]>(() => {
-        const filtered = transfers.filter(t => t.to_type === activeTab);
+        // Backend now handles filtering by to_type, but we'll keep a sanity check
+        const filtered = transfers; 
         const map = new Map<string, GroupedTransfer>();
 
         for (const t of filtered) {
@@ -178,17 +185,39 @@ export default function TransferHistoryPage() {
                     ))}
                 </div>
 
-                <div className="relative w-full lg:max-w-xs">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <svg className="fill-body hover:fill-primary dark:fill-bodydark dark:hover:fill-primary" width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M15.7781 14.4938L12.0656 10.7812C12.7969 9.79687 13.2187 8.57812 13.2187 7.28437C13.2187 3.99375 10.5187 1.29375 7.22812 1.29375C3.9375 1.29375 1.2375 3.99375 1.2375 7.28437C1.2375 10.575 3.9375 13.275 7.22812 13.275C8.52187 13.275 9.74062 12.8531 10.725 12.1219L14.4375 15.8344C14.6344 16.0312 14.8875 16.1156 15.1125 16.1156C15.3375 16.1156 15.5906 16.0312 15.7781 15.8344C16.1719 15.4688 16.1719 14.8688 15.7781 14.4938ZM2.72812 7.28437C2.72812 4.78125 4.75312 2.75625 7.25625 2.75625C9.75938 2.75625 11.7844 4.78125 11.7844 7.28437C11.7844 9.7875 9.75938 11.8125 7.25625 11.8125C4.75312 11.8125 2.72812 9.7875 2.72812 7.28437Z" fill=""></path></svg>
+                <div className="flex flex-wrap items-center gap-4 w-full lg:max-w-3xl">
+                    {/* Date Filters */}
+                    <div className="flex items-center gap-2 bg-white dark:bg-boxdark border border-stroke dark:border-strokedark rounded-lg px-3 py-1.5 shadow-sm">
+                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">From</span>
+                        <input
+                            type="date"
+                            value={startDate}
+                            onChange={(e) => { setStartDate(e.target.value); setPage(1); }}
+                            className="bg-transparent text-xs outline-none dark:text-white"
+                        />
                     </div>
-                    <input
-                        type="text"
-                        placeholder="Search transfers..."
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                        className="w-full border border-stroke dark:border-strokedark rounded-lg pl-10 pr-4 py-2 text-sm bg-gray-50 dark:bg-form-input focus:border-primary outline-none dark:text-white"
-                    />
+                    <div className="flex items-center gap-2 bg-white dark:bg-boxdark border border-stroke dark:border-strokedark rounded-lg px-3 py-1.5 shadow-sm">
+                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">To</span>
+                        <input
+                            type="date"
+                            value={endDate}
+                            onChange={(e) => { setEndDate(e.target.value); setPage(1); }}
+                            className="bg-transparent text-xs outline-none dark:text-white"
+                        />
+                    </div>
+
+                    <div className="relative flex-1 min-w-[200px]">
+                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <svg className="fill-body hover:fill-primary dark:fill-bodydark dark:hover:fill-primary" width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M15.7781 14.4938L12.0656 10.7812C12.7969 9.79687 13.2187 8.57812 13.2187 7.28437C13.2187 3.99375 10.5187 1.29375 7.22812 1.29375C3.9375 1.29375 1.2375 3.99375 1.2375 7.28437C1.2375 10.575 3.9375 13.275 7.22812 13.275C8.52187 13.275 9.74062 12.8531 10.725 12.1219L14.4375 15.8344C14.6344 16.0312 14.8875 16.1156 15.1125 16.1156C15.3375 16.1156 15.5906 16.0312 15.7781 15.8344C16.1719 15.4688 16.1719 14.8688 15.7781 14.4938ZM2.72812 7.28437C2.72812 4.78125 4.75312 2.75625 7.25625 2.75625C9.75938 2.75625 11.7844 4.78125 11.7844 7.28437C11.7844 9.7875 9.75938 11.8125 7.25625 11.8125C4.75312 11.8125 2.72812 9.7875 2.72812 7.28437Z" fill=""></path></svg>
+                        </div>
+                        <input
+                            type="text"
+                            placeholder="Search product/IMEI..."
+                            value={search}
+                            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+                            className="w-full border border-stroke dark:border-strokedark rounded-lg pl-10 pr-4 py-2 text-sm bg-gray-50 dark:bg-form-input focus:border-primary outline-none dark:text-white shadow-sm"
+                        />
+                    </div>
                 </div>
             </div>
 

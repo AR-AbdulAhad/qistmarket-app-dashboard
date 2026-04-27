@@ -751,7 +751,7 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
         },
         body: JSON.stringify({
           approved: decision === 'approve',
-          remarks: decision === 'approve' ? null : remarks.trim() || null,
+          remarks: remarks.trim() || null,
         }),
       })
 

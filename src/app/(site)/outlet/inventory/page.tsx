@@ -387,17 +387,6 @@ export default function OutletInventoryPage() {
                         className="w-full border border-stroke dark:border-strokedark rounded-lg pl-10 pr-4 py-2.5 text-sm bg-gray-50 dark:bg-form-input focus:border-primary outline-none dark:text-white"
                     />
                 </div>
-
-                {selectedIds.length > 0 && (
-                    <div className="flex items-center gap-2 flex-wrap p-2 bg-primary/5 rounded-lg border border-primary/20">
-                        <span className="text-xs font-bold px-2 text-primary">{selectedIds.length} selected</span>
-                        <div className="h-4 w-px bg-primary/30" />
-                        <button onClick={() => handleBulkStatusChange("In Stock")} className="px-3 py-1.5 bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400 rounded-md text-xs font-bold">Mark In-Stock</button>
-                        <button onClick={() => handleBulkStatusChange("Out Of Stock")} className="px-3 py-1.5 bg-gray-200 text-gray-700 dark:bg-meta-4 dark:text-gray-300 rounded-md text-xs font-bold">Mark Out-of-Stock</button>
-                        <button onClick={() => handleBulkStatusChange("Sold")} className="px-3 py-1.5 bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 rounded-md text-xs font-bold">Mark Sold</button>
-                        <button onClick={() => setSelectedIds([])} className="px-2 py-1.5 text-gray-400 hover:text-gray-600 rounded-md text-xs">Clear</button>
-                    </div>
-                )}
             </div>
 
             {/* Inventory Grouped Table */}
@@ -413,7 +402,6 @@ export default function OutletInventoryPage() {
                             <thead>
                                 <tr className="bg-gray-50 dark:bg-meta-4 border-b border-stroke dark:border-strokedark text-gray-600 dark:text-gray-300 font-semibold uppercase text-xs tracking-wider">
                                     <th className="px-4 py-4 w-10" />
-                                    <th className="px-4 py-4 w-10 text-center">#</th>
                                     <th className="px-4 py-4">Product</th>
                                     <th className="px-4 py-4">Category</th>
                                     <th className="px-4 py-4">Variant / Color</th>
@@ -450,16 +438,6 @@ export default function OutletInventoryPage() {
                                                     {isExpanded
                                                         ? <ChevronDown size={18} className="text-primary mx-auto" />
                                                         : <ChevronRight size={18} className="text-gray-400 mx-auto" />
-                                                    }
-                                                </td>
-
-                                                {/* Group select checkbox */}
-                                                <td className="px-4 py-4 text-center" onClick={() => toggleGroupSelection(grp)}>
-                                                    {allSelected
-                                                        ? <CheckSquare size={18} className="text-primary mx-auto" />
-                                                        : someSelected
-                                                        ? <div className="w-[18px] h-[18px] border-2 border-primary bg-primary/30 rounded mx-auto" />
-                                                        : <Square size={18} className="text-gray-400 mx-auto" />
                                                     }
                                                 </td>
 
@@ -518,7 +496,6 @@ export default function OutletInventoryPage() {
                                                             isChildSelected ? "bg-primary/5 dark:bg-primary/10" : "bg-gray-50/50 dark:bg-meta-4/10"
                                                         } ${isEditing ? "bg-yellow-50 dark:bg-yellow-900/10" : ""}`}
                                                     >
-                                                        {/* Indent arrow */}
                                                         <td className="px-4 py-3 text-center">
                                                             <div className="flex justify-center">
                                                                 <div className="w-4 h-px bg-gray-300 dark:bg-gray-600 mt-2.5 mr-1" />
@@ -526,49 +503,13 @@ export default function OutletInventoryPage() {
                                                             </div>
                                                         </td>
 
-                                                        {/* Child checkbox */}
-                                                        <td className="px-4 py-3 text-center">
-                                                            <button onClick={() => toggleChildSelection(item.id)}>
-                                                                {isChildSelected
-                                                                    ? <CheckSquare size={16} className="text-primary mx-auto" />
-                                                                    : <Square size={16} className="text-gray-400 mx-auto" />
-                                                                }
-                                                            </button>
-                                                        </td>
-
                                                         {/* IMEI / Product Column */}
                                                         <td className="px-4 py-3">
-                                                            {isEditing ? (
-                                                                <input
-                                                                    type="text"
-                                                                    value={editForm.imei_serial || ""}
-                                                                    onChange={e => setEditForm({ ...editForm, imei_serial: e.target.value })}
-                                                                    className="w-full border rounded px-2 py-1 text-xs dark:bg-form-input dark:border-strokedark outline-none"
-                                                                />
-                                                            ) : !hasImei ? (
-                                                                <div className="flex items-center gap-2">
-                                                                    <input
-                                                                        type="text"
-                                                                        placeholder="Enter IMEI..."
-                                                                        value={item.imei_serial || ""}
-                                                                        onChange={e => {
-                                                                            const val = e.target.value;
-                                                                            setInventory(prev => prev.map(inv => inv.id === item.id ? { ...inv, imei_serial: val } : inv));
-                                                                        }}
-                                                                        onBlur={() => { if(item.imei_serial) saveEdit(item.id); }}
-                                                                        className="w-full font-mono bg-transparent border-b border-stroke dark:border-strokedark outline-none text-xs focus:border-primary px-1"
-                                                                    />
-                                                                    {item.imei_serial && (
-                                                                        <button onClick={() => saveEdit(item.id)} className="text-green-500 hover:text-green-600">
-                                                                            <Save size={12} />
-                                                                        </button>
-                                                                    )}
-                                                                </div>
-                                                            ) : (
-                                                                <span className="text-gray-600 dark:text-gray-300 text-xs pl-2">
-                                                                    <span className="font-mono bg-gray-100 dark:bg-meta-4 px-2 py-0.5 rounded text-xs border border-gray-200 dark:border-strokedark">{item.imei_serial}</span>
+                                                            <span className="text-gray-600 dark:text-gray-300 text-xs pl-2">
+                                                                <span className="font-mono bg-gray-100 dark:bg-meta-4 px-2 py-0.5 rounded text-xs border border-gray-200 dark:border-strokedark">
+                                                                    {item.imei_serial || "—"}
                                                                 </span>
-                                                            )}
+                                                            </span>
                                                         </td>
 
                                                         {/* Category */}
@@ -587,29 +528,7 @@ export default function OutletInventoryPage() {
 
                                                         {/* Variant */}
                                                         <td className="px-4 py-3">
-                                                            {isEditing ? (
-                                                                <input
-                                                                    type="text"
-                                                                    value={editForm.color_variant || ""}
-                                                                    onChange={e => setEditForm({ ...editForm, color_variant: e.target.value })}
-                                                                    className="w-32 border rounded px-2 py-1 text-xs dark:bg-form-input dark:border-strokedark outline-none"
-                                                                    placeholder="Color/Variant"
-                                                                />
-                                                            ) : !hasColor ? (
-                                                                <input
-                                                                    type="text"
-                                                                    placeholder="Color..."
-                                                                    value={item.color_variant || ""}
-                                                                    onChange={e => {
-                                                                        const val = e.target.value;
-                                                                        setInventory(prev => prev.map(inv => inv.id === item.id ? { ...inv, color_variant: val } : inv));
-                                                                    }}
-                                                                    onBlur={() => { if(item.color_variant) saveEdit(item.id); }}
-                                                                    className="w-full bg-transparent border-b border-stroke dark:border-strokedark outline-none text-xs focus:border-primary px-1"
-                                                                />
-                                                            ) : (
-                                                                <span className="text-gray-500 dark:text-gray-400 text-xs">{item.color_variant || "—"}</span>
-                                                            )}
+                                                            <span className="text-gray-500 dark:text-gray-400 text-xs">{item.color_variant || "—"}</span>
                                                         </td>
 
                                                         {/* Quantity */}
@@ -657,13 +576,9 @@ export default function OutletInventoryPage() {
                                                         {/* Actions */}
                                                         <td className="px-4 py-3 text-center">
                                                             <div className="flex flex-col items-center gap-1">
-                                                                {/* Status button */}
-                                                                <button
-                                                                    onClick={() => toggleStatus(item)}
-                                                                    className={`px-2 py-0.5 rounded-full text-[10px] font-bold hover:scale-105 transition-transform ${STATUS_COLORS[item.status] || "bg-gray-100 text-gray-600"}`}
-                                                                >
+                                                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${STATUS_COLORS[item.status] || "bg-gray-100 text-gray-600"}`}>
                                                                     {item.status}
-                                                                </button>
+                                                                </span>
                                                             </div>
                                                         </td>
                                                     </tr>

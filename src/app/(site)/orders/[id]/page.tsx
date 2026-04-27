@@ -138,6 +138,17 @@ function LocationPhotoCard({ photo, label }: { photo: { file_url: string, upload
 }
 
 // --- Verification Data Types (copied from verification page) ---
+interface VerificationReview {
+    id: number;
+    approved: boolean;
+    remarks: string | null;
+    created_at: string;
+    reviewer: {
+        full_name: string;
+        username: string;
+    };
+}
+
 interface VerificationData {
     id: number;
     order_id: number;
@@ -163,7 +174,7 @@ interface VerificationData {
     locations: any[];
     verification_locations: any[];
     documents: any[];
-    reviews: any[];
+    reviews: VerificationReview[];
     edit_history?: any[];
     home_location_required: boolean;
     home_location_verified: boolean;
@@ -232,6 +243,7 @@ interface Order {
     status: string;
     created_at: string;
     cancelled_reason?: string | null;
+    postponed_feedback?: string | null;
     cancelled_at?: string | null;
     created_by: { username: string } | null;
     assigned_to: { username: string } | null;
@@ -244,6 +256,7 @@ interface Order {
         changed_at: string;
         changed_by: { username: string, full_name: string };
     }[];
+    verification?: VerificationData | null;
 }
 
 export default function OrderDetailsPage() {
@@ -602,6 +615,81 @@ export default function OrderDetailsPage() {
                         <div className="space-y-2">
                             <p><span className="font-medium text-red-700 dark:text-red-300">Reason:</span> {order.cancelled_reason}</p>
                             <p><span className="font-medium text-red-700 dark:text-red-300">Cancelled At:</span> {order.cancelled_at ? new Date(order.cancelled_at).toLocaleString() : 'N/A'}</p>
+                        </div>
+                    </div>
+                )}
+                {order.status === 'postponed' && (
+                    <div className="lg:col-span-2 rounded-lg border border-yellow-200 bg-yellow-50 p-6 dark:border-yellow-900/30 dark:bg-yellow-900/10">
+                        <h3 className="text-xl font-bold text-yellow-800 dark:text-yellow-400 mb-4">Postponed Details</h3>
+                        <div className="space-y-2">
+                            <p><span className="font-medium text-yellow-700 dark:text-yellow-300">Reason:</span> {order.postponed_feedback}</p>
+                        </div>
+                    </div>
+                )}
+
+                {/* Verification Reviews (Spans full width) */}
+                {verification && verification.reviews && verification.reviews.length > 0 && (
+                    <div className="lg:col-span-2 rounded-lg border border-stroke bg-white shadow-default dark:border-dark-3 dark:bg-gray-800 p-6">
+                        <h3 className="text-xl font-bold border-b pb-4 mb-4 dark:text-white flex items-center justify-between">
+                            Verification Reviews
+                            <span className="text-sm font-medium text-gray-500">
+                                {verification.reviews.length} Review(s)
+                            </span>
+                        </h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                            {verification.reviews.map((review) => (
+                                <div 
+                                    key={review.id} 
+                                    className={cn(
+                                        "p-4 rounded-xl border-2 transition-all",
+                                        review.approved 
+                                            ? "bg-green-50 border-green-100 dark:bg-green-950/10 dark:border-green-900/30" 
+                                            : "bg-red-50 border-red-100 dark:bg-red-950/10 dark:border-red-900/30"
+                                    )}
+                                >
+                                    <div className="flex justify-between items-start mb-3">
+                                        <div className="flex items-center gap-2">
+                                            <div className={cn(
+                                                "w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-xs",
+                                                review.approved ? "bg-green-500" : "bg-red-500"
+                                            )}>
+                                                {review.reviewer?.full_name?.charAt(0) || 'U'}
+                                            </div>
+                                            <div>
+                                                <p className="font-bold text-sm text-gray-900 dark:text-white">
+                                                    {review.reviewer?.full_name || 'Unknown Reviewer'}
+                                                </p>
+                                                <p className="text-xs text-gray-500">
+                                                    @{review.reviewer?.username || 'unknown'}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <span className={cn(
+                                            "px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider",
+                                            review.approved 
+                                                ? "bg-green-500 text-white" 
+                                                : "bg-red-500 text-white"
+                                        )}>
+                                            {review.approved ? 'Approved' : 'Rejected'}
+                                        </span>
+                                    </div>
+                                    
+                                    {review.remarks && (
+                                        <div className="bg-white/50 dark:bg-black/20 rounded-lg p-3 mt-2">
+                                            <p className="text-sm text-gray-700 dark:text-gray-300 italic leading-relaxed">
+                                                "{review.remarks}"
+                                            </p>
+                                        </div>
+                                    )}
+                                    
+                                    <div className="mt-3 text-[10px] text-gray-400 font-medium flex items-center gap-1.5">
+                                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                        {formatDateTimeUTC(review.created_at)}
+                                    </div>
+                                </div>
+                            ))}
                         </div>
                     </div>
                 )}

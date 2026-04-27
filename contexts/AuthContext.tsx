@@ -18,6 +18,8 @@ interface User {
   coverImage?: string | null;
   bio?: string | null;
   permissions: any[];
+  outlet_id?: number | null;
+  outlet_name?: string | null;
 }
 
 interface AuthContextType {
