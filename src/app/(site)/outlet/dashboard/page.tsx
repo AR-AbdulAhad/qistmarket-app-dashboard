@@ -153,8 +153,8 @@ export default function OutletDashboardPage() {
   // Donut chart: Order status breakdown
   const orderDonutOptions: ApexOptions = {
     chart: { type: "donut", fontFamily: "inherit" },
-    labels: ["Today's Orders", "Pending Verification", "Approved", "Delivery Pending", "Rejected"],
-    colors: ["#3C50E0", "#F59E0B", "#10B981", "#8B5CF6", "#EF4444"],
+    labels: ["Today's Orders", "Pending Verification", "Approved", "Delivery Pending", "Cancelled", "Delivered", "Expired"],
+    colors: ["#3C50E0", "#F59E0B", "#10B981", "#8B5CF6", "#EF4444", "#3C50E0", "#F59E0B", "#10B981", "#8B5CF6", "#EF4444"],
     plotOptions: { pie: { donut: { size: "68%" } } },
     dataLabels: { enabled: false },
     legend: { position: "bottom", fontFamily: "inherit", fontSize: "12px" },
