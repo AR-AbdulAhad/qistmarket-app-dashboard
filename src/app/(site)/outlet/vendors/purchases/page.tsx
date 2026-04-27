@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import Loader from "@/components/common/Loader";
+import toast from "react-hot-toast";
 
 const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
 const getAuthHeaders = () => ({
@@ -100,9 +101,13 @@ export default function VendorPurchasesPage() {
             const data = await res.json();
             if (data.success) {
                 setPurchases(prev => prev.filter(p => p.id !== id));
+                toast.success(data.message || "Purchase deleted successfully.");
+            } else {
+                toast.error(data.message || "Failed to delete purchase.");
             }
         } catch (e) {
             console.error(e);
+            toast.error("An error occurred while deleting the purchase.");
         } finally {
             setDeletingId(null);
         }
