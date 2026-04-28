@@ -9,6 +9,7 @@ import {
   MessageSquare, ShieldCheck, ArrowLeft, ChevronRight,
   Info, Smartphone, QrCode, Camera, UserCheck, ImageIcon
 } from 'lucide-react';
+import { InstallmentLedgerEditor } from '@/components/Installments/InstallmentLedgerEditor';
 import toast from 'react-hot-toast';
 import Cookies from 'js-cookie';
 import dayjs from 'dayjs';
@@ -200,32 +201,7 @@ export default function SelfPickupPage() {
     };
     setSelectedPlan(normalized);
     setAdvanceOverride(normalized.advance);
-    updateLedger(normalized.monthlyAmount, normalized.months);
   };
-
-  const updateLedger = (monthly: number, months: number) => {
-    const rows = [];
-    const today = dayjs();
-    for (let i = 1; i <= months; i++) {
-      rows.push({
-        month: i,
-        date: today.add(i, 'month').format('DD MMM YYYY'),
-        amount: monthly
-      });
-    }
-    setLedger(rows);
-  };
-
-  useEffect(() => {
-    if (selectedPlan && advanceOverride !== '') {
-      const adv = Number(advanceOverride);
-      if (adv >= selectedPlan.advance && adv < selectedPlan.totalPrice) {
-        const rem = selectedPlan.totalPrice - adv;
-        const newMonthly = roundUp(rem / selectedPlan.months);
-        updateLedger(newMonthly, selectedPlan.months);
-      }
-    }
-  }, [advanceOverride, selectedPlan]);
 
   const sendOTP = async () => {
     if (!phone) return toast.error('Phone number required');
@@ -341,6 +317,7 @@ export default function SelfPickupPage() {
         formData.append('order_id', String(id));
         formData.append('product_imei', selectedInventory.imei_serial);
         formData.append('selected_plan', JSON.stringify(submittedPlan));
+        formData.append('custom_ledger', JSON.stringify(ledger));
         formData.append('phone', phone);
         formData.append('feedback', feedback);
 
@@ -590,38 +567,26 @@ export default function SelfPickupPage() {
                              </div>
                           </div>
 
-                          <div className="overflow-hidden rounded-[2.5rem] border border-gray-100 bg-white">
-                             <table className="w-full text-left">
-                                <thead className="bg-gray-50 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">
-                                   <tr>
-                                      <th className="px-10 py-6">Reference</th>
-                                      <th className="px-10 py-6">Payment Path</th>
-                                      <th className="px-10 py-6 text-right">Amount</th>
-                                   </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-50 font-bold">
-                                   <tr className="bg-emerald-50/30">
-                                      <td className="px-10 py-6">
-                                         <div className="flex items-center gap-3">
-                                            <div className="w-8 h-8 bg-emerald-500 rounded-lg flex items-center justify-center text-white">
-                                               <Check className="w-4 h-4" />
-                                            </div>
-                                            <span className="text-emerald-700">Advance (Down payment)</span>
-                                         </div>
-                                      </td>
-                                      <td className="px-10 py-6 text-gray-400 text-sm italic">Immediate Collection at Branch Counter</td>
-                                      <td className="px-10 py-6 text-right text-emerald-600 font-black">Rs. {Number(advanceOverride).toLocaleString()}</td>
-                                   </tr>
-                                   {ledger.map((r) => (
-                                      <tr key={r.month} className="hover:bg-gray-50/50 transition-colors">
-                                         <td className="px-10 py-6 text-gray-900">Month {r.month} Installment</td>
-                                         <td className="px-10 py-6 text-gray-400 text-sm">{r.date}</td>
-                                         <td className="px-10 py-6 text-right text-gray-900 font-black">Rs. {r.amount?.toLocaleString()}</td>
-                                      </tr>
-                                   ))}
-                                </tbody>
-                             </table>
-                          </div>
+                            <div className="overflow-hidden rounded-[2.5rem] border border-gray-100 bg-white p-8">
+                               <div className="mb-4 flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                     <Calendar className="w-5 h-5 text-blue-500" />
+                                     <span className="text-sm font-black text-blue-600 uppercase tracking-widest">Installment Schedule</span>
+                                  </div>
+                                  <span className="text-[10px] bg-blue-100 text-blue-600 px-2 py-1 rounded font-bold uppercase tracking-widest">
+                                     Editable
+                                  </span>
+                               </div>
+
+                               <InstallmentLedgerEditor
+                                  totalPrice={selectedPlan.totalPrice}
+                                  advance={Number(advanceOverride) || selectedPlan.advance}
+                                  months={selectedPlan.months}
+                                  monthlyAmount={selectedPlan.monthlyAmount}
+                                  onLedgerChange={(newLedger) => setLedger(newLedger)}
+                               />
+                            </div>
+
 
                           <button 
                             onClick={() => setActiveStep(3)}

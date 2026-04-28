@@ -34,8 +34,22 @@ export function CashSubmissionPopup({ socket }: { socket: any }) {
 
     console.log("Socket listener attached to cash_submission_otp");
 
-    const handleRequest = (payload: CashSubmissionData) => {
+    const handleRequest = (payload: CashSubmissionData & { target_outlet_id?: number }) => {
       console.log("Cash submission request received:", payload);
+      
+      const userStr = localStorage.getItem("user");
+      const user = userStr ? JSON.parse(userStr) : null;
+      const myOutletId = user?.outlet_id;
+
+      // STRICT FILTER: If targeted at an outlet, ONLY show if it matches my outlet ID exactly.
+      // Super admins (no outlet_id) or other branches will be ignored.
+      if (payload.target_outlet_id) {
+        if (!myOutletId || parseInt(myOutletId) !== payload.target_outlet_id) {
+          console.log("Ignoring cash submission: targeted at outlet", payload.target_outlet_id, "but my outlet is", myOutletId);
+          return;
+        }
+      }
+
       setData(payload);
       setIsOpen(true);
     };

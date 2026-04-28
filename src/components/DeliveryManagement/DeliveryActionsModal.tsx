@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Modal } from '../Modal/Modal';
 import Cookies from 'js-cookie';
 import toast from 'react-hot-toast';
+import { InstallmentLedgerEditor } from '../Installments/InstallmentLedgerEditor';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
 
@@ -26,6 +27,29 @@ export const DeliveryActionsModal = ({
     const [isOtpSent, setIsOtpSent] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isSendingOtp, setIsSendingOtp] = useState(false);
+    const [orderData, setOrderData] = useState<any>(null);
+    const [customLedger, setCustomLedger] = useState<any[]>([]);
+
+    useEffect(() => {
+        if (isOpen && orderId && actionType === 'deliver') {
+            fetchOrderDetails();
+        }
+    }, [isOpen, orderId, actionType]);
+
+    const fetchOrderDetails = async () => {
+        try {
+            const token = Cookies.get('auth_token');
+            const res = await fetch(`${BACKEND_URL}/api/orders/${orderId}`, {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            const json = await res.json();
+            if (json.success) {
+                setOrderData(json.data.order);
+            }
+        } catch (error) {
+            console.error('Failed to fetch order details:', error);
+        }
+    };
 
     const handleSendOtp = async () => {
         if (!orderId) return;
@@ -80,6 +104,9 @@ export const DeliveryActionsModal = ({
             if (actionType === 'deliver') {
                 endpoint = `${BACKEND_URL}/api/delivery/verify-otp`;
                 body.otp = otp;
+                if (customLedger && customLedger.length > 0) {
+                    body.custom_ledger = customLedger;
+                }
             } else if (actionType === 'refund') {
                 endpoint = `${BACKEND_URL}/api/delivery/refund/verify-otp`;
                 body.otp = otp;
@@ -140,7 +167,7 @@ export const DeliveryActionsModal = ({
         <Modal
             open={isOpen}
             onClose={handleModalClose}
-            className="max-w-md rounded-2xl bg-white p-8 shadow-xl dark:bg-gray-800"
+            className="max-w-2xl rounded-2xl bg-white p-8 shadow-xl dark:bg-gray-800"
         >
             <h2 className="mb-4 text-xl font-bold text-dark dark:text-white">
                 {actionType === 'deliver' ? 'Confirm Delivery' : actionType === 'refund' ? 'Process Refund' : 'Mark as Returned'}
@@ -192,6 +219,26 @@ export const DeliveryActionsModal = ({
                         <p className="mt-2 text-[10px] text-gray-500 text-center font-medium">
                             Ask the customer for the verification code sent to their phone.
                         </p>
+                    </div>
+                )}
+
+                {actionType === 'deliver' && orderData && (
+                    <div className="mt-4 pt-4 border-t border-stroke dark:border-strokedark">
+                        <div className="flex items-center justify-between mb-4">
+                            <label className="text-sm font-bold text-gray-700 dark:text-gray-300">
+                                Review Installment Ledger
+                            </label>
+                            <span className="text-[10px] bg-blue-100 text-blue-600 px-2 py-1 rounded font-bold uppercase">
+                                Editable
+                            </span>
+                        </div>
+                        <InstallmentLedgerEditor
+                            totalPrice={orderData.total_amount}
+                            advance={orderData.advance_amount}
+                            months={orderData.months}
+                            monthlyAmount={orderData.monthly_amount}
+                            onLedgerChange={(ledger) => setCustomLedger(ledger)}
+                        />
                     </div>
                 )}
 
