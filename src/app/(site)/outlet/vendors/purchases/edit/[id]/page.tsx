@@ -283,6 +283,7 @@ export default function EditVendorPurchasePage() {
                     const diff = item.quantity - validImeis.length;
                     if (diff > 0) {
                         records.push({
+                            id: undefined,
                             product_name: item.product_name,
                             category: item.category,
                             color_variant: item.color_variant,
