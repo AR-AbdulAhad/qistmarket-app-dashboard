@@ -14,6 +14,8 @@ type InstallmentRow = {
     paidAt: string | null;
     paymentMethod: string | null;
     arrears?: number;
+    paidAmount?: number;
+    remainingAmount?: number;
 };
 
 type OrderInstallment = {
@@ -137,9 +139,14 @@ export default function InstallmentsTable({ data, onPay, selectedIds = [], onSel
                                         <td className="px-6 py-4">
                                             {nextPending ? (
                                                 <div>
-                                                    <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-                                                        {pkr(nextPending.dueAmount)}
+                                                    <p className={`text-sm font-semibold ${nextPending.paidAmount && nextPending.paidAmount > 0 ? 'text-blue-600' : 'text-gray-700 dark:text-gray-300'}`}>
+                                                        {pkr(nextPending.remainingAmount || nextPending.dueAmount)}
                                                     </p>
+                                                    {nextPending.paidAmount && nextPending.paidAmount > 0 ? (
+                                                        <p className="text-[10px] text-emerald-500 font-bold uppercase tracking-tight">
+                                                            Partial: {pkr(nextPending.paidAmount)}
+                                                        </p>
+                                                    ) : null}
                                                     {nextPending.arrears ? (
                                                         <p className="text-[10px] text-red-500 font-medium mt-0.5">
                                                             Included Arrears: {pkr(nextPending.arrears)}
@@ -281,7 +288,8 @@ export default function InstallmentsTable({ data, onPay, selectedIds = [], onSel
                                                         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
                                                             {order.installmentLedger.map((inst, idx) => {
                                                                 const isPaid = inst.status === 'paid';
-                                                                const isNext = !isPaid && order.installmentLedger
+                                                                const isPartial = inst.paidAmount && inst.paidAmount > 0 && inst.status !== 'paid';
+                                                                const isNext = !isPaid && !isPartial && order.installmentLedger
                                                                     .filter(r => r.monthNumber < inst.monthNumber)
                                                                     .every(r => r.status === 'paid');
 
@@ -291,6 +299,8 @@ export default function InstallmentsTable({ data, onPay, selectedIds = [], onSel
                                                                         className={`rounded-xl p-3 border transition-all ${
                                                                             isPaid
                                                                                 ? 'bg-green-50/60 border-green-200 dark:bg-green-900/10 dark:border-green-900/30'
+                                                                                : isPartial
+                                                                                ? 'bg-blue-50 border-blue-200 dark:bg-blue-900/10 dark:border-blue-900/30'
                                                                                 : isNext
                                                                                 ? 'bg-orange-50 border-orange-300 dark:bg-orange-900/20 dark:border-orange-700 ring-2 ring-orange-300/40'
                                                                                 : 'bg-white border-gray-100 dark:bg-gray-800 dark:border-gray-700 shadow-sm'
@@ -302,8 +312,13 @@ export default function InstallmentsTable({ data, onPay, selectedIds = [], onSel
                                                                                     {inst.label || `Month ${inst.monthNumber}`}
                                                                                 </p>
                                                                                 <p className="text-xs font-extrabold text-gray-800 dark:text-gray-200 mt-0.5">
-                                                                                    {pkr(inst.dueAmount)}
+                                                                                    {pkr(inst.remainingAmount || inst.dueAmount)}
                                                                                 </p>
+                                                                                {inst.paidAmount && inst.paidAmount > 0 && (
+                                                                                    <p className="text-[8px] text-green-600 font-bold -mt-0.5">
+                                                                                        PAID: {pkr(inst.paidAmount)}
+                                                                                    </p>
+                                                                                )}
                                                                             </div>
                                                                             {isPaid ? (
                                                                                 <div className="bg-green-100 dark:bg-green-900/30 p-1 rounded-full">
@@ -349,6 +364,7 @@ export default function InstallmentsTable({ data, onPay, selectedIds = [], onSel
                                                                                     th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
                                                                                     th { background-color: #f9f9f9; }
                                                                                     .status-paid { color: #16a34a; font-weight: bold; }
+                                                                                    .status-partial { color: #2563eb; font-weight: bold; }
                                                                                     .status-pending { color: #ea580c; font-weight: bold; }
                                                                                     .summary-box { display: flex; justify-content: space-between; background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0; margin-bottom: 30px; }
                                                                                     .summary-item { text-align: center; }
@@ -408,6 +424,8 @@ export default function InstallmentsTable({ data, onPay, selectedIds = [], onSel
                                                                                         <tr>
                                                                                             <th>Month</th>
                                                                                             <th>Amount Due</th>
+                                                                                            <th>Paid</th>
+                                                                                            <th>Remaining</th>
                                                                                             <th>Status</th>
                                                                                             <th>Due Date</th>
                                                                                             <th>Payment Date</th>
@@ -417,8 +435,10 @@ export default function InstallmentsTable({ data, onPay, selectedIds = [], onSel
                                                                                         ${order.installmentLedger.map(inst => `
                                                                                             <tr>
                                                                                                 <td>${inst.label || `Month ${inst.monthNumber}`}</td>
-                                                                                                <td>${pkr(inst.dueAmount)} ${inst.arrears ? ` <span style="color:#ef4444; font-size:10px;">(+ ${pkr(inst.arrears)} arr)</span>` : ''}</td>
-                                                                                                <td class="${inst.status === 'paid' ? 'status-paid' : 'status-pending'}">${inst.status.toUpperCase()}</td>
+                                                                                                <td style="font-weight:bold;">${pkr(inst.dueAmount)} ${inst.arrears ? ` <div style="color:#ef4444; font-size:10px;">(+ ${pkr(inst.arrears)} arr)</div>` : ''}</td>
+                                                                                                <td style="color:#16a34a; font-weight:bold;">${inst.paidAmount && inst.paidAmount > 0 ? pkr(inst.paidAmount) : '-'}</td>
+                                                                                                <td style="color:#dc2626; font-weight:bold;">${inst.remainingAmount && inst.remainingAmount > 0 ? pkr(inst.remainingAmount) : '-'}</td>
+                                                                                                <td class="status-${(inst.paidAmount && inst.paidAmount > 0 && inst.status !== 'paid') ? 'partial' : (inst.status || 'pending').toLowerCase()}">${(inst.paidAmount && inst.paidAmount > 0 && inst.status !== 'paid') ? 'PARTIAL' : (inst.status || 'PENDING').toUpperCase()}</td>
                                                                                                 <td>${inst.dueDate ? new Date(inst.dueDate).toLocaleDateString() : 'N/A'}</td>
                                                                                                 <td>${inst.paidAt ? new Date(inst.paidAt).toLocaleDateString() : '-'}</td>
                                                                                             </tr>

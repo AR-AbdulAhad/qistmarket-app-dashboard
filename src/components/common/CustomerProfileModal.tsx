@@ -517,7 +517,9 @@ function FinancialsTab({ orderId, orderRef }: { orderId: number, orderRef: strin
                             <tr className="border-b border-stroke dark:border-strokedark">
                                 <th className="px-6 py-4 text-[9px] font-black uppercase tracking-widest text-gray-400">Month</th>
                                 <th className="px-6 py-4 text-[9px] font-black uppercase tracking-widest text-gray-400">Due Date</th>
-                                <th className="px-6 py-4 text-[9px] font-black uppercase tracking-widest text-gray-400">Amount</th>
+                                <th className="px-6 py-4 text-[9px] font-black uppercase tracking-widest text-gray-400 text-right">Due</th>
+                                <th className="px-6 py-4 text-[9px] font-black uppercase tracking-widest text-gray-400 text-right">Paid</th>
+                                <th className="px-6 py-4 text-[9px] font-black uppercase tracking-widest text-gray-400 text-right">Remaining</th>
                                 <th className="px-6 py-4 text-[9px] font-black uppercase tracking-widest text-gray-400">Status</th>
                             </tr>
                         </thead>
@@ -526,19 +528,22 @@ function FinancialsTab({ orderId, orderRef }: { orderId: number, orderRef: strin
                                 <tr key={idx} className="hover:bg-white dark:hover:bg-meta-4/20 transition-colors">
                                     <td className="px-6 py-4 text-xs font-bold text-gray-700 dark:text-gray-200">{inst.label}</td>
                                     <td className="px-6 py-4 text-[10px] font-bold text-gray-500">{new Date(inst.dueDate).toLocaleDateString('en-PK', { day: '2-digit', month: 'short', year: 'numeric' })}</td>
-                                    <td className="px-6 py-4">
-                                        <div className="text-xs font-black text-gray-800 dark:text-gray-100">PKR {inst.dueAmount?.toLocaleString()}</div>
+                                    <td className="px-6 py-4 text-right">
+                                        <div className="text-[10px] font-bold text-gray-800 dark:text-gray-100">PKR {inst.dueAmount?.toLocaleString()}</div>
                                         {inst.arrears ? (
-                                            <div className="text-[9px] text-red-500 font-medium mt-1">
-                                                Included Arrears: PKR {inst.arrears?.toLocaleString()}
+                                            <div className="text-[9px] text-red-500 font-medium">
+                                                +{inst.arrears?.toLocaleString()} arr
                                             </div>
                                         ) : null}
                                     </td>
+                                    <td className="px-6 py-4 text-[10px] font-bold text-emerald-600 text-right">{inst.paidAmount > 0 ? `PKR ${inst.paidAmount.toLocaleString()}` : '-'}</td>
+                                    <td className="px-6 py-4 text-[10px] font-bold text-red-500 text-right">{inst.remainingAmount > 0 ? `PKR ${inst.remainingAmount.toLocaleString()}` : '-'}</td>
                                     <td className="px-6 py-4">
                                         <span className={`px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest ${
-                                            inst.status === 'paid' ? 'bg-green-100 text-green-600' : 'bg-amber-100 text-amber-600'
+                                            inst.status === 'paid' ? 'bg-green-100 text-green-600' : 
+                                            (inst.paidAmount > 0 ? 'bg-blue-100 text-blue-600' : 'bg-amber-100 text-amber-600')
                                         }`}>
-                                            {inst.status}
+                                            {inst.paidAmount > 0 && inst.status !== 'paid' ? 'Partial' : inst.status}
                                         </span>
                                     </td>
                                 </tr>

@@ -151,7 +151,10 @@ const fmtDate = (d: string | null) =>
       })
     : '-'
 
-const statusBadge = (status: string) => {
+const statusBadge = (status: string, paidAmount: number = 0, remainingAmount: number = 0) => {
+  if (paidAmount > 0 && remainingAmount > 0 && status !== 'paid') {
+     return 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
+  }
   const map: Record<string, string> = {
     paid:    'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
     overdue: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
@@ -731,8 +734,8 @@ const CustomerList = () => {
                                         {inst.remainingAmount > 0 ? fmt(inst.remainingAmount) : '-'}
                                       </td>
                                       <td className="py-1 text-right">
-                                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${statusBadge(inst.status)}`}>
-                                          {inst.status}
+                                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${statusBadge(inst.status, inst.paidAmount, inst.remainingAmount)}`}>
+                                          {inst.paidAmount > 0 && inst.remainingAmount > 0 && inst.status !== 'paid' ? 'Partial' : inst.status}
                                         </span>
                                       </td>
                                     </tr>

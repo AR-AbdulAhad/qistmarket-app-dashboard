@@ -112,7 +112,7 @@ export default function DeliveredProductDetails({ orderId }: { orderId: string |
     const [deliveredProduct, setDeliveredProduct] = useState<any>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [expandedInstallments, setExpandedInstallments] = useState(false);
+    const [expandedInstallments, setExpandedInstallments] = useState(true);
 
     useEffect(() => {
         if (orderId) {
@@ -467,7 +467,9 @@ export default function DeliveredProductDetails({ orderId }: { orderId: string |
                                                         <tr>
                                                             <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300">Month</th>
                                                             <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300">Due Date</th>
-                                                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300">Amount</th>
+                                                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300">Amount Due</th>
+                                                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300">Paid</th>
+                                                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300">Remaining</th>
                                                             <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300">Status</th>
                                                             <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300">Payment Date</th>
                                                             <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300">Method</th>
@@ -476,21 +478,32 @@ export default function DeliveredProductDetails({ orderId }: { orderId: string |
                                                     <tbody className="divide-y divide-gray-200 bg-white dark:divide-gray-700 dark:bg-gray-800">
                                                         {deliveredProduct.payment_details.installment_plan.installments.map((inst: any, idx: number) => (
                                                             <tr key={idx} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                                                                <td className="px-4 py-2 text-sm text-dark dark:text-white">Month {inst.month}</td>
+                                                                <td className="px-4 py-2 text-sm text-dark dark:text-white">{inst.label || `Month ${inst.month}`}</td>
                                                                 <td className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400">
                                                                     {inst.due_date ? new Date(inst.due_date).toLocaleDateString() : '-'}
                                                                 </td>
                                                                 <td className="px-4 py-2 text-sm font-medium text-dark dark:text-white">
                                                                     Rs. {inst.due_amount?.toLocaleString()}
+                                                                    {inst.arrears > 0 && (
+                                                                        <div className="text-[10px] text-red-500 font-medium">
+                                                                            +{inst.arrears?.toLocaleString()} arr
+                                                                        </div>
+                                                                    )}
+                                                                </td>
+                                                                <td className="px-4 py-2 text-sm font-bold text-green-600 dark:text-green-400">
+                                                                    {inst.paid_amount > 0 ? `Rs. ${inst.paid_amount.toLocaleString()}` : '-'}
+                                                                </td>
+                                                                <td className="px-4 py-2 text-sm font-bold text-red-500">
+                                                                    {inst.remaining_amount > 0 ? `Rs. ${inst.remaining_amount.toLocaleString()}` : '-'}
                                                                 </td>
                                                                 <td className="px-4 py-2">
                                                                     <span className={cn(
-                                                                        "inline-block rounded-full px-2 py-0.5 text-xs font-medium",
+                                                                        "inline-block rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-widest",
                                                                         inst.status === 'paid' 
                                                                             ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" 
-                                                                            : "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
+                                                                            : (inst.paid_amount > 0 ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" : "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400")
                                                                     )}>
-                                                                        {inst.status}
+                                                                        {inst.paid_amount > 0 && inst.status !== 'paid' ? 'Partial' : inst.status}
                                                                     </span>
                                                                 </td>
                                                                 <td className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400">

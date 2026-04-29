@@ -17,6 +17,7 @@ type InstallmentRow = {
     dueAmount: number;
     status: string;
     paidAt: string | null;
+    paidAmount?: number;
 };
 
 type PaymentModalProps = {
@@ -53,7 +54,11 @@ export default function InstallmentPaymentModal({ open, onClose, onSuccess, orde
             setFeedback("");
             setPaymentMethod("Cash");
             setFuelCharge(0);
-            setPaymentAmount(installment?.dueAmount || 0);
+            
+            // Default to remaining balance
+            const remaining = (installment?.dueAmount || 0) - (installment?.paidAmount || 0);
+            setPaymentAmount(remaining > 0 ? remaining : 0);
+            
             setQrData(null);
         }
     }, [open, isRecoveryOfficer, installment]);
@@ -227,13 +232,23 @@ export default function InstallmentPaymentModal({ open, onClose, onSuccess, orde
                 </div>
 
                 <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-4 mb-6 border border-blue-100 dark:border-blue-900/30">
-                    <div className="flex justify-between items-center">
+                    <div className="flex justify-between items-start">
                         <div>
                             <p className="text-blue-600 dark:text-blue-400 text-xs font-semibold uppercase tracking-wider">Month {installment.monthNumber}</p>
                             <p className="text-gray-700 dark:text-gray-300 text-sm mt-1">Due Date: {installment.dueDate ? new Date(installment.dueDate).toLocaleDateString() : 'N/A'}</p>
+                            {(installment.paidAmount || 0) > 0 && (
+                                <p className="text-green-600 dark:text-green-400 text-xs font-medium mt-2 italic">
+                                    Already Paid: PKR {installment.paidAmount?.toLocaleString()}
+                                </p>
+                            )}
                         </div>
                         <div className="text-right">
-                            <p className="text-blue-600 dark:text-blue-400 text-2xl font-bold">PKR {installment.dueAmount.toLocaleString()}</p>
+                            <p className="text-gray-500 dark:text-gray-400 text-xs uppercase font-medium">Monthly Amount</p>
+                            <p className="text-gray-400 dark:text-gray-500 text-sm line-through">PKR {installment.dueAmount.toLocaleString()}</p>
+                            <p className="text-blue-600 dark:text-blue-400 text-2xl font-bold mt-1">
+                                PKR {(installment.dueAmount - (installment.paidAmount || 0)).toLocaleString()}
+                            </p>
+                            <p className="text-[10px] text-blue-500 font-bold uppercase tracking-tighter">Remaining Balance</p>
                         </div>
                     </div>
                 </div>
@@ -289,7 +304,6 @@ export default function InstallmentPaymentModal({ open, onClose, onSuccess, orde
                                     className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 focus:ring-2 focus:ring-blue-500 outline-none transition-all dark:text-white"
                                 >
                                     <option value="Cash">Cash</option>
-                                    <option value="Online">Online / Bank Transfer</option>
                                 </select>
                             </div>
                             {isRecoveryOfficer && (
@@ -316,38 +330,7 @@ export default function InstallmentPaymentModal({ open, onClose, onSuccess, orde
                             />
                         </div>
 
-                        {paymentMethod === "Online" && !isRecoveryOfficer && (
-                            <div className="bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl p-6 text-center">
-                                {!qrData ? (
-                                    <>
-                                        <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                                            Request a SmartPay QR code for the customer to scan and pay the installment directly.
-                                        </p>
-                                        <button
-                                            onClick={() => handleGenerateQr(false)}
-                                            disabled={generatingQr}
-                                            className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 px-6 rounded-lg transition-all shadow-md active:scale-95 disabled:opacity-50 text-sm"
-                                        >
-                                            {generatingQr ? "Contacting Payment Gateway..." : "Generate SmartPay QR"}
-                                        </button>
-                                    </>
-                                ) : (
-                                    <div className="flex flex-col items-center animate-fade-in">
-                                        <p className="text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Scan QR to Pay PKR {qrData.amount.toLocaleString()}</p>
-                                        <div className="p-2 bg-white rounded-xl shadow-sm border mb-4">
-                                            <img src={qrData.qr_image_base64} alt="SmartPay QR" className="w-56 h-56 object-contain" />
-                                        </div>
-                                        <button
-                                            onClick={() => handleGenerateQr(true)}
-                                            disabled={generatingQr}
-                                            className="text-xs text-blue-500 hover:text-blue-700 underline underline-offset-2 disabled:opacity-50"
-                                        >
-                                            {generatingQr ? "Regenerating..." : "QR Not Working? Regenerate"}
-                                        </button>
-                                    </div>
-                                )}
-                            </div>
-                        )}
+
 
                         <div className="pt-4 flex gap-3">
                             <button
@@ -361,16 +344,12 @@ export default function InstallmentPaymentModal({ open, onClose, onSuccess, orde
                             </button>
                             <button
                                 onClick={handleVerifyAndPay}
-                                disabled={loading || (!isRecoveryOfficer && paymentMethod === 'Online' && !qrData)}
-                                className={`flex-[2] text-white font-semibold py-3 px-4 rounded-xl transition-all shadow-lg dark:shadow-none disabled:opacity-50 ${
-                                    paymentMethod === 'Online' ? 'bg-primary hover:bg-opacity-90 shadow-primary/30' : 'bg-green-600 hover:bg-green-700 shadow-green-200'
-                                }`}
+                                disabled={loading}
+                                className={`flex-[2] text-white font-semibold py-3 px-4 rounded-xl transition-all shadow-lg dark:shadow-none disabled:opacity-50 bg-green-600 hover:bg-green-700 shadow-green-200`}
                             >
                                 {loading 
                                     ? "Processing..." 
-                                    : paymentMethod === 'Online' 
-                                        ? "Confirm Payment Received" 
-                                        : "Verify & Collect PKR " + (installment.dueAmount + (isRecoveryOfficer ? fuelCharge : 0)).toLocaleString()
+                                    : `Verify & Collect PKR ${(paymentAmount + (isRecoveryOfficer ? fuelCharge : 0)).toLocaleString()}`
                                 }
                             </button>
                         </div>
