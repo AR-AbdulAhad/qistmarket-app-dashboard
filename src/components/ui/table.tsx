@@ -68,7 +68,7 @@ export function TableHead({
   return (
     <th
       className={cn(
-        "h-12 px-4 text-left align-middle font-medium text-neutral-500 dark:text-neutral-400 [&:has([role=checkbox])]:pr-0",
+        "h-9 px-3 py-1.5 text-[13px] whitespace-nowrap text-left align-middle font-semibold text-neutral-500 dark:text-neutral-400 [&:has([role=checkbox])]:pr-0",
         className,
       )}
       {...props}
@@ -83,7 +83,7 @@ export function TableCell({
   return (
     <td
       className={cn(
-        "p-4 align-middle [&:has([role=checkbox])]:pr-0",
+        "p-1.5 px-3 text-[13px] align-middle [&:has([role=checkbox])]:pr-0",
         className,
       )}
       {...props}

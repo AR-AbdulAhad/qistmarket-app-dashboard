@@ -1,6 +1,8 @@
 'use client'
 import { useEffect, useState, useRef } from 'react'
 import dayjs from 'dayjs'
+import utc from 'dayjs/plugin/utc'
+dayjs.extend(utc)
 import Pagination from '../common/Pagination'
 import Loader from '@/components/common/Loader'
 import {
@@ -290,7 +292,10 @@ const RecoveryOrderList = () => {
         {
             accessorKey: 'created_at',
             header: 'Date',
-            cell: ({ getValue }) => dayjs(getValue() as string).format('MMM DD, YYYY'),
+            cell: ({ getValue }) => {
+                const val = getValue() as string
+                return val ? dayjs.utc(val).format('MMM DD, YYYY hh:mm A') : 'N/A'
+            },
             enableColumnFilter: true,
         },
         { accessorKey: 'order_ref', header: 'Order Ref', enableColumnFilter: true },

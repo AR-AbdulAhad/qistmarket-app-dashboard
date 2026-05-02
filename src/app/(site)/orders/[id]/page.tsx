@@ -256,6 +256,14 @@ interface Order {
         changed_at: string;
         changed_by: { username: string, full_name: string };
     }[];
+    statusHistories?: {
+        id: number;
+        old_status: string | null;
+        new_status: string;
+        created_at: string;
+        user?: { username: string, full_name: string } | null;
+        role_name?: string | null;
+    }[];
     verification?: VerificationData | null;
 }
 
@@ -723,6 +731,60 @@ export default function OrderDetailsPage() {
                     </div>
                 )}
             </div>
+
+            {/* Order Status History Card (Spans full width) */}
+            {order.statusHistories && order.statusHistories.length > 0 && (
+                <div className="mt-8 rounded-lg border border-stroke bg-white shadow-default dark:border-dark-3 dark:bg-gray-800 p-6">
+                    <h3 className="text-xl font-bold border-b pb-4 mb-6 dark:text-white">Order Status Timeline</h3>
+                    <div className="relative pl-6 border-l-2 border-gray-200 dark:border-gray-700 ml-4">
+                        {order.statusHistories.map((h) => (
+                            <div key={h.id} className="mb-8 relative">
+                                <div className="absolute -left-[35px] top-1.5 h-6 w-6 rounded-full border-4 border-white bg-primary dark:border-gray-800 shadow-sm"></div>
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between bg-gray-50 dark:bg-dark-2 p-4 rounded-xl border border-gray-100 dark:border-dark-3 shadow-sm transition-all hover:shadow-md">
+                                    <div>
+                                        <div className="flex items-center gap-3 mb-1">
+                                            <span className="font-bold text-[15px] tracking-wide text-gray-800 dark:text-white uppercase">
+                                                {h.new_status.replace(/_/g, ' ')}
+                                            </span>
+                                            {h.old_status && (
+                                                <div className="flex items-center gap-1.5 text-xs font-medium text-gray-500">
+                                                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                                                    </svg>
+                                                    <span className="bg-gray-200 dark:bg-gray-700 px-2.5 py-1 rounded-md uppercase tracking-wider">
+                                                        {h.old_status.replace(/_/g, ' ')}
+                                                    </span>
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div className="flex items-center gap-2 mt-3">
+                                            <div className="flex items-center gap-1.5">
+                                                <div className="w-6 h-6 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center text-xs font-bold text-gray-600 dark:text-gray-300">
+                                                    {h.user?.full_name?.charAt(0) || 'S'}
+                                                </div>
+                                                <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                                                    {h.user ? h.user.full_name : 'System'}
+                                                </span>
+                                            </div>
+                                            {h.role_name && (
+                                                <span className="text-[10px] font-bold bg-primary/10 text-primary px-2 py-0.5 rounded-full tracking-wider uppercase">
+                                                    {h.role_name}
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <div className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mt-3 sm:mt-0 flex items-center gap-1.5">
+                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                        {formatDateTimeUTC(h.created_at)}
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
 
             {/* --- Verification Section (View + Home Location) --- */}
             <div className="mt-10">

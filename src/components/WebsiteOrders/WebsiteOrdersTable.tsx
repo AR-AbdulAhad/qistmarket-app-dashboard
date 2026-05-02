@@ -7,6 +7,8 @@ import {
   useReactTable,
 } from '@tanstack/react-table'
 import dayjs from 'dayjs'
+import utc from 'dayjs/plugin/utc'
+dayjs.extend(utc)
 import toast from 'react-hot-toast'
 import Cookies from 'js-cookie'
 import { createPortal } from 'react-dom'
@@ -175,7 +177,10 @@ export default function WebsiteOrdersTable() {
     {
       accessorKey: 'createdAt',
       header: 'Date',
-      cell: ({ getValue }) => dayjs(getValue() as string).format('MMM DD, YYYY')
+      cell: ({ getValue }) => {
+        const val = getValue() as string
+        return val ? dayjs.utc(val).format('MMM DD, YYYY hh:mm A') : 'N/A'
+      }
     },
     { accessorKey: 'tokenNumber', header: 'Web Token' },
     { accessorKey: 'fullName', header: 'Customer' },

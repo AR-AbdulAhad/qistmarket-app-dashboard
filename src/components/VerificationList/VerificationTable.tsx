@@ -1,6 +1,8 @@
 'use client'
 import { useEffect, useState } from 'react'
 import dayjs from 'dayjs'
+import utc from 'dayjs/plugin/utc'
+dayjs.extend(utc)
 import Loader from '@/components/common/Loader'
 import {
   ColumnDef,
@@ -194,7 +196,10 @@ const AssignedVerifications = () => {
     {
       accessorKey: 'created_at',
       header: 'Date',
-      cell: ({ getValue }) => dayjs(getValue() as string).format('MMM DD, YYYY'),
+      cell: ({ getValue }) => {
+        const val = getValue() as string
+        return val ? dayjs.utc(val).format('MMM DD, YYYY hh:mm A') : 'N/A'
+      },
       enableColumnFilter: true,
     },
     {

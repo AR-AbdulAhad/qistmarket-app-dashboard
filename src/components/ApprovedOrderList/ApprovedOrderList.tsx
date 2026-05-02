@@ -2,6 +2,8 @@
 import { useEffect, useState } from 'react'
 import dayjs from 'dayjs'
 import toast from 'react-hot-toast'
+import utc from 'dayjs/plugin/utc'
+dayjs.extend(utc)
 import Loader from '@/components/common/Loader'
 import {
   ColumnDef,
@@ -376,7 +378,10 @@ const ApprovedOrderList = () => {
     {
       accessorKey: 'created_at',
       header: 'Date',
-      cell: ({ getValue }) => dayjs(getValue() as string).format('MMM DD, YYYY'),
+      cell: ({ getValue }) => {
+        const val = getValue() as string
+        return val ? dayjs.utc(val).format('MMM DD, YYYY hh:mm A') : 'N/A'
+      },
       enableColumnFilter: true,
     },
     { accessorKey: 'order_ref', header: 'Order Ref', enableColumnFilter: true },

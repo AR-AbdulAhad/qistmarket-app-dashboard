@@ -1,6 +1,8 @@
 'use client'
 import { useEffect, useState } from 'react'
 import dayjs from 'dayjs'
+import utc from 'dayjs/plugin/utc'
+dayjs.extend(utc)
 import Loader from '@/components/common/Loader'
 import {
   ColumnDef,
@@ -25,6 +27,7 @@ import { useRouter } from 'next/navigation'
 import Pagination from '../common/Pagination'
 import { useAuth } from '../../../contexts/AuthContext'
 import { ArrowRightLeft, Send } from 'lucide-react'
+import toast from 'react-hot-toast'
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL
 
@@ -311,14 +314,17 @@ const OrderList = ({ forcedStatus, forcedChannel, hideActions, hideSelection, on
         body: JSON.stringify({ user_id: selectedVerifierId, action: 'assign' }),
       })
 
-      if (!res.ok) throw new Error('Assign failed')
+      const data = await res.json()
+      if (!res.ok || data.success === false) throw new Error(data.message || data.error?.message || 'Assign failed')
+
+      toast.success(data.message || 'Assigned successfully')
       await fetchOrders()
       setAssignModalOpen(false)
       setSelectedVerifierId(null)
       setSelectedOrder(null)
-    } catch (err) {
+    } catch (err: any) {
       console.error('Assign error:', err)
-      alert('Assign failed')
+      toast.error(err.message || 'Assign failed')
     } finally {
       setIsSubmitting(false)
     }
@@ -338,13 +344,16 @@ const OrderList = ({ forcedStatus, forcedChannel, hideActions, hideSelection, on
         body: JSON.stringify({ action: 'unassign' }),
       })
 
-      if (!res.ok) throw new Error('Unassign failed')
+      const data = await res.json()
+      if (!res.ok || data.success === false) throw new Error(data.message || data.error?.message || 'Unassign failed')
+
+      toast.success(data.message || 'Unassigned successfully')
       await fetchOrders()
       setSingleUnassignModalOpen(false)
       setSelectedOrder(null)
-    } catch (err) {
+    } catch (err: any) {
       console.error('Unassign error:', err)
-      alert('Unassign failed')
+      toast.error(err.message || 'Unassign failed')
     } finally {
       setIsSubmitting(false)
     }
@@ -378,14 +387,17 @@ const OrderList = ({ forcedStatus, forcedChannel, hideActions, hideSelection, on
         body: JSON.stringify({ order_ids: ids, user_id: selectedVerifierId, action: 'assign' }),
       })
 
-      if (!res.ok) throw new Error('Bulk assign failed')
+      const data = await res.json()
+      if (!res.ok || data.success === false) throw new Error(data.message || data.error?.message || 'Bulk assign failed')
+
+      toast.success(data.message || 'Bulk assign successful')
       await fetchOrders()
       setBulkAssignModalOpen(false)
       setRowSelection({})
       setSelectedVerifierId(null)
-    } catch (err) {
+    } catch (err: any) {
       console.error('Bulk assign error:', err)
-      alert('Bulk assign failed')
+      toast.error(err.message || 'Bulk assign failed')
     } finally {
       setIsSubmitting(false)
     }
@@ -405,14 +417,17 @@ const OrderList = ({ forcedStatus, forcedChannel, hideActions, hideSelection, on
         body: JSON.stringify({ outlet_id: selectedOutletId }),
       })
 
-      if (!res.ok) throw new Error('Transfer failed')
+      const data = await res.json()
+      if (!res.ok || data.success === false) throw new Error(data.message || data.error?.message || 'Transfer failed')
+
+      toast.success(data.message || 'Transferred successfully')
       await fetchOrders()
       setTransferModalOpen(false)
       setSelectedOutletId(null)
       setSelectedOrder(null)
-    } catch (err) {
+    } catch (err: any) {
       console.error('Transfer error:', err)
-      alert('Transfer failed')
+      toast.error(err.message || 'Transfer failed')
     } finally {
       setIsSubmitting(false)
     }
@@ -425,7 +440,7 @@ const OrderList = ({ forcedStatus, forcedChannel, hideActions, hideSelection, on
       .map((r) => r.original.id)
     
     if (ids.length === 0) {
-      alert('Selected orders are already transferred.')
+      toast.error('Selected orders are already transferred.')
       setBulkTransferModalOpen(false)
       setRowSelection({})
       return
@@ -444,14 +459,17 @@ const OrderList = ({ forcedStatus, forcedChannel, hideActions, hideSelection, on
         body: JSON.stringify({ order_ids: ids, outlet_id: selectedOutletId }),
       })
 
-      if (!res.ok) throw new Error('Bulk transfer failed')
+      const data = await res.json()
+      if (!res.ok || data.success === false) throw new Error(data.message || data.error?.message || 'Bulk transfer failed')
+
+      toast.success(data.message || 'Bulk transfer successful')
       await fetchOrders()
       setBulkTransferModalOpen(false)
       setRowSelection({})
       setSelectedOutletId(null)
-    } catch (err) {
+    } catch (err: any) {
       console.error('Bulk transfer error:', err)
-      alert('Bulk transfer failed')
+      toast.error(err.message || 'Bulk transfer failed')
     } finally {
       setIsSubmitting(false)
     }
@@ -477,13 +495,16 @@ const OrderList = ({ forcedStatus, forcedChannel, hideActions, hideSelection, on
         body: JSON.stringify({ reason: cancelReason }),
       })
 
-      if (!res.ok) throw new Error('Cancellation failed')
+      const data = await res.json()
+      if (!res.ok || data.success === false) throw new Error(data.message || data.error?.message || 'Cancellation failed')
+
+      toast.success(data.message || 'Order cancelled successfully')
       await fetchOrders()
       setCancelModalOpen(false)
       setSelectedOrder(null)
-    } catch (err) {
+    } catch (err: any) {
       console.error('Cancel error:', err)
-      alert('Cancellation failed')
+      toast.error(err.message || 'Cancellation failed')
     } finally {
       setIsSubmitting(false)
     }
@@ -519,15 +540,18 @@ const OrderList = ({ forcedStatus, forcedChannel, hideActions, hideSelection, on
         }),
       })
 
-      if (!res.ok) throw new Error('Update failed')
+      const data = await res.json()
+      if (!res.ok || data.success === false) throw new Error(data.message || data.error?.message || 'Update failed')
+
+      toast.success(data.message || 'Order updated successfully')
       await fetchOrders()
       setEditModalOpen(false)
       setSelectedOrder(null)
       setSelectedProduct(null)
       setSelectedPlan(null)
-    } catch (err) {
+    } catch (err: any) {
       console.error('Update error:', err)
-      alert('Update failed')
+      toast.error(err.message || 'Update failed')
     } finally {
       setIsSubmitting(false)
     }
@@ -552,13 +576,16 @@ const OrderList = ({ forcedStatus, forcedChannel, hideActions, hideSelection, on
         body: JSON.stringify({ order_ids: ids, action: 'unassign' }),
       })
 
-      if (!res.ok) throw new Error('Bulk unassign failed')
+      const data = await res.json()
+      if (!res.ok || data.success === false) throw new Error(data.message || data.error?.message || 'Bulk unassign failed')
+
+      toast.success(data.message || 'Bulk unassign successful')
       await fetchOrders()
       setBulkUnassignModalOpen(false)
       setRowSelection({})
-    } catch (err) {
+    } catch (err: any) {
       console.error('Bulk unassign error:', err)
-      alert('Bulk unassign failed')
+      toast.error(err.message || 'Bulk unassign failed')
     } finally {
       setIsSubmitting(false)
     }
@@ -589,7 +616,10 @@ const OrderList = ({ forcedStatus, forcedChannel, hideActions, hideSelection, on
     {
       accessorKey: 'created_at',
       header: 'Date',
-      cell: ({ getValue }) => dayjs(getValue() as string).format('MMM DD, YYYY'),
+      cell: ({ getValue }) => {
+        const val = getValue() as string
+        return val ? dayjs.utc(val).format('MMM DD, YYYY hh:mm A') : 'N/A'
+      },
       enableColumnFilter: true,
     },
     { accessorKey: 'order_ref', header: 'Order Ref', enableColumnFilter: true },
