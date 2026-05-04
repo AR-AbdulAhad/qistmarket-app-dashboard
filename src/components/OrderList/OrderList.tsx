@@ -634,7 +634,7 @@ const OrderList = ({ forcedStatus, forcedChannel, hideActions, hideSelection, on
       enableColumnFilter: true,
       cell: ({ row }) => {
         const order = row.original
-        const isActuallyTransferred = isSalesOfficer && order.outlet_id !== null && order.status?.toLowerCase() === 'pending'
+        const isActuallyTransferred = isSalesOfficer && order.outlet_id !== null
         const status = order.status?.toLowerCase() || '';
 
         let label = '';
@@ -642,11 +642,16 @@ const OrderList = ({ forcedStatus, forcedChannel, hideActions, hideSelection, on
 
         switch (status) {
           case 'new':
-            label = 'New';
-            className += ' bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300';
+            if (isActuallyTransferred) {
+              label = 'Transferred'
+              className += ' bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300'
+            } else {
+              label = 'New'
+              className += ' bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300'
+            }
             break;
 
-          case 'pending':
+            case 'pending':
             if (isActuallyTransferred) {
               label = 'Transferred'
               className += ' bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300'
@@ -657,7 +662,6 @@ const OrderList = ({ forcedStatus, forcedChannel, hideActions, hideSelection, on
             break;
 
           case 'in_progress':
-          case 'in-progress':
             label = 'In Progress';
             className += ' bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300';
             break;

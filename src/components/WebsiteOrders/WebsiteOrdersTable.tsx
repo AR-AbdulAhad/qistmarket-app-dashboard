@@ -245,12 +245,12 @@ export default function WebsiteOrdersTable() {
               >
                 <ul className="overflow-hidden text-sm font-medium">
                   <li>
-                    <button
-                      onClick={() => { setViewDetailsModal(order); setIsOpen(false) }}
+                    <a
+                      href={`/csr/website-orders/${order.id}`}
                       className="block w-full px-4 py-2.5 text-left hover:bg-[#F5F7FD] hover:text-[#ff3d3d] dark:hover:bg-dark-3"
                     >
                       View Details
-                    </button>
+                    </a>
                   </li>
                   <li>
                     <button

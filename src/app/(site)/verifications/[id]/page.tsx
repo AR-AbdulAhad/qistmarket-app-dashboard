@@ -38,6 +38,15 @@ interface VerificationData {
     street: string | null,
     zone: string | null,
     alternate_contact: string | null,
+    channel: string,
+    created_at: string,
+    delivery_assigned_at: string | null,
+    recovery_assigned_at: string | null,
+    verification_assigned_at: string | null,
+    created_by: { username: string, full_name: string } | null,
+    assigned_to: { username: string, full_name: string } | null,
+    delivery_officer: { username: string, full_name: string } | null,
+    recovery_officer: { username: string, full_name: string } | null,
     statusHistories?: {
       id: number;
       old_status: string | null;
@@ -531,6 +540,11 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
   // Officer details are in the loaded data, not fetched
   const [officerDetails, setOfficerDetails] = useState<any>(null)
   const [locationRequestPending, setLocationRequestPending] = useState(false)
+  
+  // Timeline collapse states
+  const [isAssignmentTimelineCollapsed, setIsAssignmentTimelineCollapsed] = useState(true);
+  const [isStatusTimelineCollapsed, setIsStatusTimelineCollapsed] = useState(true);
+  
   const { user } = useAuth();
   // Set officer details from loaded data when officerIdInput changes
   useEffect(() => {
@@ -864,10 +878,182 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
         </div>
       </div>
 
+      {/* Assignment Timeline Card (Spans full width) */}
+      <div className="mb-12 rounded-lg border border-stroke bg-white shadow-default dark:border-dark-3 dark:bg-gray-800 p-6">
+        <div className="flex items-center justify-between border-b pb-4 mb-6">
+          <h3 className="text-xl font-bold dark:text-white">Assignment Timeline</h3>
+          <button
+            onClick={() => setIsAssignmentTimelineCollapsed(!isAssignmentTimelineCollapsed)}
+            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-dark-2 transition-colors"
+            title={isAssignmentTimelineCollapsed ? "Expand" : "Collapse"}
+          >
+            <svg
+              className={`w-5 h-5 text-gray-600 dark:text-gray-400 transition-transform ${isAssignmentTimelineCollapsed ? 'rotate-180' : ''}`}
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+            </svg>
+          </button>
+        </div>
+
+        {!isAssignmentTimelineCollapsed && (
+        <div className="relative pl-6 border-l-2 border-gray-200 dark:border-gray-700 ml-4">
+          {/* Order Creation - Always shown first */}
+          <div className="mb-8 relative">
+            <div className="absolute -left-[35px] top-1.5 h-6 w-6 rounded-full border-4 border-white bg-blue-500 dark:border-gray-800 shadow-sm"></div>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between bg-blue-50 dark:bg-blue-900/10 p-4 rounded-xl border border-blue-100 dark:border-blue-900/30 shadow-sm transition-all hover:shadow-md">
+              <div>
+                <div className="flex items-center gap-3 mb-1">
+                  <span className="font-bold text-[15px] tracking-wide text-blue-800 dark:text-blue-300 uppercase">
+                    Order Created
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 mt-3">
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-6 h-6 rounded-full bg-blue-200 dark:bg-blue-800 flex items-center justify-center text-xs font-bold text-blue-700 dark:text-blue-300">
+                      {data.order?.created_by?.full_name?.charAt(0) || 'C'}
+                    </div>
+                    <span className="text-sm font-semibold text-blue-800 dark:text-blue-300">
+                      {data.order?.created_by?.full_name || 'System'} (@{data.order?.created_by?.username || 'system'})
+                    </span>
+                  </div>
+                </div>
+                <div className="text-xs text-blue-700 dark:text-blue-400 mt-2 font-medium">
+                  Channel: <span className="font-bold">{data.order?.channel}</span>
+                </div>
+              </div>
+              <div className="text-[11px] font-bold text-blue-700 dark:text-blue-400 uppercase tracking-wider mt-3 sm:mt-0 flex items-center gap-1.5">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                {formatDateTimeUTC(data.order?.created_at)}
+              </div>
+            </div>
+          </div>
+
+          {/* Verification Officer Assignment */}
+          {data.order?.verification_assigned_at && data.order?.assigned_to && (
+            <div className="mb-8 relative">
+              <div className="absolute -left-[35px] top-1.5 h-6 w-6 rounded-full border-4 border-white bg-indigo-500 dark:border-gray-800 shadow-sm"></div>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between bg-indigo-50 dark:bg-indigo-900/10 p-4 rounded-xl border border-indigo-100 dark:border-indigo-900/30 shadow-sm transition-all hover:shadow-md">
+                <div>
+                  <div className="flex items-center gap-3 mb-1">
+                    <span className="font-bold text-[15px] tracking-wide text-indigo-800 dark:text-indigo-300 uppercase">
+                      Verification Officer Assigned
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 mt-3">
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-6 h-6 rounded-full bg-indigo-200 dark:bg-indigo-800 flex items-center justify-center text-xs font-bold text-indigo-700 dark:text-indigo-300">
+                        {data.order?.assigned_to?.full_name?.charAt(0) || 'V'}
+                      </div>
+                      <span className="text-sm font-semibold text-indigo-800 dark:text-indigo-300">
+                        {data.order?.assigned_to?.full_name} (@{data.order?.assigned_to?.username})
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <div className="text-[11px] font-bold text-indigo-700 dark:text-indigo-400 uppercase tracking-wider mt-3 sm:mt-0 flex items-center gap-1.5">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  {formatDateTimeUTC(data.order?.verification_assigned_at)}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Delivery Officer Assignment */}
+          {data.order?.delivery_assigned_at && data.order?.delivery_officer && (
+            <div className="mb-8 relative">
+              <div className="absolute -left-[35px] top-1.5 h-6 w-6 rounded-full border-4 border-white bg-green-500 dark:border-gray-800 shadow-sm"></div>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between bg-green-50 dark:bg-green-900/10 p-4 rounded-xl border border-green-100 dark:border-green-900/30 shadow-sm transition-all hover:shadow-md">
+                <div>
+                  <div className="flex items-center gap-3 mb-1">
+                    <span className="font-bold text-[15px] tracking-wide text-green-800 dark:text-green-300 uppercase">
+                      Delivery Officer Assigned
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 mt-3">
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-6 h-6 rounded-full bg-green-200 dark:bg-green-800 flex items-center justify-center text-xs font-bold text-green-700 dark:text-green-300">
+                        {data.order?.delivery_officer?.full_name?.charAt(0) || 'D'}
+                      </div>
+                      <span className="text-sm font-semibold text-green-800 dark:text-green-300">
+                        {data.order?.delivery_officer?.full_name} (@{data.order?.delivery_officer?.username})
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <div className="text-[11px] font-bold text-green-700 dark:text-green-400 uppercase tracking-wider mt-3 sm:mt-0 flex items-center gap-1.5">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  {formatDateTimeUTC(data.order?.delivery_assigned_at)}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Recovery Officer Assignment */}
+          {data.order?.recovery_assigned_at && data.order?.recovery_officer && (
+            <div className="mb-8 relative">
+              <div className="absolute -left-[35px] top-1.5 h-6 w-6 rounded-full border-4 border-white bg-orange-500 dark:border-gray-800 shadow-sm"></div>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between bg-orange-50 dark:bg-orange-900/10 p-4 rounded-xl border border-orange-100 dark:border-orange-900/30 shadow-sm transition-all hover:shadow-md">
+                <div>
+                  <div className="flex items-center gap-3 mb-1">
+                    <span className="font-bold text-[15px] tracking-wide text-orange-800 dark:text-orange-300 uppercase">
+                      Recovery Officer Assigned
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 mt-3">
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-6 h-6 rounded-full bg-orange-200 dark:bg-orange-800 flex items-center justify-center text-xs font-bold text-orange-700 dark:text-orange-300">
+                        {data.order?.recovery_officer?.full_name?.charAt(0) || 'R'}
+                      </div>
+                      <span className="text-sm font-semibold text-orange-800 dark:text-orange-300">
+                        {data.order?.recovery_officer?.full_name} (@{data.order?.recovery_officer?.username})
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <div className="text-[11px] font-bold text-orange-700 dark:text-orange-400 uppercase tracking-wider mt-3 sm:mt-0 flex items-center gap-1.5">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  {formatDateTimeUTC(data.order?.recovery_assigned_at)}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+        )}
+      </div>
+
       {/* Order Status History Card */}
       {data.order?.statusHistories && data.order.statusHistories.length > 0 && (
         <div className="mb-12 rounded-lg border border-stroke bg-white shadow-default dark:border-dark-3 dark:bg-gray-800 p-6">
-          <h3 className="text-xl font-bold border-b pb-4 mb-6 dark:text-white">Order Status Timeline</h3>
+          <div className="flex items-center justify-between border-b pb-4 mb-6">
+            <h3 className="text-xl font-bold dark:text-white">Order Status Timeline</h3>
+            <button
+              onClick={() => setIsStatusTimelineCollapsed(!isStatusTimelineCollapsed)}
+              className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-dark-2 transition-colors"
+              title={isStatusTimelineCollapsed ? "Expand" : "Collapse"}
+            >
+              <svg
+                className={`w-5 h-5 text-gray-600 dark:text-gray-400 transition-transform ${isStatusTimelineCollapsed ? 'rotate-180' : ''}`}
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+              </svg>
+            </button>
+          </div>
+
+          {!isStatusTimelineCollapsed && (
           <div className="relative pl-6 border-l-2 border-gray-200 dark:border-gray-700 ml-4">
             {data.order.statusHistories.map((h) => (
               <div key={h.id} className="mb-8 relative">
@@ -915,6 +1101,7 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
               </div>
             ))}
           </div>
+          )}
         </div>
       )}
 
