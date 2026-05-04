@@ -57,29 +57,30 @@ function DeliveryPhotoCard({ upload, index }: { upload: any; index: number }) {
                     onClick={() => setIsModalOpen(false)}
                 >
                     <div
-                        className="relative max-w-4xl w-full max-h-[90vh] overflow-hidden rounded-lg bg-white dark:bg-gray-800"
+                        className="relative max-w-4xl w-full max-h-[90vh] overflow-y-auto rounded-lg bg-white dark:bg-gray-800"
                         onClick={(e) => e.stopPropagation()}
                     >
                         <button
                             onClick={() => setIsModalOpen(false)}
-                            className="absolute right-2 top-2 z-10 rounded-full bg-black bg-opacity-50 p-2 text-white hover:bg-opacity-70 transition-colors"
+                            className="sticky top-2 right-2 z-10 float-right rounded-full bg-black bg-opacity-50 p-2 text-white hover:bg-opacity-70 transition-colors"
                         >
                             <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                             </svg>
                         </button>
-                        
-                        <div className="p-4 border-b dark:border-dark-3">
+
+                        <div className="p-4 border-b dark:border-dark-3 clear-both">
                             <h3 className="text-xl font-bold dark:text-white">Delivery Upload Details</h3>
                             <p className="text-sm text-gray-500 capitalize">{upload.upload_type?.replace(/_/g, ' ')}</p>
                         </div>
-                        
-                        <div className="overflow-auto p-4 max-h-[70vh] flex items-center justify-center bg-gray-50 dark:bg-dark-2">
+
+                        {/* Image container with better sizing */}
+                        <div className="p-4 flex items-center justify-center bg-gray-50 dark:bg-dark-2">
                             {upload.file_url ? (
                                 <img
                                     src={upload.file_url}
                                     alt="Full size"
-                                    className="max-w-full h-auto shadow-lg rounded"
+                                    className="max-w-full max-h-[75vh] w-auto h-auto object-contain shadow-lg rounded"
                                 />
                             ) : upload.link ? (
                                 <div className="p-8 text-center">
@@ -96,14 +97,14 @@ function DeliveryPhotoCard({ upload, index }: { upload: any; index: number }) {
                                 <p className="dark:text-gray-400">No preview available</p>
                             )}
                         </div>
-                        
+
                         <div className="p-4 bg-gray-50 dark:bg-dark-3 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                             <div>Uploaded: {formatDateTimeUTC(upload.uploaded_at)}</div>
-                             {upload.tag && <div>Tag: <span className="font-medium text-dark dark:text-white px-2 py-0.5 bg-gray-200 dark:bg-gray-700 rounded">{upload.tag}</span></div>}
+                            <div>Uploaded: {formatDateTimeUTC(upload.uploaded_at)}</div>
+                            {upload.tag && <div>Tag: <span className="font-medium text-dark dark:text-white px-2 py-0.5 bg-gray-200 dark:bg-gray-700 rounded">{upload.tag}</span></div>}
                         </div>
                     </div>
                 </div>
-            )}
+            )} 
         </>
     );
 }
