@@ -491,6 +491,15 @@ export default function OrderDetailsPage() {
         <div className="mx-auto max-w-7xl">
             <Breadcrumb pageName={`Order: ${order.order_ref}`} />
 
+            {order.channel === 'Repeat Customer' && (
+                <div className="mb-6 flex items-center gap-2">
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1 text-xs font-black uppercase tracking-widest text-emerald-700 border border-emerald-200 shadow-sm animate-bounce-subtle">
+                        <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812z"></path><path fillRule="evenodd" d="M13.477 7.078a1 1 0 01.022 1.413l-3.5 3.5a1 1 0 01-1.414 0l-1.5-1.5a1 1 0 011.414-1.414L9.25 9.828l2.813-2.812a1 1 0 011.414.062z" clipRule="evenodd"></path></svg>
+                        Repeat Customer Verified
+                    </span>
+                </div>
+            )}
+
             <div className="mt-4 flex flex-wrap justify-end gap-3 mb-6 font-medium">
                 {order.status !== "delivered" && (
                     <button
@@ -918,7 +927,7 @@ export default function OrderDetailsPage() {
 
                     {!isStatusTimelineCollapsed && (
                     <div className="relative pl-6 border-l-2 border-gray-200 dark:border-gray-700 ml-4">
-                        {order.statusHistories.map((h) => (
+                        {[...(order.statusHistories || [])].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).map((h) => (
                             <div key={h.id} className="mb-8 relative">
                                 <div className="absolute -left-[35px] top-1.5 h-6 w-6 rounded-full border-4 border-white bg-primary dark:border-gray-800 shadow-sm"></div>
                                 <div className="flex flex-col sm:flex-row sm:items-center justify-between bg-gray-50 dark:bg-dark-2 p-4 rounded-xl border border-gray-100 dark:border-dark-3 shadow-sm transition-all hover:shadow-md">
@@ -953,6 +962,16 @@ export default function OrderDetailsPage() {
                                                 </span>
                                             )}
                                         </div>
+                                        {(h as any).remarks && (
+                                            <div className="mt-2.5 px-3 py-1.5 rounded-lg bg-primary/5 border border-primary/10 inline-block">
+                                                <span className="text-[11px] font-bold text-primary uppercase tracking-wide flex items-center gap-1.5">
+                                                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                    </svg>
+                                                    {(h as any).remarks}
+                                                </span>
+                                            </div>
+                                        )}
                                     </div>
                                     <div className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mt-3 sm:mt-0 flex items-center gap-1.5">
                                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">

@@ -819,7 +819,15 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
         {data.order?.order_ref && (
           <div className="text-right">
             <p className="text-sm text-gray-500 dark:text-gray-400">Order Reference</p>
-            <p className="text-lg font-semibold text-primary">{data.order.order_ref}</p>
+            <div className="flex flex-col items-end gap-1.5">
+                <p className="text-lg font-semibold text-primary">{data.order.order_ref}</p>
+                {data.order.channel === 'Repeat Customer' && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-black uppercase tracking-widest text-emerald-700 border border-emerald-200">
+                        <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20"><path d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812z"></path></svg>
+                        Repeat Verified
+                    </span>
+                )}
+            </div>
           </div>
         )}
       </div>
@@ -1055,7 +1063,7 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
 
           {!isStatusTimelineCollapsed && (
           <div className="relative pl-6 border-l-2 border-gray-200 dark:border-gray-700 ml-4">
-            {data.order.statusHistories.map((h) => (
+            {[...(data.order.statusHistories || [])].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).map((h) => (
               <div key={h.id} className="mb-8 relative">
                 <div className="absolute -left-[35px] top-1.5 h-6 w-6 rounded-full border-4 border-white bg-primary dark:border-gray-800 shadow-sm"></div>
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between bg-gray-50 dark:bg-dark-2 p-4 rounded-xl border border-gray-100 dark:border-dark-3 shadow-sm transition-all hover:shadow-md">
@@ -1090,6 +1098,16 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
                         </span>
                       )}
                     </div>
+                    {(h as any).remarks && (
+                      <div className="mt-2.5 px-3 py-1.5 rounded-lg bg-primary/5 border border-primary/10 inline-block">
+                        <span className="text-[11px] font-bold text-primary uppercase tracking-wide flex items-center gap-1.5">
+                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          {(h as any).remarks}
+                        </span>
+                      </div>
+                    )}
                   </div>
                   <div className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mt-3 sm:mt-0 flex items-center gap-1.5">
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">

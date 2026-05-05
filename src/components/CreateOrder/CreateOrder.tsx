@@ -334,8 +334,8 @@ const CreateOrders: React.FC = () => {
     const newErrors: Record<string, string> = {};
 
     if (!formData.customer_name.trim()) newErrors.customer_name = 'Customer name is required';
-    if (!formData.whatsapp_number.trim() || !/^(\+92|0)?[0-9]{10}$/.test(formData.whatsapp_number.replace(/\s+/g, ''))) {
-      newErrors.whatsapp_number = 'Valid WhatsApp number is required';
+    if (!formData.whatsapp_number.trim() || !/^0[0-9]{10}$/.test(formData.whatsapp_number.replace(/\s+/g, ''))) {
+      newErrors.whatsapp_number = 'WhatsApp number must be 11 digits and start with 0';
     }
 
     if (isManualAddress) {
@@ -503,15 +503,14 @@ const CreateOrders: React.FC = () => {
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">WhatsApp Number <span className="text-red-500">*</span></label>
                   <div className="relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-medium">+92</span>
                     <input
                       ref={whatsappRef}
                       type="tel"
                       name="whatsapp_number"
                       value={formData.whatsapp_number}
                       onChange={handleChange}
-                      className={`w-full pl-12 pr-4 py-3 border rounded-xl focus:ring-4 focus:ring-red-100 outline-none transition-all ${errors.whatsapp_number ? 'border-red-500 bg-red-50' : 'border-gray-200 focus:border-red-500'}`}
-                      placeholder="3001234567"
+                      className={`w-full px-4 py-3 border rounded-xl focus:ring-4 focus:ring-red-100 outline-none transition-all ${errors.whatsapp_number ? 'border-red-500 bg-red-50' : 'border-gray-200 focus:border-red-500'}`}
+                      placeholder="03001234567"
                     />
                   </div>
                   {errors.whatsapp_number && <p className="text-red-500 text-xs mt-1.5 flex items-center gap-1"><AlertCircle className="w-3 h-3" /> {errors.whatsapp_number}</p>}

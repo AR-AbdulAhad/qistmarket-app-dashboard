@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import Loader from '@/components/common/Loader'
 import {
   ColumnDef,
@@ -23,6 +24,7 @@ interface CustomerGroup {
 const fmt = (n: number) => `Rs. ${Number(n).toLocaleString()}`
 
 const ClearedCustomerList = () => {
+  const router = useRouter()
   const [customers, setCustomers] = useState<CustomerGroup[]>([])
   const [globalFilter, setGlobalFilter] = useState('')
   const [loading, setLoading] = useState(false)
@@ -109,12 +111,25 @@ const ClearedCustomerList = () => {
       id: 'actions',
       header: 'Review',
       cell: ({ row }) => (
-        <button
-          onClick={() => openProfile(row.original)}
-          className="rounded-xl bg-emerald-500 px-6 py-2 text-xs font-black uppercase tracking-widest text-white hover:bg-emerald-600 shadow-lg shadow-emerald-500/20 transition-all hover:scale-105 active:scale-95"
-        >
-          View Profile
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => openProfile(row.original)}
+            className="rounded-xl bg-emerald-500 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-white hover:bg-emerald-600 shadow-lg shadow-emerald-500/20 transition-all hover:scale-105 active:scale-95 whitespace-nowrap"
+          >
+            View Profile
+          </button>
+          <button
+            onClick={() => {
+              const lastOrder = row.original.orders?.[0];
+              if (lastOrder) {
+                router.push(`/convert-sale/${lastOrder.order_id}`);
+              }
+            }}
+            className="rounded-xl bg-blue-600 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-white hover:bg-blue-700 shadow-lg shadow-blue-500/20 transition-all hover:scale-105 active:scale-95 whitespace-nowrap"
+          >
+            Convert Sale
+          </button>
+        </div>
       ),
     },
   ]
