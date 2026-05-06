@@ -57,6 +57,8 @@ const ClearedCustomerList = () => {
     fetchCleared()
   }, [])
 
+  console.log('Cleared Customers:', selectedOrder)
+
   const openProfile = (customerGroup: CustomerGroup) => {
     if (customerGroup.orders && customerGroup.orders.length > 0) {
         setSelectedOrder(customerGroup.orders[0]); 

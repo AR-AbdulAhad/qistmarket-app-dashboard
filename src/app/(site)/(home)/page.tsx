@@ -156,7 +156,7 @@ export default function Home() {
         ),
         fetchJson(`${BACKEND_URL}/api/customers?page=1&limit=1`),
         fetchJson(
-          `${BACKEND_URL}/api/orders?page=1&limit=10&sortBy=created_at&sortDir=desc`
+          `${BACKEND_URL}/api/orders?page=1&limit=10&sortBy=created_at&sortDir=asc`
         ),
         fetchJson(`${BACKEND_URL}/api/orders/delivery-status`),
       ])
@@ -295,9 +295,14 @@ export default function Home() {
 
           <div className="rounded-[10px] border border-stroke bg-white p-5 shadow-1 dark:border-dark-3 dark:bg-gray-dark">
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-base font-semibold text-dark dark:text-white">
-                Latest Orders
-              </h2>
+              <div className="flex items-center gap-3">
+                <h2 className="text-base font-semibold text-dark dark:text-white">
+                  Latest Orders
+                </h2>
+                <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
+                  FIFO: Oldest First
+                </span>
+              </div>
               <Link
                 href="/orders-list"
                 className="text-xs font-medium text-[#ff3d3d] hover:underline"

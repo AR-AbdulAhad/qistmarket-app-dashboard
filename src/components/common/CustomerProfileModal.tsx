@@ -349,7 +349,7 @@ export default function CustomerProfileModal({ open, onClose, data }: ProfileMod
                             Back
                         </button>
                         <a
-                            href={`/orders/${data.id}`}
+                            href={`/orders/${data.id || data.order_id}`}
                             className="flex-1 sm:flex-none px-10 py-3.5 rounded-xl text-xs font-black uppercase tracking-widest bg-primary text-white shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all text-center leading-none flex items-center justify-center gap-2"
                         >
                             View Case Details <ExternalLink size={14} />

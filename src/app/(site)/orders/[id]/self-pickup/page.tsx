@@ -7,7 +7,8 @@ import {
   AlertCircle, ChevronDown, Check, Calculator, Key, 
   CreditCard, Calendar, ArrowRight, PackageOpen, 
   MessageSquare, ShieldCheck, ArrowLeft, ChevronRight,
-  Info, Smartphone, QrCode, Camera, UserCheck, ImageIcon
+  Info, Smartphone, QrCode, Camera, UserCheck, ImageIcon,
+  RefreshCcw, FlipHorizontal, Scissors, Maximize, CheckCircle, RotateCcw
 } from 'lucide-react';
 import { InstallmentLedgerEditor } from '@/components/Installments/InstallmentLedgerEditor';
 import toast from 'react-hot-toast';
@@ -48,9 +49,33 @@ export default function SelfPickupPage() {
   const [ledger, setLedger] = useState<any[]>([]);
   const [feedback, setFeedback] = useState('');
   const [faceImage, setFaceImage] = useState<string | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
+  const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
+  const [isMirrored, setIsMirrored] = useState(true);
+  
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isCameraActive, setIsCameraActive] = useState(false);
+
+  const getDevices = async () => {
+    try {
+      const allDevices = await navigator.mediaDevices.enumerateDevices();
+      const videoDevices = allDevices.filter(d => d.kind === 'videoinput');
+      setDevices(videoDevices);
+      if (videoDevices.length > 0 && !selectedDeviceId) {
+        setSelectedDeviceId(videoDevices[0].deviceId);
+      }
+    } catch (err) {
+      console.error("Error enumerating devices:", err);
+    }
+  };
+
+  useEffect(() => {
+    if (activeStep === 4) {
+      getDevices();
+    }
+  }, [activeStep]);
 
   const fetchOrder = async () => {
     try {
@@ -252,9 +277,22 @@ export default function SelfPickupPage() {
     }
   };
 
-  const startCamera = async () => {
+  const startCamera = async (deviceId?: string) => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
+      if (videoRef.current && videoRef.current.srcObject) {
+        stopCamera();
+      }
+      
+      const constraints = {
+        video: {
+          deviceId: deviceId ? { exact: deviceId } : undefined,
+          facingMode: deviceId ? undefined : 'user',
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        }
+      };
+      
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         setIsCameraActive(true);
@@ -274,19 +312,100 @@ export default function SelfPickupPage() {
     }
   };
 
-  const captureImage = () => {
+  const autoCrop = (dataUrl: string): Promise<string> => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        try {
+          const canvas = document.createElement('canvas');
+          const size = Math.min(img.width, img.height);
+          canvas.width = size;
+          canvas.height = size;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(
+              img,
+              (img.width - size) / 2,
+              (img.height - size) / 2,
+              size,
+              size,
+              0,
+              0,
+              size,
+              size
+            );
+            resolve(canvas.toDataURL('image/jpeg', 0.9));
+          } else {
+            resolve(dataUrl);
+          }
+        } catch (e) {
+          console.error("Crop error:", e);
+          resolve(dataUrl);
+        }
+      };
+      img.onerror = () => {
+        console.error("Image load error for cropping");
+        resolve(dataUrl);
+      };
+      img.src = dataUrl;
+    });
+  };
+
+  const captureImage = async () => {
     if (videoRef.current && canvasRef.current) {
       const video = videoRef.current;
       const canvas = canvasRef.current;
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        const dataUrl = canvas.toDataURL('image/jpeg');
-        setFaceImage(dataUrl);
-        stopCamera();
+      
+      try {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          
+          if (isMirrored) {
+            ctx.translate(canvas.width, 0);
+            ctx.scale(-1, 1);
+          }
+          
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          ctx.setTransform(1, 0, 0, 1, 0, 0);
+          
+          const rawData = canvas.toDataURL('image/jpeg', 0.95);
+          setFaceImage(rawData);
+          setIsEditing(true);
+          stopCamera();
+
+          // Perform "Advanced Optimization" (Auto-Crop)
+          const cropped = await autoCrop(rawData);
+          setFaceImage(cropped);
+          
+          // Small delay for visual feedback before hiding the loader
+          setTimeout(() => {
+            setIsEditing(false);
+          }, 800);
+        }
+      } catch (err) {
+        console.error("Capture error:", err);
+        setIsEditing(false);
+        toast.error("Failed to capture image correctly.");
       }
+    }
+  };
+
+  const handleManualOptimize = async () => {
+    if (!faceImage) return;
+    setIsEditing(true);
+    try {
+      const cropped = await autoCrop(faceImage);
+      setFaceImage(cropped);
+      setTimeout(() => {
+        setIsEditing(false);
+      }, 1000);
+    } catch (err) {
+      console.error("Manual optimize error:", err);
+      setIsEditing(false);
     }
   };
 
@@ -688,30 +807,145 @@ export default function SelfPickupPage() {
                 {/* Step 4: Face Verification */}
                 {activeStep === 4 && (
                   <div className="p-10 animate-in fade-in zoom-in-95 duration-500">
-                    <div className="flex items-center gap-4 mb-8">
-                        <div className="w-12 h-12 bg-red-50 rounded-2xl flex items-center justify-center text-red-600">
-                           <Camera className="w-6 h-6" />
+                    <div className="flex items-center justify-between mb-8">
+                        <div className="flex items-center gap-4">
+                           <div className="w-12 h-12 bg-red-50 rounded-2xl flex items-center justify-center text-red-600">
+                              <Camera className="w-6 h-6" />
+                           </div>
+                           <div>
+                              <h3 className="text-2xl font-black text-gray-900 tracking-tight">Advanced Face ID</h3>
+                              <p className="text-gray-400 text-sm font-bold">Multiple camera support & image optimization</p>
+                           </div>
                         </div>
-                        <div>
-                           <h3 className="text-2xl font-black text-gray-900 tracking-tight">Identity Verification</h3>
-                           <p className="text-gray-400 text-sm font-bold">Capture customer face photo for branch records</p>
-                        </div>
+                        
+                        {!faceImage && devices.length > 1 && (
+                          <div className="flex items-center gap-2 bg-gray-50 p-1.5 rounded-2xl border border-gray-100">
+                             <select 
+                                value={selectedDeviceId}
+                                onChange={(e) => {
+                                   setSelectedDeviceId(e.target.value);
+                                   startCamera(e.target.value);
+                                }}
+                                className="bg-transparent border-none outline-none text-xs font-black text-gray-600 px-3 py-1 cursor-pointer"
+                             >
+                                {devices.map((device, idx) => (
+                                   <option key={device.deviceId} value={device.deviceId}>
+                                      {device.label || `Camera ${idx + 1}`}
+                                   </option>
+                                ))}
+                             </select>
+                             <button 
+                                onClick={() => {
+                                   const currentIndex = devices.findIndex(d => d.deviceId === selectedDeviceId);
+                                   const nextIndex = (currentIndex + 1) % devices.length;
+                                   const nextDevice = devices[nextIndex];
+                                   setSelectedDeviceId(nextDevice.deviceId);
+                                   startCamera(nextDevice.deviceId);
+                                }}
+                                className="p-2 bg-white rounded-xl shadow-sm hover:text-red-500 transition-colors"
+                             >
+                                <RefreshCcw className="w-4 h-4" />
+                             </button>
+                          </div>
+                        )}
                     </div>
 
-                    <div className="max-w-md mx-auto space-y-8">
-                       <div className="relative aspect-video bg-gray-900 rounded-[2.5rem] overflow-hidden shadow-2xl border-4 border-gray-100">
+                    <div className="max-w-xl mx-auto space-y-8">
+                       <div className="relative aspect-square md:aspect-video bg-gray-900 rounded-[3rem] overflow-hidden shadow-2xl border-8 border-white group">
                           {faceImage ? (
-                            <img src={faceImage} alt="Face" className="w-full h-full object-cover" />
+                            <div className="relative w-full h-full bg-gray-100 flex items-center justify-center">
+                               <img 
+                                  src={faceImage} 
+                                  alt="Captured" 
+                                  className={cn(
+                                    "max-w-full max-h-full object-contain transition-all",
+                                    isEditing ? "opacity-50 blur-sm" : ""
+                                  )} 
+                               />
+                               
+                               {isEditing && (
+                                  <div className="absolute inset-0 flex flex-col items-center justify-center animate-in fade-in zoom-in duration-300">
+                                     <div className="w-64 h-64 border-4 border-dashed border-red-500 rounded-full flex items-center justify-center relative">
+                                        <div className="absolute inset-0 bg-red-500/10 rounded-full" />
+                                        <Scissors className="w-8 h-8 text-red-500 animate-bounce" />
+                                     </div>
+                                     <p className="text-red-600 font-black text-sm mt-6 bg-white px-4 py-1.5 rounded-full shadow-lg uppercase tracking-widest">Applying Optimization...</p>
+                                  </div>
+                               )}
+                               
+                               {!isEditing && (
+                                  <div className="absolute top-6 right-6 flex gap-2">
+                                     <button 
+                                         onClick={handleManualOptimize}
+                                         className="p-3 bg-white/20 backdrop-blur-md border border-white/30 rounded-2xl text-white hover:bg-white/40 transition-all shadow-xl"
+                                         title="Enhance Photo"
+                                      >
+                                        <Maximize className="w-5 h-5" />
+                                     </button>
+                                  </div>
+                               )}
+                            </div>
                           ) : (
                             <>
-                              <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover mirror" />
+                              <video 
+                                ref={videoRef} 
+                                autoPlay 
+                                playsInline 
+                                className={cn(
+                                  "w-full h-full object-cover transition-all",
+                                  isMirrored ? "-scale-x-100" : ""
+                                )} 
+                              />
+                              
+                              {/* Face Guide Overlay */}
+                              {isCameraActive && (
+                                <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+                                   <div className="w-64 h-80 border-2 border-white/30 rounded-[100px] relative">
+                                      <div className="absolute inset-x-0 top-1/4 h-0.5 bg-red-500/30 animate-pulse" />
+                                      <div className="absolute -top-10 left-1/2 -translate-x-1/2 text-white/50 text-[10px] font-black uppercase tracking-[0.3em] whitespace-nowrap">Align Face Here</div>
+                                   </div>
+                                </div>
+                              )}
+
                               {!isCameraActive && (
-                                <div className="absolute inset-0 flex items-center justify-center">
+                                <div className="absolute inset-0 flex items-center justify-center bg-gray-900/60 backdrop-blur-sm">
                                    <button 
-                                      onClick={startCamera}
-                                      className="px-8 py-4 bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl text-white font-black uppercase tracking-widest hover:bg-white/20 transition-all"
+                                      onClick={() => startCamera(selectedDeviceId)}
+                                      className="group flex flex-col items-center gap-4"
                                    >
-                                      Start Camera
+                                      <div className="w-20 h-20 bg-red-600 rounded-full flex items-center justify-center text-white shadow-2xl shadow-red-500/40 group-hover:scale-110 transition-transform">
+                                         <Camera className="w-8 h-8" />
+                                      </div>
+                                      <span className="text-white font-black uppercase tracking-[0.2em] text-xs">Initialize Camera</span>
+                                   </button>
+                                </div>
+                              )}
+                              
+                              {/* Quick Actions overlay */}
+                              {isCameraActive && (
+                                <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-4 px-6 py-3 bg-black/40 backdrop-blur-md border border-white/20 rounded-[2rem]">
+                                   <button 
+                                      onClick={() => setIsMirrored(!isMirrored)}
+                                      className={cn(
+                                        "p-2.5 rounded-xl transition-all",
+                                        isMirrored ? "bg-red-600 text-white" : "text-white/70 hover:bg-white/10"
+                                      )}
+                                      title="Mirror View"
+                                   >
+                                      <FlipHorizontal className="w-5 h-5" />
+                                   </button>
+                                   <div className="w-px h-6 bg-white/20 mx-1" />
+                                   <button 
+                                      onClick={() => {
+                                         const currentIndex = devices.findIndex(d => d.deviceId === selectedDeviceId);
+                                         const nextIndex = (currentIndex + 1) % devices.length;
+                                         setSelectedDeviceId(devices[nextIndex].deviceId);
+                                         startCamera(devices[nextIndex].deviceId);
+                                      }}
+                                      className="p-2.5 text-white/70 hover:bg-white/10 rounded-xl transition-all"
+                                      title="Switch Camera"
+                                   >
+                                      <RefreshCcw className="w-5 h-5" />
                                    </button>
                                 </div>
                               )}
@@ -720,28 +954,54 @@ export default function SelfPickupPage() {
                           <canvas ref={canvasRef} className="hidden" />
                        </div>
 
-                       <div className="flex gap-4">
+                       <div className="flex gap-6">
                           {faceImage ? (
-                            <button 
-                              onClick={() => { setFaceImage(null); startCamera(); }}
-                              className="flex-1 py-5 bg-gray-100 text-gray-600 rounded-[2rem] font-black uppercase tracking-widest text-sm hover:bg-gray-200 transition-all flex items-center justify-center gap-2"
-                            >
-                              <X className="w-4 h-4" />
-                              Retake Photo
-                            </button>
+                            <>
+                              <button 
+                                onClick={() => { 
+                                  setFaceImage(null); 
+                                  setIsEditing(false);
+                                  startCamera(selectedDeviceId); 
+                                }}
+                                className="flex-1 py-5 bg-white border-2 border-gray-100 text-gray-500 rounded-[2rem] font-black uppercase tracking-widest text-sm hover:bg-gray-50 transition-all flex items-center justify-center gap-3 shadow-lg shadow-gray-100/50"
+                              >
+                                <RotateCcw className="w-5 h-5" />
+                                Retake
+                              </button>
+                              <button 
+                                onClick={() => setActiveStep(5)}
+                                disabled={isEditing}
+                                className="flex-[1.5] py-5 bg-gray-900 text-white rounded-[2rem] font-black uppercase tracking-widest text-sm shadow-2xl shadow-gray-200 hover:bg-black disabled:opacity-50 transition-all flex items-center justify-center gap-3"
+                              >
+                                {isEditing ? (
+                                  <>
+                                    <RefreshCcw className="w-5 h-5 animate-spin" />
+                                    Optimizing...
+                                  </>
+                                ) : (
+                                  <>
+                                    Next Step
+                                    <ArrowRight className="w-5 h-5" />
+                                  </>
+                                )}
+                              </button>
+                            </>
                           ) : (
                             <>
                               <button 
                                 onClick={captureImage}
                                 disabled={!isCameraActive}
-                                className="flex-1 py-5 bg-red-600 text-white rounded-[2rem] font-black uppercase tracking-widest text-sm shadow-xl shadow-red-100 hover:bg-red-700 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
+                                className="flex-[2] py-6 bg-red-600 text-white rounded-[2.5rem] font-black uppercase tracking-widest text-lg shadow-2xl shadow-red-500/20 hover:bg-red-700 disabled:opacity-50 transition-all flex items-center justify-center gap-4 active:scale-95"
                               >
-                                <Camera className="w-4 h-4" />
-                                Capture Now
+                                <div className="w-8 h-8 bg-white/20 rounded-xl flex items-center justify-center">
+                                   <Camera className="w-5 h-5" />
+                                </div>
+                                Capture Identity
                               </button>
-                              <label className="flex-1 py-5 bg-gray-900 text-white rounded-[2rem] font-black uppercase tracking-widest text-sm shadow-xl shadow-gray-200 hover:bg-black cursor-pointer transition-all flex items-center justify-center gap-2">
-                                <ImageIcon className="w-4 h-4" />
-                                Upload Image
+                              
+                              <label className="flex-1 py-6 bg-white border-2 border-gray-100 text-gray-400 rounded-[2.5rem] font-black uppercase tracking-widest text-sm hover:bg-gray-50 cursor-pointer transition-all flex items-center justify-center gap-3 shadow-lg shadow-gray-100/50">
+                                <ImageIcon className="w-6 h-6" />
+                                <span className="hidden sm:inline">Gallery</span>
                                 <input 
                                   type="file" 
                                   accept="image/*" 
@@ -750,9 +1010,22 @@ export default function SelfPickupPage() {
                                     const file = e.target.files?.[0];
                                     if (file) {
                                       const reader = new FileReader();
-                                      reader.onloadend = () => {
-                                        setFaceImage(reader.result as string);
-                                        stopCamera();
+                                      reader.onloadend = async () => {
+                                        try {
+                                          const rawData = reader.result as string;
+                                          setFaceImage(rawData);
+                                          setIsEditing(true);
+                                          stopCamera();
+                                          
+                                          const cropped = await autoCrop(rawData);
+                                          setFaceImage(cropped);
+                                          setTimeout(() => {
+                                            setIsEditing(false);
+                                          }, 800);
+                                        } catch (err) {
+                                          setIsEditing(false);
+                                          toast.error("Failed to process uploaded image.");
+                                        }
                                       };
                                       reader.readAsDataURL(file);
                                     }
@@ -763,19 +1036,25 @@ export default function SelfPickupPage() {
                           )}
                        </div>
 
-                       {faceImage && (
-                          <button 
-                             onClick={() => setActiveStep(5)}
-                             className="w-full py-6 bg-blue-600 text-white rounded-[2rem] font-black text-lg shadow-xl shadow-blue-100 hover:bg-blue-700 transition-all flex items-center justify-center gap-3 uppercase tracking-widest animate-in slide-in-from-bottom-4"
-                          >
-                             Confirm & Next
-                             <ArrowRight className="w-6 h-6" />
-                          </button>
-                       )}
-
-                       <div className="flex items-center gap-4 p-6 bg-amber-50/50 rounded-3xl border border-amber-100">
-                           <UserCheck className="w-8 h-8 text-amber-600 flex-shrink-0" />
-                           <p className="text-xs text-amber-800 font-bold leading-relaxed">Ensure the customer's face is clearly visible in well-lit conditions.</p>
+                       <div className="grid grid-cols-3 gap-4">
+                          <div className="p-4 bg-indigo-50/50 rounded-3xl border border-indigo-100 flex flex-col items-center text-center gap-2">
+                             <div className="w-10 h-10 bg-indigo-100 rounded-2xl flex items-center justify-center text-indigo-600">
+                                <Maximize className="w-5 h-5" />
+                             </div>
+                             <p className="text-[10px] text-indigo-800 font-black uppercase">Auto-Crop</p>
+                          </div>
+                          <div className="p-4 bg-emerald-50/50 rounded-3xl border border-emerald-100 flex flex-col items-center text-center gap-2">
+                             <div className="w-10 h-10 bg-emerald-100 rounded-2xl flex items-center justify-center text-emerald-600">
+                                <ShieldCheck className="w-5 h-5" />
+                             </div>
+                             <p className="text-[10px] text-emerald-800 font-black uppercase">Secure ID</p>
+                          </div>
+                          <div className="p-4 bg-amber-50/50 rounded-3xl border border-amber-100 flex flex-col items-center text-center gap-2">
+                             <div className="w-10 h-10 bg-amber-100 rounded-2xl flex items-center justify-center text-amber-600">
+                                <Info className="w-5 h-5" />
+                             </div>
+                             <p className="text-[10px] text-amber-800 font-black uppercase">High Res</p>
+                          </div>
                        </div>
                     </div>
                   </div>
