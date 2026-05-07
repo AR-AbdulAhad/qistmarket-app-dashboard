@@ -76,20 +76,7 @@ export const InstallmentLedgerEditor = ({
 
     return (
         <div className="space-y-4">
-            <div className="flex items-center justify-between bg-blue-50/50 p-4 rounded-xl border border-blue-100">
-                <div>
-                    <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest">Balance to Distribute</p>
-                    <p className={cn("text-lg font-black", balanceRemaining === 0 ? "text-emerald-600" : "text-amber-600")}>
-                        Rs. {(totalPrice - advance).toLocaleString()}
-                    </p>
-                </div>
-                {balanceRemaining !== 0 && (
-                   <div className="flex items-center gap-2 text-amber-600 animate-pulse">
-                      <AlertCircle className="w-5 h-5" />
-                      <span className="text-xs font-bold">Unbalanced: {balanceRemaining.toLocaleString()}</span>
-                   </div>
-                )}
-            </div>
+
 
             <div className="max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
                 <table className="w-full text-left border-collapse">
@@ -131,10 +118,7 @@ export const InstallmentLedgerEditor = ({
                 </table>
             </div>
             
-            <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-100 flex items-center justify-between">
-                <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Total Installments</span>
-                <span className="text-sm font-black text-emerald-700">Rs. {totalInLedger.toLocaleString()}</span>
-            </div>
+
         </div>
     );
 };

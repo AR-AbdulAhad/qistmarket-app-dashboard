@@ -487,6 +487,9 @@ export default function OrderDetailsPage() {
     if (error) return <div className="p-8 text-center text-red-500">Error: {error}</div>;
     if (!order) return <div className="p-8 text-center text-gray-500">Order not found.</div>;
 
+    const cancellationHistory = order.statusHistories?.find(h => h.new_status.toLowerCase() === 'cancelled');
+    const postponementHistory = order.statusHistories?.find(h => h.new_status.toLowerCase() === 'postponed');
+
     return (
         <div className="mx-auto max-w-7xl">
             <Breadcrumb pageName={`Order: ${order.order_ref}`} />
@@ -641,6 +644,11 @@ export default function OrderDetailsPage() {
                         <div className="space-y-2">
                             <p><span className="font-medium text-red-700 dark:text-red-300">Reason:</span> {order.cancelled_reason}</p>
                             <p><span className="font-medium text-red-700 dark:text-red-300">Cancelled At:</span> {order.cancelled_at ? new Date(order.cancelled_at).toLocaleString() : 'N/A'}</p>
+                            {cancellationHistory && (
+                                <p>
+                                    <span className="font-medium text-red-700 dark:text-red-300">Cancelled By:</span> {cancellationHistory.user?.full_name || 'System'} (@{cancellationHistory.user?.username || 'system'}) [{cancellationHistory.role_name || 'N/A'}]
+                                </p>
+                            )}
                         </div>
                     </div>
                 )}
@@ -649,6 +657,16 @@ export default function OrderDetailsPage() {
                         <h3 className="text-xl font-bold text-yellow-800 dark:text-yellow-400 mb-4">Postponed Details</h3>
                         <div className="space-y-2">
                             <p><span className="font-medium text-yellow-700 dark:text-yellow-300">Reason:</span> {order.postponed_feedback}</p>
+                            {postponementHistory && (
+                                <>
+                                    <p>
+                                        <span className="font-medium text-yellow-700 dark:text-yellow-300">Postponed By:</span> {postponementHistory.user?.full_name || 'System'} (@{postponementHistory.user?.username || 'system'}) [{postponementHistory.role_name || 'N/A'}]
+                                    </p>
+                                    <p>
+                                        <span className="font-medium text-yellow-700 dark:text-yellow-300">Postponed At:</span> {new Date(postponementHistory.created_at).toLocaleString()}
+                                    </p>
+                                </>
+                            )}
                         </div>
                     </div>
                 )}

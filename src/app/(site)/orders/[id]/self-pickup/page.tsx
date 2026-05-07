@@ -701,7 +701,11 @@ export default function SelfPickupPage() {
                                   totalPrice={selectedPlan.totalPrice}
                                   advance={Number(advanceOverride) || selectedPlan.advance}
                                   months={selectedPlan.months}
-                                  monthlyAmount={selectedPlan.monthlyAmount}
+                                  monthlyAmount={
+                                     Number(advanceOverride) !== selectedPlan.advance
+                                       ? roundUp((selectedPlan.totalPrice - (Number(advanceOverride) || 0)) / selectedPlan.months)
+                                       : selectedPlan.monthlyAmount
+                                  }
                                   onLedgerChange={(newLedger) => setLedger(newLedger)}
                                />
                             </div>

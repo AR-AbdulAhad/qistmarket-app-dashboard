@@ -156,7 +156,7 @@ export default function Home() {
         ),
         fetchJson(`${BACKEND_URL}/api/customers?page=1&limit=1`),
         fetchJson(
-          `${BACKEND_URL}/api/orders?page=1&limit=10&sortBy=created_at&sortDir=asc`
+          `${BACKEND_URL}/api/orders?page=1&limit=10&sortBy=updated_at&sortDir=desc`
         ),
         fetchJson(`${BACKEND_URL}/api/orders/delivery-status`),
       ])
@@ -300,7 +300,7 @@ export default function Home() {
                   Latest Orders
                 </h2>
                 <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
-                  FIFO: Oldest First
+                  LIFO: Latest First
                 </span>
               </div>
               <Link

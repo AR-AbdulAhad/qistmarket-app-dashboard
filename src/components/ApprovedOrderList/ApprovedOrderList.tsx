@@ -118,7 +118,7 @@ const ApprovedOrderList = () => {
   })
   const [globalFilter, setGlobalFilter] = useState('')
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
-  const [sorting, setSorting] = useState<SortingState>([{ id: 'created_at', desc: true }])
+  const [sorting, setSorting] = useState<SortingState>([{ id: 'updated_at', desc: true }])
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
   const [loading, setLoading] = useState(false)
 
@@ -376,11 +376,23 @@ const ApprovedOrderList = () => {
       enableColumnFilter: false,
     },
     {
-      accessorKey: 'created_at',
-      header: 'Date',
-      cell: ({ getValue }) => {
+      accessorKey: 'updated_at',
+      header: 'Activity Date',
+      cell: ({ row, getValue }) => {
         const val = getValue() as string
-        return val ? dayjs.utc(val).format('MMM DD, YYYY hh:mm A') : 'N/A'
+        const createdAt = row.original.created_at
+        return (
+          <div className="flex flex-col">
+            <span className="font-bold text-dark dark:text-white">
+              {val ? dayjs.utc(val).format('MMM DD, YYYY hh:mm A') : 'N/A'}
+            </span>
+            {createdAt && (
+              <span className="text-[10px] text-gray-400">
+                Placed: {dayjs.utc(createdAt).format('MMM DD, YYYY')}
+              </span>
+            )}
+          </div>
+        )
       },
       enableColumnFilter: true,
     },
