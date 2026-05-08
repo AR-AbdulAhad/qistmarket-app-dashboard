@@ -7,7 +7,7 @@ const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:500
 
 const formatDateTimeUTC = (value?: string): string => {
     if (!value) return "Not set";
-    const parsed = dayjs.utc(value);
+    const parsed = dayjs(value);
     return parsed.isValid() ? parsed.format("MMM D, YYYY h:mm A") : value;
 };
 

@@ -384,11 +384,11 @@ const ApprovedOrderList = () => {
         return (
           <div className="flex flex-col">
             <span className="font-bold text-dark dark:text-white">
-              {val ? dayjs.utc(val).format('MMM DD, YYYY hh:mm A') : 'N/A'}
+              {val ? dayjs(val).format('MMM DD, YYYY hh:mm A') : 'N/A'}
             </span>
             {createdAt && (
               <span className="text-[10px] text-gray-400">
-                Placed: {dayjs.utc(createdAt).format('MMM DD, YYYY')}
+                Placed: {dayjs(createdAt).format('MMM DD, YYYY')}
               </span>
             )}
           </div>

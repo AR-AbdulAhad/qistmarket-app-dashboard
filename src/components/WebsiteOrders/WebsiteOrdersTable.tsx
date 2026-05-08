@@ -179,7 +179,7 @@ export default function WebsiteOrdersTable() {
       header: 'Date',
       cell: ({ getValue }) => {
         const val = getValue() as string
-        return val ? dayjs.utc(val).format('MMM DD, YYYY hh:mm A') : 'N/A'
+        return val ? dayjs(val).format('MMM DD, YYYY hh:mm A') : 'N/A'
       }
     },
     { accessorKey: 'tokenNumber', header: 'Web Token' },

@@ -12,7 +12,7 @@ dayjs.extend(utc);
 
 const formatDateTimeUTC = (value?: string): string => {
   if (!value) return "Not set";
-  const parsed = dayjs.utc(value);
+  const parsed = dayjs(value);
   return parsed.isValid() ? parsed.format("MMM D, YYYY h:mm A") : value;
 };
 
