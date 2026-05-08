@@ -5,7 +5,7 @@ export default function PendingOrdersPage() {
     return (
         <div>
             <Breadcrumb pageName="Pending Orders" />
-            <OrderList forcedStatus="pending" hideActions hideSelection />
+            <OrderList forcedStatus="pending" />
         </div>
     );
 };

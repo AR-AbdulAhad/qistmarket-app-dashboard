@@ -63,6 +63,7 @@ const CreateOrders: React.FC = () => {
   // Advance Editing & Ledger States
   const [advanceOverride, setAdvanceOverride] = useState<number | ''>('');
   const [ledger, setLedger] = useState<any[]>([]);
+  const [activeCustomPlan, setActiveCustomPlan] = useState<{ cashPrice: number, months: number, profit: number } | null>(null);
 
   const nameRef = useRef<HTMLInputElement>(null);
   const whatsappRef = useRef<HTMLInputElement>(null);
@@ -316,6 +317,27 @@ const CreateOrders: React.FC = () => {
       }
     }
   }, [advanceOverride, selectedPlan]);
+
+  // Handle auto-recalculation for Custom Products when linked to Calculator
+  useEffect(() => {
+    if (isCustomProduct && activeCustomPlan && formData.advance_amount !== '' && !isCustomProductNoPricing) {
+      const currentCashPrice = activeCustomPlan.cashPrice; // We use the cash price from when it was applied
+      const newAdv = Number(formData.advance_amount);
+      const { months, profit } = activeCustomPlan;
+
+      if (!isNaN(newAdv) && newAdv >= 0 && newAdv < currentCashPrice) {
+        const rem = currentCashPrice - newAdv;
+        const profitAmount = roundUp(rem * profit);
+        const total = rem + profitAmount;
+        const newMonthly = roundUp(total / months);
+
+        setFormData(prev => ({
+          ...prev,
+          monthly_amount: newMonthly.toString()
+        }));
+      }
+    }
+  }, [formData.advance_amount, isCustomProduct, activeCustomPlan, isCustomProductNoPricing]);
 
   const handlePlanSelect = (plan: any) => {
     setSelectedPlan(plan);
@@ -697,6 +719,7 @@ const CreateOrders: React.FC = () => {
                     checked={isCustomProduct}
                     onChange={(e) => {
                       setIsCustomProduct(e.target.checked);
+                      setActiveCustomPlan(null);
                       if (e.target.checked) {
                         setSelectedProduct(null);
                         setSelectedPlan(null);
@@ -1221,11 +1244,16 @@ const CreateOrders: React.FC = () => {
                                     setFormData(prev => ({
                                       ...prev,
                                       product_name: `Custom ${calcCategory} Product`,
-                                      total_amount: (parseFloat(calcPrice) || 0).toString(),
+                                      total_amount: plan.totalPrice.toString(), // Store total price including profit
                                       advance_amount: plan.advanceAmount.toString(),
                                       monthly_amount: plan.monthlyAmount.toString(),
                                       months: plan.months.toString()
                                     }));
+                                    setActiveCustomPlan({
+                                      cashPrice: parseFloat(calcPrice) || 0,
+                                      months: plan.months,
+                                      profit: plan.profit
+                                    });
                                     setIsCustomProduct(true);
                                     setIsCalculatorOpen(false);
                                     toast.success("Plan applied to form!");

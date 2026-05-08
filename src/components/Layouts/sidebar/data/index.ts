@@ -13,8 +13,12 @@ export const NAV_DATA = [
             url: "/create-orders",
           },
           {
-            title: "Order List",
-            url: "/orders-list",
+            title: "New Orders",
+            url: "/new-orders",
+          },
+          {
+            title: "All Orders",
+            url: "/all-orders",
           },
           {
             title: "Pending Orders",
@@ -200,8 +204,12 @@ export const NAV_DATA = [
             url: "/csr/create-order",
           },
           {
-            title: "Order List",
-            url: "/orders-list",
+            title: "New Orders",
+            url: "/new-orders",
+          },
+          {
+            title: "All Orders",
+            url: "/all-orders",
           },
           {
             title: "Pending Orders",
@@ -285,8 +293,12 @@ export const NAV_DATA = [
             url: "/create-orders",
           },
           {
-            title: "Order List",
-            url: "/orders-list",
+            title: "New Orders",
+            url: "/new-orders",
+          },
+          {
+            title: "All Orders",
+            url: "/all-orders",
           },
           {
             title: "Pending Orders",
@@ -437,3 +449,7 @@ export const NAV_DATA = [
     ],
   },
 ];
+
+
+
+

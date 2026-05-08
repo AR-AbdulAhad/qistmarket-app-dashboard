@@ -21,6 +21,7 @@ export default function GlobalSearch() {
     const [results, setResults] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
     const [isOpen, setIsOpen] = useState(false);
+    const [searchType, setSearchType] = useState("all");
     const [selectedProfile, setSelectedProfile] = useState<any>(null);
     const searchRef = useRef<HTMLDivElement>(null);
 
@@ -44,13 +45,13 @@ export default function GlobalSearch() {
         }, 500);
 
         return () => clearTimeout(timer);
-    }, [query]);
+    }, [query, searchType]);
 
     const handleSearch = async () => {
         setLoading(true);
         setIsOpen(true);
         try {
-            const res = await fetch(`${API_BASE}/api/outlet/search?query=${query}`, {
+            const res = await fetch(`${API_BASE}/api/outlet/search?query=${query}&type=${searchType}`, {
                 headers: {
                     Authorization: `Bearer ${Cookies.get("auth_token")}`,
                 },
@@ -95,87 +96,70 @@ export default function GlobalSearch() {
             {/* Results Dropdown */}
             {isOpen && query.length >= 3 && (
                 <div className="absolute top-full mt-3 w-full bg-white dark:bg-boxdark rounded-[28px] border border-stroke dark:border-strokedark shadow-[0_20px_50px_rgba(0,0,0,0.15)] overflow-hidden z-[1000] animate-fade-in-up">
-                    <div className="p-5 bg-gray-50/80 dark:bg-meta-4/50 border-b border-stroke dark:border-strokedark flex justify-between items-center">
-                        <div className="flex items-center gap-2">
-                             <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-                             <span className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-500">Universal Matches ({results.length})</span>
+                    <div className="p-5 bg-gray-50/80 dark:bg-meta-4/50 border-b border-stroke dark:border-strokedark">
+                        <div className="flex justify-between items-center mb-4">
+                            <div className="flex items-center gap-2">
+                                <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                                <span className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-500">Universal Matches</span>
+                            </div>
+                            {loading && <Loader2 size={14} className="animate-spin text-primary" />}
                         </div>
-                        {loading && <Loader2 size={14} className="animate-spin text-primary" />}
+                        
+                        <div className="flex gap-2">
+                            {['all', 'customers', 'orders'].map((t) => (
+                                <button
+                                    key={t}
+                                    onClick={() => setSearchType(t)}
+                                    className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${
+                                        searchType === t 
+                                        ? 'bg-primary text-white shadow-md shadow-primary/20' 
+                                        : 'bg-white dark:bg-boxdark text-gray-500 hover:bg-gray-100 dark:hover:bg-meta-4 border border-stroke dark:border-strokedark'
+                                    }`}
+                                >
+                                    {t}
+                                </button>
+                            ))}
+                        </div>
                     </div>
 
                     <div className="max-h-[70vh] overflow-y-auto custom-scrollbar">
                         {results.length > 0 ? (
-                            <div className="p-4 grid gap-4">
-                                {results.map((item) => {
-                                    const statusStyle = statusColors[item.status?.toLowerCase()] || statusColors.default;
-                                    const purchaserPhoto = item.verification?.documents?.find((d: any) => d.document_type === 'photo' && d.person_type === 'purchaser')?.file_url;
-
-                                    return (
-                                        <div key={item.id} className="bg-white dark:bg-meta-4/20 rounded-2xl border border-stroke dark:border-strokedark hover:border-primary/30 hover:shadow-lg transition-all overflow-hidden group/item">
-                                            <div className="p-4">
-                                                <div className="flex items-start gap-4 mb-4">
-                                                    <div className="relative shrink-0">
-                                                        <div className="w-16 h-16 rounded-2xl bg-primary/5 border border-primary/10 flex items-center justify-center overflow-hidden transition-transform group-hover/item:scale-105 shadow-sm">
-                                                            {purchaserPhoto ? (
-                                                                <img src={purchaserPhoto} alt={item.verification?.purchaser?.name} className="w-full h-full object-cover" />
-                                                            ) : (
-                                                                <User size={28} className="text-primary/40" />
-                                                            )}
-                                                        </div>
-                                                        <div className={`absolute -bottom-1 -right-1 w-5 h-5 rounded-full border-4 border-white dark:border-boxdark ${item.status === 'delivered' ? 'bg-green-500' : 'bg-amber-500'}`} />
-                                                    </div>
-                                                    
-                                                    <div className="flex-1 min-w-0">
-                                                        <div className="flex items-center justify-between gap-2 mb-1">
-                                                            <h4 className="font-black text-gray-800 dark:text-white text-base  pr-2">
-                                                                {item.verification?.purchaser?.name} 
-                                                            </h4>
-                                                            {/* <span className={`px-2.5 py-0.5 rounded-full border ${statusStyle} text-[8px] font-black uppercase tracking-widest shrink-0`}>
-                                                                {item.status?.replace('_', ' ')}
-                                                                </span> */}
-                                                        </div>
-                                                        <span className="text-gray-400 font-bold text-xs">S/O {item.father_name}</span>
-                                                        <div className="space-y-1.5 mt-2">
-                                                            <ResultMeta icon={<Phone size={11} />} text={item.verification?.purchaser?.telephone_number} />
-                                                        </div>
-                                                    </div>
-                                                </div>
-
-                                                <div className="pt-4 border-t border-stroke/50 dark:border-strokedark/50 flex items-center justify-between gap-2">
-                                                    <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                                                        <MapPin size={11} className="text-gray-400 shrink-0" />
-                                                        {item.verification?.purchaser?.permanent_address && (
-                                                            <span className="text-[10px] font-bold text-gray-400 truncate">{item.verification.purchaser.permanent_address}</span>
-                                                        )}
-                                                        {item.verification?.purchaser?.permanent_area || item.verification?.purchaser?.permanent_block || item.verification?.purchaser?.permanent_house_no || item.verification?.purchaser?.permanent_street || item.verification?.purchaser?.permanent_zone ? (
-                                                            <span className="text-[10px] font-bold text-gray-400 truncate">{item.verification?.purchaser?.permanent_house_no || ''}, {item.verification?.purchaser?.permanent_block || ''}, {item.verification?.purchaser?.permanent_street || ''}, {item.verification?.purchaser?.permanent_area || ''}, {item.verification?.purchaser?.permanent_zone || ''}</span>
-                                                        ) : null}
-                                                    </div>
-                                                    <div className="flex items-center gap-1.5">
-                                                        <ActionIconButton 
-                                                            icon={<User size={16} />} 
-                                                            label="Profile"
-                                                            color="blue"
-                                                            onClick={() => { setSelectedProfile(item); setIsOpen(false); }}
-                                                        />
-                                                        <ActionIconButton 
-                                                            icon={<FileText size={16} />} 
-                                                            label="Order"
-                                                            color="emerald"
-                                                            href={`/outlet/orders/${item.id}`}
-                                                        />
-                                                        {/* <ActionIconButton 
-                                                            icon={<ArrowRight size={16} />} 
-                                                            label="Ledger"
-                                                            color="indigo"
-                                                            href={`/outlet/installments?search=${encodeURIComponent(item.order_ref)}`}
-                                                        /> */}
-                                                    </div>
-                                                </div>
-                                            </div>
+                            <div className="p-4 space-y-6">
+                                {/* Customers Section */}
+                                {(searchType === 'all' || searchType === 'customers') && results.filter(i => i.status === 'delivered').length > 0 && (
+                                    <div>
+                                        <div className="flex items-center gap-3 mb-4 px-2">
+                                            <div className="h-[1px] flex-1 bg-gradient-to-r from-transparent via-stroke dark:via-strokedark to-transparent" />
+                                            <span className="text-[10px] font-black uppercase tracking-[0.3em] text-green-500 flex items-center gap-2">
+                                                <UserCheck size={12} /> Customers (Took Product)
+                                            </span>
+                                            <div className="h-[1px] flex-1 bg-gradient-to-r from-transparent via-stroke dark:via-strokedark to-transparent" />
                                         </div>
-                                    );
-                                })}
+                                        <div className="grid gap-4">
+                                            {results.filter(i => i.status === 'delivered').map((item) => (
+                                                <ResultItem key={item.id} item={item} setSelectedProfile={setSelectedProfile} setIsOpen={setIsOpen} />
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Orders Section */}
+                                {(searchType === 'all' || searchType === 'orders') && results.filter(i => i.status !== 'delivered').length > 0 && (
+                                    <div>
+                                        <div className="flex items-center gap-3 mb-4 px-2">
+                                            <div className="h-[1px] flex-1 bg-gradient-to-r from-transparent via-stroke dark:via-strokedark to-transparent" />
+                                            <span className="text-[10px] font-black uppercase tracking-[0.3em] text-amber-500 flex items-center gap-2">
+                                                <ClipboardList size={12} /> Orders (In Process)
+                                            </span>
+                                            <div className="h-[1px] flex-1 bg-gradient-to-r from-transparent via-stroke dark:via-strokedark to-transparent" />
+                                        </div>
+                                        <div className="grid gap-4">
+                                            {results.filter(i => i.status !== 'delivered').map((item) => (
+                                                <ResultItem key={item.id} item={item} setSelectedProfile={setSelectedProfile} setIsOpen={setIsOpen} />
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         ) : !loading ? (
                             <div className="p-16 text-center">
@@ -201,6 +185,70 @@ export default function GlobalSearch() {
                 onClose={() => setSelectedProfile(null)} 
                 data={selectedProfile} 
             />
+        </div>
+    );
+}
+
+function ResultItem({ item, setSelectedProfile, setIsOpen }: any) {
+    const purchaserPhoto = item.verification?.documents?.find((d: any) => d.document_type === 'photo' && d.person_type === 'purchaser')?.file_url;
+
+    return (
+        <div key={item.id} className="bg-white dark:bg-meta-4/20 rounded-2xl border border-stroke dark:border-strokedark hover:border-primary/30 hover:shadow-lg transition-all overflow-hidden group/item">
+            <div className="p-4">
+                <div className="flex items-start gap-4 mb-4">
+                    <div className="relative shrink-0">
+                        <div className="w-16 h-16 rounded-2xl bg-primary/5 border border-primary/10 flex items-center justify-center overflow-hidden transition-transform group-hover/item:scale-105 shadow-sm">
+                            {purchaserPhoto ? (
+                                <img src={purchaserPhoto} alt={item.verification?.purchaser?.name} className="w-full h-full object-cover" />
+                            ) : (
+                                <User size={28} className="text-primary/40" />
+                            )}
+                        </div>
+                        <div className={`absolute -bottom-1 -right-1 w-5 h-5 rounded-full border-4 border-white dark:border-boxdark ${item.status === 'delivered' ? 'bg-green-500' : 'bg-amber-500'}`} />
+                    </div>
+                    
+                    <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2 mb-1">
+                            <h4 className="font-black text-gray-800 dark:text-white text-base pr-2 truncate">
+                                {item.verification?.purchaser?.name || item.customer_name} 
+                            </h4>
+                        </div>
+                        {item.father_name && item.father_name !== 'N/A' && (
+                            <span className="text-gray-400 font-bold text-xs uppercase tracking-tight">S/O {item.father_name}</span>
+                        )}
+                        <div className="space-y-1.5 mt-2">
+                            <ResultMeta icon={<Phone size={11} />} text={item.verification?.purchaser?.telephone_number || item.whatsapp_number} />
+                        </div>
+                    </div>
+                </div>
+
+                <div className="pt-4 border-t border-stroke/50 dark:border-strokedark/50 flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                        <MapPin size={11} className="text-gray-400 shrink-0" />
+                        <span className="text-[10px] font-bold text-gray-400 truncate">
+                            {item.verification?.purchaser?.permanent_address || 
+                             `${item.verification?.purchaser?.permanent_house_no || ''} ${item.verification?.purchaser?.permanent_block || ''} ${item.verification?.purchaser?.permanent_area || ''}`.trim() || 
+                             'No address recorded'}
+                        </span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                        {item.verification && (
+                            <ActionIconButton 
+                                icon={<User size={16} />} 
+                                label="Profile"
+                                color="blue"
+                                onClick={() => { setSelectedProfile(item); setIsOpen(false); }}
+                            />
+                        )}
+                        <ActionIconButton 
+                            icon={<FileText size={16} />} 
+                            label="Order"
+                            color="emerald"
+                            href={`/orders/${item.id}`}
+                        />
+                    </div>
+                </div>
+            </div>
         </div>
     );
 }

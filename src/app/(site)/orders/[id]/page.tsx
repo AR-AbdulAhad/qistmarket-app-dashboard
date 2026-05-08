@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, use } from 'react';
+import { useEffect, useState, use, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
 import Cookies from 'js-cookie';
@@ -14,47 +14,413 @@ import { useAuth } from '../../../../../contexts/AuthContext';
 import DeliveredProductDetails from '@/components/common/DeliveredProductDetails';
 import RecoveryVisitDetails from '@/components/common/RecoveryVisitDetails';
 
-// --- ReadOnlyField for view-only display (like Field, but always whitespace-pre-wrap) ---
-const ReadOnlyField = ({ label, value, className = "" }: { label: string; value: any; className?: string }) => {
-    if (!shouldDisplay(value)) return null;
-    const displayValue = typeof value === 'boolean' ? (value ? 'Yes' : 'No') : value;
+// --- Editable Field Component ---
+const EditableField = ({
+    label,
+    value,
+    fieldName,
+    entityType,
+    entityId,
+    onSave,
+    className = "",
+    editHistory = []
+}: {
+    label: string;
+    value: any;
+    fieldName: string;
+    entityType: 'purchaser' | 'grantor';
+    entityId: number;
+    onSave: (fieldName: string, newValue: string, entityType: string, entityId: number) => Promise<void>;
+    className?: string;
+    editHistory?: any[]
+}) => {
+    const [isEditing, setIsEditing] = useState(false)
+    const [inputValue, setInputValue] = useState(value || '')
+    const [isSaving, setIsSaving] = useState(false)
+    const [showHistory, setShowHistory] = useState(false)
+
+    const fieldHistory = editHistory.filter(h => h.field_name === fieldName).sort((a, b) =>
+        new Date(b.edited_at).getTime() - new Date(a.edited_at).getTime()
+    )
+
+    const handleSave = async () => {
+        if (inputValue === value) {
+            setIsEditing(false)
+            return
+        }
+
+        setIsSaving(true)
+        try {
+            await onSave(fieldName, inputValue, entityType, entityId)
+            setIsEditing(false)
+            toast.success(`${label} updated successfully`)
+        } catch (error) {
+            console.error('Save error:', error)
+            toast.error('Failed to save changes')
+        } finally {
+            setIsSaving(false)
+        }
+    }
+
+    const handleCancel = () => {
+        setInputValue(value || '')
+        setIsEditing(false)
+    }
+
+    if (!shouldDisplay(value) && !isEditing) return null
+
     return (
         <div className={className}>
-            <label className="block text-sm font-medium text-gray-500 dark:text-gray-400">{label}</label>
-            <div className="mt-1 rounded-lg bg-gray-100 px-4 py-2.5 whitespace-pre-wrap dark:bg-dark-3 dark:text-gray-300">{displayValue}</div>
-        </div>
-    );
-};
+            <label className="block text-sm font-medium text-gray-500 dark:text-gray-400">
+                {label}
+            </label>
 
-function DocumentCard({ doc }: { doc: any }) {
-    const [isModalOpen, setIsModalOpen] = useState(false);
+            {isEditing ? (
+                <div className="mt-1">
+                    <textarea
+                        value={inputValue}
+                        onChange={(e) => setInputValue(e.target.value)}
+                        className="w-full rounded-lg border border-gray-300 p-2 focus:border-primary focus:ring-1 focus:ring-primary dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+                        rows={3}
+                        disabled={isSaving}
+                        placeholder={`Enter ${label.toLowerCase()}...`}
+                    />
+                    <div className="mt-2 flex gap-2">
+                        <button
+                            onClick={handleSave}
+                            disabled={isSaving}
+                            className="rounded bg-green-600 px-3 py-1 text-xs text-white hover:bg-green-700 disabled:bg-gray-400"
+                        >
+                            {isSaving ? 'Saving...' : 'Save'}
+                        </button>
+                        <button
+                            onClick={handleCancel}
+                            disabled={isSaving}
+                            className="rounded bg-gray-500 px-3 py-1 text-xs text-white hover:bg-gray-600 disabled:bg-gray-400"
+                        >
+                            Cancel
+                        </button>
+                    </div>
+                </div>
+            ) : (
+                <div
+                    className="mt-1 rounded-lg bg-gray-100 px-4 py-2.5 dark:bg-dark-3 dark:text-gray-300 cursor-pointer hover:bg-gray-200 dark:hover:bg-dark-2 transition-colors group relative"
+                    onClick={() => setIsEditing(true)}
+                >
+                    <div className="flex justify-between items-start">
+                        <div className="flex-1 whitespace-pre-wrap">
+                            {value}
+                        </div>
+                        <span className="text-xs text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity ml-2">
+                            Click to edit
+                        </span>
+                    </div>
+
+                    {fieldHistory.length > 0 && (
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation()
+                                setShowHistory(!showHistory)
+                            }}
+                            className="mt-1 text-xs text-gray-500 hover:text-blue-600 flex items-center gap-1"
+                        >
+                            <span>📋 {fieldHistory.length} edit{fieldHistory.length > 1 ? 's' : ''}</span>
+                        </button>
+                    )}
+
+                    {showHistory && fieldHistory.length > 0 && (
+                        <div className="absolute z-10 mt-2 w-72 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-3">
+                            <div className="text-xs font-semibold mb-2 text-gray-700 dark:text-gray-300">
+                                Edit History
+                            </div>
+                            <div className="space-y-2 max-h-60 overflow-y-auto">
+                                {fieldHistory.map((history: any) => (
+                                    <div key={history.id} className="text-xs border-b border-gray-100 dark:border-gray-700 pb-2">
+                                        <div className="flex justify-between text-gray-600 dark:text-gray-400">
+                                            <span className="font-medium">{history.edited_by_name}</span>
+                                            <span>{formatDateTimeUTC(history.edited_at)}</span>
+                                        </div>
+                                        <div className="mt-1 text-gray-700 dark:text-gray-300">
+                                            <span className="line-through text-red-500">{history.old_value || '(empty)'}</span>
+                                            <span className="mx-1">→</span>
+                                            <span className="text-green-500">{history.new_value}</span>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
+        </div>
+    )
+}
+
+function MediaReplaceModal({
+    open,
+    onClose,
+    file,
+    onConfirm,
+    isUploading
+}: {
+    open: boolean;
+    onClose: () => void;
+    file: File | null;
+    onConfirm: () => Promise<void>;
+    isUploading: boolean;
+}) {
+    const [preview, setPreview] = useState<string | null>(null)
+
+    useEffect(() => {
+        if (file) {
+            const objectUrl = URL.createObjectURL(file)
+            setPreview(objectUrl)
+            return () => URL.revokeObjectURL(objectUrl)
+        } else {
+            setPreview(null)
+        }
+    }, [file])
+
+    if (!open || !file) return null
+
+    return (
+        <div className="fixed inset-0 z-[10001] flex items-center justify-center bg-black bg-opacity-75 p-4 backdrop-blur-sm">
+            <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl dark:bg-gray-800">
+                <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-xl font-bold text-dark dark:text-white">Preview New Document</h3>
+                    <button onClick={onClose} disabled={isUploading} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+                        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+
+                <p className="mb-6 text-sm text-gray-500 dark:text-gray-400">
+                    You are about to replace the existing document with the one shown below. Please confirm if this is correct.
+                </p>
+
+                <div className="relative mb-8 aspect-[4/3] overflow-hidden rounded-xl border-2 border-dashed border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-dark-3 flex items-center justify-center">
+                    {preview ? (
+                        <img src={preview} alt="Preview" className="h-full w-full object-contain" />
+                    ) : (
+                        <div className="text-gray-400 text-center">
+                            <svg className="w-12 h-12 mx-auto mb-2 opacity-20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                            <span>No image selected</span>
+                        </div>
+                    )}
+                </div>
+
+                <div className="flex gap-4">
+                    <button
+                        onClick={onConfirm}
+                        disabled={isUploading}
+                        className="flex flex-1 items-center justify-center rounded-lg bg-primary px-4 py-3 font-semibold text-white shadow-md transition-all hover:bg-primary/90 disabled:bg-gray-400"
+                    >
+                        {isUploading ? (
+                            <>
+                                <svg className="mr-2 h-4 w-4 animate-spin" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path></svg>
+                                Uploading...
+                            </>
+                        ) : (
+                            'Confirm & Replace'
+                        )}
+                    </button>
+                    <button
+                        onClick={onClose}
+                        disabled={isUploading}
+                        className="flex-1 rounded-lg border border-stroke bg-gray-100 px-4 py-3 font-semibold text-gray-700 transition-all hover:bg-gray-200 dark:border-dark-3 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+                    >
+                        Cancel
+                    </button>
+                </div>
+            </div>
+        </div>
+    )
+}
+
+function DocumentCard({
+    doc,
+    onEdit,
+    editHistory = [],
+    isEditable = false
+}: {
+    doc: any,
+    onEdit?: (file: File, documentId: number, documentType: string, personType: string, personId: number | null) => Promise<void>,
+    editHistory?: any[],
+    isEditable?: boolean
+}) {
+    const [isModalOpen, setIsModalOpen] = useState(false)
+    const [isReplaceModalOpen, setIsReplaceModalOpen] = useState(false)
+    const [showHistory, setShowHistory] = useState(false)
+    const [selectedFile, setSelectedFile] = useState<File | null>(null)
+    const [isUploading, setIsUploading] = useState(false)
+    const fileInputRef = useRef<HTMLInputElement>(null)
+
+    const fieldHistory = editHistory.filter(h =>
+        h.field_name === doc.document_type &&
+        (h.entity_type === doc.person_type || (h.entity_id !== null && h.entity_id === doc.person_id))
+    )
+
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0]
+        if (!file) return
+        setSelectedFile(file)
+        setIsReplaceModalOpen(true)
+        e.target.value = ''
+    }
+
+    const handleConfirmUpload = async () => {
+        if (!selectedFile || !onEdit) return
+        setIsUploading(true)
+        try {
+            await onEdit(selectedFile, doc.id, doc.document_type, doc.person_type, doc.person_id)
+            setIsReplaceModalOpen(false)
+            setSelectedFile(null)
+        } catch (err) {
+            console.error(err)
+        } finally {
+            setIsUploading(false)
+        }
+    }
+
     return (
         <>
             <div
-                onClick={() => setIsModalOpen(true)}
-                className="group relative overflow-hidden rounded-lg border border-stroke bg-white p-4 shadow-sm transition-all hover:shadow-md dark:border-dark-3 dark:bg-gray-800 cursor-pointer"
+                className="group relative overflow-hidden rounded-lg border border-stroke bg-white p-4 shadow-sm transition-all hover:shadow-md dark:border-dark-3 dark:bg-gray-800"
             >
-                <h4 className="mb-2 font-medium text-gray-800 dark:text-gray-200 line-clamp-2">
-                    {doc.label || doc.document_type}
-                </h4>
+                <div className="flex justify-between items-start mb-2">
+                    <div>
+                        <h4 className="font-medium text-gray-800 dark:text-gray-200 line-clamp-2">
+                            {doc.label || doc.document_type}
+                        </h4>
+                        {fieldHistory.length > 0 && (
+                            <button
+                                onClick={() => setShowHistory(!showHistory)}
+                                className="mt-0.5 text-[10px] text-blue-600 hover:underline flex items-center gap-0.5"
+                            >
+                                <span className="flex items-center gap-1">
+                                    📋 {fieldHistory.length} edit{fieldHistory.length > 1 ? 's' : ''}
+                                </span>
+                            </button>
+                        )}
+                    </div>
+                    <div className="flex gap-1">
+                        {isEditable && onEdit && (
+                            <button
+                                onClick={() => fileInputRef.current?.click()}
+                                className="p-1.5 rounded-full bg-gray-100 hover:bg-primary hover:text-white dark:bg-gray-700 dark:hover:bg-primary transition-colors text-gray-500 dark:text-gray-400 shadow-sm"
+                                title="Replace Media"
+                            >
+                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                </svg>
+                            </button>
+                        )}
+                        <input
+                            type="file"
+                            ref={fileInputRef}
+                            className="hidden"
+                            onChange={handleFileChange}
+                            accept="image/*"
+                        />
+                        <button
+                            onClick={() => setIsModalOpen(true)}
+                            className="p-1.5 rounded-full bg-gray-100 hover:bg-blue-600 hover:text-white dark:bg-gray-700 dark:hover:bg-blue-600 transition-colors text-gray-500 dark:text-gray-400 shadow-sm"
+                            title="View Full Size"
+                        >
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
                 <div className="mb-3 text-xs text-gray-500 dark:text-gray-400 space-y-1">
                     <p>Type: <span className="font-medium capitalize">{doc.document_type.replace('_', ' ')}</span></p>
                     <p>Uploaded: <span className="font-medium">{formatDateTimeUTC(doc.uploaded_at)}</span></p>
                 </div>
-                <div className="relative aspect-[4/3] overflow-hidden rounded-md bg-gray-100 dark:bg-gray-700">
+                <div
+                    className="relative aspect-[4/3] overflow-hidden rounded-md bg-gray-100 dark:bg-gray-700 cursor-pointer"
+                    onClick={() => setIsModalOpen(true)}
+                >
                     <img
                         src={doc.file_url}
                         alt={doc.label || doc.document_type}
                         className="h-full w-full object-cover transition-transform group-hover:scale-105"
                     />
                 </div>
-                <div className="mt-3 inline-flex items-center text-sm font-medium text-[#ff3d3d] hover:underline">
-                    Click to view full size →
+                <div
+                    className="mt-3 inline-flex items-center text-sm font-medium text-[#ff3d3d] hover:underline cursor-pointer"
+                    onClick={() => setIsModalOpen(true)}
+                >
+                    View Full Size →
                 </div>
+
+                {/* History Popup */}
+                {showHistory && fieldHistory.length > 0 && (
+                    <div className="absolute z-20 mt-1 right-2 left-2 top-10 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl p-3 animate-in fade-in zoom-in duration-200 ring-1 ring-black/5">
+                        <div className="flex justify-between items-center mb-2 border-b border-gray-100 dark:border-gray-700 pb-1.5">
+                            <span className="text-[11px] font-bold text-gray-700 dark:text-gray-300">Edit History</span>
+                            <button onClick={() => setShowHistory(false)} className="text-gray-400 hover:text-red-500">
+                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+                        <div className="space-y-4 max-h-56 overflow-y-auto pr-1">
+                            {fieldHistory.map((history: any) => (
+                                <div key={history.id} className="text-[10px] border-b border-gray-50 dark:border-gray-700 pb-3 last:border-0 last:pb-0">
+                                    <div className="flex justify-between text-gray-500 mb-1.5">
+                                        <span className="font-bold text-blue-600 dark:text-blue-400">{history.edited_by_name}</span>
+                                        <span className="bg-gray-100 dark:bg-gray-700 px-1 rounded">{formatDateTimeUTC(history.edited_at)}</span>
+                                    </div>
+                                    <div className="flex gap-2 items-start">
+                                        <div className="flex-1">
+                                            <span className="text-gray-400 block mb-1 text-[9px] uppercase tracking-wider font-semibold">Previous</span>
+                                            {history.old_value ? (
+                                                <a href={history.old_value} target="_blank" rel="noreferrer" className="group/old block relative aspect-video rounded overflow-hidden border border-gray-200 dark:border-gray-600 hover:border-blue-400 transition-colors bg-gray-50 dark:bg-dark-3">
+                                                    <img src={history.old_value} alt="Old" className="h-full w-full object-cover opacity-50 grayscale transition-all group-hover/old:opacity-80 group-hover/old:grayscale-0" />
+                                                </a>
+                                            ) : (
+                                                <div className="aspect-video rounded border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-dark-3 flex items-center justify-center text-gray-400 italic">
+                                                    Initial upload
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div className="pt-5 text-gray-400">
+                                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+                                            </svg>
+                                        </div>
+                                        <div className="flex-1">
+                                            <span className="text-gray-400 block mb-1 text-[9px] uppercase tracking-wider font-semibold text-blue-500">Replaced With</span>
+                                            <a href={history.new_value} target="_blank" rel="noreferrer" className="group/new block relative aspect-video rounded overflow-hidden border border-blue-200 dark:border-blue-700 hover:border-blue-400 transition-colors bg-gray-50 dark:bg-dark-3 shadow-sm">
+                                                <img src={history.new_value} alt="New" className="h-full w-full object-cover transition-transform group-hover/new:scale-110" />
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
             </div>
+
+            <MediaReplaceModal
+                open={isReplaceModalOpen}
+                onClose={() => {
+                    setIsReplaceModalOpen(false);
+                    setSelectedFile(null);
+                }}
+                file={selectedFile}
+                onConfirm={handleConfirmUpload}
+                isUploading={isUploading}
+            />
+
             {isModalOpen && (
                 <div
-                    className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75 p-4"
+                    className="fixed inset-0 z-[10002] flex items-center justify-center bg-black bg-opacity-75 p-4"
                     onClick={() => setIsModalOpen(false)}
                 >
                     <div
@@ -365,6 +731,48 @@ export default function OrderDetailsPage() {
             fetchVerification();
         }
     }, [id]);
+    // Verification Edit Handlers
+    const handleFieldSave = async (fieldName: string, newValue: string, entityType: string, entityId: number) => {
+        if (!verification) return;
+        const token = Cookies.get('auth_token');
+        const url = entityType === 'purchaser' 
+            ? `${BACKEND_URL}/api/verification/${verification.id}/purchaser/field`
+            : `${BACKEND_URL}/api/verification/${verification.id}/grantor/${entityId}/field`;
+
+        const res = await fetch(url, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`
+            },
+            body: JSON.stringify({ field_name: fieldName, new_value: newValue })
+        });
+
+        if (!res.ok) throw new Error('Update failed');
+        await fetchVerification();
+    };
+
+    const handleMediaReplace = async (file: File, documentId: number, documentType: string, personType: string, personId: number | null) => {
+        if (!verification) return;
+        const token = Cookies.get('auth_token');
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('document_id', String(documentId));
+        formData.append('document_type', documentType);
+        formData.append('person_type', personType);
+        if (personId) formData.append('person_id', String(personId));
+
+        const res = await fetch(`${BACKEND_URL}/api/verification/${verification.id}/media`, {
+            method: 'PUT',
+            headers: { Authorization: `Bearer ${token}` },
+            body: formData
+        });
+
+        if (!res.ok) throw new Error('Media replacement failed');
+        toast.success('Media replaced successfully');
+        await fetchVerification();
+    };
+
     // Home location assignment action
     const handleLocationAction = async (action: 'send-to-vo' | 'send-to-do', officerId: string) => {
         if (!verification?.id) return;
@@ -1123,35 +1531,48 @@ export default function OrderDetailsPage() {
                             </div>
                         </Modal>
 
-                        {/* Purchaser Details (view-only, verification page order/logic) */}
-                        {verification.purchaser && Object.values(verification.purchaser).some(val => shouldDisplay(val)) && (
+                        {/* Purchaser Details */}
+                        {verification.purchaser && (
                             <div className="mb-12">
                                 <h2 className="mb-4 text-2xl font-semibold text-dark dark:text-white">Purchaser Details</h2>
                                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-                                    <ReadOnlyField label="Name" value={verification.purchaser.name} />
-                                    <ReadOnlyField label="Father/Husband Name" value={verification.purchaser.father_husband_name} />
-                                    {shouldDisplay(verification.purchaser.present_address) && (
-                                        <ReadOnlyField label="Present Address" value={`${verification.purchaser.present_address}${verification.purchaser.present_zone ? `\nZone: ${verification.purchaser.present_zone}` : ''}${verification.purchaser.present_area ? `\nArea: ${verification.purchaser.present_area}` : ''}${verification.purchaser.present_block ? `\nBlock: ${verification.purchaser.present_block}` : ''}${verification.purchaser.present_street ? `\nStreet: ${verification.purchaser.present_street}` : ''}${verification.purchaser.present_house_no ? `\nHouse No: ${verification.purchaser.present_house_no}` : ''}`} />
-                                    )}
-                                    {shouldDisplay(verification.purchaser.permanent_address) && (
-                                        <ReadOnlyField label="Permanent Address" value={`${verification.purchaser.permanent_address}${verification.purchaser.permanent_zone ? `\nZone: ${verification.purchaser.permanent_zone}` : ''}${verification.purchaser.permanent_area ? `\nArea: ${verification.purchaser.permanent_area}` : ''}${verification.purchaser.permanent_block ? `\nBlock: ${verification.purchaser.permanent_block}` : ''}${verification.purchaser.permanent_street ? `\nStreet: ${verification.purchaser.permanent_street}` : ''}${verification.purchaser.permanent_house_no ? `\nHouse No: ${verification.purchaser.permanent_house_no}` : ''}`} />
-                                    )}
-                                    <ReadOnlyField label="CNIC Number" value={verification.purchaser.cnic_number} />
-                                    <ReadOnlyField label="Telephone Number" value={verification.purchaser.telephone_number} />
-                                    <ReadOnlyField label="Employment Type" value={verification.purchaser.employment_type} />
-                                    <ReadOnlyField label="Job Type" value={verification.purchaser.job_type} />
-                                    <ReadOnlyField label="Employer Name" value={verification.purchaser.employer_name} />
-                                    <ReadOnlyField label="Employer Address" value={verification.purchaser.employer_address} />
-                                    <ReadOnlyField label="Designation" value={verification.purchaser.designation} />
-                                    <ReadOnlyField label="Official Number" value={verification.purchaser.official_number} />
-                                    <ReadOnlyField label="Business Name" value={verification.purchaser.business_name} />
-                                    <ReadOnlyField label="Established Since" value={verification.purchaser.established_since} />
-                                    <ReadOnlyField label="Business Address" value={verification.purchaser.business_address} />
-                                    <ReadOnlyField label="Net Income" value={verification.purchaser.net_income} />
-                                    <ReadOnlyField label="Years in Company" value={verification.purchaser.years_in_company} />
-                                    <ReadOnlyField label="Gross Salary" value={verification.purchaser.gross_salary} />
-                                    <ReadOnlyField label="Nearest Location" value={verification.purchaser.nearest_location} />
-                                    <ReadOnlyField label="Verified" value={verification.purchaser.is_verified} />
+                                    {[
+                                        { label: "Name", field: "name" },
+                                        { label: "Father/Husband Name", field: "father_husband_name" },
+                                        { label: "Present Address", field: "present_address" },
+                                        { label: "Permanent Address", field: "permanent_address" },
+                                        { label: "CNIC Number", field: "cnic_number" },
+                                        { label: "Telephone Number", field: "telephone_number" },
+                                        { label: "Employment Type", field: "employment_type" },
+                                        { label: "Job Type", field: "job_type" },
+                                        { label: "Employer Name", field: "employer_name" },
+                                        { label: "Employer Address", field: "employer_address" },
+                                        { label: "Designation", field: "designation" },
+                                        { label: "Official Number", field: "official_number" },
+                                        { label: "Business Name", field: "business_name" },
+                                        { label: "Established Since", field: "established_since" },
+                                        { label: "Business Address", field: "business_address" },
+                                        { label: "Net Income", field: "net_income" },
+                                        { label: "Years in Company", field: "years_in_company" },
+                                        { label: "Gross Salary", field: "gross_salary" },
+                                        { label: "Nearest Location", field: "nearest_location" }
+                                    ].map(f => {
+                                        const isEditable = user?.role === 'Super Admin' && order.status === 'delivered';
+                                        return isEditable ? (
+                                            <EditableField
+                                                key={f.field}
+                                                label={f.label}
+                                                value={verification.purchaser[f.field]}
+                                                fieldName={f.field}
+                                                entityType="purchaser"
+                                                entityId={verification.purchaser.id}
+                                                onSave={handleFieldSave}
+                                                editHistory={verification.purchaser.edit_history || []}
+                                            />
+                                        ) : (
+                                            <Field key={f.field} label={f.label} value={verification.purchaser[f.field]} />
+                                        );
+                                    })}
                                 </div>
                                 {/* Purchaser Documents */}
                                 {verification.documents.filter((doc: any) => doc.person_type === 'purchaser').length > 0 && (
@@ -1159,7 +1580,13 @@ export default function OrderDetailsPage() {
                                         <h3 className="mb-4 text-xl font-semibold text-blue-700 dark:text-blue-400">Purchaser Uploaded Documents</h3>
                                         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                                             {verification.documents.filter((doc: any) => doc.person_type === 'purchaser').map((doc: any) => (
-                                                <DocumentCard key={doc.id} doc={doc} />
+                                                <DocumentCard 
+                                                    key={doc.id} 
+                                                    doc={doc} 
+                                                    isEditable={user?.role === 'Super Admin' && order.status === 'delivered'}
+                                                    onEdit={handleMediaReplace}
+                                                    editHistory={verification.edit_history || []}
+                                                />
                                             ))}
                                         </div>
                                     </div>
@@ -1167,49 +1594,65 @@ export default function OrderDetailsPage() {
                             </div>
                         )}
 
-                        {/* Grantors (view-only, verification page order/logic) */}
+                        {/* Grantors */}
                         {verification.grantors && verification.grantors.map((grantor: any) => {
-                            const hasGrantorData = Object.values(grantor).some(val => shouldDisplay(val));
-                            const hasDocuments = verification.documents.filter((doc: any) => doc.person_type === `grantor${grantor.grantor_number}`).length > 0;
-                            if (!hasGrantorData && !hasDocuments) return null;
+                            const isEditable = user?.role === 'Super Admin' && order.status === 'delivered';
                             return (
                                 <div key={grantor.id} className="mb-16">
                                     <h2 className="mb-4 text-2xl font-semibold text-dark dark:text-white">Grantor {grantor.grantor_number} Details</h2>
                                     <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-                                        <ReadOnlyField label="Name" value={grantor.name} />
-                                        <ReadOnlyField label="Father/Husband Name" value={grantor.father_husband_name} />
-                                        {shouldDisplay(grantor.present_address) && (
-                                            <ReadOnlyField label="Present Address" value={`${grantor.present_address}${grantor.present_zone ? `\nZone: ${grantor.present_zone}` : ''}${grantor.present_area ? `\nArea: ${grantor.present_area}` : ''}${grantor.present_block ? `\nBlock: ${grantor.present_block}` : ''}${grantor.present_street ? `\nStreet: ${grantor.present_street}` : ''}${grantor.present_house_no ? `\nHouse No: ${grantor.present_house_no}` : ''}`} />
-                                        )}
-                                        {shouldDisplay(grantor.permanent_address) && (
-                                            <ReadOnlyField label="Permanent Address" value={`${grantor.permanent_address}${grantor.permanent_zone ? `\nZone: ${grantor.permanent_zone}` : ''}${grantor.permanent_area ? `\nArea: ${grantor.permanent_area}` : ''}${grantor.permanent_block ? `\nBlock: ${grantor.permanent_block}` : ''}${grantor.permanent_street ? `\nStreet: ${grantor.permanent_street}` : ''}${grantor.permanent_house_no ? `\nHouse No: ${grantor.permanent_house_no}` : ''}`} />
-                                        )}
-                                        <ReadOnlyField label="CNIC Number" value={grantor.cnic_number} />
-                                        <ReadOnlyField label="Telephone Number" value={grantor.telephone_number} />
-                                        <ReadOnlyField label="Employment Type" value={grantor.employment_type} />
-                                        <ReadOnlyField label="Job Type" value={grantor.job_type} />
-                                        <ReadOnlyField label="Designation" value={grantor.designation} />
-                                        <ReadOnlyField label="Official Number" value={grantor.official_number} />
-                                        <ReadOnlyField label="Office Address" value={grantor.office_address} />
-                                        <ReadOnlyField label="Company Name" value={grantor.company_name} />
-                                        <ReadOnlyField label="Years in Company" value={grantor.years_in_company} />
-                                        <ReadOnlyField label="Monthly Income" value={grantor.monthly_income} />
-                                        <ReadOnlyField label="Business Name" value={grantor.business_name} />
-                                        <ReadOnlyField label="Established Since" value={grantor.established_since} />
-                                        <ReadOnlyField label="Business Address" value={grantor.business_address} />
-                                        <ReadOnlyField label="Net Income" value={grantor.net_income} />
-                                        <ReadOnlyField label="Full Residential Address" value={grantor.full_residential_address} />
-                                        <ReadOnlyField label="Relationship" value={grantor.relationship} />
-                                        <ReadOnlyField label="Nearest Location" value={grantor.nearest_location} />
-                                        <ReadOnlyField label="Verified" value={grantor.is_verified} />
+                                        {[
+                                            { label: "Name", field: "name" },
+                                            { label: "Father/Husband Name", field: "father_husband_name" },
+                                            { label: "Present Address", field: "present_address" },
+                                            { label: "Permanent Address", field: "permanent_address" },
+                                            { label: "CNIC Number", field: "cnic_number" },
+                                            { label: "Telephone Number", field: "telephone_number" },
+                                            { label: "Employment Type", field: "employment_type" },
+                                            { label: "Job Type", field: "job_type" },
+                                            { label: "Designation", field: "designation" },
+                                            { label: "Official Number", field: "official_number" },
+                                            { label: "Office Address", field: "office_address" },
+                                            { label: "Company Name", field: "company_name" },
+                                            { label: "Years in Company", field: "years_in_company" },
+                                            { label: "Monthly Income", field: "monthly_income" },
+                                            { label: "Business Name", field: "business_name" },
+                                            { label: "Established Since", field: "established_since" },
+                                            { label: "Business Address", field: "business_address" },
+                                            { label: "Net Income", field: "net_income" },
+                                            { label: "Full Residential Address", field: "full_residential_address" },
+                                            { label: "Relationship", field: "relationship" },
+                                            { label: "Nearest Location", field: "nearest_location" }
+                                        ].map(f => {
+                                            return isEditable ? (
+                                                <EditableField
+                                                    key={f.field}
+                                                    label={f.label}
+                                                    value={grantor[f.field]}
+                                                    fieldName={f.field}
+                                                    entityType="grantor"
+                                                    entityId={grantor.id}
+                                                    onSave={handleFieldSave}
+                                                    editHistory={grantor.edit_history || []}
+                                                />
+                                            ) : (
+                                                <Field key={f.field} label={f.label} value={grantor[f.field]} />
+                                            );
+                                        })}
                                     </div>
                                     {/* Grantor Documents */}
-                                    {hasDocuments && (
+                                    {verification.documents.filter((doc: any) => doc.person_type === `grantor${grantor.grantor_number}`).length > 0 && (
                                         <div className="mt-8">
                                             <h3 className="mb-4 text-xl font-semibold text-indigo-700 dark:text-indigo-400">Grantor {grantor.grantor_number} Uploaded Documents</h3>
                                             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                                                 {verification.documents.filter((doc: any) => doc.person_type === `grantor${grantor.grantor_number}`).map((doc: any) => (
-                                                    <DocumentCard key={doc.id} doc={doc} />
+                                                    <DocumentCard 
+                                                        key={doc.id} 
+                                                        doc={doc} 
+                                                        isEditable={isEditable}
+                                                        onEdit={handleMediaReplace}
+                                                        editHistory={verification.edit_history || []}
+                                                    />
                                                 ))}
                                             </div>
                                         </div>
@@ -1223,10 +1666,10 @@ export default function OrderDetailsPage() {
                             <div className="mb-12">
                                 <h2 className="mb-4 text-2xl font-semibold text-dark dark:text-white">Next of Kin Details</h2>
                                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-                                    <ReadOnlyField label="Name" value={verification.nextOfKin.name} />
-                                    <ReadOnlyField label="CNIC Number" value={verification.nextOfKin.cnic_number} />
-                                    <ReadOnlyField label="Relation" value={verification.nextOfKin.relation} />
-                                    <ReadOnlyField label="Phone Number" value={verification.nextOfKin.phone_number} />
+                                    <Field label="Name" value={verification.nextOfKin.name} />
+                                    <Field label="CNIC Number" value={verification.nextOfKin.cnic_number} />
+                                    <Field label="Relation" value={verification.nextOfKin.relation} />
+                                    <Field label="Phone Number" value={verification.nextOfKin.phone_number} />
                                 </div>
                             </div>
                         )}

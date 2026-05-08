@@ -38,7 +38,7 @@ export default function CustomerProfileModal({ open, onClose, data }: ProfileMod
         { id: "personal", label: "Identity", icon: <Fingerprint size={14} /> },
         { id: "employment", label: "Work Profile", icon: <Briefcase size={14} /> },
         { id: "guarantors", label: `Guarantors`, icon: <UserPlus size={14} /> },
-        { id: "financials", label: "Ledger Summary", icon: <Wallet size={14} /> },
+        ...(order.status === 'delivered' ? [{ id: "financials", label: "Ledger Summary", icon: <Wallet size={14} /> }] : []),
         { id: "documents", label: "Media Assets", icon: <ImageIcon size={14} /> },
     ];
 

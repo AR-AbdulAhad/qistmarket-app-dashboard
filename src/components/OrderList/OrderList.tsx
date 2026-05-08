@@ -73,6 +73,7 @@ interface OrderListProps {
   forcedChannel?: string
   hideActions?: boolean
   hideSelection?: boolean
+  showAllStatuses?: boolean
   onRowSelectionChange?: (selectedOrders: Order[]) => void
   customTopBarActions?: React.ReactNode
 }
@@ -95,7 +96,7 @@ interface PaginationInfo {
 // ─────────────────────────────────────────────────────────────────────────────
 // Main Component
 // ─────────────────────────────────────────────────────────────────────────────
-const OrderList = ({ forcedStatus, forcedChannel, hideActions, hideSelection, onRowSelectionChange, customTopBarActions }: OrderListProps) => {
+const OrderList = ({ forcedStatus, forcedChannel, hideActions, hideSelection, showAllStatuses, onRowSelectionChange, customTopBarActions }: OrderListProps) => {
   const router = useRouter()
   const [orders, setOrders] = useState<Order[]>([])
   const [pagination, setPagination] = useState<PaginationInfo>({
@@ -134,6 +135,7 @@ const OrderList = ({ forcedStatus, forcedChannel, hideActions, hideSelection, on
   const [dateRange, setDateRange] = useState('All')
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
+  const [statusFilter, setStatusFilter] = useState('All')
 
   // Action Modals
   const [editModalOpen, setEditModalOpen] = useState(false)
@@ -165,11 +167,15 @@ const OrderList = ({ forcedStatus, forcedChannel, hideActions, hideSelection, on
 
       if (forcedStatus) {
         params.append('status', forcedStatus)
+      } else if (showAllStatuses) {
+        if (statusFilter !== 'All') {
+          params.append('status', statusFilter)
+        }
       } else {
-        // Default for Order List page: new and pending
-        const statusFilter = columnFilters.find(f => f.id === 'status')
-        if (!statusFilter) {
-          params.append('status', 'new,pending')
+        // Default for New Orders page: srif new wale
+        const colStatusFilter = columnFilters.find(f => f.id === 'status')
+        if (!colStatusFilter) {
+          params.append('status', 'new')
         }
       }
 
@@ -239,7 +245,7 @@ const OrderList = ({ forcedStatus, forcedChannel, hideActions, hideSelection, on
 
   useEffect(() => {
     fetchOrders()
-  }, [pagination.page, pagination.limit, globalFilter, columnFilters, sorting, dateRange, startDate, endDate])
+  }, [pagination.page, pagination.limit, globalFilter, columnFilters, sorting, dateRange, startDate, endDate, statusFilter])
 
   useEffect(() => {
     fetchVerifiers()
@@ -1023,6 +1029,26 @@ const OrderList = ({ forcedStatus, forcedChannel, hideActions, hideSelection, on
             </select>
           </div>
 
+          {showAllStatuses && (
+            <div className="flex items-center">
+              <p className="pr-2 text-dark dark:text-current">Status:</p>
+              <select
+                value={statusFilter}
+                onChange={(e) => {
+                  setStatusFilter(e.target.value)
+                  setPagination((p) => ({ ...p, page: 1 }))
+                }}
+                className="rounded-lg border border-stroke bg-transparent px-3 py-1.5 outline-none focus:border-[#ff3d3d] dark:border-dark-3"
+              >
+                {["All", "new", "pending", "in_progress", "cancelled", "delivered", "completed", "expired"].map((s) => (
+                  <option key={s} value={s} className="dark:bg-dark-2">
+                    {s === "All" ? "All Statuses" : s.replace(/_/g, " ").charAt(0).toUpperCase() + s.replace(/_/g, " ").slice(1)}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           {dateRange === 'Custom Range' && (
             <div className="flex items-center gap-2">
               <input
@@ -1218,7 +1244,8 @@ const OrderList = ({ forcedStatus, forcedChannel, hideActions, hideSelection, on
                   <option key={cat} value={cat}>{cat}</option>
                 ))}
               </select>
-            </div>
+          </div>
+
             <div>
               <label className="block text-sm font-medium mb-1 dark:text-gray-300">Subcategory:</label>
               <select
@@ -1232,7 +1259,7 @@ const OrderList = ({ forcedStatus, forcedChannel, hideActions, hideSelection, on
                   <option key={sub} value={sub}>{sub}</option>
                 ))}
               </select>
-            </div>
+          </div>
           </div>
 
           <div>
