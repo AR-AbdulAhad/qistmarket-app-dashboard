@@ -2,6 +2,9 @@ import { useEffect, useState } from "react";
 import Cookies from "js-cookie";
 import dayjs from "dayjs";
 import { cn } from '@/lib/utils';
+import { MediaCard } from "./MediaCard";
+import toast from "react-hot-toast";
+import { useAuth } from "../../../contexts/AuthContext";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
 
@@ -11,115 +14,50 @@ const formatDateTimeUTC = (value?: string): string => {
     return parsed.isValid() ? parsed.format("MMM D, YYYY h:mm A") : value;
 };
 
-// DeliveryPhotoCard Component - For delivery uploads (similar to RecoveryPhotoCard)
-function DeliveryPhotoCard({ upload, index }: { upload: any; index: number }) {
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    
-    return (
-        <>
-            <div
-                onClick={() => setIsModalOpen(true)}
-                className="group relative overflow-hidden rounded-lg border border-stroke bg-white p-4 shadow-sm transition-all hover:shadow-md dark:border-dark-3 dark:bg-gray-800 cursor-pointer"
-            >
-                <h4 className="mb-2 font-medium text-gray-800 dark:text-gray-200 line-clamp-2">
-                    Delivery Upload #{index + 1}
-                </h4>
-                <div className="mb-3 text-xs text-gray-500 dark:text-gray-400 space-y-1">
-                    {upload.upload_type && (
-                        <p>Type: <span className="font-medium capitalize">{upload.upload_type.replace(/_/g, ' ')}</span></p>
-                    )}
-                    <p>Uploaded: <span className="font-medium">{formatDateTimeUTC(upload.uploaded_at)}</span></p>
-                </div>
-                <div className="relative aspect-[4/3] overflow-hidden rounded-md bg-gray-100 dark:bg-gray-700">
-                    {upload.file_url ? (
-                        <img
-                            src={upload.file_url}
-                            alt={`Delivery upload ${index + 1}`}
-                            className="h-full w-full object-cover transition-transform group-hover:scale-105"
-                        />
-                    ) : (
-                        <div className="flex h-full w-full items-center justify-center text-gray-400 text-xs text-center p-2">
-                            {upload.link ? <span className="text-primary underline font-medium">Document Link</span> : 'No Preview'}
-                        </div>
-                    )}
-                </div>
-                <div className="mt-3 inline-flex items-center text-sm font-medium text-primary hover:underline">
-                    <svg className="mr-1 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
-                    </svg>
-                    View Details →
-                </div>
-            </div>
-            
-            {isModalOpen && (
-                <div
-                    className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 p-4"
-                    onClick={() => setIsModalOpen(false)}
-                >
-                    <div
-                        className="relative max-w-4xl w-full max-h-[90vh] overflow-y-auto rounded-lg bg-white dark:bg-gray-800"
-                        onClick={(e) => e.stopPropagation()}
-                    >
-                        <button
-                            onClick={() => setIsModalOpen(false)}
-                            className="sticky top-2 right-2 z-10 float-right rounded-full bg-black bg-opacity-50 p-2 text-white hover:bg-opacity-70 transition-colors"
-                        >
-                            <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                        </button>
+// DeliveryPhotoCard Component - Now replaced by shared MediaCard
 
-                        <div className="p-4 border-b dark:border-dark-3 clear-both">
-                            <h3 className="text-xl font-bold dark:text-white">Delivery Upload Details</h3>
-                            <p className="text-sm text-gray-500 capitalize">{upload.upload_type?.replace(/_/g, ' ')}</p>
-                        </div>
-
-                        {/* Image container with better sizing */}
-                        <div className="p-4 flex items-center justify-center bg-gray-50 dark:bg-dark-2">
-                            {upload.file_url ? (
-                                <img
-                                    src={upload.file_url}
-                                    alt="Full size"
-                                    className="max-w-full max-h-[75vh] w-auto h-auto object-contain shadow-lg rounded"
-                                />
-                            ) : upload.link ? (
-                                <div className="p-8 text-center">
-                                    <p className="mb-4 dark:text-gray-300">This upload is a document link:</p>
-                                    <a 
-                                        href={upload.link} 
-                                        target="_blank" 
-                                        className="inline-block bg-primary text-white px-6 py-2 rounded-lg hover:bg-opacity-90 transition-all shadow-md font-bold"
-                                    >
-                                        Open Document in New Tab
-                                    </a>
-                                </div>
-                            ) : (
-                                <p className="dark:text-gray-400">No preview available</p>
-                            )}
-                        </div>
-
-                        <div className="p-4 bg-gray-50 dark:bg-dark-3 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                            <div>Uploaded: {formatDateTimeUTC(upload.uploaded_at)}</div>
-                            {upload.tag && <div>Tag: <span className="font-medium text-dark dark:text-white px-2 py-0.5 bg-gray-200 dark:bg-gray-700 rounded">{upload.tag}</span></div>}
-                        </div>
-                    </div>
-                </div>
-            )} 
-        </>
-    );
-}
-
-export default function DeliveredProductDetails({ orderId }: { orderId: string | number }) {
+export default function DeliveredProductDetails({ 
+    orderId, 
+    editHistory = [],
+    onRefresh
+}: { 
+    orderId: string | number,
+    editHistory?: any[],
+    onRefresh?: () => Promise<void> | void
+}) {
     const [deliveredProduct, setDeliveredProduct] = useState<any>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [expandedInstallments, setExpandedInstallments] = useState(true);
+    const { user } = useAuth();
 
     useEffect(() => {
         if (orderId) {
             fetchDeliveredProductDetails();
         }
     }, [orderId]);
+
+    const handleReplaceMedia = async (file: File, uploadId: number) => {
+        const token = Cookies.get('auth_token');
+        const formData = new FormData();
+        formData.append('file', file);
+
+        try {
+            const res = await fetch(`${BACKEND_URL}/api/delivery/upload/${uploadId}/replace`, {
+                method: 'PUT',
+                headers: { Authorization: `Bearer ${token}` },
+                body: formData
+            });
+
+            if (!res.ok) throw new Error('Replacement failed');
+            toast.success('Delivery upload replaced successfully');
+            await fetchDeliveredProductDetails();
+            if (onRefresh) await onRefresh();
+        } catch (err: any) {
+            console.error(err);
+            toast.error(err.message || 'Failed to replace media');
+        }
+    };
 
     const fetchDeliveredProductDetails = async () => {
         if (!orderId) return;
@@ -333,7 +271,18 @@ export default function DeliveredProductDetails({ orderId }: { orderId: string |
                         </h3>
                         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
                             {deliveredProduct.delivery_details.uploads.map((upload: any, idx: number) => (
-                                <DeliveryPhotoCard key={upload.id || idx} upload={upload} index={idx} />
+                                <MediaCard
+                                    key={upload.id || idx}
+                                    id={upload.id}
+                                    title={`Delivery Upload #${idx + 1}`}
+                                    subtitle={upload.upload_type?.replace(/_/g, ' ')}
+                                    fileUrl={upload.file_url}
+                                    uploadedAt={upload.uploaded_at}
+                                    isEditable={user?.role === 'Super Admin'}
+                                    onEdit={(file) => handleReplaceMedia(file, upload.id)}
+                                    editHistory={editHistory}
+                                    historyFilter={(h) => h.entity_type === 'delivery_upload' && h.entity_id === upload.id}
+                                />
                             ))}
                         </div>
                     </div>

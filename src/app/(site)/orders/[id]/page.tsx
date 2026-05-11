@@ -13,6 +13,8 @@ import utc from "dayjs/plugin/utc";
 import { useAuth } from '../../../../../contexts/AuthContext';
 import DeliveredProductDetails from '@/components/common/DeliveredProductDetails';
 import RecoveryVisitDetails from '@/components/common/RecoveryVisitDetails';
+import { MediaCard } from '@/components/common/MediaCard';
+import { MediaReplaceModal } from '@/components/common/MediaReplaceModal';
 
 // --- Editable Field Component ---
 const EditableField = ({
@@ -153,355 +155,12 @@ const EditableField = ({
                 </div>
             )}
         </div>
-    )
-}
-
-function MediaReplaceModal({
-    open,
-    onClose,
-    file,
-    onConfirm,
-    isUploading
-}: {
-    open: boolean;
-    onClose: () => void;
-    file: File | null;
-    onConfirm: () => Promise<void>;
-    isUploading: boolean;
-}) {
-    const [preview, setPreview] = useState<string | null>(null)
-
-    useEffect(() => {
-        if (file) {
-            const objectUrl = URL.createObjectURL(file)
-            setPreview(objectUrl)
-            return () => URL.revokeObjectURL(objectUrl)
-        } else {
-            setPreview(null)
-        }
-    }, [file])
-
-    if (!open || !file) return null
-
-    return (
-        <div className="fixed inset-0 z-[10001] flex items-center justify-center bg-black bg-opacity-75 p-4 backdrop-blur-sm">
-            <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl dark:bg-gray-800">
-                <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-xl font-bold text-dark dark:text-white">Preview New Document</h3>
-                    <button onClick={onClose} disabled={isUploading} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
-                        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                    </button>
-                </div>
-
-                <p className="mb-6 text-sm text-gray-500 dark:text-gray-400">
-                    You are about to replace the existing document with the one shown below. Please confirm if this is correct.
-                </p>
-
-                <div className="relative mb-8 aspect-[4/3] overflow-hidden rounded-xl border-2 border-dashed border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-dark-3 flex items-center justify-center">
-                    {preview ? (
-                        <img src={preview} alt="Preview" className="h-full w-full object-contain" />
-                    ) : (
-                        <div className="text-gray-400 text-center">
-                            <svg className="w-12 h-12 mx-auto mb-2 opacity-20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                            </svg>
-                            <span>No image selected</span>
-                        </div>
-                    )}
-                </div>
-
-                <div className="flex gap-4">
-                    <button
-                        onClick={onConfirm}
-                        disabled={isUploading}
-                        className="flex flex-1 items-center justify-center rounded-lg bg-primary px-4 py-3 font-semibold text-white shadow-md transition-all hover:bg-primary/90 disabled:bg-gray-400"
-                    >
-                        {isUploading ? (
-                            <>
-                                <svg className="mr-2 h-4 w-4 animate-spin" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path></svg>
-                                Uploading...
-                            </>
-                        ) : (
-                            'Confirm & Replace'
-                        )}
-                    </button>
-                    <button
-                        onClick={onClose}
-                        disabled={isUploading}
-                        className="flex-1 rounded-lg border border-stroke bg-gray-100 px-4 py-3 font-semibold text-gray-700 transition-all hover:bg-gray-200 dark:border-dark-3 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
-                    >
-                        Cancel
-                    </button>
-                </div>
-            </div>
-        </div>
-    )
-}
-
-function DocumentCard({
-    doc,
-    onEdit,
-    editHistory = [],
-    isEditable = false
-}: {
-    doc: any,
-    onEdit?: (file: File, documentId: number, documentType: string, personType: string, personId: number | null) => Promise<void>,
-    editHistory?: any[],
-    isEditable?: boolean
-}) {
-    const [isModalOpen, setIsModalOpen] = useState(false)
-    const [isReplaceModalOpen, setIsReplaceModalOpen] = useState(false)
-    const [showHistory, setShowHistory] = useState(false)
-    const [selectedFile, setSelectedFile] = useState<File | null>(null)
-    const [isUploading, setIsUploading] = useState(false)
-    const fileInputRef = useRef<HTMLInputElement>(null)
-
-    const fieldHistory = editHistory.filter(h =>
-        h.field_name === doc.document_type &&
-        (h.entity_type === doc.person_type || (h.entity_id !== null && h.entity_id === doc.person_id))
-    )
-
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0]
-        if (!file) return
-        setSelectedFile(file)
-        setIsReplaceModalOpen(true)
-        e.target.value = ''
-    }
-
-    const handleConfirmUpload = async () => {
-        if (!selectedFile || !onEdit) return
-        setIsUploading(true)
-        try {
-            await onEdit(selectedFile, doc.id, doc.document_type, doc.person_type, doc.person_id)
-            setIsReplaceModalOpen(false)
-            setSelectedFile(null)
-        } catch (err) {
-            console.error(err)
-        } finally {
-            setIsUploading(false)
-        }
-    }
-
-    return (
-        <>
-            <div
-                className="group relative overflow-hidden rounded-lg border border-stroke bg-white p-4 shadow-sm transition-all hover:shadow-md dark:border-dark-3 dark:bg-gray-800"
-            >
-                <div className="flex justify-between items-start mb-2">
-                    <div>
-                        <h4 className="font-medium text-gray-800 dark:text-gray-200 line-clamp-2">
-                            {doc.label || doc.document_type}
-                        </h4>
-                        {fieldHistory.length > 0 && (
-                            <button
-                                onClick={() => setShowHistory(!showHistory)}
-                                className="mt-0.5 text-[10px] text-blue-600 hover:underline flex items-center gap-0.5"
-                            >
-                                <span className="flex items-center gap-1">
-                                    📋 {fieldHistory.length} edit{fieldHistory.length > 1 ? 's' : ''}
-                                </span>
-                            </button>
-                        )}
-                    </div>
-                    <div className="flex gap-1">
-                        {isEditable && onEdit && (
-                            <button
-                                onClick={() => fileInputRef.current?.click()}
-                                className="p-1.5 rounded-full bg-gray-100 hover:bg-primary hover:text-white dark:bg-gray-700 dark:hover:bg-primary transition-colors text-gray-500 dark:text-gray-400 shadow-sm"
-                                title="Replace Media"
-                            >
-                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                                </svg>
-                            </button>
-                        )}
-                        <input
-                            type="file"
-                            ref={fileInputRef}
-                            className="hidden"
-                            onChange={handleFileChange}
-                            accept="image/*"
-                        />
-                        <button
-                            onClick={() => setIsModalOpen(true)}
-                            className="p-1.5 rounded-full bg-gray-100 hover:bg-blue-600 hover:text-white dark:bg-gray-700 dark:hover:bg-blue-600 transition-colors text-gray-500 dark:text-gray-400 shadow-sm"
-                            title="View Full Size"
-                        >
-                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
-                            </svg>
-                        </button>
-                    </div>
-                </div>
-                <div className="mb-3 text-xs text-gray-500 dark:text-gray-400 space-y-1">
-                    <p>Type: <span className="font-medium capitalize">{doc.document_type.replace('_', ' ')}</span></p>
-                    <p>Uploaded: <span className="font-medium">{formatDateTimeUTC(doc.uploaded_at)}</span></p>
-                </div>
-                <div
-                    className="relative aspect-[4/3] overflow-hidden rounded-md bg-gray-100 dark:bg-gray-700 cursor-pointer"
-                    onClick={() => setIsModalOpen(true)}
-                >
-                    <img
-                        src={doc.file_url}
-                        alt={doc.label || doc.document_type}
-                        className="h-full w-full object-cover transition-transform group-hover:scale-105"
-                    />
-                </div>
-                <div
-                    className="mt-3 inline-flex items-center text-sm font-medium text-[#ff3d3d] hover:underline cursor-pointer"
-                    onClick={() => setIsModalOpen(true)}
-                >
-                    View Full Size →
-                </div>
-
-                {/* History Popup */}
-                {showHistory && fieldHistory.length > 0 && (
-                    <div className="absolute z-20 mt-1 right-2 left-2 top-10 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl p-3 animate-in fade-in zoom-in duration-200 ring-1 ring-black/5">
-                        <div className="flex justify-between items-center mb-2 border-b border-gray-100 dark:border-gray-700 pb-1.5">
-                            <span className="text-[11px] font-bold text-gray-700 dark:text-gray-300">Edit History</span>
-                            <button onClick={() => setShowHistory(false)} className="text-gray-400 hover:text-red-500">
-                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                </svg>
-                            </button>
-                        </div>
-                        <div className="space-y-4 max-h-56 overflow-y-auto pr-1">
-                            {fieldHistory.map((history: any) => (
-                                <div key={history.id} className="text-[10px] border-b border-gray-50 dark:border-gray-700 pb-3 last:border-0 last:pb-0">
-                                    <div className="flex justify-between text-gray-500 mb-1.5">
-                                        <span className="font-bold text-blue-600 dark:text-blue-400">{history.edited_by_name}</span>
-                                        <span className="bg-gray-100 dark:bg-gray-700 px-1 rounded">{formatDateTimeUTC(history.edited_at)}</span>
-                                    </div>
-                                    <div className="flex gap-2 items-start">
-                                        <div className="flex-1">
-                                            <span className="text-gray-400 block mb-1 text-[9px] uppercase tracking-wider font-semibold">Previous</span>
-                                            {history.old_value ? (
-                                                <a href={history.old_value} target="_blank" rel="noreferrer" className="group/old block relative aspect-video rounded overflow-hidden border border-gray-200 dark:border-gray-600 hover:border-blue-400 transition-colors bg-gray-50 dark:bg-dark-3">
-                                                    <img src={history.old_value} alt="Old" className="h-full w-full object-cover opacity-50 grayscale transition-all group-hover/old:opacity-80 group-hover/old:grayscale-0" />
-                                                </a>
-                                            ) : (
-                                                <div className="aspect-video rounded border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-dark-3 flex items-center justify-center text-gray-400 italic">
-                                                    Initial upload
-                                                </div>
-                                            )}
-                                        </div>
-                                        <div className="pt-5 text-gray-400">
-                                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
-                                            </svg>
-                                        </div>
-                                        <div className="flex-1">
-                                            <span className="text-gray-400 block mb-1 text-[9px] uppercase tracking-wider font-semibold text-blue-500">Replaced With</span>
-                                            <a href={history.new_value} target="_blank" rel="noreferrer" className="group/new block relative aspect-video rounded overflow-hidden border border-blue-200 dark:border-blue-700 hover:border-blue-400 transition-colors bg-gray-50 dark:bg-dark-3 shadow-sm">
-                                                <img src={history.new_value} alt="New" className="h-full w-full object-cover transition-transform group-hover/new:scale-110" />
-                                            </a>
-                                        </div>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                )}
-            </div>
-
-            <MediaReplaceModal
-                open={isReplaceModalOpen}
-                onClose={() => {
-                    setIsReplaceModalOpen(false);
-                    setSelectedFile(null);
-                }}
-                file={selectedFile}
-                onConfirm={handleConfirmUpload}
-                isUploading={isUploading}
-            />
-
-            {isModalOpen && (
-                <div
-                    className="fixed inset-0 z-[10002] flex items-center justify-center bg-black bg-opacity-75 p-4"
-                    onClick={() => setIsModalOpen(false)}
-                >
-                    <div
-                        className="relative max-w-4xl max-h-[90vh] overflow-hidden rounded-lg bg-white dark:bg-gray-800"
-                        onClick={(e) => e.stopPropagation()}
-                    >
-                        <button
-                            onClick={() => setIsModalOpen(false)}
-                            className="absolute right-2 top-2 z-10 rounded-full bg-black bg-opacity-50 p-2 text-white hover:bg-opacity-70"
-                        >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                        </button>
-                        <img
-                            src={doc.file_url}
-                            alt={doc.label || doc.document_type}
-                            className="max-h-[90vh] w-auto object-contain"
-                        />
-                    </div>
-                </div>
-            )}
-        </>
     );
-}
+};
 
-function LocationPhotoCard({ photo, label }: { photo: { file_url: string, uploaded_at: string }, label: string }) {
-    const [isModalOpen, setIsModalOpen] = useState(false)
+// Reusable Media Components have been moved to shared components directory.
 
-    return (
-        <>
-            <div
-                onClick={() => setIsModalOpen(true)}
-                className="group relative overflow-hidden rounded-lg border border-stroke bg-white p-4 shadow-sm transition-all hover:shadow-md dark:border-dark-3 dark:bg-gray-800 cursor-pointer"
-            >
-                <h4 className="mb-2 font-medium text-gray-800 dark:text-gray-200">
-                    {label} - Location Photo
-                </h4>
-                <div className="mb-3 text-xs text-gray-500 dark:text-gray-400">
-                    <p>Uploaded: {new Date(photo.uploaded_at).toLocaleString()}</p>
-                </div>
-                <div className="relative aspect-[4/3] overflow-hidden rounded-md bg-gray-100 dark:bg-gray-700">
-                    <img
-                        src={photo.file_url}
-                        alt={`Location photo for ${label}`}
-                        className="h-full w-full object-cover transition-transform group-hover:scale-105"
-                    />
-                </div>
-                <div className="mt-3 inline-flex items-center text-sm font-medium text-[#ff3d3d] hover:underline">
-                    Click to view full size →
-                </div>
-            </div>
-
-            {isModalOpen && (
-                <div
-                    className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75 p-4"
-                    onClick={() => setIsModalOpen(false)}
-                >
-                    <div
-                        className="relative max-w-4xl max-h-[90vh] overflow-hidden rounded-lg bg-white dark:bg-gray-800"
-                        onClick={(e) => e.stopPropagation()}
-                    >
-                        <button
-                            onClick={() => setIsModalOpen(false)}
-                            className="absolute right-2 top-2 z-10 rounded-full bg-black bg-opacity-50 p-2 text-white hover:bg-opacity-70"
-                        >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                        </button>
-                        <img
-                            src={photo.file_url}
-                            alt={`Location photo for ${label}`}
-                            className="max-h-[90vh] w-auto object-contain"
-                        />
-                    </div>
-                </div>
-            )}
-        </>
-    )
-}
+// LocationPhotoCard Component - Now replaced by shared MediaCard
 
 // --- Verification Data Types (copied from verification page) ---
 interface VerificationReview {
@@ -770,6 +429,22 @@ export default function OrderDetailsPage() {
 
         if (!res.ok) throw new Error('Media replacement failed');
         toast.success('Media replaced successfully');
+        await fetchVerification();
+    };
+
+    const handleLocationMediaReplace = async (file: File, photoId: number) => {
+        const token = Cookies.get('auth_token');
+        const formData = new FormData();
+        formData.append('file', file);
+
+        const res = await fetch(`${BACKEND_URL}/api/location-photo/${photoId}/replace`, {
+            method: 'PUT',
+            headers: { Authorization: `Bearer ${token}` },
+            body: formData
+        });
+
+        if (!res.ok) throw new Error('Location media replacement failed');
+        toast.success('Location photo replaced successfully');
         await fetchVerification();
     };
 
@@ -1580,12 +1255,20 @@ export default function OrderDetailsPage() {
                                         <h3 className="mb-4 text-xl font-semibold text-blue-700 dark:text-blue-400">Purchaser Uploaded Documents</h3>
                                         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                                             {verification.documents.filter((doc: any) => doc.person_type === 'purchaser').map((doc: any) => (
-                                                <DocumentCard 
+                                                <MediaCard 
                                                     key={doc.id} 
-                                                    doc={doc} 
+                                                    id={doc.id}
+                                                    title={doc.label || doc.document_type}
+                                                    subtitle={doc.document_type?.replace(/_/g, ' ')}
+                                                    fileUrl={doc.file_url}
+                                                    uploadedAt={doc.uploaded_at}
                                                     isEditable={user?.role === 'Super Admin' && order.status === 'delivered'}
-                                                    onEdit={handleMediaReplace}
+                                                    onEdit={(file) => handleMediaReplace(file, doc.id, doc.document_type, doc.person_type, doc.person_id)}
                                                     editHistory={verification.edit_history || []}
+                                                    historyFilter={(h) => 
+                                                        h.field_name === doc.document_type && 
+                                                        (h.entity_type === doc.person_type || (h.entity_id !== null && h.entity_id === doc.person_id))
+                                                    }
                                                 />
                                             ))}
                                         </div>
@@ -1646,12 +1329,20 @@ export default function OrderDetailsPage() {
                                             <h3 className="mb-4 text-xl font-semibold text-indigo-700 dark:text-indigo-400">Grantor {grantor.grantor_number} Uploaded Documents</h3>
                                             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                                                 {verification.documents.filter((doc: any) => doc.person_type === `grantor${grantor.grantor_number}`).map((doc: any) => (
-                                                    <DocumentCard 
+                                                    <MediaCard 
                                                         key={doc.id} 
-                                                        doc={doc} 
+                                                        id={doc.id}
+                                                        title={doc.label || doc.document_type}
+                                                        subtitle={doc.document_type?.replace(/_/g, ' ')}
+                                                        fileUrl={doc.file_url}
+                                                        uploadedAt={doc.uploaded_at}
                                                         isEditable={isEditable}
-                                                        onEdit={handleMediaReplace}
+                                                        onEdit={(file) => handleMediaReplace(file, doc.id, doc.document_type, doc.person_type, doc.person_id)}
                                                         editHistory={verification.edit_history || []}
+                                                        historyFilter={(h) => 
+                                                            h.field_name === doc.document_type && 
+                                                            (h.entity_type === doc.person_type || (h.entity_id !== null && h.entity_id === doc.person_id))
+                                                        }
                                                     />
                                                 ))}
                                             </div>
@@ -1757,7 +1448,18 @@ export default function OrderDetailsPage() {
                                                             <h4 className="mb-3 font-medium text-gray-700 dark:text-gray-300">Photos</h4>
                                                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                                                                 {loc.photos.map((photo: any) => (
-                                                                    <LocationPhotoCard key={photo.id} photo={photo} label={loc.label} />
+                                                                    <MediaCard 
+                                                                        key={photo.id} 
+                                                                        id={photo.id}
+                                                                        title={`${loc.label} - Photo`}
+                                                                        fileUrl={photo.file_url}
+                                                                        uploadedAt={photo.uploaded_at}
+                                                                        isEditable={user?.role === 'Super Admin' && order.status === 'delivered'}
+                                                                                                                                                 onEdit={(file) => handleLocationMediaReplace(file, photo.id)}
+                                                                         editHistory={verification?.edit_history}
+                                                                         historyFilter={(h) => h.entity_type === 'location_photo' && h.entity_id === photo.id}
+
+                                                                    />
                                                                 ))}
                                                             </div>
                                                         </div>
@@ -1775,14 +1477,22 @@ export default function OrderDetailsPage() {
 
             {(order.status === 'delivered') && (
                 <div className="mt-10">
-                    <DeliveredProductDetails orderId={order.id} />
+                    <DeliveredProductDetails 
+                        orderId={order.id} 
+                        editHistory={verification?.edit_history} 
+                        onRefresh={fetchVerification}
+                    />
                 </div>
             )}
 
             {/* Recovery Visits Section - Show for all orders that might have recovery visits */}
             {(order.recovery_officer_id) && (
                 <div className="mt-10">
-                    <RecoveryVisitDetails orderId={order.id} />
+                    <RecoveryVisitDetails 
+                        orderId={order.id} 
+                        editHistory={verification?.edit_history} 
+                        onRefresh={fetchVerification}
+                    />
                 </div>
             )}
 

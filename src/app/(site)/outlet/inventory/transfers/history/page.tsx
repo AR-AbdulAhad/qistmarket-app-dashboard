@@ -232,7 +232,8 @@ export default function TransferHistoryPage() {
                                 <th className="p-4">Variant</th>
                                 <th className="p-4 text-center">Total Units</th>
                                 <th className="p-4">Recipient</th>
-                                <th className="p-4 text-center">Status</th>
+                                <th className="p-4 text-center">Transfer Status</th>
+                                <th className="p-4 text-center">Delivery Status</th>
                                 <th className="p-4 text-right">Last Transfer</th>
                             </tr>
                         </thead>
@@ -292,6 +293,9 @@ export default function TransferHistoryPage() {
                                                 </div>
                                             </td>
 
+                                            <td className="p-4 text-center">
+                                                <span className="px-2 py-1 bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400 rounded-md text-[10px] font-bold uppercase tracking-wider border border-green-100 dark:border-green-800">Transferred</span>
+                                            </td>
                                             <td className="p-4 text-center">
                                                 {grp.records.some(r => r.status === 'pending') ? (
                                                     <span className="px-2 py-1 bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400 rounded-md text-[10px] font-bold uppercase tracking-wider border border-amber-100 dark:border-amber-800">Pending</span>

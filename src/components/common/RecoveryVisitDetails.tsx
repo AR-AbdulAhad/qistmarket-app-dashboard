@@ -2,6 +2,9 @@ import { useEffect, useState } from "react";
 import Cookies from "js-cookie";
 import { cn } from '@/lib/utils';
 import dayjs from "dayjs";
+import { MediaCard } from "./MediaCard";
+import toast from "react-hot-toast";
+import { useAuth } from "../../../contexts/AuthContext";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
 
@@ -11,91 +14,50 @@ const formatDateTimeUTC = (value?: string): string => {
     return parsed.isValid() ? parsed.format("MMM D, YYYY h:mm A") : value;
 };
 
-// RecoveryPhotoCard Component - For recovery visit photos
-function RecoveryPhotoCard({ photo, visitNumber, photoIndex }: { photo: any; visitNumber: number; photoIndex: number }) {
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    
-    return (
-        <>
-            <div
-                onClick={() => setIsModalOpen(true)}
-                className="group relative overflow-hidden rounded-lg border border-stroke bg-white p-4 shadow-sm transition-all hover:shadow-md dark:border-dark-3 dark:bg-gray-800 cursor-pointer"
-            >
-                <h4 className="mb-2 font-medium text-gray-800 dark:text-gray-200 line-clamp-2">
-                    Recovery Visit #{visitNumber} - Photo {photoIndex + 1}
-                </h4>
-                <div className="mb-3 text-xs text-gray-500 dark:text-gray-400 space-y-1">
-                    {photo.photo_type && (
-                        <p>Type: <span className="font-medium capitalize">{photo.photo_type.replace('_', ' ')}</span></p>
-                    )}
-                    <p>Uploaded: <span className="font-medium">{formatDateTimeUTC(photo.uploaded_at)}</span></p>
-                </div>
-                <div className="relative aspect-[4/3] overflow-hidden rounded-md bg-gray-100 dark:bg-gray-700">
-                    <img
-                        src={photo.file_url}
-                        alt={`Recovery visit ${visitNumber} photo ${photoIndex + 1}`}
-                        className="h-full w-full object-cover transition-transform group-hover:scale-105"
-                    />
-                </div>
-                <div className="mt-3 inline-flex items-center text-sm font-medium text-primary hover:underline">
-                    <svg className="mr-1 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
-                    </svg>
-                    Click to view full size →
-                </div>
-            </div>
-            
-            {isModalOpen && (
-                <div
-                    className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75 p-4"
-                    onClick={() => setIsModalOpen(false)}
-                >
-                    <div
-                        className="relative max-w-4xl max-h-[90vh] overflow-hidden rounded-lg bg-white dark:bg-gray-800"
-                        onClick={(e) => e.stopPropagation()}
-                    >
-                        <button
-                            onClick={() => setIsModalOpen(false)}
-                            className="absolute right-2 top-2 z-10 rounded-full bg-black bg-opacity-50 p-2 text-white hover:bg-opacity-70 transition-colors"
-                        >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                        </button>
-                        <img
-                            src={photo.file_url}
-                            alt={`Recovery visit photo`}
-                            className="max-h-[90vh] w-auto object-contain"
-                        />
-                        {/* Photo Info Footer */}
-                        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black to-transparent p-4">
-                            <div className="text-white">
-                                <p className="text-sm font-medium">
-                                    {photo.photo_type ? `Type: ${photo.photo_type.replace('_', ' ')}` : 'Recovery Visit Photo'}
-                                </p>
-                                <p className="text-xs opacity-75">
-                                    Uploaded: {formatDateTimeUTC(photo.uploaded_at)}
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
-        </>
-    );
-}
+// RecoveryPhotoCard Component - Now replaced by shared MediaCard
 
-export default function RecoveryVisitDetails({ orderId }: { orderId: string | number }) {
+export default function RecoveryVisitDetails({ 
+    orderId,
+    editHistory = [],
+    onRefresh
+}: { 
+    orderId: string | number,
+    editHistory?: any[],
+    onRefresh?: () => Promise<void> | void
+}) {
     const [recoveryVisits, setRecoveryVisits] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [expandedVisit, setExpandedVisit] = useState<number | null>(null);
+    const { user } = useAuth();
 
     useEffect(() => {
         if (orderId) {
             fetchRecoveryVisits();
         }
     }, [orderId]);
+
+    const handleReplaceMedia = async (file: File, photoId: number) => {
+        const token = Cookies.get('auth_token');
+        const formData = new FormData();
+        formData.append('file', file);
+
+        try {
+            const res = await fetch(`${BACKEND_URL}/api/recovery/visit-photo/${photoId}/replace`, {
+                method: 'PUT',
+                headers: { Authorization: `Bearer ${token}` },
+                body: formData
+            });
+
+            if (!res.ok) throw new Error('Replacement failed');
+            toast.success('Recovery visit photo replaced successfully');
+            await fetchRecoveryVisits();
+            if (onRefresh) await onRefresh();
+        } catch (err: any) {
+            console.error(err);
+            toast.error(err.message || 'Failed to replace media');
+        }
+    };
 
     const fetchRecoveryVisits = async () => {
         if (!orderId) return;
@@ -428,11 +390,17 @@ export default function RecoveryVisitDetails({ orderId }: { orderId: string | nu
                                     </h4>
                                     <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                                         {visit.photos.map((photo: any, photoIdx: number) => (
-                                            <RecoveryPhotoCard 
+                                            <MediaCard
                                                 key={photo.id || photoIdx}
-                                                photo={photo}
-                                                visitNumber={index + 1}
-                                                photoIndex={photoIdx}
+                                                id={photo.id}
+                                                title={`Visit #${index + 1} - Photo ${photoIdx + 1}`}
+                                                subtitle={photo.photo_type?.replace(/_/g, ' ')}
+                                                fileUrl={photo.file_url}
+                                                uploadedAt={photo.uploaded_at}
+                                                isEditable={user?.role === 'Super Admin'}
+                                                onEdit={(file) => handleReplaceMedia(file, photo.id)}
+                                                editHistory={editHistory}
+                                                historyFilter={(h) => h.entity_type === 'recovery_visit_photo' && h.entity_id === photo.id}
                                             />
                                         ))}
                                     </div>
