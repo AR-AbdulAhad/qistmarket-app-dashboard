@@ -5,7 +5,7 @@ export default function ExpiredOrdersPage() {
     return (
         <div>
             <Breadcrumb pageName="Expired Orders" />
-            <OrderList forcedStatus="expired" hideActions hideSelection />
+            <OrderList forcedStatus="expired" hideSelection />
         </div>
     );
 }

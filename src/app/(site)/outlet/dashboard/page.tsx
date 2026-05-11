@@ -29,6 +29,7 @@ type Stats = {
     cancelledOrders: number;
     deliveryPending: number;
     delivered: number;
+    rejectedOrders: number;
     expiredOrders: number;
   };
   performance: {
@@ -153,8 +154,8 @@ export default function OutletDashboardPage() {
   // Donut chart: Order status breakdown
   const orderDonutOptions: ApexOptions = {
     chart: { type: "donut", fontFamily: "inherit" },
-    labels: ["Today's Orders", "Pending Verification", "Approved", "Delivery Pending", "Cancelled", "Delivered", "Expired"],
-    colors: ["#3C50E0", "#F59E0B", "#10B981", "#8B5CF6", "#EF4444", "#3C50E0", "#F59E0B", "#10B981", "#8B5CF6", "#EF4444"],
+    labels: ["Today's Orders", "Pending Verification", "Approved", "Picked Orders", "Delivered", "Cancelled", "Rejected", "Expired"],
+    colors: ["#3C50E0", "#F59E0B", "#10B981", "#8B5CF6", "#3C50E0", "#EF4444", "#F43F5E", "#F59E0B"],
     plotOptions: { pie: { donut: { size: "68%" } } },
     dataLabels: { enabled: false },
     legend: { position: "bottom", fontFamily: "inherit", fontSize: "12px" },
@@ -166,8 +167,9 @@ export default function OutletDashboardPage() {
         stats.orders.pendingVerification,
         stats.orders.approvedOrders,
         stats.orders.deliveryPending,
-        stats.orders.cancelledOrders,
         stats.orders.delivered,
+        stats.orders.cancelledOrders,
+        stats.orders.rejectedOrders,
         stats.orders.expiredOrders,
       ]
     : [0, 0, 0, 0, 0];
@@ -304,9 +306,10 @@ export default function OutletDashboardPage() {
           />
           <StatCard
             icon={Truck}
-            label="Delivery Pending"
+            label="Picked Orders"
             value={stats?.orders.deliveryPending ?? 0}
-            accent="bg-violet-500"
+            accent="bg-purple-500"
+            onClick={() => router.push("/picked-orders")}
           />
             <StatCard
               icon={CheckCircle}
@@ -321,6 +324,13 @@ export default function OutletDashboardPage() {
             value={stats?.orders.cancelledOrders ?? 0}
             accent="bg-red-500"
             onClick={() => router.push("/cancelled-orders")}
+          />
+          <StatCard
+            icon={XCircle}
+            label="Rejected Orders"
+            value={stats?.orders.rejectedOrders ?? 0}
+            accent="bg-rose-500"
+            onClick={() => router.push("/rejected-orders")}
           />
           <StatCard
             icon={Clock}

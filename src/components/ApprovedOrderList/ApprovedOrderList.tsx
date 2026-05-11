@@ -107,6 +107,7 @@ interface PaginationInfo {
 // ─────────────────────────────────────────────────────────────────────────────
 const ApprovedOrderList = () => {
   const { user } = useAuth();
+  const isSalesOfficer = (user?.role || '').toLowerCase() === 'sales officer';
   const [orders, setOrders] = useState<Order[]>([])
   const [pagination, setPagination] = useState<PaginationInfo>({
     page: 1,
@@ -557,30 +558,33 @@ const ApprovedOrderList = () => {
                 >
                   <ul className="overflow-hidden text-sm font-medium text-current">
 
-                    {order.delivery_officer ? (
-                      <li>
-                        <button
-                          onClick={() => {
-                            handleUnassignClick(order);
-                            setIsOpen(false);
-                          }}
-                          className="block w-full px-4 py-2.5 text-left hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/30 dark:hover:text-red-400"
-                        >
-                          Unassign Delivery
-                        </button>
-                      </li>
-                    ) : (
-                      <li>
-                        <button
-                          onClick={() => {
-                            handleAssignClick(order);
-                            setIsOpen(false);
-                          }}
-                          className="block w-full px-4 py-2.5 text-left hover:bg-[#F5F7FD] hover:text-[#ff3d3d] dark:hover:bg-dark-3 dark:hover:text-neutral-50"
-                        >
-                          Assign Delivery
-                        </button>
-                      </li>
+                    {/* Only show Assign/Unassign Delivery for non-Sales Officers */}
+                    {!isSalesOfficer && (
+                      order.delivery_officer ? (
+                        <li>
+                          <button
+                            onClick={() => {
+                              handleUnassignClick(order);
+                              setIsOpen(false);
+                            }}
+                            className="block w-full px-4 py-2.5 text-left hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/30 dark:hover:text-red-400"
+                          >
+                            Unassign Delivery
+                          </button>
+                        </li>
+                      ) : (
+                        <li>
+                          <button
+                            onClick={() => {
+                              handleAssignClick(order);
+                              setIsOpen(false);
+                            }}
+                            className="block w-full px-4 py-2.5 text-left hover:bg-[#F5F7FD] hover:text-[#ff3d3d] dark:hover:bg-dark-3 dark:hover:text-neutral-50"
+                          >
+                            Assign Delivery
+                          </button>
+                        </li>
+                      )
                     )}
 
                     <li>
@@ -734,7 +738,7 @@ const ApprovedOrderList = () => {
       </div>
 
       {/* Bulk actions */}
-      {selectedCount > 0 && (
+      {selectedCount > 0 && !isSalesOfficer && (
         <div className="px-7.5 pb-4 flex flex-wrap gap-4">
           <button
             onClick={handleBulkAssign}

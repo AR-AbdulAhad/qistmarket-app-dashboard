@@ -120,6 +120,7 @@ interface CustomerInfo {
   city: string | null
   area: string | null
   profile_photo: string | null
+  created_at?: string
 }
 
 interface CustomerGroup {
@@ -265,6 +266,27 @@ const CustomerList = () => {
       accessorFn: (row) => row.customer.area || 'N/A',
       header: 'Area',
       enableColumnFilter: true,
+    },
+    {
+      id: 'created_at',
+      accessorFn: (row) => row.customer.created_at,
+      header: 'Date & Time',
+      enableColumnFilter: false,
+      cell: ({ getValue }) => {
+        const val = getValue() as string
+        if (!val) return '-'
+        const date = new Date(val)
+        return (
+          <div className="flex flex-col">
+            <span className="font-medium text-dark dark:text-white">
+              {date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+            </span>
+            <span className="text-[10px] text-gray-500 dark:text-gray-400">
+              {date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}
+            </span>
+          </div>
+        )
+      },
     },
     {
       id: 'total_orders',

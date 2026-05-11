@@ -568,6 +568,10 @@ function StatusBadge({ status }: { status: OrderStatus }) {
       label = 'Cancelled'
       className += 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300'
       break
+    case 'rejected':
+      label = 'Rejected'
+      className += 'bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300'
+      break
     default:
       label = status || 'Unknown'
       className += 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'

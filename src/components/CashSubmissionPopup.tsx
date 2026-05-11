@@ -12,7 +12,7 @@ interface CashSubmissionData {
   amount: number;
   payment_method: string;
   otp: string;
-  entries: {
+  entries?: {
     customer_name?: string;
     order_ref: string;
     product_name?: string;
@@ -138,22 +138,7 @@ export function CashSubmissionPopup({ socket }: { socket: any }) {
             <p className="text-3xl font-black text-blue-700 dark:text-blue-300">PKR {data.amount.toLocaleString()}</p>
           </div>
 
-          <div>
-            <p className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-3 pl-1">Submission Breakdown:</p>
-            <div className="max-h-40 overflow-y-auto space-y-2 scrollbar-hide">
-              {data.entries.map((entry, idx) => (
-                <div key={idx} className="p-3 bg-white dark:bg-gray-900 rounded-xl border border-gray-50 dark:border-gray-800 shadow-sm flex items-center justify-between">
-                  <div>
-                    <span className="text-[11px] font-bold text-gray-800 dark:text-white block pb-1">
-                       {entry.cash_type || 'Advance amount payment'}
-                    </span>
-                    <span className="text-[10px] text-gray-400">Reference: {entry.order_ref}</span>
-                  </div>
-                  <span className="text-sm font-black text-primary">PKR {entry.amount.toLocaleString()}</span>
-                </div>
-              ))}
-            </div>
-          </div>
+          {/* Removed Submission Breakdown as per user request */}
 
           <div className="pt-4 mt-2 border-t border-gray-100 dark:border-gray-700">
             <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">

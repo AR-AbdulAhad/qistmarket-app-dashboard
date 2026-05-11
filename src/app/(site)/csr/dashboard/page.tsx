@@ -20,6 +20,8 @@ interface CsrDashboardStats {
     new: number;
     pending: number;
     approved: number;
+    picked: number;
+    rejected: number;
   };
   channelStats: {
     referral: ChannelStat;
@@ -117,8 +119,11 @@ export default function CsrDashboardPage() {
       { label: "Delivered", value: statusCounts.delivered, color: "bg-green-500", icon: "✅" },
       { label: "Completed", value: statusCounts.completed, color: "bg-teal-500", icon: "🏆" },
       { label: "Cancelled", value: statusCounts.cancelled, color: "bg-red-500", icon: "❌" },
-      { label: "Expired", value: statusCounts.expired, color: "bg-orange-500", icon: "⏳" },
-      { label: "In-Progress", value: statusCounts.in_progress, color: "bg-indigo-500", icon: "⚙️" },
+      { label: "Expired", value: statusCounts.expired || 0, color: "bg-orange-500", icon: "⏳" },
+      { label: "In-Progress", value: statusCounts.in_progress || 0, color: "bg-indigo-500", icon: "⚙️" },
+      { label: "Approved", value: statusCounts.approved || 0, color: "bg-green-600", icon: "👍" },
+      { label: "Picked", value: statusCounts.picked || 0, color: "bg-purple-500", icon: "📦" },
+      { label: "Rejected", value: statusCounts.rejected || 0, color: "bg-rose-500", icon: "✖️" },
     ];
 
     return (

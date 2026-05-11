@@ -699,6 +699,11 @@ const OrderList = ({ forcedStatus, forcedChannel, hideActions, hideSelection, sh
             className += ' bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300';
             break;
 
+          case 'rejected':
+            label = 'Rejected';
+            className += ' bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300';
+            break;
+
           case 'expired':
             label = 'Expired';
             className += ' bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300';
@@ -712,6 +717,16 @@ const OrderList = ({ forcedStatus, forcedChannel, hideActions, hideSelection, sh
           case 'delivered':
             label = 'Delivered';
             className += ' bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300';
+            break;
+
+          case 'approved':
+            label = 'Approved';
+            className += ' bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300';
+            break;
+
+          case 'picked':
+            label = 'Picked';
+            className += ' bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300';
             break;
 
           default:
@@ -744,8 +759,8 @@ const OrderList = ({ forcedStatus, forcedChannel, hideActions, hideSelection, sh
     const order = row.original
     const orderStatus = order.status?.toLowerCase() || '';
     
-    // Check if order is cancelled or delivered
-    const isCancelledOrDelivered = orderStatus === 'cancelled' || orderStatus === 'delivered';
+    // Check if order is cancelled, delivered, rejected or expired
+    const isRestrictedStatus = orderStatus === 'cancelled' || orderStatus === 'delivered' || orderStatus === 'rejected' || orderStatus === 'expired';
 
     const [isOpen, setIsOpen] = useState(false)
     const [position, setPosition] = useState({ top: 0, left: 0 })
@@ -852,8 +867,8 @@ const OrderList = ({ forcedStatus, forcedChannel, hideActions, hideSelection, sh
                   </button>
                 </li>
 
-                {/* Only show Edit Item if status is NOT cancelled or delivered */}
-                {!isCancelledOrDelivered && (
+                {/* Only show Edit Item if status is NOT restricted */}
+                {!isRestrictedStatus && (
                   <li>
                     <button
                       onClick={() => {
@@ -867,8 +882,8 @@ const OrderList = ({ forcedStatus, forcedChannel, hideActions, hideSelection, sh
                   </li>
                 )}
 
-                {/* Only show Cancel Order if status is NOT cancelled or delivered */}
-                {!isCancelledOrDelivered && (
+                {/* Only show Cancel Order if status is NOT restricted */}
+                {!isRestrictedStatus && (
                   <li>
                     <button
                       onClick={() => {
@@ -1040,7 +1055,7 @@ const OrderList = ({ forcedStatus, forcedChannel, hideActions, hideSelection, sh
                 }}
                 className="rounded-lg border border-stroke bg-transparent px-3 py-1.5 outline-none focus:border-[#ff3d3d] dark:border-dark-3"
               >
-                {["All", "new", "pending", "in_progress", "cancelled", "delivered", "completed", "expired"].map((s) => (
+                {["All", "new", "pending", "in_progress", "cancelled", "rejected", "delivered", "completed", "expired", "approved", "picked"].map((s) => (
                   <option key={s} value={s} className="dark:bg-dark-2">
                     {s === "All" ? "All Statuses" : s.replace(/_/g, " ").charAt(0).toUpperCase() + s.replace(/_/g, " ").slice(1)}
                   </option>

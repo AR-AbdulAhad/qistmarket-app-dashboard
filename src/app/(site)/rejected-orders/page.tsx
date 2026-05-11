@@ -1,11 +1,11 @@
 import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
 import OrderList from "@/components/OrderList/OrderList";
 
-export default function PickedOrdersPage() {
+export default function RejectedOrdersPage() {
     return (
         <div>
-            <Breadcrumb pageName="Picked Orders" />
-            <OrderList forcedStatus="picked" hideSelection />
+            <Breadcrumb pageName="Rejected Orders" />
+            <OrderList forcedStatus="rejected" hideSelection />
         </div>
     );
 };

@@ -13,12 +13,12 @@ export const NAV_DATA = [
             url: "/create-orders",
           },
           {
-            title: "New Orders",
-            url: "/new-orders",
-          },
-          {
             title: "All Orders",
             url: "/all-orders",
+          },
+          {
+            title: "New Orders",
+            url: "/new-orders",
           },
           {
             title: "Pending Orders",
@@ -43,6 +43,18 @@ export const NAV_DATA = [
           {
             title: "Expired Orders",
             url: "/expired-orders",
+          },
+          {
+            title: "Approved Orders",
+            url: "/approved-order-list",
+          },
+          {
+            title: "Picked Orders",
+            url: "/picked-orders",
+          },
+          {
+            title: "Rejected Orders",
+            url: "/rejected-orders",
           }
         ],
       },
@@ -204,12 +216,12 @@ export const NAV_DATA = [
             url: "/csr/create-order",
           },
           {
-            title: "New Orders",
-            url: "/new-orders",
-          },
-          {
             title: "All Orders",
             url: "/all-orders",
+          },
+          {
+            title: "New Orders",
+            url: "/new-orders",
           },
           {
             title: "Pending Orders",
@@ -234,6 +246,18 @@ export const NAV_DATA = [
           {
             title: "Expired Orders",
             url: "/expired-orders",
+          },
+          {
+            title: "Approved Orders",
+            url: "/approved-order-list",
+          },
+          {
+            title: "Picked Orders",
+            url: "/picked-orders",
+          },
+          {
+            title: "Rejected Orders",
+            url: "/rejected-orders",
           }
         ],
       },
@@ -293,12 +317,12 @@ export const NAV_DATA = [
             url: "/create-orders",
           },
           {
-            title: "New Orders",
-            url: "/new-orders",
-          },
-          {
             title: "All Orders",
             url: "/all-orders",
+          },
+          {
+            title: "New Orders",
+            url: "/new-orders",
           },
           {
             title: "Pending Orders",
@@ -323,6 +347,18 @@ export const NAV_DATA = [
           {
             title: "Expired Orders",
             url: "/expired-orders",
+          },
+          {
+            title: "Approved Orders",
+            url: "/approved-order-list",
+          },
+          {
+            title: "Picked Orders",
+            url: "/picked-orders",
+          },
+          {
+            title: "Rejected Orders",
+            url: "/rejected-orders",
           }
         ],
       },

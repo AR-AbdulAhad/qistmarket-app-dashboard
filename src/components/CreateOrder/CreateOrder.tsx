@@ -64,6 +64,13 @@ const CreateOrders: React.FC = () => {
   const [advanceOverride, setAdvanceOverride] = useState<number | ''>('');
   const [ledger, setLedger] = useState<any[]>([]);
   const [activeCustomPlan, setActiveCustomPlan] = useState<{ cashPrice: number, months: number, profit: number } | null>(null);
+  const [phoneMatches, setPhoneMatches] = useState<any[]>([]);
+  const [checkingPhone, setCheckingPhone] = useState(false);
+
+  // Custom Product Calculation States
+  const [customCashPrice, setCustomCashPrice] = useState<string>('');
+  const [customCategory, setCustomCategory] = useState<string>('');
+  const [customMonths, setCustomMonths] = useState<string>('');
 
   const nameRef = useRef<HTMLInputElement>(null);
   const whatsappRef = useRef<HTMLInputElement>(null);
@@ -150,6 +157,46 @@ const CreateOrders: React.FC = () => {
     fetchProducts();
   }, []);
 
+  // WhatsApp Number Cross-Check
+  useEffect(() => {
+    const checkPhone = async () => {
+      const phone = formData.whatsapp_number.replace(/\s+/g, '');
+      if (phone.length === 11 && /^0[0-9]{10}$/.test(phone)) {
+        setCheckingPhone(true);
+        try {
+          const token = Cookies.get("auth_token");
+          const response = await fetch(`${BACKEND_URL}/api/check-phone`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`
+            },
+            body: JSON.stringify({ phone })
+          });
+          const result = await response.json();
+          if (result.success) {
+            setPhoneMatches(result.results);
+            if (result.results.length > 0) {
+              toast.error(`Found ${result.results.length} existing order(s) for this number!`, {
+                duration: 4000,
+                icon: '⚠️'
+              });
+            }
+          }
+        } catch (error) {
+          console.error("Error checking phone:", error);
+        } finally {
+          setCheckingPhone(false);
+        }
+      } else {
+        setPhoneMatches([]);
+      }
+    };
+
+    const timer = setTimeout(checkPhone, 500);
+    return () => clearTimeout(timer);
+  }, [formData.whatsapp_number]);
+
   // Round up logic
   const roundUp = (val: number) => Math.ceil(val / 50) * 50;
 
@@ -162,6 +209,7 @@ const CreateOrders: React.FC = () => {
         { months: 3, profit: 0.20, advance: 0.35 },
         { months: 6, profit: 0.35, advance: 0.25 },
         { months: 9, profit: 0.45, advance: 0.20 },
+        { months: 11, profit: 0.52, advance: 0.18 },
         { months: 12, profit: 0.55, advance: 0.15 },
       ];
     } else if (price > 50000 && price <= 100000) {
@@ -169,6 +217,7 @@ const CreateOrders: React.FC = () => {
         { months: 3, profit: 0.20, advance: 0.40 },
         { months: 6, profit: 0.35, advance: 0.35 },
         { months: 9, profit: 0.45, advance: 0.30 },
+        { months: 11, profit: 0.52, advance: 0.28 },
         { months: 12, profit: 0.55, advance: 0.25 },
       ];
     } else if (price > 100000) {
@@ -176,7 +225,9 @@ const CreateOrders: React.FC = () => {
         { months: 3, profit: 0.20, advance: 0.40 },
         { months: 6, profit: 0.35, advance: 0.35 },
         { months: 9, profit: 0.45, advance: 0.30 },
+        { months: 11, profit: 0.52, advance: 0.28 },
         { months: 12, profit: 0.55, advance: 0.25 },
+        { months: 18, profit: 0.70, advance: 0.25 },
         { months: 24, profit: 0.85, advance: 0.25 },
       ];
     } else {
@@ -185,7 +236,10 @@ const CreateOrders: React.FC = () => {
         { months: 3, profit: 0.22, advance: 0.40 },
         { months: 6, profit: 0.38, advance: 0.35 },
         { months: 9, profit: 0.48, advance: 0.30 },
+        { months: 11, profit: 0.55, advance: 0.28 },
         { months: 12, profit: 0.60, advance: 0.25 },
+        { months: 18, profit: 0.75, advance: 0.25 },
+        { months: 24, profit: 0.90, advance: 0.25 },
       ];
     }
 
@@ -320,13 +374,87 @@ const CreateOrders: React.FC = () => {
 
   // Handle auto-recalculation for Custom Products when linked to Calculator
   useEffect(() => {
-    if (isCustomProduct && activeCustomPlan && formData.advance_amount !== '' && !isCustomProductNoPricing) {
-      const currentCashPrice = activeCustomPlan.cashPrice; // We use the cash price from when it was applied
-      const newAdv = Number(formData.advance_amount);
-      const { months, profit } = activeCustomPlan;
+    if (isCustomProduct && !isCustomProductNoPricing) {
+      const price = parseFloat(customCashPrice);
+      const months = parseInt(customMonths);
+      const category = customCategory;
 
-      if (!isNaN(newAdv) && newAdv >= 0 && newAdv < currentCashPrice) {
-        const rem = currentCashPrice - newAdv;
+      if (!isNaN(price) && months && category) {
+        const cat = category.toLowerCase().trim();
+        let plan = null;
+
+        // Formula logic for custom product calculation
+        if (cat === 'mobiles' && price <= 50000) {
+          const plans = [
+            { months: 3, profit: 0.20, advance: 0.35 },
+            { months: 6, profit: 0.35, advance: 0.25 },
+            { months: 9, profit: 0.45, advance: 0.20 },
+            { months: 11, profit: 0.52, advance: 0.18 },
+            { months: 12, profit: 0.55, advance: 0.15 },
+          ];
+          plan = plans.find(p => p.months === months);
+        } else if (price > 50000 && price <= 100000) {
+          const plans = [
+            { months: 3, profit: 0.20, advance: 0.40 },
+            { months: 6, profit: 0.35, advance: 0.35 },
+            { months: 9, profit: 0.45, advance: 0.30 },
+            { months: 11, profit: 0.52, advance: 0.28 },
+            { months: 12, profit: 0.55, advance: 0.25 },
+          ];
+          plan = plans.find(p => p.months === months);
+        } else if (price > 100000) {
+          const plans = [
+            { months: 3, profit: 0.20, advance: 0.40 },
+            { months: 6, profit: 0.35, advance: 0.35 },
+            { months: 9, profit: 0.45, advance: 0.30 },
+            { months: 11, profit: 0.52, advance: 0.28 },
+            { months: 12, profit: 0.55, advance: 0.25 },
+            { months: 18, profit: 0.70, advance: 0.25 },
+            { months: 24, profit: 0.85, advance: 0.25 },
+          ];
+          plan = plans.find(p => p.months === months);
+        } else {
+          const plans = [
+            { months: 3, profit: 0.22, advance: 0.40 },
+            { months: 6, profit: 0.38, advance: 0.35 },
+            { months: 9, profit: 0.48, advance: 0.30 },
+            { months: 11, profit: 0.55, advance: 0.28 },
+            { months: 12, profit: 0.60, advance: 0.25 },
+            { months: 18, profit: 0.75, advance: 0.25 },
+            { months: 24, profit: 0.90, advance: 0.25 },
+          ];
+          plan = plans.find(p => p.months === months);
+        }
+
+        if (plan) {
+          const adv = roundUp(price * plan.advance);
+          const rem = price - adv;
+          const profit = roundUp(rem * plan.profit);
+          const total = rem + profit;
+          const monthly = roundUp(total / plan.months);
+          const fullTotal = adv + (monthly * plan.months);
+
+          setFormData(prev => ({
+            ...prev,
+            total_amount: fullTotal.toString(),
+            advance_amount: adv.toString(),
+            monthly_amount: monthly.toString(),
+            months: months.toString()
+          }));
+          setActiveCustomPlan({ cashPrice: price, months, profit: plan.profit });
+        }
+      }
+    }
+  }, [customCashPrice, customCategory, customMonths, isCustomProduct, isCustomProductNoPricing]);
+
+  // Handle Advance override recalculation for custom products
+  useEffect(() => {
+    if (isCustomProduct && activeCustomPlan && !isCustomProductNoPricing && formData.advance_amount !== '') {
+      const { cashPrice, months, profit } = activeCustomPlan;
+      const newAdv = parseFloat(formData.advance_amount);
+
+      if (!isNaN(newAdv) && newAdv >= 0 && newAdv < cashPrice) {
+        const rem = cashPrice - newAdv;
         const profitAmount = roundUp(rem * profit);
         const total = rem + profitAmount;
         const newMonthly = roundUp(total / months);
@@ -337,7 +465,7 @@ const CreateOrders: React.FC = () => {
         }));
       }
     }
-  }, [formData.advance_amount, isCustomProduct, activeCustomPlan, isCustomProductNoPricing]);
+  }, [formData.advance_amount]);
 
   const handlePlanSelect = (plan: any) => {
     setSelectedPlan(plan);
@@ -476,6 +604,10 @@ const CreateOrders: React.FC = () => {
       setLedger([]);
       setAreaSearchTerm('');
       setProductSearchTerm('');
+      setCustomCashPrice('');
+      setCustomCategory('');
+      setCustomMonths('');
+      setPhoneMatches([]);
       setErrors({});
 
     } catch (error: any) {
@@ -534,8 +666,61 @@ const CreateOrders: React.FC = () => {
                       className={`w-full px-4 py-3 border rounded-xl focus:ring-4 focus:ring-red-100 outline-none transition-all ${errors.whatsapp_number ? 'border-red-500 bg-red-50' : 'border-gray-200 focus:border-red-500'}`}
                       placeholder="03001234567"
                     />
+                    {checkingPhone && <div className="absolute right-4 top-1/2 -translate-y-1/2 animate-spin rounded-full h-4 w-4 border-b-2 border-red-600"></div>}
                   </div>
                   {errors.whatsapp_number && <p className="text-red-500 text-xs mt-1.5 flex items-center gap-1"><AlertCircle className="w-3 h-3" /> {errors.whatsapp_number}</p>}
+                  
+                  {phoneMatches.length > 0 && (
+                    <div className="mt-4 bg-white border-2 border-red-100 rounded-2xl shadow-lg shadow-red-100/50 overflow-hidden animate-in zoom-in-95 duration-300">
+                      <div className="bg-red-50 px-4 py-3 border-b border-red-100 flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-red-700 font-bold text-xs uppercase tracking-wider">
+                          <AlertCircle className="w-4 h-4" /> 
+                          Existing Records Found ({phoneMatches.length})
+                        </div>
+                      </div>
+                      <div className="max-h-[180px] overflow-y-auto custom-scrollbar">
+                        <div className="divide-y divide-red-50">
+                          {phoneMatches.map((m: any) => (
+                            <div key={m.id} className="p-3 hover:bg-red-50/30 transition-colors group">
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="space-y-1">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-sm font-black text-gray-900 group-hover:text-red-600 transition-colors">{m.order_ref}</span>
+                                    <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full uppercase ${
+                                      m.status === 'delivered' ? 'bg-emerald-100 text-emerald-700' :
+                                      m.status === 'cancelled' ? 'bg-gray-100 text-gray-600' :
+                                      'bg-amber-100 text-amber-700'
+                                    }`}>
+                                      {m.status}
+                                    </span>
+                                  </div>
+                                  <p className="text-[11px] text-gray-500 font-medium">
+                                    Customer: <span className="text-gray-900">{m.customer_name}</span>
+                                  </p>
+                                </div>
+                                <div className="text-right">
+                                  <div className="text-[9px] font-black text-red-500 bg-red-50 px-2 py-1 rounded-lg uppercase border border-red-100 shadow-sm">
+                                    {m.role}
+                                  </div>
+                                  <p className="text-[9px] text-gray-400 mt-1 font-bold">
+                                    {new Date(m.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}
+                                  </p>
+                                </div>
+                              </div>
+                              <a 
+                                href={`/orders/${m.id}`} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="mt-2 block text-[10px] text-blue-600 hover:text-blue-800 font-bold underline decoration-dotted underline-offset-2"
+                              >
+                                View Order Details
+                              </a>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div>
@@ -764,69 +949,90 @@ const CreateOrders: React.FC = () => {
                     </div>
 
                     {!isCustomProductNoPricing && (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 animate-in fade-in slide-in-from-top-2 duration-300">
-                        <div>
-                          <label className="block text-sm font-semibold text-gray-700 mb-2">Total Amount <span className="text-red-500">*</span></label>
-                          <div className="relative">
-                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-medium">Rs.</span>
-                            <input
-                              type="number"
-                              name="total_amount"
-                              value={formData.total_amount}
-                              onChange={handleChange}
-                              className={`w-full pl-12 pr-4 py-3 border rounded-xl focus:ring-4 focus:ring-blue-100 outline-none transition-all ${errors.total_amount ? 'border-red-500 bg-red-50' : 'border-gray-200 focus:border-blue-500'}`}
-                              placeholder="0"
-                            />
+                      <div className="space-y-6 animate-in fade-in slide-in-from-top-2 duration-300">
+                        {/* Interactive Calculator Inputs */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                          <div>
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">Cash Price <span className="text-red-500">*</span></label>
+                            <div className="relative">
+                              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-medium">Rs.</span>
+                              <input
+                                type="number"
+                                value={customCashPrice}
+                                onChange={(e) => setCustomCashPrice(e.target.value)}
+                                className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all"
+                                placeholder="Enter cash price"
+                              />
+                            </div>
                           </div>
-                          {errors.total_amount && <p className="text-red-500 text-xs mt-1.5 flex items-center gap-1"><AlertCircle className="w-3 h-3" /> {errors.total_amount}</p>}
+
+                          <div>
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">Category <span className="text-red-500">*</span></label>
+                            <select
+                              value={customCategory}
+                              onChange={(e) => setCustomCategory(e.target.value)}
+                              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all appearance-none bg-no-repeat bg-[right_1rem_center]"
+                              style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236B7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")` }}
+                            >
+                              <option value="">Select Category</option>
+                              {allCategories.map((cat: any) => <option key={cat.id || cat.name} value={cat.name}>{cat.name}</option>)}
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">Months <span className="text-red-500">*</span></label>
+                            <select
+                              value={customMonths}
+                              onChange={(e) => setCustomMonths(e.target.value)}
+                              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all appearance-none bg-no-repeat bg-[right_1rem_center]"
+                              style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236B7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")` }}
+                            >
+                              <option value="">Duration</option>
+                              {[3, 6, 9, 11, 12, 18, 24].map((m: any) => <option key={m} value={m}>{m} Months</option>)}
+                            </select>
+                          </div>
                         </div>
 
-                        <div>
-                          <label className="block text-sm font-semibold text-gray-700 mb-2">Advance <span className="text-red-500">*</span></label>
-                          <div className="relative">
-                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-medium">Rs.</span>
-                            <input
-                              type="number"
-                              name="advance_amount"
-                              value={formData.advance_amount}
-                              onChange={handleChange}
-                              className={`w-full pl-12 pr-4 py-3 border rounded-xl focus:ring-4 focus:ring-blue-100 outline-none transition-all ${errors.advance_amount ? 'border-red-500 bg-red-50' : 'border-gray-200 focus:border-blue-500'}`}
-                              placeholder="0"
-                            />
+                        {/* Calculated Results (Read-only total, Editable advance) */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 bg-blue-50/30 p-4 rounded-xl border border-blue-100">
+                          <div>
+                            <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1.5">Total Amount</label>
+                            <div className="px-4 py-3 bg-white border border-gray-100 rounded-xl text-blue-900 font-black">
+                              Rs. {Number(formData.total_amount || 0).toLocaleString()}
+                            </div>
                           </div>
-                          {errors.advance_amount && <p className="text-red-500 text-xs mt-1.5 flex items-center gap-1"><AlertCircle className="w-3 h-3" /> {errors.advance_amount}</p>}
-                        </div>
 
-                        <div>
-                          <label className="block text-sm font-semibold text-gray-700 mb-2">Monthly <span className="text-red-500">*</span></label>
-                          <div className="relative">
-                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-medium">Rs.</span>
-                            <input
-                              type="number"
-                              name="monthly_amount"
-                              value={formData.monthly_amount}
-                              onChange={handleChange}
-                              className={`w-full pl-12 pr-4 py-3 border rounded-xl focus:ring-4 focus:ring-blue-100 outline-none transition-all ${errors.monthly_amount ? 'border-red-500 bg-red-50' : 'border-gray-200 focus:border-blue-500'}`}
-                              placeholder="0"
-                            />
+                          <div>
+                            <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1.5">Advance Amount <span className="text-red-500">*</span></label>
+                            <div className="relative">
+                              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-medium">Rs.</span>
+                              <input
+                                type="number"
+                                name="advance_amount"
+                                value={formData.advance_amount}
+                                onChange={handleChange}
+                                className={`w-full pl-12 pr-4 py-3 border rounded-xl focus:ring-4 focus:ring-blue-100 outline-none transition-all ${errors.advance_amount ? 'border-red-500 bg-red-50' : 'border-gray-200 focus:border-blue-500 font-bold'}`}
+                                placeholder="0"
+                              />
+                            </div>
                           </div>
-                          {errors.monthly_amount && <p className="text-red-500 text-xs mt-1.5 flex items-center gap-1"><AlertCircle className="w-3 h-3" /> {errors.monthly_amount}</p>}
-                        </div>
 
-                        <div>
-                          <label className="block text-sm font-semibold text-gray-700 mb-2">Months <span className="text-red-500">*</span></label>
-                          <select
-                            name="months"
-                            value={formData.months}
-                            onChange={handleChange}
-                            className={`w-full px-4 py-3 border rounded-xl focus:ring-4 focus:ring-blue-100 outline-none transition-all appearance-none bg-no-repeat bg-[right_1rem_center] ${errors.months ? 'border-red-500 bg-red-50' : 'border-gray-200 focus:border-blue-500'}`}
-                            style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236B7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")` }}
-                          >
-                            <option value="">Duration</option>
-                            {[3, 4, 6, 8, 9, 10, 12, 15, 18, 24].map((m: any) => <option key={m} value={m}>{m} Months</option>)}
-                          </select>
-                          {errors.months && <p className="text-red-500 text-xs mt-1.5 flex items-center gap-1"><AlertCircle className="w-3 h-3" /> {errors.months}</p>}
+                          <div>
+                            <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1.5">Monthly Installment</label>
+                            <div className="px-4 py-3 bg-white border border-gray-100 rounded-xl text-emerald-600 font-black">
+                              Rs. {Number(formData.monthly_amount || 0).toLocaleString()}
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1.5">Selected Months</label>
+                            <div className="px-4 py-3 bg-white border border-gray-100 rounded-xl text-gray-700 font-bold">
+                              {formData.months || '0'} Months
+                            </div>
+                          </div>
                         </div>
+                        {errors.total_amount && <p className="text-red-500 text-xs mt-1.5 flex items-center gap-1"><AlertCircle className="w-3 h-3" /> {errors.total_amount}</p>}
+                        {errors.advance_amount && <p className="text-red-500 text-xs mt-1.5 flex items-center gap-1"><AlertCircle className="w-3 h-3" /> {errors.advance_amount}</p>}
                       </div>
                     )}
                   </div>

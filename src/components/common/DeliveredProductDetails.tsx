@@ -325,7 +325,7 @@ export default function DeliveredProductDetails({
                                     <div>
                                         <label className="block text-xs font-medium text-gray-500 dark:text-gray-400">Payment Date</label>
                                         <p className="mt-1 text-sm text-dark dark:text-white">
-                                            {deliveredProduct.payment_details.advance_payment.created_at ? formatDateTimeUTC(deliveredProduct.payment_details.advance_payment.created_at) : 'N/A'}
+                                            {deliveredProduct.payment_details.advance_payment.paid_at ? formatDateTimeUTC(deliveredProduct.payment_details.advance_payment.paid_at) : 'N/A'}
                                         </p>
                                     </div>
                                 </div>
