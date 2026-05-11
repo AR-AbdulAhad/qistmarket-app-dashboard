@@ -346,6 +346,12 @@ export default function TransferHistoryPage() {
                                                     PKR {rec.inventory.purchase_price?.toLocaleString()}
                                                 </td>
 
+                                                <td className="p-3 text-center">
+                                                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400`}>
+                                                        Transferred
+                                                    </span>
+                                                </td>
+
                                                 {/* Detail Status */}
                                                 <td className="p-3 text-center">
                                                     <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
