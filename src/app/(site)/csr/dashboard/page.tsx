@@ -58,7 +58,11 @@ interface CsrRanking {
   totalOrders: number;
   delivered: number;
   cancelled: number;
+  transferred: number;
+  completedInOutlet: number;
+  remainingInOutlet: number;
   achievedAmount: number;
+  targetProgress: number;
   successRate: number;
 }
 
@@ -115,21 +119,31 @@ export default function CsrDashboardPage() {
     const { statusCounts, totalOrders } = stats;
     
     const cards = [
-      { label: "Orders in Range", value: totalOrders, color: "bg-blue-500", icon: "📦" },
-      { label: "Delivered", value: statusCounts.delivered, color: "bg-green-500", icon: "✅" },
-      { label: "Completed", value: statusCounts.completed, color: "bg-teal-500", icon: "🏆" },
-      { label: "Cancelled", value: statusCounts.cancelled, color: "bg-red-500", icon: "❌" },
-      { label: "Expired", value: statusCounts.expired || 0, color: "bg-orange-500", icon: "⏳" },
-      { label: "In-Progress", value: statusCounts.in_progress || 0, color: "bg-indigo-500", icon: "⚙️" },
-      { label: "Approved", value: statusCounts.approved || 0, color: "bg-green-600", icon: "👍" },
-      { label: "Picked", value: statusCounts.picked || 0, color: "bg-purple-500", icon: "📦" },
-      { label: "Rejected", value: statusCounts.rejected || 0, color: "bg-rose-500", icon: "✖️" },
+      { label: "Orders in Range", value: totalOrders, color: "bg-blue-500", icon: "📦", url: "/all-orders" },
+      { label: "New", value: statusCounts.new, color: "bg-red-500", icon: "⭐", url: "/new-orders" },
+      { label: "Pending", value: statusCounts.pending, color: "bg-yellow-500", icon: "⏳", url: "/pending-orders" },
+      { label: "In-Progress", value: statusCounts.in_progress || 0, color: "bg-indigo-500", icon: "⚙️", url: "/in-progress-orders" },
+      { label: "Cancelled", value: statusCounts.cancelled, color: "bg-purple-500", icon: "❌", url: "/cancelled-orders" },
+      { label: "Completed", value: statusCounts.completed, color: "bg-teal-500", icon: "🏆", url: "/completed-orders" },
+      { label: "Delivered", value: statusCounts.delivered, color: "bg-green-500", icon: "✅", url: "/delivered-orders" },
+      { label: "Expired", value: statusCounts.expired || 0, color: "bg-orange-500", icon: "⏳", url: "/expired-orders" },
+      { label: "Approved", value: statusCounts.approved || 0, color: "bg-green-600", icon: "👍", url: "/approved-order-list" },
+      { label: "Picked", value: statusCounts.picked || 0, color: "bg-purple-500", icon: "📦", url: "/picked-orders" },
+      { label: "Rejected", value: statusCounts.rejected || 0, color: "bg-rose-500", icon: "✖️", url: "/rejected-orders" },
     ];
+
+    const handleCardClick = (url: string) => {
+      router.push(url);
+    };
 
     return (
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-6">
         {cards.map((card) => (
-          <div key={card.label} className="rounded-xl border border-stroke bg-white p-5 shadow-default transition-all hover:shadow-md dark:border-dark-3 dark:bg-boxdark">
+          <div
+            key={card.label}
+            onClick={() => handleCardClick(card.url)}
+            className="rounded-xl border border-stroke bg-white p-5 shadow-default transition-all hover:shadow-md hover:scale-[1.03] active:scale-95 cursor-pointer select-none dark:border-dark-3 dark:bg-boxdark"
+          >
             <div className="flex items-center justify-between mb-3">
               <div className={`flex items-center justify-center size-10 rounded-full ${card.color} text-white shadow-sm text-lg bg-opacity-90`}>
                 {card.icon}
@@ -142,6 +156,7 @@ export default function CsrDashboardPage() {
       </div>
     );
   };
+
 
   const renderChannelCards = () => {
     if (!stats) return null;
@@ -237,7 +252,7 @@ export default function CsrDashboardPage() {
         {/* Target Tracking */}
         <div className="col-span-1 lg:col-span-8 rounded-xl border border-stroke bg-white p-6 shadow-sm dark:border-dark-3 dark:bg-boxdark">
           <div className="flex justify-between items-center mb-6">
-             <h3 className="text-lg font-bold text-black dark:text-white">Target Tracking (Advance)</h3>
+             <h3 className="text-lg font-bold text-black dark:text-white">Target Tracking (Total Amount)</h3>
              <span className="px-3 py-1 bg-primary/10 text-primary text-xs font-bold rounded-full uppercase tracking-wider">{filterType === 'month' ? 'This Month' : filterType === 'today' ? 'Today' : 'Custom Range'}</span>
           </div>
 
@@ -281,7 +296,7 @@ export default function CsrDashboardPage() {
   };
 
   const renderRankingBoard = () => {
-    if (!stats || stats.isCsr || !stats.csrRanking || stats.csrRanking.length === 0) return null;
+    if (!stats || !stats.csrRanking || stats.csrRanking.length === 0) return null;
 
     return (
       <div className="rounded-xl border border-stroke bg-white shadow-sm dark:border-dark-3 dark:bg-boxdark mb-10 overflow-hidden">
@@ -296,39 +311,58 @@ export default function CsrDashboardPage() {
               <tr className="bg-gray-50 dark:bg-gray-800/50 text-xs uppercase tracking-wider text-gray-500 dark:text-gray-400 border-b border-stroke dark:border-dark-3">
                 <th className="px-6 py-4 font-semibold">Rank</th>
                 <th className="px-6 py-4 font-semibold">CSR Name</th>
-                <th className="px-6 py-4 font-semibold">Orders</th>
-                <th className="px-6 py-4 font-semibold">Delivered</th>
-                <th className="px-6 py-4 font-semibold">Success %</th>
-                <th className="px-6 py-4 font-semibold text-right">Advance Achieved</th>
+                <th className="px-6 py-4 font-semibold">Delivered Amount</th>
+                <th className="px-6 py-4 font-semibold text-center">Transferred</th>
+                <th className="px-6 py-4 font-semibold text-center">Completed</th>
+                <th className="px-6 py-4 font-semibold text-center">Remaining</th>
+                <th className="px-6 py-4 font-semibold text-right">Target Progress</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-stroke dark:divide-dark-3">
-              {stats.csrRanking.map((rank, index) => (
-                <tr key={rank.userId} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
-                  <td className="px-6 py-4">
-                    <div className={`size-8 rounded-full flex items-center justify-center font-bold text-sm ${index === 0 ? 'bg-yellow-100 text-yellow-600' : index === 1 ? 'bg-gray-200 text-gray-600' : index === 2 ? 'bg-orange-100 text-orange-600' : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'}`}>
-                      {index + 1}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <p className="font-semibold text-black dark:text-white">{rank.name}</p>
-                    <p className="text-xs text-gray-500">@{rank.username}</p>
-                  </td>
-                  <td className="px-6 py-4 font-medium text-gray-700 dark:text-gray-300">{rank.totalOrders}</td>
-                  <td className="px-6 py-4 font-medium text-green-600">{rank.delivered}</td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-black dark:text-white">{rank.successRate}%</span>
-                      <div className="w-16 bg-gray-200 rounded-full h-1.5 dark:bg-gray-700">
-                        <div className="bg-green-500 h-1.5 rounded-full" style={{ width: `${rank.successRate}%` }}></div>
+              {stats.csrRanking.map((rank, index) => {
+                const isYou = rank.userId === user?.id;
+                return (
+                  <tr key={rank.userId} className={`${isYou ? 'bg-primary/5 dark:bg-primary/10' : ''} hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors`}>
+                    <td className="px-6 py-4">
+                      <div className={`size-8 rounded-full flex items-center justify-center font-bold text-sm ${index === 0 ? 'bg-yellow-100 text-yellow-600' : index === 1 ? 'bg-gray-200 text-gray-600' : index === 2 ? 'bg-orange-100 text-orange-600' : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'}`}>
+                        {index + 1}
                       </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 font-bold text-right text-black dark:text-white">
-                    Rs {rank.achievedAmount.toLocaleString()}
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-2">
+                        <p className="font-semibold text-black dark:text-white">{rank.name}</p>
+                        {isYou && (
+                          <span className="bg-primary text-white text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">You</span>
+                        )}
+                      </div>
+                      <p className="text-xs text-gray-500">@{rank.username}</p>
+                    </td>
+                    <td className="px-6 py-4 font-bold text-black dark:text-white">
+                      Rs {rank.achievedAmount.toLocaleString()}
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      <span className="font-medium text-blue-600 bg-blue-50 dark:bg-blue-900/20 px-2 py-1 rounded">{rank.transferred}</span>
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      <span className="font-medium text-green-600 bg-green-50 dark:bg-green-900/20 px-2 py-1 rounded">{rank.completedInOutlet}</span>
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      <span className="font-medium text-orange-600 bg-orange-50 dark:bg-orange-900/20 px-2 py-1 rounded">{rank.remainingInOutlet}</span>
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <div className="flex flex-col items-end gap-1">
+                        <span className="font-bold text-black dark:text-white">{rank.targetProgress}%</span>
+                        <div className="w-24 bg-gray-200 rounded-full h-1.5 dark:bg-gray-700 overflow-hidden">
+                          <div 
+                            className={`h-1.5 rounded-full ${rank.targetProgress >= 100 ? 'bg-green-500' : rank.targetProgress >= 50 ? 'bg-primary' : 'bg-orange-500'}`} 
+                            style={{ width: `${Math.min(rank.targetProgress, 100)}%` }}
+                          ></div>
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

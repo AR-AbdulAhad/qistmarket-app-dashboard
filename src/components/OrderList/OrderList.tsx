@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import dayjs from 'dayjs'
 import utc from 'dayjs/plugin/utc'
 dayjs.extend(utc)
@@ -23,7 +23,7 @@ import { Modal } from '../Modal/Modal'
 import { cn } from '@/lib/utils'
 import { createPortal } from 'react-dom'
 import { useRef } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Pagination from '../common/Pagination'
 import { useAuth } from '../../../contexts/AuthContext'
 import { ArrowRightLeft, Send } from 'lucide-react'
@@ -96,7 +96,7 @@ interface PaginationInfo {
 // ─────────────────────────────────────────────────────────────────────────────
 // Main Component
 // ─────────────────────────────────────────────────────────────────────────────
-const OrderList = ({ forcedStatus, forcedChannel, hideActions, hideSelection, showAllStatuses, onRowSelectionChange, customTopBarActions }: OrderListProps) => {
+const OrderListContent = ({ forcedStatus, forcedChannel, hideActions, hideSelection, showAllStatuses, onRowSelectionChange, customTopBarActions }: OrderListProps) => {
   const router = useRouter()
   const [orders, setOrders] = useState<Order[]>([])
   const [pagination, setPagination] = useState<PaginationInfo>({
@@ -131,11 +131,21 @@ const OrderList = ({ forcedStatus, forcedChannel, hideActions, hideSelection, sh
   const [selectedVerifierId, setSelectedVerifierId] = useState<number | null>(null)
   const [verifiers, setVerifiers] = useState<User[]>([])
 
+  const searchParams = useSearchParams()
+  const urlStatus = searchParams.get('status')
+  
   // Filtration
   const [dateRange, setDateRange] = useState('All')
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
-  const [statusFilter, setStatusFilter] = useState('All')
+  const [statusFilter, setStatusFilter] = useState(urlStatus ? urlStatus : 'All')
+
+  // Sync statusFilter if URL param changes
+  useEffect(() => {
+    if (urlStatus && urlStatus !== statusFilter) {
+      setStatusFilter(urlStatus)
+    }
+  }, [urlStatus])
 
   // Action Modals
   const [editModalOpen, setEditModalOpen] = useState(false)
@@ -867,37 +877,90 @@ const OrderList = ({ forcedStatus, forcedChannel, hideActions, hideSelection, sh
                   </button>
                 </li>
 
-                {/* Only show Edit Item if status is NOT restricted */}
-                {!isRestrictedStatus && (
-                  <li>
-                    <button
-                      onClick={() => {
-                        handleEditClick(order)
-                        setIsOpen(false)
-                      }}
-                      className="block w-full px-4 py-2.5 text-left hover:bg-[#F5F7FD] hover:text-[#ff3d3d] dark:hover:bg-dark-3"
-                    >
-                      Edit Item
-                    </button>
-                  </li>
-                )}
+                {/* Show Edit Item logic */}
+                {(() => {
+                  // Rule 1: Never on "All Orders" page
+                  if (showAllStatuses) return null;
+                  
+                  // Rule 2: On "Picked Orders" page — show for everyone
+                  if (forcedStatus === 'picked') {
+                    return (
+                      <li>
+                        <button
+                          onClick={() => {
+                            handleEditClick(order)
+                            setIsOpen(false)
+                          }}
+                          className="block w-full px-4 py-2.5 text-left hover:bg-[#F5F7FD] hover:text-[#ff3d3d] dark:hover:bg-dark-3"
+                        >
+                          Edit Item
+                        </button>
+                      </li>
+                    );
+                  }
 
-                {/* Only show Cancel Order if status is NOT restricted */}
-                {!isRestrictedStatus && (
-                  <li>
-                    <button
-                      onClick={() => {
-                        handleCancelClick(order)
-                        setIsOpen(false)
-                      }}
-                      className="block w-full px-4 py-2.5 text-left hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/30 dark:hover:text-red-400"
-                    >
-                      Cancel Order
-                    </button>
-                  </li>
-                )}
+                  // Default status-based rule (restricted for other pages)
+                  if (!isRestrictedStatus) {
+                    return (
+                      <li>
+                        <button
+                          onClick={() => {
+                            handleEditClick(order)
+                            setIsOpen(false)
+                          }}
+                          className="block w-full px-4 py-2.5 text-left hover:bg-[#F5F7FD] hover:text-[#ff3d3d] dark:hover:bg-dark-3"
+                        >
+                          Edit Item
+                        </button>
+                      </li>
+                    );
+                  }
+                  return null;
+                })()}
 
-                {!hideActions && (
+                {/* Show Cancel Order logic */}
+                {(() => {
+                  // Rule 1: Never on "All Orders" page
+                  if (showAllStatuses) return null;
+
+                  // Rule 2: On "Picked Orders" page — show for everyone
+                  if (forcedStatus === 'picked') {
+                    return (
+                      <li>
+                        <button
+                          onClick={() => {
+                            handleCancelClick(order)
+                            setIsOpen(false)
+                          }}
+                          className="block w-full px-4 py-2.5 text-left hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/30 dark:hover:text-red-400"
+                        >
+                          Cancel Order
+                        </button>
+                      </li>
+                    );
+                  }
+
+                  // Default status-based rule
+                  if (!isRestrictedStatus) {
+                    return (
+                      <li>
+                        <button
+                          onClick={() => {
+                            handleCancelClick(order)
+                            setIsOpen(false)
+                          }}
+                          className="block w-full px-4 py-2.5 text-left hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/30 dark:hover:text-red-400"
+                        >
+                          Cancel Order
+                        </button>
+                      </li>
+                    );
+                  }
+                  return null;
+                })()}
+
+                {/* Assignment/Transfer Actions (Hide on All Orders and Picked Orders) */}
+                {!hideActions && !showAllStatuses && forcedStatus !== 'picked' && (
                   <>
                     {isSalesOfficer ? (
                       <>
@@ -1644,6 +1707,14 @@ const OrderList = ({ forcedStatus, forcedChannel, hideActions, hideSelection, sh
         </div>
       </Modal>
     </section>
+  )
+}
+
+const OrderList = (props: OrderListProps) => {
+  return (
+    <Suspense fallback={<Loader />}>
+      <OrderListContent {...props} />
+    </Suspense>
   )
 }
 

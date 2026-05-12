@@ -264,8 +264,28 @@ export const NAV_DATA = [
       {
         title: "Website Orders",
         icon: Icons.GlobeIcon,
-        url: "/csr/website-orders",
-        items: [],
+        items: [
+          {
+            title: "Website Feed",
+            url: "/csr/website-orders",
+          },
+          {
+            title: "New Orders",
+            url: "/csr/website-orders/new",
+          },
+          {
+            title: "Cancelled Orders",
+            url: "/csr/website-orders/cancelled",
+          },
+          {
+            title: "Pending Orders",
+            url: "/csr/website-orders/pending",
+          },
+          {
+            title: "Expired Orders",
+            url: "/csr/website-orders/expired",
+          },
+        ],
       },
       {
         title: "Customers Profiles",

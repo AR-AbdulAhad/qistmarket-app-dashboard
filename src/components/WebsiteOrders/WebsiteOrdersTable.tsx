@@ -58,6 +58,9 @@ export default function WebsiteOrdersTable() {
   // Modals
   const [viewDetailsModal, setViewDetailsModal] = useState<WebsiteOrder | null>(null)
   const [pickupConfirmModal, setPickupConfirmModal] = useState<WebsiteOrder[] | null>(null)
+  const [cancelModal, setCancelModal] = useState<WebsiteOrder | null>(null)
+  const [cancelReason, setCancelReason] = useState('')
+  const [isCancelling, setIsCancelling] = useState(false)
 
   const fetchWebsiteOrders = async () => {
     setLoading(true)
@@ -151,6 +154,41 @@ export default function WebsiteOrdersTable() {
       toast.error('Something went wrong')
     } finally {
       setIsPickingUp(false)
+    }
+  }
+
+  const handleCancelOrder = async () => {
+    if (!cancelModal || !cancelReason.trim()) return
+    setIsCancelling(true)
+    const token = Cookies.get('auth_token')
+
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/orders/website-feed/${cancelModal.id}/cancel`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ 
+          reason: cancelReason,
+          orderData: cancelModal 
+        })
+      })
+
+      if (res.ok) {
+        toast.success('Order cancelled successfully')
+        setCancelModal(null)
+        setCancelReason('')
+        fetchWebsiteOrders()
+      } else {
+        const err = await res.json()
+        toast.error(err.message || 'Failed to cancel order')
+      }
+    } catch (error) {
+      console.error('Cancel error:', error)
+      toast.error('Something went wrong')
+    } finally {
+      setIsCancelling(false)
     }
   }
 
@@ -258,6 +296,14 @@ export default function WebsiteOrdersTable() {
                       className="block w-full px-4 py-2.5 text-left hover:bg-green-50 hover:text-green-600 dark:hover:bg-green-900/30"
                     >
                       Pick Up Order
+                    </button>
+                  </li>
+                  <li>
+                    <button
+                      onClick={() => { setCancelModal(order); setIsOpen(false) }}
+                      className="block w-full px-4 py-2.5 text-left hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/30"
+                    >
+                      Cancel Order
                     </button>
                   </li>
                 </ul>
@@ -431,6 +477,10 @@ export default function WebsiteOrdersTable() {
                   onClick={() => { setPickupConfirmModal([viewDetailsModal]); setViewDetailsModal(null) }}
                   className="px-6 py-2.5 bg-[#ff3d3d] text-white rounded-xl text-sm font-bold shadow-lg shadow-red-100 hover:opacity-90 transition-all"
                 >Pick Up Order</button>
+                <button
+                  onClick={() => { setCancelModal(viewDetailsModal); setViewDetailsModal(null) }}
+                  className="px-6 py-2.5 bg-red-50 text-red-600 rounded-xl text-sm font-bold hover:bg-red-100 transition-all"
+                >Cancel Order</button>
               </div>
             </div>
           </div>
@@ -483,6 +533,52 @@ export default function WebsiteOrdersTable() {
                     <Check className="w-4 h-4" />
                   )}
                   {isPickingUp ? "Picking up..." : "Yes, Confirm Pickup"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </Modal>
+      {/* Cancel Order Modal */}
+      <Modal open={!!cancelModal} onClose={() => setCancelModal(null)}>
+        {cancelModal && (
+          <div className="bg-white dark:bg-gray-900 rounded-2xl p-8 shadow-xl border border-gray-100 dark:border-gray-800 max-w-md w-full">
+            <div className="flex items-center justify-between mb-8">
+              <h3 className="text-xl font-black text-gray-900 dark:text-white">Cancel Website Order</h3>
+              <button onClick={() => setCancelModal(null)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full">
+                <X className="w-5 h-5 text-gray-400" />
+              </button>
+            </div>
+
+            <div className="space-y-6">
+              <div className="p-4 bg-red-50 dark:bg-red-900/10 rounded-xl border border-red-100 dark:border-red-900/30">
+                <p className="text-red-700 dark:text-red-400 text-sm font-medium">
+                  Are you sure you want to cancel order <span className="font-bold">#{cancelModal.tokenNumber}</span>? This will notify the customer and the website backend.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Reason for Cancellation</label>
+                <textarea
+                  value={cancelReason}
+                  onChange={(e) => setCancelReason(e.target.value)}
+                  placeholder="e.g. Out of stock, Customer changed mind, etc."
+                  className="w-full rounded-xl border border-stroke bg-transparent px-4 py-3 text-sm outline-none focus:border-[#ff3d3d] dark:border-dark-3 h-32 resize-none"
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4">
+                <button
+                  disabled={isCancelling}
+                  onClick={() => setCancelModal(null)}
+                  className="px-6 py-2.5 text-sm font-bold text-gray-500 hover:text-gray-700"
+                >Back</button>
+                <button
+                  disabled={isCancelling || !cancelReason.trim()}
+                  onClick={handleCancelOrder}
+                  className="flex items-center justify-center gap-2 px-8 py-2.5 bg-red-600 text-white rounded-xl text-sm font-black hover:bg-red-700 shadow-lg shadow-red-100 disabled:opacity-50 transition-all min-w-[150px]"
+                >
+                  {isCancelling ? "Cancelling..." : "Confirm Cancellation"}
                 </button>
               </div>
             </div>
