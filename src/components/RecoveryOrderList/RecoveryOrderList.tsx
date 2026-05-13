@@ -46,6 +46,9 @@ interface Order {
     months: number
     status: string
     created_at: string
+    updated_at: string
+    assigned_to: { id: number; username: string; full_name: string } | null
+    delivery_officer: { id: number; username: string; full_name: string } | null
     recovery_officer: { id: number; username: string; full_name: string } | null
 }
 
@@ -335,6 +338,18 @@ const RecoveryOrderList = () => {
                     </span>
                 )
             },
+        },
+        {
+            id: 'assigned_to',
+            accessorFn: (row) => row.assigned_to?.username || 'Unassigned',
+            header: 'Verification Officer',
+            enableColumnFilter: true,
+        },
+        {
+            id: 'delivery_officer',
+            accessorFn: (row) => row.delivery_officer?.username || 'Unassigned',
+            header: 'Delivery Officer',
+            enableColumnFilter: true,
         },
         {
             id: 'recovery_officer',

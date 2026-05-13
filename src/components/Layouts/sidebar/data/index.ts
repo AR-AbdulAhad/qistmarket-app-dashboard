@@ -46,7 +46,7 @@ export const NAV_DATA = [
           },
           {
             title: "Approved Orders",
-            url: "/approved-order-list",
+            url: "/approved-orders",
           },
           {
             title: "Picked Orders",
@@ -249,7 +249,7 @@ export const NAV_DATA = [
           },
           {
             title: "Approved Orders",
-            url: "/approved-order-list",
+            url: "/approved-orders",
           },
           {
             title: "Picked Orders",
@@ -270,16 +270,8 @@ export const NAV_DATA = [
             url: "/csr/website-orders",
           },
           {
-            title: "New Orders",
-            url: "/csr/website-orders/new",
-          },
-          {
             title: "Cancelled Orders",
             url: "/csr/website-orders/cancelled",
-          },
-          {
-            title: "Pending Orders",
-            url: "/csr/website-orders/pending",
           },
           {
             title: "Expired Orders",
@@ -370,7 +362,7 @@ export const NAV_DATA = [
           },
           {
             title: "Approved Orders",
-            url: "/approved-order-list",
+            url: "/approved-orders",
           },
           {
             title: "Picked Orders",

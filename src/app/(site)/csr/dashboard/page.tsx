@@ -5,6 +5,7 @@ import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
 import Cookies from "js-cookie";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../../../../../contexts/AuthContext";
+import RankingBoard from "@/components/CSR/RankingBoard";
 
 interface CsrDashboardStats {
   filter: string;
@@ -52,18 +53,21 @@ interface ChannelStat {
 }
 
 interface CsrRanking {
+  rank: number;
   userId: number;
   name: string;
   username: string;
-  totalOrders: number;
+  image?: string;
+  uniqueCustomers: number;
   delivered: number;
+  repeatCustomers: number;
   cancelled: number;
-  transferred: number;
-  completedInOutlet: number;
-  remainingInOutlet: number;
-  achievedAmount: number;
-  targetProgress: number;
+  expired: number;
+  totalSales: number;
+  score: number;
+  trend: number;
   successRate: number;
+  cancelRate: number;
 }
 
 export default function CsrDashboardPage() {
@@ -299,73 +303,8 @@ export default function CsrDashboardPage() {
     if (!stats || !stats.csrRanking || stats.csrRanking.length === 0) return null;
 
     return (
-      <div className="rounded-xl border border-stroke bg-white shadow-sm dark:border-dark-3 dark:bg-boxdark mb-10 overflow-hidden">
-        <div className="px-6 py-5 border-b border-stroke dark:border-dark-3 bg-gray-50 dark:bg-gray-800/30">
-          <h3 className="text-lg font-bold text-black dark:text-white flex items-center gap-2">
-            <span>🏆</span> CSR Ranking Board
-          </h3>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left">
-            <thead>
-              <tr className="bg-gray-50 dark:bg-gray-800/50 text-xs uppercase tracking-wider text-gray-500 dark:text-gray-400 border-b border-stroke dark:border-dark-3">
-                <th className="px-6 py-4 font-semibold">Rank</th>
-                <th className="px-6 py-4 font-semibold">CSR Name</th>
-                <th className="px-6 py-4 font-semibold">Delivered Amount</th>
-                <th className="px-6 py-4 font-semibold text-center">Transferred</th>
-                <th className="px-6 py-4 font-semibold text-center">Completed</th>
-                <th className="px-6 py-4 font-semibold text-center">Remaining</th>
-                <th className="px-6 py-4 font-semibold text-right">Target Progress</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-stroke dark:divide-dark-3">
-              {stats.csrRanking.map((rank, index) => {
-                const isYou = rank.userId === user?.id;
-                return (
-                  <tr key={rank.userId} className={`${isYou ? 'bg-primary/5 dark:bg-primary/10' : ''} hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors`}>
-                    <td className="px-6 py-4">
-                      <div className={`size-8 rounded-full flex items-center justify-center font-bold text-sm ${index === 0 ? 'bg-yellow-100 text-yellow-600' : index === 1 ? 'bg-gray-200 text-gray-600' : index === 2 ? 'bg-orange-100 text-orange-600' : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'}`}>
-                        {index + 1}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        <p className="font-semibold text-black dark:text-white">{rank.name}</p>
-                        {isYou && (
-                          <span className="bg-primary text-white text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">You</span>
-                        )}
-                      </div>
-                      <p className="text-xs text-gray-500">@{rank.username}</p>
-                    </td>
-                    <td className="px-6 py-4 font-bold text-black dark:text-white">
-                      Rs {rank.achievedAmount.toLocaleString()}
-                    </td>
-                    <td className="px-6 py-4 text-center">
-                      <span className="font-medium text-blue-600 bg-blue-50 dark:bg-blue-900/20 px-2 py-1 rounded">{rank.transferred}</span>
-                    </td>
-                    <td className="px-6 py-4 text-center">
-                      <span className="font-medium text-green-600 bg-green-50 dark:bg-green-900/20 px-2 py-1 rounded">{rank.completedInOutlet}</span>
-                    </td>
-                    <td className="px-6 py-4 text-center">
-                      <span className="font-medium text-orange-600 bg-orange-50 dark:bg-orange-900/20 px-2 py-1 rounded">{rank.remainingInOutlet}</span>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <div className="flex flex-col items-end gap-1">
-                        <span className="font-bold text-black dark:text-white">{rank.targetProgress}%</span>
-                        <div className="w-24 bg-gray-200 rounded-full h-1.5 dark:bg-gray-700 overflow-hidden">
-                          <div 
-                            className={`h-1.5 rounded-full ${rank.targetProgress >= 100 ? 'bg-green-500' : rank.targetProgress >= 50 ? 'bg-primary' : 'bg-orange-500'}`} 
-                            style={{ width: `${Math.min(rank.targetProgress, 100)}%` }}
-                          ></div>
-                        </div>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+      <div className="mb-10">
+        <RankingBoard rankings={stats.csrRanking} currentUserId={user?.id} />
       </div>
     );
   };

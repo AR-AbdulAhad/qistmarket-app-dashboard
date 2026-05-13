@@ -242,6 +242,21 @@ const Field = ({ label, value, className = "" }: { label: string; value: any; cl
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
 
+interface DummyCustomer {
+    id: number;
+    customer_name: string | null;
+    whatsapp_number: string | null;
+    alternate_contact?: string | null;
+    address: string | null;
+    city: string | null;
+    area: string | null;
+    block?: string | null;
+    house_no?: string | null;
+    street?: string | null;
+    zone?: string | null;
+    moved_at: string;
+}
+
 interface Order {
     id: number;
     order_ref: string;
@@ -295,6 +310,7 @@ interface Order {
         role_name?: string | null;
     }[];
     verification?: VerificationData | null;
+    dummyCustomer?: DummyCustomer | null;
 }
 
 export default function OrderDetailsPage() {
@@ -614,6 +630,59 @@ export default function OrderDetailsPage() {
                 </button>
                 )}
             </div>
+
+            {order.dummyCustomer && (
+                <div className="mb-8 rounded-xl border-l-4 border-primary bg-white p-6 shadow-md dark:bg-gray-800 animate-fade-in">
+                    <div className="flex items-start gap-4">
+                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                            <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                        </div>
+                        <div className="flex-1">
+                            <h3 className="text-lg font-bold text-gray-900 dark:text-white">Initial Placement Details</h3>
+                            <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                                These are the initial details provided during order placement.
+                            </p>
+                            
+                            <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                                <div>
+                                    <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">Customer Name</p>
+                                    <p className="font-semibold text-gray-900 dark:text-gray-200">{order.dummyCustomer.customer_name || 'N/A'}</p>
+                                </div>
+                                <div>
+                                    <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">WhatsApp Number</p>
+                                    <p className="font-semibold text-gray-900 dark:text-gray-200">{order.dummyCustomer.whatsapp_number || 'N/A'}</p>
+                                </div>
+                                <div>
+                                    <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">Alternate Contact</p>
+                                    <p className="font-semibold text-gray-900 dark:text-gray-200">{order.dummyCustomer.alternate_contact || 'N/A'}</p>
+                                </div>
+                                <div>
+                                    <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">Captured At</p>
+                                    <p className="font-semibold text-gray-900 dark:text-gray-200">{dayjs(order.dummyCustomer.moved_at).format('MMM D, YYYY h:mm A')}</p>
+                                </div>
+                            </div>
+                            
+                            <div className="mt-4 border-t border-gray-100 pt-3 dark:border-gray-700">
+                                <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">Initial Address</p>
+                                <p className="mt-1 text-sm font-medium text-gray-800 dark:text-gray-300">
+                                    {order.dummyCustomer.address ? order.dummyCustomer.address : (
+                                        [
+                                            order.dummyCustomer.house_no,
+                                            order.dummyCustomer.street,
+                                            order.dummyCustomer.block,
+                                            order.dummyCustomer.area,
+                                            order.dummyCustomer.city,
+                                            order.dummyCustomer.zone
+                                        ].filter(Boolean).join(', ') || 'No address details recorded'
+                                    )}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
                 {/* Customer Info Card */}

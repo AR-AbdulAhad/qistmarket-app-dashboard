@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Search, User, FileText, ClipboardList, Loader2, X, Hash, MapPin, Phone, ArrowRight, UserCheck, ExternalLink } from "lucide-react";
+import { Search, User, FileText, ClipboardList, Loader2, X, Hash, MapPin, Phone, ArrowRight, UserCheck, ExternalLink, PartyPopper } from "lucide-react";
 import Cookies from "js-cookie";
 import CustomerProfileModal from "./CustomerProfileModal";
 
@@ -13,8 +13,12 @@ const statusColors: any = {
     'pending': 'bg-amber-500/10 text-amber-500 border-amber-500/20',
     'in_progress': 'bg-indigo-500/10 text-indigo-500 border-indigo-500/20',
     'cancelled': 'bg-red-500/10 text-red-500 border-red-500/20',
+    'approved': 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20',
+    'rejected': 'bg-rose-500/10 text-rose-500 border-rose-500/20',
     'default': 'bg-gray-500/10 text-gray-500 border-gray-500/20'
 };
+
+import { cn } from "@/lib/utils";
 
 export default function GlobalSearch() {
     const [query, setQuery] = useState("");
@@ -136,7 +140,7 @@ export default function GlobalSearch() {
                                             <div className="h-[1px] flex-1 bg-gradient-to-r from-transparent via-stroke dark:via-strokedark to-transparent" />
                                         </div>
                                         <div className="grid gap-4">
-                                            {results.filter(i => i.status === 'delivered').map((item) => (
+                                            {results.filter(i => i.status === 'delivered').slice(0, searchType === 'all' ? 5 : 10).map((item) => (
                                                 <ResultItem key={item.id} item={item} setSelectedProfile={setSelectedProfile} setIsOpen={setIsOpen} />
                                             ))}
                                         </div>
@@ -154,7 +158,7 @@ export default function GlobalSearch() {
                                             <div className="h-[1px] flex-1 bg-gradient-to-r from-transparent via-stroke dark:via-strokedark to-transparent" />
                                         </div>
                                         <div className="grid gap-4">
-                                            {results.filter(i => i.status !== 'delivered').map((item) => (
+                                            {results.filter(i => i.status !== 'delivered').slice(0, searchType === 'all' ? 5 : 10).map((item) => (
                                                 <ResultItem key={item.id} item={item} setSelectedProfile={setSelectedProfile} setIsOpen={setIsOpen} />
                                             ))}
                                         </div>
@@ -174,9 +178,17 @@ export default function GlobalSearch() {
                         ) : null}
                     </div>
                     
-                    <div className="p-4 bg-gray-50 dark:bg-meta-4/80 border-t border-stroke dark:border-strokedark text-center">
-                         <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Search results are limited to top 10 matches</p>
-                    </div>
+                    {results.length > 0 && (
+                        <div className="p-4 bg-gray-50 dark:bg-meta-4/80 border-t border-stroke dark:border-strokedark">
+                            <a 
+                                href={`/search-results?query=${query}&type=${searchType}`}
+                                className="flex items-center justify-center gap-2 w-full py-3 rounded-xl bg-primary text-white text-xs font-black uppercase tracking-widest hover:bg-opacity-90 transition-all shadow-md shadow-primary/20"
+                                onClick={() => setIsOpen(false)}
+                            >
+                                View All Results ({results.length}) <ExternalLink size={14} />
+                            </a>
+                        </div>
+                    )}
                 </div>
             )}
 
@@ -218,6 +230,15 @@ function ResultItem({ item, setSelectedProfile, setIsOpen }: any) {
                         )}
                         <div className="space-y-1.5 mt-2">
                             <ResultMeta icon={<Phone size={11} />} text={item.verification?.purchaser?.telephone_number || item.whatsapp_number} />
+                            <div className="flex items-center gap-2 mt-2">
+                                <span className="text-[9px] font-black uppercase tracking-widest text-gray-400">Order Status:</span>
+                                <span className={cn(
+                                    "px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-widest border",
+                                    statusColors[item.status?.toLowerCase()] || statusColors.default
+                                )}>
+                                    {item.status}
+                                </span>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -246,6 +267,14 @@ function ResultItem({ item, setSelectedProfile, setIsOpen }: any) {
                             color="emerald"
                             href={`/orders/${item.id}`}
                         />
+                        {item.status === 'delivered' && (
+                            <ActionIconButton 
+                                icon={<PartyPopper size={16} />} 
+                                label="Convert"
+                                color="indigo"
+                                href={`/convert-sale/${item.id}`}
+                            />
+                        )}
                     </div>
                 </div>
             </div>

@@ -74,6 +74,7 @@ interface OrderWithVerification {
   created_at: string
   updated_at: string
   assigned_to: UserSelect | null
+  delivery_officer: UserSelect | null
   created_by: { username: string; full_name: string } | null
 
   verification: VerificationNested | null

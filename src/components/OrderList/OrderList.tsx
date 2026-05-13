@@ -56,6 +56,8 @@ interface Order {
   created_at: string
   created_by: { username: string } | null
   assigned_to: { username: string } | null
+  delivery_officer: { username: string; full_name: string } | null
+  recovery_officer: { username: string; full_name: string } | null
   outlet_id?: number | null
   cancelled_reason?: string | null
   cancelled_at?: string | null
@@ -607,6 +609,11 @@ const OrderListContent = ({ forcedStatus, forcedChannel, hideActions, hideSelect
     }
   }
 
+  // Column visibility flags based on page status
+  const hideAssignedTo = ['rejected', 'expired', 'cancelled'].includes(forcedStatus || '')
+  const showDeliveryOfficer = ['completed', 'delivered', 'picked'].includes(forcedStatus || '')
+  const showRecoveryOfficer = ['delivered'].includes(forcedStatus || '')
+
   // ── Columns ────────────────────────────────────────────────────────────────
   const columns: ColumnDef<Order>[] = [
     ...(hideSelection ? [] : [{
@@ -754,12 +761,25 @@ const OrderListContent = ({ forcedStatus, forcedChannel, hideActions, hideSelect
       header: 'Created By',
       enableColumnFilter: true,
     },
-    ...(isSalesOfficer ? [] : [{
+    // Show 'Assigned To' for all statuses except rejected, expired, cancelled
+    ...(hideAssignedTo ? [] : [{
       id: 'assigned_to',
       accessorFn: (row: Order) => row.assigned_to?.username || 'Unassigned',
-      header: 'Assigned To',
+      header: 'Verification Officer',
       enableColumnFilter: true,
     }]),
+    ...(showDeliveryOfficer ? [{
+      id: 'delivery_officer',
+      accessorFn: (row: Order) => row.delivery_officer?.full_name || row.delivery_officer?.username || 'Unassigned',
+      header: 'Delivery Officer',
+      enableColumnFilter: true,
+    }] : []),
+    ...(showRecoveryOfficer ? [{
+      id: 'recovery_officer',
+      accessorFn: (row: Order) => row.recovery_officer?.full_name || row.recovery_officer?.username || 'Unassigned',
+      header: 'Recovery Officer',
+      enableColumnFilter: true,
+    }] : []),
     {
   id: 'actions',
   header: 'Actions',

@@ -143,6 +143,11 @@ const ApprovedOrderList = () => {
   const [isUnassigning, setIsUnassigning] = useState(false)
   const [isBulkAssigning, setIsBulkAssigning] = useState(false)
   const [isBulkUnassigning, setIsBulkUnassigning] = useState(false)
+  
+  // Cancel Order States
+  const [cancelModalOpen, setCancelModalOpen] = useState(false)
+  const [cancelReason, setCancelReason] = useState('')
+  const [isSubmittingCancel, setIsSubmittingCancel] = useState(false)
 
   // ── Data Fetching ──────────────────────────────────────────────────────────
   const fetchApprovedOrders = async () => {
@@ -352,6 +357,46 @@ const ApprovedOrderList = () => {
     }
   }
 
+  const handleCancelClick = (order: Order) => {
+    setSelectedOrder(order)
+    setCancelReason('')
+    setCancelModalOpen(true)
+  }
+
+  const confirmCancel = async () => {
+    if (!selectedOrder || !cancelReason.trim()) {
+      toast.error('Please provide a reason for cancellation')
+      return
+    }
+
+    setIsSubmittingCancel(true)
+    try {
+      const token = Cookies.get('auth_token')
+      const res = await fetch(`${BACKEND_URL}/api/orders/${selectedOrder.id}/cancel`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ reason: cancelReason }),
+      })
+
+      const data = await res.json()
+      if (data.success) {
+        toast.success('Order cancelled successfully')
+        setCancelModalOpen(false)
+        fetchApprovedOrders() // Refresh list
+      } else {
+        toast.error(data.message || 'Failed to cancel order')
+      }
+    } catch (err) {
+      console.error('Cancel order error:', err)
+      toast.error('Internal server error')
+    } finally {
+      setIsSubmittingCancel(false)
+    }
+  }
+
   console.log('Orders:', deliveryOfficers)
 
   // ── Columns ────────────────────────────────────────────────────────────────
@@ -443,6 +488,12 @@ const ApprovedOrderList = () => {
       id: 'created_by',
       accessorFn: (row) => row.created_by?.username || '',
       header: 'Created By',
+      enableColumnFilter: true,
+    },
+    {
+      id: 'assigned_to',
+      accessorFn: (row) => row.assigned_to?.username || 'Unassigned',
+      header: 'Verification Officer',
       enableColumnFilter: true,
     },
     {
@@ -612,6 +663,18 @@ const ApprovedOrderList = () => {
                         </button>
                       </li>
                     )}
+
+                    <li>
+                      <button
+                        onClick={() => {
+                          handleCancelClick(order);
+                          setIsOpen(false);
+                        }}
+                        className="block w-full px-4 py-2.5 text-left border-t border-gray-50 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 dark:border-dark-3"
+                      >
+                        Cancel Order
+                      </button>
+                    </li>
                   </ul>
                 </div>,
                 document.body
@@ -995,6 +1058,46 @@ const ApprovedOrderList = () => {
           >
             {isBulkUnassigning && <span className="size-4 animate-spin rounded-full border-2 border-white border-t-transparent"></span>}
             {isBulkUnassigning ? 'Unassigning...' : 'Unassign All'}
+          </button>
+        </div>
+      </Modal>
+
+      {/* Cancel Order Modal */}
+      <Modal
+        open={cancelModalOpen}
+        onClose={() => setCancelModalOpen(false)}
+        className="max-w-md rounded-2xl bg-white p-8 shadow-xl dark:bg-gray-800"
+      >
+        <h2 className="mb-4 text-xl font-semibold text-dark dark:text-white">Cancel Order</h2>
+        <p className="mb-4 text-gray-600 dark:text-gray-300">
+          Are you sure you want to cancel order <strong>{selectedOrder?.order_ref}</strong>?
+        </p>
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium mb-1 dark:text-gray-300">Reason for Cancellation (Mandatory):</label>
+            <textarea
+              value={cancelReason}
+              onChange={(e) => setCancelReason(e.target.value)}
+              className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2.5 outline-none focus:border-[#ff3d3d] dark:border-dark-3"
+              rows={3}
+              placeholder="e.g., Customer not responding, Incorrect information..."
+            ></textarea>
+          </div>
+        </div>
+        <div className="mt-6 flex justify-end gap-4">
+          <button
+            onClick={() => setCancelModalOpen(false)}
+            className="rounded border border-stroke px-6 py-2.5 text-dark hover:bg-gray-100 dark:border-dark-3 dark:text-white dark:hover:bg-dark-3 disabled:opacity-50"
+            disabled={isSubmittingCancel}
+          >
+            Back
+          </button>
+          <button
+            onClick={confirmCancel}
+            disabled={!cancelReason.trim() || isSubmittingCancel}
+            className="rounded bg-red-600 px-6 py-2.5 text-white hover:bg-red-700 disabled:opacity-50"
+          >
+            {isSubmittingCancel ? 'Cancelling...' : 'Cancel Order'}
           </button>
         </div>
       </Modal>

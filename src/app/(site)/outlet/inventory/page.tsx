@@ -362,7 +362,7 @@ export default function OutletInventoryPage() {
             {/* Stats Row */}
             <div className="grid grid-cols-3 gap-4 mb-6">
                 {[
-                    { label: "Total Stock", val: totalStats.totalStock, color: "text-primary" },
+                    { label: "Total Product", val: totalStats.totalStock, color: "text-primary" },
                     { label: "In Stock", val: totalStats.inStock, color: "text-green-600 dark:text-green-400" },
                     { label: "Sold", val: totalStats.sold, color: "text-blue-600 dark:text-blue-400" },
                 ].map(s => (
