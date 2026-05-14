@@ -373,7 +373,7 @@ const ApprovedOrderList = () => {
     try {
       const token = Cookies.get('auth_token')
       const res = await fetch(`${BACKEND_URL}/api/orders/${selectedOrder.id}/cancel`, {
-        method: 'POST',
+        method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,

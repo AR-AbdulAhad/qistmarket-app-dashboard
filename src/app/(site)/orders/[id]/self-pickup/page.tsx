@@ -54,6 +54,9 @@ export default function SelfPickupPage() {
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
   const [isMirrored, setIsMirrored] = useState(true);
   
+  // Custom Cash Price
+  const [cashPriceInput, setCashPriceInput] = useState<number | ''>('');
+  
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isCameraActive, setIsCameraActive] = useState(false);
@@ -192,6 +195,7 @@ export default function SelfPickupPage() {
     setSearch(item.imei_serial || '');
     setSelectedPlan(null);
     setLedger([]);
+    setCashPriceInput(''); // Reset custom cash price on new selection
 
     // Prefer stored installment_plans from inventory; fallback to generated
     const storedPlans: any[] = Array.isArray(item.installment_plans)
@@ -200,20 +204,41 @@ export default function SelfPickupPage() {
 
     if (storedPlans.length > 0) {
       setSuggestedPlans(storedPlans);
-      // Auto-select matching months if order had a pre-filled duration
-      const match = storedPlans.find((p: any) => p.months === order?._prefill_months);
-      if (match) setTimeout(() => handlePlanSelect(match), 0);
     } else if (item.purchase_price > 0) {
       // Use category and purchase_price for generating installments as per user instructions
       const generated = calculateInstallments(item.category || '', item.purchase_price);
       setSuggestedPlans(generated);
-      const match = generated.find((p: any) => p.months === order?._prefill_months);
-      if (match) setTimeout(() => handlePlanSelect(match), 0);
     } else {
       setSuggestedPlans([]);
     }
     setActiveStep(2);
   };
+
+  // Re-calculate plans when custom cash price is entered
+  useEffect(() => {
+    if (activeStep !== 2 || !selectedInventory) return;
+
+    if (cashPriceInput && Number(cashPriceInput) > 0) {
+      const generated = calculateInstallments(selectedInventory.category || '', Number(cashPriceInput));
+      setSuggestedPlans(generated);
+      setSelectedPlan(null); // Clear selection so they must re-select
+      setLedger([]);
+    } else {
+      // Revert to default
+      const storedPlans: any[] = Array.isArray(selectedInventory.installment_plans)
+        ? selectedInventory.installment_plans.filter((p: any) => p.isActive !== false)
+        : [];
+      if (storedPlans.length > 0) {
+        setSuggestedPlans(storedPlans);
+      } else if (selectedInventory.purchase_price > 0) {
+        setSuggestedPlans(calculateInstallments(selectedInventory.category || '', selectedInventory.purchase_price));
+      } else {
+        setSuggestedPlans([]);
+      }
+      setSelectedPlan(null);
+      setLedger([]);
+    }
+  }, [cashPriceInput]);
 
   // Normalize plan to standard shape before storing
   const handlePlanSelect = (plan: any) => {
@@ -607,23 +632,39 @@ export default function SelfPickupPage() {
                 {/* Step 2: Financial Configuration */}
                 {activeStep === 2 && (
                   <div className="p-10 animate-in fade-in slide-in-from-right-5 duration-500">
-                     <div className="flex items-center justify-between mb-10">
+                     <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-10 gap-6">
                         <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600">
+                            <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600 shrink-0">
                               <Calculator className="w-6 h-6" />
                             </div>
                             <div>
-                              <h3 className="text-2xl font-black text-gray-900 tracking-tight">Financial Schedule</h3>
+                              <h3 className="text-xl md:text-2xl font-black text-gray-900 tracking-tight">Financial Schedule</h3>
                               <p className="text-gray-400 text-sm font-bold">Configure installment plan for {selectedInventory?.product_name}</p>
                             </div>
                         </div>
-                        <div className="bg-emerald-50 px-4 py-2 rounded-xl flex items-center gap-2 border border-emerald-100">
-                            <div className="w-2 h-2 bg-emerald-500 rounded-full animate-ping" />
-                            <span className="text-emerald-700 text-xs font-black uppercase">Live Calculations</span>
+
+                        {/* Custom Cash Price Input */}
+                        <div className="bg-gray-50 border-2 border-gray-100 p-4 rounded-2xl flex items-center gap-4 w-full md:w-auto">
+                            <div className="flex flex-col">
+                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Custom Cash Price</label>
+                                <div className="flex items-center gap-2">
+                                    <span className="text-gray-400 font-black">Rs.</span>
+                                    <input 
+                                        type="number" 
+                                        placeholder="Default"
+                                        value={cashPriceInput}
+                                        onChange={(e) => setCashPriceInput(e.target.value ? Number(e.target.value) : '')}
+                                        className="bg-transparent border-none outline-none font-black text-xl text-gray-900 placeholder:text-gray-300 w-32"
+                                    />
+                                </div>
+                            </div>
+                            <div className="w-10 h-10 bg-white rounded-xl shadow-sm border border-gray-100 flex items-center justify-center text-blue-500">
+                                <RefreshCcw className="w-5 h-5" />
+                            </div>
                         </div>
                      </div>
 
-                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
                         {suggestedPlans.map((plan, idx) => {
                           // Normalize field names — stored plans use `advance`, generated also use `advance` now
                           const planAdvance = plan.advance ?? plan.advanceAmount ?? 0;

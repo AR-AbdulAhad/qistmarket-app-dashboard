@@ -44,28 +44,19 @@ export const InstallmentLedgerEditor = ({
 
     const updateLedgerRow = (index: number, field: keyof LedgerRow, value: string | number) => {
         const updated = [...ledger];
-        const row = { ...updated[index], [field]: value };
 
-        if (field === 'amount') {
-            const newAmount = Number(value);
-            const diff = ledger[index].amount - newAmount;
-            updated[index] = { ...row, amount: newAmount };
-
-            // Redistribute difference to remaining months
-            const remainingMonths = updated.length - (index + 1);
-            if (remainingMonths > 0) {
-                const adjustment = Math.floor(diff / remainingMonths);
-                const remainder = diff % remainingMonths;
-
-                for (let i = index + 1; i < updated.length; i++) {
-                    updated[i].amount += adjustment;
-                    if (i === updated.length - 1) {
-                        updated[i].amount += remainder;
-                    }
-                }
+        if (field === 'date' && index === 0) {
+            // First installment date changed -> cascade to others
+            const newStartDate = dayjs(value as string);
+            for (let i = 0; i < updated.length; i++) {
+                updated[i] = {
+                    ...updated[i],
+                    date: newStartDate.add(i, 'month').format('YYYY-MM-DD')
+                };
             }
         } else {
-            updated[index] = row as LedgerRow;
+            // Should not be reachable for other rows or amounts, but kept for safety
+            updated[index] = { ...updated[index], [field]: value };
         }
 
         setLedger(updated);
@@ -92,24 +83,27 @@ export const InstallmentLedgerEditor = ({
                             <tr key={r.month} className="hover:bg-gray-50/50 dark:hover:bg-meta-4/10 transition-colors">
                                 <td className="py-3 text-sm font-bold text-gray-900 dark:text-white">{r.month}</td>
                                 <td className="py-3">
-                                    <input
-                                        type="date"
-                                        value={r.date}
-                                        min={today.format('YYYY-MM-DD')}
-                                        onChange={e => updateLedgerRow(index, 'date', e.target.value)}
-                                        className="bg-transparent border-none p-0 text-sm font-medium text-gray-600 dark:text-gray-400 outline-none focus:text-primary transition-colors cursor-pointer"
-                                    />
+                                    {index === 0 ? (
+                                        <input
+                                            type="date"
+                                            value={r.date}
+                                            min={today.format('YYYY-MM-DD')}
+                                            max={today.add(40, 'day').format('YYYY-MM-DD')}
+                                            onChange={e => updateLedgerRow(index, 'date', e.target.value)}
+                                            className="bg-transparent border-none p-0 text-sm font-medium text-gray-600 dark:text-gray-400 outline-none focus:text-primary transition-colors cursor-pointer"
+                                        />
+                                    ) : (
+                                        <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                                            {dayjs(r.date).format('DD MMM, YYYY')}
+                                        </span>
+                                    )}
                                 </td>
                                 <td className="py-3 text-right">
                                     <div className="flex items-center justify-end gap-1">
                                         <span className="text-[10px] text-gray-400 font-bold">Rs.</span>
-                                        <input
-                                            type="number"
-                                            value={r.amount}
-                                            min={1}
-                                            onChange={e => updateLedgerRow(index, 'amount', e.target.value)}
-                                            className="w-24 bg-transparent border-none p-0 text-sm font-black text-gray-900 dark:text-white outline-none focus:text-primary text-right transition-colors"
-                                        />
+                                        <span className="w-24 bg-transparent border-none p-0 text-sm font-black text-gray-900 dark:text-white text-right">
+                                            {Number(r.amount).toLocaleString()}
+                                        </span>
                                     </div>
                                 </td>
                             </tr>

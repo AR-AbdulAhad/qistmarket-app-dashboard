@@ -12,6 +12,7 @@ import Cookies from "js-cookie";
 import { toast } from "react-hot-toast";
 import { CashSubmissionPopup } from "@/components/CashSubmissionPopup";
 import { ReturnExchangePopup } from "@/components/ReturnExchangePopup";
+import { StockTransferOTPPopup } from "@/components/StockTransferOTPPopup";
 
 export default function Layout({ children }: PropsWithChildren) {
   const { socket: socketInstance } = useNotifications();
@@ -35,9 +36,11 @@ export default function Layout({ children }: PropsWithChildren) {
             <CashSubmissionPopup socket={socketInstance} />
             {/* Global OTP Popup for Return/Exchange */}
             <ReturnExchangePopup socket={socketInstance} />
+            {/* Global OTP Popup for Stock Transfer */}
+            <StockTransferOTPPopup />
           </div>
         </SidebarProvider>
       </ProtectedRoute>
     </AuthProvider>
   );
-}
+}

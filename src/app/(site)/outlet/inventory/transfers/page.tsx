@@ -1,9 +1,12 @@
 "use client";
 
-import { useState, useEffect, useMemo, Fragment } from "react";
+import { useState, useEffect, useMemo, Fragment, useRef } from "react";
 import Cookies from "js-cookie";
 import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
 import { Send, KeyRound, CheckCircle2, ChevronDown, ChevronRight, CheckSquare, Square, Plus, Save, X, Trash2 } from "lucide-react";
+import { useNotifications } from "../../../../../../contexts/NotificationContext";
+import { useAuth } from "../../../../../../contexts/AuthContext";
+import { toast } from "react-hot-toast";
 
 const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
 const getAuthHeaders = () => ({
@@ -60,6 +63,8 @@ export default function TransfersPage() {
     const [otp, setOtp] = useState("");
     const [loading, setLoading] = useState(false);
     const [statusMessage, setStatusMessage] = useState({ type: "", text: "" });
+    // Track initiated inventory IDs so we can pass them during verify
+    const [initiatedInventoryIds, setInitiatedInventoryIds] = useState<{ id: number; quantity: number }[]>([]);
 
     const fetchData = async () => {
         try {
@@ -81,10 +86,40 @@ export default function TransfersPage() {
         }
     };
 
+    const { socket } = useNotifications();
+    const { user } = useAuth();
+
+    const fetchDataRef = useRef(fetchData);
+    useEffect(() => { fetchDataRef.current = fetchData; }, [fetchData]);
+
     useEffect(() => {
-        fetchData();
+        fetchDataRef.current();
         setSelectedTargetId("");
     }, [transferType, page, search]);
+
+    useEffect(() => {
+        if (!socket || !user) return;
+
+        const handleUpdate = () => {
+            fetchDataRef.current();
+        };
+
+        socket.on("stock_transfer_initiated", handleUpdate);
+        socket.on("stock_transfer_cancelled", handleUpdate);
+        socket.on("stock_transfer_completed", (data: any) => {
+            handleUpdate();
+        });
+        socket.on("stock_transfer_status", (data: any) => {
+            handleUpdate();
+        });
+
+        return () => {
+            socket.off("stock_transfer_initiated", handleUpdate);
+            socket.off("stock_transfer_cancelled", handleUpdate);
+            socket.off("stock_transfer_completed");
+            socket.off("stock_transfer_status");
+        };
+    }, [socket, user]);
 
     // Only In-Stock items
     const inStockItems = useMemo(() => inventory.filter(i => i.status === "In Stock"), [inventory]);
@@ -160,16 +195,9 @@ export default function TransfersPage() {
         }
     };
 
-    const initiateTransfer = async (isConfirmed = false) => {
+    const initiateTransfer = async () => {
         if (selectedIds.length === 0 || !selectedTargetId) return;
 
-        // Add confirmation for Outlet transfer
-        if (transferType === "Outlet" && !isConfirmed) {
-            setConfirmModalOpen(true);
-            return;
-        }
-
-        setConfirmModalOpen(false);
         setLoading(true);
         setStatusMessage({ type: "", text: "" });
         try {
@@ -181,19 +209,11 @@ export default function TransfersPage() {
             });
             const data = await res.json();
             if (data.success) {
-                if (transferType === "Outlet") {
-                    // Immediate success for Outlets
-                    setStatusMessage({ type: "success", text: "Stock transferred successfully." });
-                    setSelectedIds([]);
-                    setTransferQuantities({});
-                    setExpandedKeys(new Set());
-                    fetchData();
-                } else {
-                    // OTP flow for Delivery Officers
-                    setOtpModalOpen(true);
-                    setOtp("");
-                    setStatusMessage({ type: "success", text: `OTP sent to ${transferType}.` });
-                }
+                // Track which items were initiated for the verify step
+                setInitiatedInventoryIds(payloadArray);
+                setOtpModalOpen(true);
+                setOtp("");
+                setStatusMessage({ type: "success", text: `OTP sent to ${transferType}.` });
             } else {
                 setStatusMessage({ type: "error", text: data.message || "Failed to initiate." });
             }
@@ -208,14 +228,15 @@ export default function TransfersPage() {
         if (otp.length < 4) return;
         setLoading(true);
         try {
-            const payloadArray = selectedIds.map(id => ({ 
-                id, 
-                quantity: transferQuantities[id] || 1
-            }));
             const res = await fetch(`${API_BASE}/api/outlet/inventory/transfer/verify`, {
                 method: "POST",
                 headers: getAuthHeaders(),
-                body: JSON.stringify({ otp, inventory_ids: payloadArray, to_type: transferType, to_id: selectedTargetId }),
+                body: JSON.stringify({ 
+                    otp, 
+                    to_type: transferType, 
+                    to_id: selectedTargetId,
+                    inventory_ids: initiatedInventoryIds 
+                }),
             });
             const data = await res.json();
             if (data.success) {
@@ -253,30 +274,16 @@ export default function TransfersPage() {
                 </div>
             )}
 
-            <div className="bg-white dark:bg-boxdark rounded-xl shadow border border-stroke dark:border-strokedark p-6">
+            <div className="bg-white dark:bg-boxdark rounded-xl shadow border border-stroke dark:border-strokedark p-6 mb-8">
                 {/* Destination Bar */}
                 <div className="mb-8 pb-6 border-b border-stroke dark:border-strokedark flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
                     <div>
-                        <h2 className="text-xl font-bold text-gray-800 dark:text-white">Select Destination & Target</h2>
+                        <h2 className="text-xl font-bold text-gray-800 dark:text-white">1. Select Destination & Target</h2>
                         <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">
-                            Expand product groups below to pick specific units/IMEIs.
+                            Choose where you want to send the stock.
                         </p>
                     </div>
                     <div className="flex flex-col sm:flex-row items-center gap-4 w-full md:w-auto">
-                        {/* Search Bar */}
-                        <div className="relative w-full sm:w-64">
-                            <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                <svg className="fill-gray-400" width="16" height="16" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M15.7781 14.4938L12.0656 10.7812C12.7969 9.79687 13.2187 8.57812 13.2187 7.28437C13.2187 3.99375 10.5187 1.29375 7.22812 1.29375C3.9375 1.29375 1.2375 3.99375 1.2375 7.28437C1.2375 10.575 3.9375 13.275 7.22812 13.275C8.52187 13.275 9.74062 12.8531 10.725 12.1219L14.4375 15.8344C14.6344 16.0312 14.8875 16.1156 15.1125 16.1156C15.3375 16.1156 15.5906 16.0312 15.7781 15.8344C16.1719 15.4688 16.1719 14.8688 15.7781 14.4938ZM2.72812 7.28437C2.72812 4.78125 4.75312 2.75625 7.25625 2.75625C9.75938 2.75625 11.7844 4.78125 11.7844 7.28437C11.7844 9.7875 9.75938 11.8125 7.25625 11.8125C4.75312 11.8125 2.72812 9.7875 2.72812 7.28437Z" fill=""></path></svg>
-                            </span>
-                            <input
-                                type="text"
-                                placeholder="Search product/IMEI..."
-                                value={search}
-                                onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-                                className="w-full border border-stroke dark:border-strokedark rounded-lg pl-9 pr-4 py-2.5 text-sm bg-gray-50 outline-none focus:border-primary dark:bg-form-input dark:text-white"
-                            />
-                        </div>
-
                         <select
                             value={transferType}
                             onChange={(e) => setTransferType(e.target.value as "Delivery Officer" | "Outlet")}
@@ -299,138 +306,154 @@ export default function TransfersPage() {
                     </div>
                 </div>
 
-                {/* Grouped Stock Selection Table */}
-                <div className="overflow-x-auto mb-6 border rounded-xl border-stroke dark:border-strokedark">
-                    <table className="w-full text-left border-collapse text-sm">
-                        <thead className="sticky top-0 bg-gray-100 dark:bg-meta-4 shadow-sm z-10">
-                            <tr className="text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">
-                                <th className="p-4 w-10" />
-                                <th className="p-4 w-10 text-center">Sel.</th>
-                                <th className="p-4">Product</th>
-                                <th className="p-4">Variant</th>
-                                <th className="p-4 text-center">Available Qty</th>
-                                <th className="p-4 text-center">Transfer Qty</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-stroke dark:divide-strokedark">
-                            {grouped.length === 0 ? (
-                                <tr><td colSpan={6} className="p-10 text-center text-gray-500">No in-stock items available for transfer.</td></tr>
-                            ) : grouped.map(grp => {
-                                const isExpanded = expandedKeys.has(grp.key);
-                                const groupIds = grp.children.map(c => c.id);
-                                const allSelected = groupIds.every(id => selectedIds.includes(id));
-                                const someSelected = groupIds.some(id => selectedIds.includes(id));
+                <div className="mb-8">
+                    <h2 className="text-xl font-bold text-gray-800 dark:text-white mb-4">2. Select Products</h2>
+                    <div className="relative w-full mb-4">
+                        <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <svg className="fill-gray-400" width="16" height="16" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M15.7781 14.4938L12.0656 10.7812C12.7969 9.79687 13.2187 8.57812 13.2187 7.28437C13.2187 3.99375 10.5187 1.29375 7.22812 1.29375C3.9375 1.29375 1.2375 3.99375 1.2375 7.28437C1.2375 10.575 3.9375 13.275 7.22812 13.275C8.52187 13.275 9.74062 12.8531 10.725 12.1219L14.4375 15.8344C14.6344 16.0312 14.8875 16.1156 15.1125 16.1156C15.3375 16.1156 15.5906 16.0312 15.7781 15.8344C16.1719 15.4688 16.1719 14.8688 15.7781 14.4938ZM2.72812 7.28437C2.72812 4.78125 4.75312 2.75625 7.25625 2.75625C9.75938 2.75625 11.7844 4.78125 11.7844 7.28437C11.7844 9.7875 9.75938 11.8125 7.25625 11.8125C4.75312 11.8125 2.72812 9.7875 2.72812 7.28437Z" fill=""></path></svg>
+                        </span>
+                        <input
+                            type="text"
+                            placeholder="Search products by name or IMEI..."
+                            value={search}
+                            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+                            className="w-full border border-stroke dark:border-strokedark rounded-lg pl-9 pr-4 py-2.5 text-sm bg-gray-50 outline-none focus:border-primary dark:bg-form-input dark:text-white"
+                        />
+                    </div>
 
-                                return (
-                                    <Fragment key={grp.key}>
-                                        {/* Master Group Row */}
-                                        <tr
-                                            key={`grp-${grp.key}`}
-                                            className={`cursor-pointer transition-colors ${isExpanded ? "bg-primary/5 dark:bg-primary/10" : "hover:bg-gray-50 dark:hover:bg-meta-4/20"}`}
-                                        >
-                                            <td className="p-4 text-center" onClick={() => toggleExpand(grp.key)}>
-                                                {isExpanded
-                                                    ? <ChevronDown size={16} className="text-primary mx-auto" />
-                                                    : <ChevronRight size={16} className="text-gray-400 mx-auto" />
-                                                }
-                                            </td>
-                                            <td className="p-4 text-center" onClick={() => toggleGroup(grp)}>
-                                                {allSelected
-                                                    ? <CheckSquare size={18} className="text-primary mx-auto" />
-                                                    : someSelected
-                                                    ? <div className="w-[18px] h-[18px] border-2 border-primary bg-primary/30 rounded mx-auto" />
-                                                    : <Square size={18} className="text-gray-400 mx-auto" />
-                                                }
-                                            </td>
-                                            <td className="p-4 font-bold text-black dark:text-white" onClick={() => toggleExpand(grp.key)}>
-                                                {grp.product_name}
-                                                <span className="ml-2 text-xs text-gray-400 font-normal">({grp.children.length} unit{grp.children.length !== 1 ? "s" : ""})</span>
-                                            </td>
-                                            <td className="p-4 text-gray-500" onClick={() => toggleExpand(grp.key)}>
-                                                {grp.color_variant
-                                                    ? <span className="px-2 py-0.5 bg-violet-50 text-violet-700 dark:bg-violet-900/20 dark:text-violet-300 rounded-full text-xs border border-violet-200 dark:border-violet-700">{grp.color_variant}</span>
-                                                    : <span className="text-gray-400 text-xs">{grp.category || "—"}</span>
-                                                }
-                                            </td>
-                                            <td className="p-4 text-center font-black text-base" onClick={() => toggleExpand(grp.key)}>
-                                                {grp.totalQty}
-                                            </td>
-                                            <td className="p-4 text-center text-xs text-gray-400">
-                                                <div className="flex items-center justify-center gap-3">
-                                                    {someSelected ? (
-                                                        <span className="font-bold text-primary">
-                                                            {groupIds.filter(id => selectedIds.includes(id)).reduce((s, id) => s + (transferQuantities[id] || 1), 0)} sel.
-                                                        </span>
-                                                    ) : "—"}
-                                                </div>
-                                            </td>
-                                        </tr>
+                    {/* Grouped Stock Selection Table */}
+                    <div className="overflow-x-auto border rounded-xl border-stroke dark:border-strokedark">
+                        <table className="w-full text-left border-collapse text-sm">
+                            <thead className="sticky top-0 bg-gray-100 dark:bg-meta-4 shadow-sm z-10">
+                                <tr className="text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">
+                                    <th className="p-4 w-10" />
+                                    <th className="p-4 w-10 text-center">Sel.</th>
+                                    <th className="p-4">Product</th>
+                                    <th className="p-4">Variant</th>
+                                    <th className="p-4 text-center">Available Qty</th>
+                                    <th className="p-4 text-center">Transfer Qty</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-stroke dark:divide-strokedark">
+                                {grouped.length === 0 ? (
+                                    <tr><td colSpan={6} className="p-10 text-center text-gray-500">No in-stock items available for transfer.</td></tr>
+                                ) : grouped.map(grp => {
+                                    const isExpanded = expandedKeys.has(grp.key);
+                                    const groupIds = grp.children.map(c => c.id);
+                                    const allSelected = groupIds.every(id => selectedIds.includes(id));
+                                    const someSelected = groupIds.some(id => selectedIds.includes(id));
 
-                                        {/* Child Unit Rows */}
-                                        {isExpanded && grp.children.map((item, idx) => {
-                                            const isSelected = selectedIds.includes(item.id);
-                                            return (
-                                                <tr
-                                                    key={`child-${item.id}`}
-                                                    className={`border-t border-dashed border-stroke/50 dark:border-strokedark/50 transition-colors ${
-                                                        isSelected ? "bg-primary/5 dark:bg-primary/10" : "bg-gray-50/60 dark:bg-meta-4/10"
-                                                    }`}
-                                                >
-                                                    <td className="p-3 pl-6 text-center">
-                                                        <span className="text-[10px] text-gray-400 font-mono">#{idx + 1}</span>
-                                                    </td>
+                                    return (
+                                        <Fragment key={grp.key}>
+                                            {/* Master Group Row */}
+                                            <tr
+                                                key={`grp-${grp.key}`}
+                                                className={`cursor-pointer transition-colors ${isExpanded ? "bg-primary/5 dark:bg-primary/10" : "hover:bg-gray-50 dark:hover:bg-meta-4/20"}`}
+                                            >
+                                                <td className="p-4 text-center" onClick={() => toggleExpand(grp.key)}>
+                                                    {isExpanded
+                                                        ? <ChevronDown size={16} className="text-primary mx-auto" />
+                                                        : <ChevronRight size={16} className="text-gray-400 mx-auto" />
+                                                    }
+                                                </td>
+                                                <td className="p-4 text-center" onClick={() => toggleGroup(grp)}>
+                                                    {allSelected
+                                                        ? <CheckSquare size={18} className="text-primary mx-auto" />
+                                                        : someSelected
+                                                        ? <div className="w-[18px] h-[18px] border-2 border-primary bg-primary/30 rounded mx-auto" />
+                                                        : <Square size={18} className="text-gray-400 mx-auto" />
+                                                    }
+                                                </td>
+                                                <td className="p-4 font-bold text-black dark:text-white" onClick={() => toggleExpand(grp.key)}>
+                                                    {grp.product_name}
+                                                    <span className="ml-2 text-xs text-gray-400 font-normal">({grp.children.length} unit{grp.children.length !== 1 ? "s" : ""})</span>
+                                                </td>
+                                                <td className="p-4 text-gray-500" onClick={() => toggleExpand(grp.key)}>
+                                                    {grp.color_variant
+                                                        ? <span className="px-2 py-0.5 bg-violet-50 text-violet-700 dark:bg-violet-900/20 dark:text-violet-300 rounded-full text-xs border border-violet-200 dark:border-violet-700">{grp.color_variant}</span>
+                                                        : <span className="text-gray-400 text-xs">{grp.category || "—"}</span>
+                                                    }
+                                                </td>
+                                                <td className="p-4 text-center font-black text-base" onClick={() => toggleExpand(grp.key)}>
+                                                    {grp.totalQty}
+                                                </td>
+                                                <td className="p-4 text-center text-xs text-gray-400">
+                                                    <div className="flex items-center justify-center gap-3">
+                                                        {someSelected ? (
+                                                            <span className="font-bold text-primary">
+                                                                {groupIds.filter(id => selectedIds.includes(id)).reduce((s, id) => s + (transferQuantities[id] || 1), 0)} sel.
+                                                            </span>
+                                                        ) : "—"}
+                                                    </div>
+                                                </td>
+                                            </tr>
 
-                                                    {/* Checkbox */}
-                                                    <td className="p-3 text-center">
-                                                        <button onClick={() => toggleChild(item, grp.key)}>
-                                                            {isSelected
-                                                                ? <CheckSquare size={16} className="text-primary mx-auto" />
-                                                                : <Square size={16} className="text-gray-400 mx-auto" />
-                                                            }
-                                                        </button>
-                                                    </td>
+                                            {/* Child Unit Rows */}
+                                            {isExpanded && grp.children.map((item, idx) => {
+                                                const isSelected = selectedIds.includes(item.id);
+                                                return (
+                                                    <tr
+                                                        key={`child-${item.id}`}
+                                                        className={`border-t border-dashed border-stroke/50 dark:border-strokedark/50 transition-colors ${
+                                                            isSelected ? "bg-primary/5 dark:bg-primary/10" : "bg-gray-50/60 dark:bg-meta-4/10"
+                                                        }`}
+                                                    >
+                                                        <td className="p-3 pl-6 text-center">
+                                                            <span className="text-[10px] text-gray-400 font-mono">#{idx + 1}</span>
+                                                        </td>
 
-                                                    {/* IMEI / Generic label */}
-                                                    <td className="p-3 pl-8">
-                                                        <span className="font-mono bg-gray-100 dark:bg-meta-4 px-2 py-0.5 rounded text-xs border border-gray-200 dark:border-strokedark text-gray-700 dark:text-gray-300">
-                                                            {item.imei_serial || "No IMEI"}
-                                                        </span>
-                                                    </td>
+                                                        {/* Checkbox */}
+                                                        <td className="p-3 text-center">
+                                                            <button onClick={() => toggleChild(item, grp.key)}>
+                                                                {isSelected
+                                                                    ? <CheckSquare size={16} className="text-primary mx-auto" />
+                                                                    : <Square size={16} className="text-gray-400 mx-auto" />
+                                                                }
+                                                            </button>
+                                                        </td>
 
-                                                    {/* Variant */}
-                                                    <td className="p-3 text-gray-500 text-xs">
-                                                        {item.color_variant || "—"}
-                                                    </td>
+                                                        {/* IMEI / Generic label */}
+                                                        <td className="p-3 pl-8">
+                                                            <span className="font-mono bg-gray-100 dark:bg-meta-4 px-2 py-0.5 rounded text-xs border border-gray-200 dark:border-strokedark text-gray-700 dark:text-gray-300">
+                                                                {item.imei_serial || "No IMEI"}
+                                                            </span>
+                                                        </td>
 
-                                                    {/* Available */}
-                                                    <td className="p-3 text-center font-bold text-sm">{item.quantity}</td>
+                                                        {/* Variant */}
+                                                        <td className="p-3 text-gray-500 text-xs">
+                                                            {item.color_variant || "—"}
+                                                        </td>
 
-                                                    {/* Transfer Qty Input */}
-                                                    <td className="p-3 text-center" onClick={e => e.stopPropagation()}>
-                                                        <div className="flex flex-col items-center gap-1">
-                                                            <input
-                                                                type="number"
-                                                                min="1"
-                                                                max={item.quantity}
-                                                                value={isSelected ? (transferQuantities[item.id] || 1) : ""}
-                                                                placeholder="—"
-                                                                onChange={e => updateQty(item.id, parseInt(e.target.value), item.quantity)}
-                                                                disabled={!isSelected || !!item.imei_serial}
-                                                                className="w-16 text-center border rounded px-1 py-1 text-xs dark:bg-form-input dark:border-strokedark outline-none disabled:opacity-30"
-                                                            />
-                                                            {isSelected && item.quantity > 1 && (
-                                                                <span className="text-[10px] text-gray-400">of {item.quantity}</span>
-                                                            )}
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            );
-                                        })}
-                                    </Fragment>
-                                );
-                            })}
-                        </tbody>
-                    </table>
+                                                        {/* Available */}
+                                                        <td className="p-3 text-center font-bold text-sm">{item.quantity}</td>
+
+                                                        {/* Transfer Qty Input */}
+                                                        <td className="p-3 text-center" onClick={e => e.stopPropagation()}>
+                                                            <div className="flex flex-col items-center gap-1">
+                                                                <input
+                                                                    type="number"
+                                                                    min="1"
+                                                                    max={item.quantity}
+                                                                    value={isSelected ? (transferQuantities[item.id] || 1) : ""}
+                                                                    placeholder="—"
+                                                                    onChange={e => updateQty(item.id, parseInt(e.target.value), item.quantity)}
+                                                                    disabled={!isSelected || !!item.imei_serial}
+                                                                    className="w-16 text-center border rounded px-1 py-1 text-xs dark:bg-form-input dark:border-strokedark outline-none disabled:opacity-30"
+                                                                />
+                                                                {isSelected && item.quantity > 1 && (
+                                                                    <span className="text-[10px] text-gray-400">of {item.quantity}</span>
+                                                                )}
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </Fragment>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
 
                 {/* Summary & Transfer Button */}
@@ -447,9 +470,7 @@ export default function TransfersPage() {
                         <Send size={18} />
                         {loading && !otpModalOpen 
                             ? "Processing..." 
-                            : transferType === "Outlet" 
-                                ? "Transfer Stock" 
-                                : "Send OTP for Transfer"
+                            : "Initiate Transfer (OTP Required)"
                         }
                     </button>
                 </div>
@@ -491,35 +512,6 @@ export default function TransfersPage() {
                             >
                                 {loading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <CheckCircle2 size={18} />}
                                 Verify & Transfer
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Confirmation Modal */}
-            {confirmModalOpen && (
-                <div className="fixed inset-0 z-[9999] bg-black bg-opacity-60 flex items-center justify-center p-4 backdrop-blur-sm">
-                    <div className="bg-white dark:bg-boxdark rounded-2xl p-8 max-w-sm w-full shadow-2xl">
-                        <div className="mx-auto w-16 h-16 bg-blue-500/10 rounded-full flex items-center justify-center mb-6 text-blue-500">
-                            <Send size={32} />
-                        </div>
-                        <h3 className="text-2xl font-bold text-center text-black dark:text-white mb-2">Confirm Transfer</h3>
-                        <p className="text-sm text-center text-gray-500 dark:text-gray-400 mb-8 px-4">
-                            Are you sure you want to transfer <strong>{totalUnitsSelected}</strong> unit(s) to the selected Outlet? This action is immediate.
-                        </p>
-                        <div className="flex gap-3">
-                            <button
-                                onClick={() => setConfirmModalOpen(false)}
-                                className="flex-1 border border-stroke dark:border-strokedark text-gray-600 dark:text-gray-300 py-3 rounded-xl font-semibold hover:bg-gray-50 dark:hover:bg-meta-4 transition-colors"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={() => initiateTransfer(true)}
-                                className="flex-1 bg-primary text-white py-3 rounded-xl font-bold hover:bg-opacity-90 flex items-center justify-center gap-2 transition-all"
-                            >
-                                Confirm & Send
                             </button>
                         </div>
                     </div>
