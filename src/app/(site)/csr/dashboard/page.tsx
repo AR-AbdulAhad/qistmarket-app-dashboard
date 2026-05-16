@@ -88,6 +88,10 @@ interface CsrDashboardStats {
     cancelled: number;
     expired: number;
     sales: number;
+    in_progress: number;
+    picked: number;
+    completed: number;
+    rejected: number;
   };
   channelStats: {
     referral: ChannelStat;
@@ -186,13 +190,13 @@ export default function CsrDashboardPage() {
     const cards = [
       { label: "Total Orders", value: totalOrders, inc: todayIncrement.total, color: "text-[#E31E24]", bg: "bg-red-50", icon: <ShoppingBag size={18} />, href: "/all-orders" },
       { label: "Pending", value: statusCounts.pending || 0, inc: todayIncrement.pending, color: "text-amber-600", bg: "bg-amber-50", icon: <Clock size={18} />, href: "/pending-orders" },
-      { label: "In Progress", value: statusCounts.in_progress || 0, inc: 0, color: "text-blue-600", bg: "bg-blue-50", icon: <Activity size={18} />, href: "/in-progress-orders" },
+      { label: "In Progress", value: statusCounts.in_progress || 0, inc: todayIncrement.in_progress || 0, color: "text-blue-600", bg: "bg-blue-50", icon: <Activity size={18} />, href: "/in-progress-orders" },
       { label: "Approved", value: statusCounts.approved || 0, inc: todayIncrement.approved, color: "text-indigo-600", bg: "bg-indigo-50", icon: <CheckCircle2 size={18} />, href: "/approved-orders" },
-      { label: "Picked", value: statusCounts.picked || 0, inc: 0, color: "text-teal-600", bg: "bg-teal-50", icon: <ShoppingBag size={18} />, href: "/picked-orders" },
-      { label: "Completed", value: statusCounts.completed || 0, inc: 0, color: "text-emerald-600", bg: "bg-emerald-50", icon: <CheckCircle2 size={18} />, href: "/completed-orders" },
+      { label: "Picked", value: statusCounts.picked || 0, inc: todayIncrement.picked || 0, color: "text-teal-600", bg: "bg-teal-50", icon: <ShoppingBag size={18} />, href: "/picked-orders" },
+      { label: "Completed", value: statusCounts.completed || 0, inc: todayIncrement.completed || 0, color: "text-emerald-600", bg: "bg-emerald-50", icon: <CheckCircle2 size={18} />, href: "/completed-orders" },
       { label: "Delivered", value: statusCounts.delivered || 0, inc: todayIncrement.delivered, color: "text-emerald-600", bg: "bg-emerald-50", icon: <Award size={18} />, href: "/delivered-orders" },
       { label: "Cancelled", value: statusCounts.cancelled || 0, inc: todayIncrement.cancelled, color: "text-rose-600", bg: "bg-rose-50", icon: <XCircle size={18} />, href: "/cancelled-orders" },
-      { label: "Rejected", value: statusCounts.rejected || 0, inc: 0, color: "text-red-600", bg: "bg-red-50", icon: <AlertCircle size={18} />, href: "/rejected-orders" },
+      { label: "Rejected", value: statusCounts.rejected || 0, inc: todayIncrement.rejected || 0, color: "text-red-600", bg: "bg-red-50", icon: <AlertCircle size={18} />, href: "/rejected-orders" },
       { label: "Expired", value: statusCounts.expired || 0, inc: todayIncrement.expired, color: "text-orange-600", bg: "bg-orange-50", icon: <AlertCircle size={18} />, href: "/expired-orders" },
       { label: "Total Sales", value: `PKR ${formatCurrency(targetTracking.achievedAmount)}`, inc: todayIncrement.sales, color: "text-[#E31E24]", bg: "bg-red-50/50", icon: <Wallet size={18} />, href: null },
       { label: "Success Rate", value: `${stats.successRate}%`, inc: targetTracking.successRateIncrement, color: "text-emerald-600", bg: "bg-emerald-50/50", icon: <Percent size={18} />, href: null },
