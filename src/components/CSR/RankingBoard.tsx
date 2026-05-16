@@ -1,17 +1,13 @@
 "use client";
 
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   Trophy, 
-  TrendingUp, 
-  TrendingDown, 
   User, 
-  Users, 
-  ShoppingBag, 
-  RefreshCcw, 
-  XCircle, 
-  Clock, 
-  Target 
+  ArrowUpRight,
+  ArrowDownRight,
+  CheckCircle2,
+  MessageSquare
 } from 'lucide-react';
 
 interface CsrRanking {
@@ -30,6 +26,10 @@ interface CsrRanking {
   trend: number;
   successRate: number;
   cancelRate: number;
+  outletName?: string;
+  target?: number;
+  complaintsSolved: number;
+  complaintsPending: number;
 }
 
 interface RankingBoardProps {
@@ -38,201 +38,132 @@ interface RankingBoardProps {
 }
 
 const RankingBoard: React.FC<RankingBoardProps> = ({ rankings, currentUserId }) => {
-  const topThree = rankings.slice(0, 3);
-  const rest = rankings.slice(3);
+  const [sortBy, setSortBy] = useState<'achievement' | 'sales' | 'score' | 'complaints'>('achievement');
 
-  const getRankBadge = (rank: number) => {
-    switch (rank) {
-      case 1: return <div className="flex h-10 w-10 items-center justify-center rounded-full bg-yellow-400 text-white shadow-lg"><Trophy size={20} /></div>;
-      case 2: return <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-300 text-slate-700 shadow-lg"><Trophy size={20} /></div>;
-      case 3: return <div className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-600 text-white shadow-lg"><Trophy size={20} /></div>;
-      default: return <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-100 text-gray-500 font-bold">{rank}</div>;
+  // Sort logic
+  const sortedRankings = [...rankings].sort((a, b) => {
+    if (sortBy === 'achievement') {
+        const aPct = (a.target && a.target > 0) ? (a.delivered / a.target) : (a.delivered / 486);
+        const bPct = (b.target && b.target > 0) ? (b.delivered / b.target) : (b.delivered / 486);
+        return bPct - aPct;
     }
-  };
+    if (sortBy === 'sales') return b.totalSales - a.totalSales;
+    if (sortBy === 'complaints') return b.complaintsSolved - a.complaintsSolved;
+    return b.score - a.score;
+  }).map((r, i) => ({ ...r, displayRank: i + 1 }));
 
   const formatCurrency = (val: number) => {
-    return new Intl.NumberFormat('en-PK', { style: 'currency', currency: 'PKR', maximumFractionDigits: 0 }).format(val);
+    return new Intl.NumberFormat('en-PK', { maximumFractionDigits: 0 }).format(val);
   };
 
   return (
-    <div className="flex flex-col gap-6">
-      {/* Top 3 Spotlight */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {topThree.map((item) => (
-          <div 
-            key={item.userId}
-            className={`relative overflow-hidden rounded-2xl border bg-white p-6 shadow-sm transition-all hover:shadow-md ${
-              item.userId === currentUserId ? 'ring-2 ring-primary border-primary/20' : 'border-stroke'
-            }`}
+    <div className="flex flex-col w-full bg-white rounded-3xl overflow-hidden border border-gray-100 shadow-xl shadow-gray-200/50 animate-in fade-in zoom-in-95 duration-700">
+      {/* Sorting Tabs */}
+      <div className="flex border-b border-gray-50 bg-gray-50/30 px-4 md:px-8 overflow-x-auto no-scrollbar shrink-0">
+        {[
+          { id: 'achievement', label: 'BY ACHIEVEMENT' },
+          { id: 'sales', label: 'BY SALE AMOUNT' },
+          { id: 'score', label: 'BY SCORE' },
+          { id: 'complaints', label: 'BY COMPLAINTS' }
+        ].map(tab => (
+          <button 
+              key={tab.id}
+              onClick={() => setSortBy(tab.id as any)}
+              className={`whitespace-nowrap px-6 py-4 text-[9px] font-black uppercase tracking-widest transition-all border-b-2 ${sortBy === tab.id ? 'border-[#E31E24] text-[#E31E24]' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
           >
-            <div className="absolute -right-4 -top-4 opacity-10">
-              <Trophy size={100} />
-            </div>
-            
-            <div className="flex items-center justify-between mb-4">
-              {getRankBadge(item.rank)}
-              <div className="flex items-center gap-1 text-sm font-medium">
-                {item.trend > 0 ? (
-                  <span className="flex items-center text-meta-3"><TrendingUp size={16} className="mr-1" /> Up</span>
-                ) : item.trend < 0 ? (
-                  <span className="flex items-center text-meta-1"><TrendingDown size={16} className="mr-1" /> Down</span>
-                ) : (
-                  <span className="text-gray-400">Steady</span>
-                )}
-              </div>
-            </div>
-
-            <div className="flex items-center gap-4 mb-6">
-              <div className="h-16 w-16 overflow-hidden rounded-full border-2 border-primary/10 bg-gray-100 flex items-center justify-center">
-                {item.image ? (
-                  <img src={item.image} alt={item.name} className="h-full w-full object-cover" />
-                ) : (
-                  <User size={32} className="text-gray-300" />
-                )}
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h3 className="font-bold text-black dark:text-white text-lg leading-tight">{item.name}</h3>
-                  {item.userId === currentUserId && (
-                    <span className="inline-flex items-center rounded-full bg-primary px-2 py-0.5 text-[10px] font-bold text-white uppercase tracking-wide">
-                      You
-                    </span>
-                  )}
-                </div>
-                <p className="text-sm text-gray-500">@{item.username}</p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="rounded-lg bg-gray-50 p-3">
-                <p className="text-xs text-gray-500 mb-1">Score</p>
-                <p className="text-xl font-bold text-primary">{item.score}</p>
-              </div>
-              <div className="rounded-lg bg-gray-50 p-3">
-                <p className="text-xs text-gray-500 mb-1">Conversion</p>
-                <p className="text-xl font-bold text-black">{item.successRate}%</p>
-              </div>
-              <div className="rounded-lg bg-gray-50 p-2 flex items-center justify-center gap-1">
-                <Users size={14} className="text-blue-500" />
-                <span className="text-xs font-bold text-black">{item.uniqueCustomers} Unq</span>
-              </div>
-              <div className="rounded-lg bg-gray-50 p-2 flex items-center justify-center gap-1">
-                <ShoppingBag size={14} className="text-green-500" />
-                <span className="text-xs font-bold text-black">{item.delivered} Del</span>
-              </div>
-              <div className="rounded-lg bg-gray-50 p-2 flex items-center justify-center gap-1 col-span-2">
-                <RefreshCcw size={14} className="text-purple-500" />
-                <span className="text-xs font-bold text-black">{item.repeatCustomers} Repeat Sales</span>
-              </div>
-            </div>
-
-            <div className="mt-4 pt-4 border-t border-stroke">
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-500">Total Sales</span>
-                <span className="font-semibold text-black">{formatCurrency(item.totalSales)}</span>
-              </div>
-            </div>
-          </div>
+              {tab.label}
+          </button>
         ))}
       </div>
 
-      {/* Leaderboard Table */}
-      <div className="rounded-2xl border border-stroke bg-white shadow-default dark:border-strokedark dark:bg-boxdark overflow-hidden">
-        <div className="border-b border-stroke px-6 py-4 dark:border-strokedark flex justify-between items-center">
-          <h3 className="font-bold text-black dark:text-white flex items-center gap-2">
-            <Target size={20} className="text-primary" /> Performance Ranking
-          </h3>
-        </div>
-        
-        <div className="max-w-full overflow-x-auto">
-          <table className="w-full table-auto">
-            <thead>
-              <tr className="bg-gray-2 text-left dark:bg-meta-4">
-                <th className="px-4 py-4 font-medium text-black dark:text-white xl:pl-11">Rank</th>
-                <th className="px-4 py-4 font-medium text-black dark:text-white">Sales Officer</th>
-                <th className="px-4 py-4 font-medium text-black dark:text-white text-center">Unique Customers</th>
-                <th className="px-4 py-4 font-medium text-black dark:text-white text-center">Delivered</th>
-                <th className="px-4 py-4 font-medium text-black dark:text-white text-center">Repeat</th>
-                <th className="px-4 py-4 font-medium text-black dark:text-white text-center">Score</th>
-                <th className="px-4 py-4 font-medium text-black dark:text-white text-right xl:pr-11">Total Sales</th>
-              </tr>
+      {/* Table with fixed height and scroll */}
+      <div className="overflow-x-auto w-full custom-scrollbar" style={{ maxHeight: '535px' }}>
+        <table className="w-full text-left border-collapse min-w-[1000px]">
+            <thead className="sticky top-0 bg-white z-10">
+                <tr className="bg-gray-50/50 border-b border-gray-100">
+                    <th className="px-6 py-4 text-[8px] font-black text-gray-400 uppercase">Rank</th>
+                    <th className="px-6 py-4 text-[8px] font-black text-gray-400 uppercase">CSR Participant</th>
+                    <th className="px-6 py-4 text-[8px] font-black text-gray-400 uppercase">Outlet</th>
+                    <th className="px-6 py-4 text-[8px] font-black text-gray-400 uppercase text-center">Done</th>
+                    <th className="px-6 py-4 text-[8px] font-black text-gray-400 uppercase">Achievement</th>
+                    <th className="px-6 py-4 text-[8px] font-black text-gray-400 uppercase">Sale Amount</th>
+                    <th className="px-6 py-4 text-[8px] font-black text-gray-400 uppercase text-center">Complaints</th>
+                    <th className="px-6 py-4 text-[8px] font-black text-gray-400 uppercase text-center">Score</th>
+                    <th className="px-6 py-4 text-[8px] font-black text-gray-400 uppercase text-right">Trend</th>
+                </tr>
             </thead>
-            <tbody>
-              {rest.map((item) => (
-                <tr 
-                  key={item.userId} 
-                  className={`border-b border-stroke hover:bg-gray-50/50 transition-colors dark:border-strokedark ${
-                    item.userId === currentUserId ? 'bg-primary/5' : ''
-                  }`}
-                >
-                  <td className="px-4 py-5 xl:pl-11">
-                    <div className="flex items-center gap-2">
-                      {getRankBadge(item.rank)}
-                    </div>
-                  </td>
-                  <td className="px-4 py-5">
-                    <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 overflow-hidden rounded-full bg-gray-100 flex items-center justify-center">
-                        {item.image ? (
-                          <img src={item.image} alt={item.name} className="h-full w-full object-cover" />
-                        ) : (
-                          <User size={20} className="text-gray-300" />
-                        )}
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h5 className="font-medium text-black dark:text-white">{item.name}</h5>
-                          {item.userId === currentUserId && (
-                            <span className="inline-flex items-center rounded-full bg-primary px-2 py-0.5 text-[10px] font-bold text-white uppercase tracking-wide">
-                              You
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-xs text-gray-500">@{item.username}</p>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-4 py-5 text-center">
-                    <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-3 py-1 text-sm font-medium text-blue-600">
-                      <Users size={14} /> {item.uniqueCustomers}
-                    </span>
-                  </td>
-                  <td className="px-4 py-5 text-center">
-                    <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-3 py-1 text-sm font-medium text-green-600">
-                      <ShoppingBag size={14} /> {item.delivered}
-                    </span>
-                  </td>
-                  <td className="px-4 py-5 text-center">
-                    <span className="inline-flex items-center gap-1 rounded-full bg-purple-50 px-3 py-1 text-sm font-medium text-purple-600">
-                      <RefreshCcw size={14} /> {item.repeatCustomers}
-                    </span>
-                  </td>
-                  <td className="px-4 py-5 text-center">
-                    <p className="font-bold text-primary">{item.score}</p>
-                    <div className="flex items-center justify-center gap-1 text-[10px]">
-                      {item.trend > 0 ? (
-                        <TrendingUp size={10} className="text-meta-3" />
-                      ) : item.trend < 0 ? (
-                        <TrendingDown size={10} className="text-meta-1" />
-                      ) : null}
-                    </div>
-                  </td>
-                  <td className="px-4 py-5 text-right xl:pr-11">
-                    <p className="font-semibold text-black dark:text-white">{formatCurrency(item.totalSales)}</p>
-                    <p className="text-[10px] text-gray-500">{item.successRate}% Success</p>
-                  </td>
-                </tr>
-              ))}
-              {rankings.length === 0 && (
-                <tr>
-                  <td colSpan={7} className="px-4 py-10 text-center text-gray-500">
-                    No data available for the selected period.
-                  </td>
-                </tr>
-              )}
+            <tbody className="divide-y divide-gray-50">
+                {sortedRankings.map((item) => {
+                    const targetVal = item.target || 486; 
+                    const achievementPct = Math.round((item.delivered / targetVal) * 100);
+                    const isCurrentUser = item.userId === currentUserId;
+                    const rank = item.displayRank;
+
+                    return (
+                        <tr key={item.userId} className={`hover:bg-gray-50 transition-colors ${isCurrentUser ? 'bg-red-50/30' : ''}`}>
+                            <td className="px-6 py-3">
+                                <div className="flex items-center justify-center">
+                                    {rank <= 3 ? (
+                                        <div className={`flex h-7 w-7 items-center justify-center rounded-xl text-white shadow-md ${rank === 1 ? 'bg-yellow-400' : rank === 2 ? 'bg-slate-300' : 'bg-orange-300'}`}>
+                                            <Trophy size={12} />
+                                        </div>
+                                    ) : (
+                                        <span className="text-xs font-black text-gray-300">{rank}</span>
+                                    )}
+                                </div>
+                            </td>
+                            <td className="px-6 py-3 whitespace-nowrap">
+                                <div className="flex items-center gap-3">
+                                    <div className="h-8 w-8 overflow-hidden rounded-xl border border-gray-100 bg-gray-50">
+                                        {item.image ? <img src={item.image} alt="" className="h-full w-full object-cover" /> : <User size={14} className="text-gray-200 m-auto mt-2" />}
+                                    </div>
+                                    <div>
+                                        <span className={`text-xs font-black ${isCurrentUser ? 'text-[#E31E24]' : 'text-gray-800'}`}>{item.name}</span>
+                                        <p className="text-[7px] font-bold text-gray-400 uppercase tracking-tighter">@{item.username}</p>
+                                    </div>
+                                </div>
+                            </td>
+                            <td className="px-6 py-3">
+                                <span className="text-[9px] font-black text-gray-400 uppercase truncate max-w-[80px] block">{item.outletName || 'Main'}</span>
+                            </td>
+                            <td className="px-6 py-3 text-center font-black text-gray-800 text-xs">{item.delivered}</td>
+                            <td className="px-6 py-3">
+                                <div className="flex items-center gap-2">
+                                    <div className="w-16 bg-gray-100 h-1.5 rounded-full overflow-hidden">
+                                        <div className={`h-full rounded-full transition-all duration-1000 ${achievementPct >= 100 ? 'bg-emerald-500' : 'bg-[#E31E24]'}`} style={{ width: `${Math.min(100, achievementPct)}%` }}></div>
+                                    </div>
+                                    <span className="text-[9px] font-black text-gray-800">{achievementPct}%</span>
+                                </div>
+                            </td>
+                            <td className="px-6 py-3 font-black text-gray-800 text-xs">{formatCurrency(item.totalSales)}</td>
+                            <td className="px-6 py-3">
+                                <div className="flex flex-col items-center">
+                                    <div className="flex items-center gap-2">
+                                        <div className="flex items-center gap-1">
+                                            <CheckCircle2 size={10} className="text-emerald-500" />
+                                            <span className="text-[10px] font-black text-emerald-600">{item.complaintsSolved}</span>
+                                        </div>
+                                        <div className="w-px h-3 bg-gray-100"></div>
+                                        <div className="flex items-center gap-1">
+                                            <MessageSquare size={10} className="text-amber-500" />
+                                            <span className="text-[10px] font-black text-amber-600">{item.complaintsPending}</span>
+                                        </div>
+                                    </div>
+                                    <p className="text-[7px] font-bold text-gray-400 uppercase mt-0.5">Solved / Pending</p>
+                                </div>
+                            </td>
+                            <td className="px-6 py-3 text-center font-black text-[#E31E24] text-xs">{item.score.toLocaleString()}</td>
+                            <td className="px-6 py-3 text-right">
+                                <div className={`flex items-center justify-end gap-1 font-black text-[9px] ${item.trend >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                                    {item.trend >= 0 ? <ArrowUpRight size={10} /> : <ArrowDownRight size={10} />}
+                                    {Math.abs(item.trend || 0)}%
+                                </div>
+                            </td>
+                        </tr>
+                    );
+                })}
             </tbody>
-          </table>
-        </div>
+        </table>
       </div>
     </div>
   );

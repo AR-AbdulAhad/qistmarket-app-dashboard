@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, Fragment, useRef } from "react";
 import Cookies from "js-cookie";
 import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
 import {
-    History, Package, Truck, Store, ChevronDown, ChevronRight, Building2, X, KeyRound, CheckCircle2
+    History, Package, Truck, Store, ChevronDown, ChevronRight, Building2, X, KeyRound, CheckCircle2, RotateCcw
 } from "lucide-react";
 import Loader from "@/components/common/Loader";
 import { toast } from "react-hot-toast";
@@ -27,6 +27,7 @@ interface TransferRecord {
     quantity_transferred: number;
     status: string;
     created_at: string;
+    updated_at: string;
     recipient_name: string;
     inventory: {
         product_name: string;
@@ -82,6 +83,10 @@ export default function TransferHistoryPage() {
     const [confirmModalOpen, setConfirmModalOpen] = useState(false);
     const [itemToCancel, setItemToCancel] = useState<number | null>(null);
 
+    // Stock Back Confirmation Modal
+    const [backConfirmModalOpen, setBackConfirmModalOpen] = useState(false);
+    const [backConfirmData, setBackConfirmData] = useState<{id: number, name: string, imei: string} | null>(null);
+
     const { socket } = useNotifications();
     const { user } = useAuth();
 
@@ -136,11 +141,23 @@ export default function TransferHistoryPage() {
             handleUpdate();
         });
 
+        // Stock Back events
+        socket.on("stock_back_initiated", (data: any) => {
+            toast.success("Stock back initiated!");
+            handleUpdate();
+        });
+        socket.on("stock_back_completed", (data: any) => {
+            toast.success("Stock back confirmed!");
+            handleUpdate();
+        });
+
         return () => {
             socket.off("stock_transfer_initiated", handleUpdate);
             socket.off("stock_transfer_cancelled", handleUpdate);
             socket.off("stock_transfer_completed");
             socket.off("stock_transfer_status");
+            socket.off("stock_back_initiated", handleUpdate);
+            socket.off("stock_back_completed", handleUpdate);
         };
     }, [socket, user]);
 
@@ -163,12 +180,13 @@ export default function TransferHistoryPage() {
                 setOtpModalOpen(false);
                 setOtp("");
                 // Refresh list
-                window.location.reload();
+                toast.success("Verification successful!");
+                setTimeout(() => window.location.reload(), 1500);
             } else {
-                alert(data.message || "Verification failed.");
+                toast.error(data.message || "Verification failed.");
             }
         } catch {
-            alert("Network error.");
+            toast.error("Network error.");
         } finally {
             setActionLoading(false);
         }
@@ -223,6 +241,37 @@ export default function TransferHistoryPage() {
                 }
             } else {
                 toast.error(data.message || "Failed to resend OTP.");
+            }
+        } catch {
+            toast.error("Network error.");
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
+    const handleInitiateStockBack = (id: number, name: string, imei: string) => {
+        setBackConfirmData({ id, name, imei });
+        setBackConfirmModalOpen(true);
+    };
+
+    const executeStockBack = async () => {
+        if (!backConfirmData) return;
+        
+        setActionLoading(true);
+        try {
+            const res = await fetch(`${API_BASE}/api/outlet/inventory/transfer/back/initiate`, {
+                method: "POST",
+                headers: getAuthHeaders(),
+                body: JSON.stringify({ transfer_id: backConfirmData.id }),
+            });
+            const data = await res.json();
+            if (data.success) {
+                toast.success("Stock back initiated! Please check for OTP popups.");
+                setBackConfirmModalOpen(false);
+                setBackConfirmData(null);
+                fetchHistory();
+            } else {
+                toast.error(data.message || "Failed to initiate stock back.");
             }
         } catch {
             toast.error("Network error.");
@@ -439,6 +488,8 @@ export default function TransferHistoryPage() {
                                             <td className="p-4 text-center">
                                                 {grp.records.some(r => r.status === 'pending') ? (
                                                     <span className="px-2 py-1 bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400 rounded-md text-[10px] font-bold uppercase tracking-wider border border-amber-100 dark:border-amber-800">Pending</span>
+                                                ) : grp.records.every(r => r.status === 'returned' || r.status === 'Stock Back') ? (
+                                                    <span className="px-2 py-1 bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400 rounded-md text-[10px] font-bold uppercase tracking-wider border border-green-100 dark:border-green-800">Stock Back</span>
                                                 ) : grp.records.every(r => r.status === 'transferred' || r.status === 'delivered') ? (
                                                     <span className="px-2 py-1 bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400 rounded-md text-[10px] font-bold uppercase tracking-wider border border-green-100 dark:border-green-800">Transferred</span>
                                                 ) : (
@@ -462,10 +513,16 @@ export default function TransferHistoryPage() {
                                                     <div className="flex items-center justify-center gap-2">
                                                         <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
                                                             (rec.status === 'transferred' || rec.status === 'delivered') ? "bg-green-100 text-green-700" : 
+                                                            (rec.status === 'returned' || rec.status === 'Stock Back') ? "bg-green-100 text-green-800" :
                                                             rec.status === 'pending' ? "bg-amber-100 text-amber-700" : "bg-red-100 text-red-700"
                                                         }`}>
-                                                            {rec.status === 'delivered' ? 'transferred' : rec.status}
+                                                            {rec.status === 'returned' || rec.status === 'Stock Back' ? 'Stock Back' : rec.status === 'delivered' ? 'transferred' : rec.status}
                                                         </span>
+                                                        {rec.status === 'Stock Back' && rec.updated_at && (
+                                                            <span className="text-[10px] text-gray-400">
+                                                                on {formatDate(rec.updated_at)}
+                                                            </span>
+                                                        )}
                                                         
                                                         {/* Actions for Pending */}
                                                         {rec.status === 'pending' && (
@@ -498,6 +555,18 @@ export default function TransferHistoryPage() {
                                                                     <div className="text-[10px] text-gray-400 italic">Awaiting your OTP...</div>
                                                                 )}
                                                             </div>
+                                                        )}
+                                                        {/* Actions for Transferred (Stock Back) */}
+                                                        {(rec.status === 'transferred' || rec.status === 'delivered') && (
+                                                            <button
+                                                                onClick={(e) => { e.stopPropagation(); handleInitiateStockBack(rec.id, rec.inventory.product_name, rec.inventory.imei_serial || ""); }}
+                                                                disabled={actionLoading}
+                                                                className="flex items-center gap-1.5 px-2 py-1 bg-indigo-500 text-white rounded hover:bg-opacity-90 disabled:opacity-50 transition-all shadow-sm"
+                                                                title="Initiate Stock Back"
+                                                            >
+                                                                <RotateCcw size={14} />
+                                                                <span className="text-[10px] font-bold">Stock Back</span>
+                                                            </button>
                                                         )}
                                                     </div>
                                                 </td>
@@ -597,6 +666,40 @@ export default function TransferHistoryPage() {
                                 className="flex-1 bg-red-600 text-white py-3 rounded-xl font-bold hover:bg-opacity-90 disabled:opacity-50 transition-all shadow-lg shadow-red-600/20"
                             >
                                 {actionLoading ? "Processing..." : "Yes, Cancel"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {/* Confirmation Modal for Stock Back */}
+            {backConfirmModalOpen && backConfirmData && (
+                <div className="fixed inset-0 z-[9999] bg-black bg-opacity-60 flex items-center justify-center p-4 backdrop-blur-sm">
+                    <div className="bg-white dark:bg-boxdark rounded-2xl p-8 max-w-sm w-full shadow-2xl">
+                        <div className="mx-auto w-16 h-16 bg-indigo-100 dark:bg-indigo-900/20 rounded-full flex items-center justify-center mb-6 text-indigo-600">
+                            <RotateCcw size={32} />
+                        </div>
+                        <h3 className="text-xl font-bold text-center text-black dark:text-white mb-2">Initiate Stock Back?</h3>
+                        <div className="text-sm text-center text-gray-500 dark:text-gray-400 mb-8 px-4 space-y-2">
+                            <p>Are you sure you want to reverse this transfer?</p>
+                            <div className="p-3 bg-gray-50 dark:bg-meta-4 rounded-lg border border-stroke dark:border-strokedark mt-2">
+                                <p className="font-bold text-black dark:text-white line-clamp-1">{backConfirmData.name}</p>
+                                {backConfirmData.imei && <p className="text-[10px] text-primary font-mono mt-1">IMEI: {backConfirmData.imei}</p>}
+                            </div>
+                            <p className="text-[10px] font-bold text-amber-600 uppercase mt-4 text-center">Verification via OTP will be required</p>
+                        </div>
+                        <div className="flex gap-4">
+                            <button
+                                onClick={() => { setBackConfirmModalOpen(false); setBackConfirmData(null); }}
+                                className="flex-1 bg-gray-100 dark:bg-meta-4 text-gray-700 dark:text-white py-3 rounded-xl font-bold hover:bg-gray-200 dark:hover:bg-opacity-80 transition-all"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={executeStockBack}
+                                disabled={actionLoading}
+                                className="flex-1 bg-indigo-600 text-white py-3 rounded-xl font-bold hover:bg-opacity-90 disabled:opacity-50 transition-all shadow-lg shadow-indigo-600/20"
+                            >
+                                {actionLoading ? "Processing..." : "Initiate"}
                             </button>
                         </div>
                     </div>
