@@ -203,6 +203,7 @@ export default function GlobalSearch() {
 
 function ResultItem({ item, setSelectedProfile, setIsOpen }: any) {
     const purchaserPhoto = item.verification?.documents?.find((d: any) => d.document_type === 'photo' && d.person_type === 'purchaser')?.file_url;
+    const isBlacklisted = item.is_blacklisted === true || item.verification?.is_blacklisted === true || item.verification?.purchaser?.is_blacklisted === true;
 
     return (
         <div key={item.id} className="bg-white dark:bg-meta-4/20 rounded-2xl border border-stroke dark:border-strokedark hover:border-primary/30 hover:shadow-lg transition-all overflow-hidden group/item">
@@ -216,7 +217,7 @@ function ResultItem({ item, setSelectedProfile, setIsOpen }: any) {
                                 <User size={28} className="text-primary/40" />
                             )}
                         </div>
-                        <div className={`absolute -bottom-1 -right-1 w-5 h-5 rounded-full border-4 border-white dark:border-boxdark ${item.status === 'delivered' ? 'bg-green-500' : 'bg-amber-500'}`} />
+                        <div className={`absolute -bottom-1 -right-1 w-5 h-5 rounded-full border-4 border-white dark:border-boxdark ${isBlacklisted ? 'bg-red-500 animate-pulse' : (item.status === 'delivered' ? 'bg-green-500' : 'bg-amber-500')}`} />
                     </div>
                     
                     <div className="flex-1 min-w-0">
@@ -231,13 +232,19 @@ function ResultItem({ item, setSelectedProfile, setIsOpen }: any) {
                         <div className="space-y-1.5 mt-2">
                             <ResultMeta icon={<Phone size={11} />} text={item.verification?.purchaser?.telephone_number || item.whatsapp_number} />
                             <div className="flex items-center gap-2 mt-2">
-                                <span className="text-[9px] font-black uppercase tracking-widest text-gray-400">Order Status:</span>
-                                <span className={cn(
-                                    "px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-widest border",
-                                    statusColors[item.status?.toLowerCase()] || statusColors.default
-                                )}>
-                                    {item.status}
-                                </span>
+                                <span className="text-[9px] font-black uppercase tracking-widest text-gray-400">Customer Status:</span>
+                                {isBlacklisted ? (
+                                    <span className="px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-widest border bg-red-500/10 text-red-500 border-red-500/20">
+                                        Blacklisted
+                                    </span>
+                                ) : (
+                                    <span className={cn(
+                                        "px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-widest border",
+                                        statusColors[item.status?.toLowerCase()] || statusColors.default
+                                    )}>
+                                        {item.status}
+                                    </span>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -267,7 +274,7 @@ function ResultItem({ item, setSelectedProfile, setIsOpen }: any) {
                             color="emerald"
                             href={`/orders/${item.id}`}
                         />
-                        {item.status === 'delivered' && (
+                        {item.status === 'delivered' && !isBlacklisted && item.is_ledger_cleared && (
                             <ActionIconButton 
                                 icon={<PartyPopper size={16} />} 
                                 label="Convert"

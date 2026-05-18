@@ -5,6 +5,12 @@ export const NAV_DATA = [
     label: "MAIN MENU",
     items: [
       {
+        title: "Main Dashboard",
+        icon: Icons.LayoutDashboardIcon,
+        url: "/",
+        items: [],
+      },
+      {
         title: "Orders",
         icon: Icons.CreateOrderSquareIcon,
         items: [

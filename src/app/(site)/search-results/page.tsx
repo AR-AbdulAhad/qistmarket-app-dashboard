@@ -148,9 +148,10 @@ function SearchResultsContent() {
 function ResultCard({ item, onProfileClick }: { item: any, onProfileClick: () => void }) {
     const purchaserPhoto = item.verification?.documents?.find((d: any) => d.document_type === 'photo' && d.person_type === 'purchaser')?.file_url;
     const isDelivered = item.status === 'delivered';
+    const isBlacklisted = item.is_blacklisted === true || item.verification?.is_blacklisted === true || item.verification?.purchaser?.is_blacklisted === true;
 
     return (
-        <div className="bg-white dark:bg-boxdark rounded-[32px] border border-stroke dark:border-strokedark overflow-hidden hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 group">
+        <div className={`bg-white dark:bg-boxdark rounded-[32px] border overflow-hidden hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 group ${isBlacklisted ? 'bg-red-50/40 dark:bg-red-950/10 border-red-200 dark:border-red-900/30 hover:border-red-300' : 'border-stroke dark:border-strokedark'}`}>
             <div className="p-6">
                 <div className="flex items-start gap-5 mb-6">
                     <div className="relative shrink-0">
@@ -161,8 +162,8 @@ function ResultCard({ item, onProfileClick }: { item: any, onProfileClick: () =>
                                 <User size={32} className="text-gray-200" />
                             )}
                         </div>
-                        <div className={`absolute -bottom-1 -right-1 px-2 py-0.5 rounded-lg border-2 border-white dark:border-boxdark text-[8px] font-black uppercase tracking-widest text-white ${isDelivered ? 'bg-green-500' : 'bg-amber-500'}`}>
-                            {item.status}
+                        <div className={`absolute -bottom-1 -right-1 px-2 py-0.5 rounded-lg border-2 border-white dark:border-boxdark text-[8px] font-black uppercase tracking-widest text-white ${isBlacklisted ? 'bg-red-600' : (isDelivered ? 'bg-green-500' : 'bg-amber-500')}`}>
+                            {isBlacklisted ? 'Blacklisted' : item.status}
                         </div>
                     </div>
                     
@@ -210,7 +211,7 @@ function ResultCard({ item, onProfileClick }: { item: any, onProfileClick: () =>
                     >
                         <FileText size={14} /> Details
                     </a>
-                    {isDelivered && (
+                    {isDelivered && !isBlacklisted && item.is_ledger_cleared && (
                         <a 
                             href={`/convert-sale/${item.id}`}
                             className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white transition-all text-xs font-black uppercase tracking-widest dark:bg-indigo-900/20 dark:text-indigo-400"

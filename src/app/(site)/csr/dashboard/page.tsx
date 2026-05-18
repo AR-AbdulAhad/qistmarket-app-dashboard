@@ -204,12 +204,12 @@ export default function CsrDashboardPage() {
     ];
 
     return (
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 xl:grid-cols-9 gap-4 mb-8 w-full">
+      <div className="flex flex-wrap gap-4 mb-8 w-full">
         {cards.map((card, i) => (
           <div 
             key={card.label} 
             onClick={() => card.href ? router.push(card.href) : null}
-            className={`rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition-all duration-300 animate-in fade-in slide-in-from-top-${(i+1)*2} ${card.href ? 'cursor-pointer hover:shadow-lg hover:border-gray-200 hover:-translate-y-0.5' : ''}`}
+            className={`min-w-[160px] flex-1 shrink-0 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition-all duration-300 animate-in fade-in slide-in-from-top-${(i+1)*2} ${card.href ? 'cursor-pointer hover:shadow-lg hover:border-gray-200 hover:-translate-y-0.5' : ''}`}
           >
             <div className="flex items-center gap-2 mb-3">
                 <div className={`p-2 rounded-xl ${card.bg} ${card.color}`}>{card.icon}</div>
@@ -237,7 +237,7 @@ export default function CsrDashboardPage() {
 
     return (
         <div className="flex flex-col gap-6 w-full">
-            <div className="rounded-3xl border border-gray-100 bg-white p-8 shadow-xl shadow-gray-200/40 animate-in fade-in slide-in-from-left-4 duration-700">
+            <div className="rounded-3xl border border-gray-100 bg-white p-8 py-[41px] shadow-xl shadow-gray-200/40 animate-in fade-in slide-in-from-left-4 duration-700">
                 <div className="flex justify-between items-center mb-6">
                     <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest">My Performance</h3>
                     <div className="px-3 py-1 bg-red-50 text-[#E31E24] rounded-full text-[8px] font-black uppercase">Live</div>
@@ -301,8 +301,19 @@ export default function CsrDashboardPage() {
                     ))}
                 </div>
             </div>
+        </div>
+    );
+  };
 
-            <div className="rounded-3xl border border-gray-100 bg-white p-8 py-[45px] shadow-2xl shadow-gray-200/40 relative overflow-hidden animate-in fade-in slide-in-from-right-6 duration-700 shrink-0">
+  const renderMiddle = () => {
+    if (!stats) return null;
+    const { csrRanking, targetTracking } = stats;
+    const topPerformer = csrRanking[0];
+
+
+    return (
+        <div className="flex flex-col gap-6 w-full">
+            <div className="rounded-3xl border border-gray-100 bg-white p-8 shadow-2xl shadow-gray-200/40 relative overflow-hidden animate-in fade-in slide-in-from-right-6 duration-700 shrink-0">
                 <div className="absolute top-0 right-0 p-4 text-red-500/5"><Trophy size={100} /></div>
                 <h3 className="text-[10px] font-black text-[#E31E24] uppercase tracking-widest mb-8 text-center">Top Ranking CSR</h3>
                 <div className="flex flex-col items-center gap-6 mb-8">
@@ -312,60 +323,25 @@ export default function CsrDashboardPage() {
                         </div>
                         <div className="absolute -top-1 -left-1 bg-[#E31E24] text-white rounded-xl h-8 w-8 flex items-center justify-center font-black text-xs">1</div>
                     </div>
-                    <div className="text-center"><h4 className="text-lg font-black text-gray-800 tracking-tight">{topPerformer.name}</h4><p className="text-[9px] font-black text-[#E31E24] uppercase mt-1">{topPerformer.outletName || 'Main'}</p></div>
+                    <div className="text-center"><h4 className="text-lg font-black text-gray-800 tracking-tight">{topPerformer.name}</h4></div>
                 </div>
                 <div className="grid grid-cols-2 gap-y-6 pt-6 border-t border-gray-50 text-center">
                     <div><p className="text-[9px] font-black text-gray-400 uppercase">Achievement</p><p className="text-sm font-black text-gray-800">{Math.round((topPerformer.delivered / 120) * 100)}%</p></div>
                     <div><p className="text-[9px] font-black text-gray-400 uppercase">Sales</p><p className="text-sm font-black text-gray-800">{formatCurrency(topPerformer.totalSales)}</p></div>
                 </div>
             </div>
-        </div>
-    );
-  };
-
-  const renderMiddle = () => {
-    if (!stats) return null;
-    const { csrRanking, targetTracking } = stats;
-
-    return (
-        <div className="flex flex-col gap-6 w-full">
-            <div className="w-full overflow-hidden shrink-0">
-                <RankingBoard rankings={csrRanking.map(r => ({ ...r, target: targetTracking.customerTarget }))} currentUserId={user?.id} />
-            </div>
-
-            <div className="rounded-3xl border border-gray-100 bg-white p-8 shadow-xl shadow-gray-200/40 animate-in fade-in slide-in-from-bottom-4 duration-700">
-                <div className="flex justify-between items-center mb-8">
-                    <div>
-                        <h4 className="text-[14px] font-black text-gray-800 uppercase tracking-tight">Complaint Resolution Ranking</h4>
-                        <p className="text-[9px] font-bold text-gray-400 mt-1 uppercase tracking-widest">Efficiency in solving customer issues</p>
-                    </div>
-                    <div className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl">
-                        <MessageCircle size={24} />
-                    </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                    {[...csrRanking].sort((a,b) => b.complaintsSolved - a.complaintsSolved).slice(0, 4).map((csr, i) => (
-                        <div key={csr.userId} className="relative group p-6 rounded-3xl bg-gray-50/50 border border-gray-100 hover:bg-white hover:shadow-xl transition-all duration-500">
-                            <div className="absolute -top-3 -right-3 h-8 w-8 bg-[#E31E24] text-white rounded-xl flex items-center justify-center font-black text-xs shadow-lg">#{i+1}</div>
-                            <div className="flex flex-col items-center text-center">
-                                <div className="h-16 w-16 rounded-2xl overflow-hidden mb-4 border-2 border-white shadow-md bg-white">
-                                    {csr.image ? <img src={csr.image} className="h-full w-full object-cover" /> : <Users className="text-gray-200 m-auto mt-4" size={24} />}
-                                </div>
-                                <h5 className="text-sm font-black text-gray-800 truncate w-full">{csr.name}</h5>
-                                <p className="text-[8px] font-bold text-gray-400 uppercase mb-4 truncate w-full">{csr.outletName}</p>
-                                
-                                <div className="grid grid-cols-2 gap-4 w-full pt-4 border-t border-gray-100">
-                                    <div>
-                                        <p className="text-[8px] font-black text-emerald-600 uppercase">Solved</p>
-                                        <p className="text-lg font-black text-gray-800">{csr.complaintsSolved}</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-[8px] font-black text-amber-600 uppercase">Pending</p>
-                                        <p className="text-lg font-black text-gray-800">{csr.complaintsPending}</p>
-                                    </div>
-                                </div>
-                            </div>
+            <div className="rounded-3xl border border-gray-100 bg-white p-8 shadow-xl shadow-gray-200/40 animate-in fade-in slide-in-from-left-6 duration-700">
+                <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-6">Target Stats</h3>
+                <div className="space-y-5">
+                    {[
+                        { label: "Working Days Left", value: targetTracking.remainingDays, icon: <Clock size={14} className="text-gray-300" /> },
+                        { label: "Required Daily Avg", value: targetTracking.dailyAvgRequired, icon: <Zap size={14} className="text-[#E31E24]" /> },
+                        { label: "Current Daily Avg", value: targetTracking.currentDailyAvg, icon: <Activity size={14} className="text-emerald-500" /> },
+                        { label: "Pending Target", value: targetTracking.remainingCustomers, color: 'text-rose-500', icon: <Users size={14} className="text-rose-300" /> },
+                    ].map(item => (
+                        <div key={item.label} className="flex justify-between items-center group">
+                            <div className="flex items-center gap-3">{item.icon}<span className="text-[9px] font-black text-gray-400 uppercase group-hover:text-gray-600">{item.label}</span></div>
+                            <span className={`text-sm font-black ${item.color || 'text-gray-800'}`}>{item.value}</span>
                         </div>
                     ))}
                 </div>
@@ -385,17 +361,17 @@ export default function CsrDashboardPage() {
                 <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-6">Performance Funnel</h3>
                 <div className="space-y-4">
                     {[
-                        { label: "Total Influx Leads", value: totalOrders, color: 'bg-red-600' },
+                        { label: "Total Orders", value: totalOrders, color: 'bg-red-600' },
                         { label: "Pending Verification", value: statusCounts.pending, color: 'bg-amber-500' },
-                        { label: "Approved Operations", value: statusCounts.approved, color: 'bg-indigo-600' },
+                        { label: "Approved Orders", value: statusCounts.approved, color: 'bg-indigo-600' },
                         { label: "Delivered (Done Customer)", value: statusCounts.delivered, color: 'bg-emerald-600' },
                     ].map((step, i) => (
-                        <div key={step.label} className="space-y-3">
+                        <div key={step.label} className="space-y-2">
                             <div className="flex justify-between items-center">
                                 <p className="text-[10px] font-black text-gray-500 uppercase tracking-tight">{step.label}</p>
                                 <p className="text-base font-black text-gray-800">{step.value.toLocaleString()}</p>
                             </div>
-                            <div className="h-8 w-full bg-gray-50 rounded-2xl overflow-hidden shadow-inner border border-gray-100/50">
+                            <div className="h-[26px] w-full bg-gray-50 rounded-2xl overflow-hidden shadow-inner border border-gray-100/50">
                                 <div className={`h-full ${step.color} shadow-lg transition-all duration-1000 flex items-center justify-end px-3`} style={{ width: `${Math.max(15, 100 - (i * 15))}%` }}>
                                     <ChevronRight className="text-white/30" size={14} />
                                 </div>
@@ -405,34 +381,16 @@ export default function CsrDashboardPage() {
                 </div>
             </div>
 
-            <div className="rounded-3xl border border-gray-100 bg-white p-8 shadow-xl shadow-gray-200/40 animate-in fade-in slide-in-from-left-6 duration-700">
-                <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-6">Target Stats</h3>
-                <div className="space-y-5">
-                    {[
-                        { label: "Working Days Left", value: targetTracking.remainingDays, icon: <Clock size={14} className="text-gray-300" /> },
-                        { label: "Required Daily Avg", value: targetTracking.dailyAvgRequired, icon: <Zap size={14} className="text-[#E31E24]" /> },
-                        { label: "Current Daily Avg", value: targetTracking.currentDailyAvg, icon: <Activity size={14} className="text-emerald-500" /> },
-                        { label: "Pending Target", value: targetTracking.remainingCustomers, color: 'text-rose-500', icon: <Users size={14} className="text-rose-300" /> },
-                    ].map(item => (
-                        <div key={item.label} className="flex justify-between items-center group">
-                            <div className="flex items-center gap-3">{item.icon}<span className="text-[9px] font-black text-gray-400 uppercase group-hover:text-gray-600">{item.label}</span></div>
-                            <span className={`text-sm font-black ${item.color || 'text-gray-800'}`}>{item.value}</span>
-                        </div>
-                    ))}
-                </div>
-            </div>
-
-
             <div className="rounded-3xl border border-gray-100 bg-white p-8 shadow-xl shadow-gray-200/40 animate-in fade-in slide-in-from-right-8 duration-700">
                 <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-6 text-center">Success Channels</h3>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="flex items-center gap-3 overflow-x-auto pb-2 [&::-webkit-scrollbar]:hidden">
                     {[
                         { label: "Web", data: channelStats.website, icon: <Globe size={14} />, color: 'text-blue-500', bg: 'bg-blue-50' },
                         { label: "WhatsApp", data: channelStats.whatsapp, icon: <MessageCircle size={14} />, color: 'text-emerald-500', bg: 'bg-emerald-50' },
                         { label: "Referral", data: channelStats.referral, icon: <Share2 size={14} />, color: 'text-amber-500', bg: 'bg-amber-50' },
                         { label: "Call", data: channelStats.call, icon: <PhoneCall size={14} />, color: 'text-rose-500', bg: 'bg-rose-50' },
                     ].map(ch => (
-                        <div key={ch.label} className="flex flex-col items-center gap-1 p-2 rounded-2xl bg-gray-50/50 border border-gray-100/50">
+                        <div key={ch.label} className="flex min-w-[75px] flex-1 shrink-0 flex-col items-center justify-center gap-1 p-2 rounded-2xl bg-gray-50/50 border border-gray-100/50">
                             <div className={`p-1.5 rounded-lg ${ch.bg} ${ch.color}`}>{ch.icon}</div>
                             <p className="text-[7px] font-black text-gray-400 uppercase">{ch.label}</p>
                             <p className="text-[10px] font-black text-gray-800">{ch.data.successRate}%</p>
@@ -456,6 +414,14 @@ export default function CsrDashboardPage() {
     colors: ['#E31E24', '#94A3B8'],
     tooltip: { theme: 'light', x: { show: false }, marker: { show: true } }
   };
+
+  const currentSalesTotal = stats?.graphData?.sales?.current?.reduce((a: number, b: number) => a + b, 0) || 0;
+  const previousSalesTotal = stats?.graphData?.sales?.previous?.reduce((a: number, b: number) => a + b, 0) || 0;
+  const currentCustomersTotal = stats?.graphData?.customers?.current?.reduce((a: number, b: number) => a + b, 0) || 0;
+  const previousCustomersTotal = stats?.graphData?.customers?.previous?.reduce((a: number, b: number) => a + b, 0) || 0;
+
+  if (!stats) return null;
+    const { csrRanking } = stats;
 
   return (
     <div className="w-full p-4 md:p-6 lg:p-8 min-h-screen animate-in fade-in duration-1000">
@@ -493,27 +459,86 @@ export default function CsrDashboardPage() {
         <>
         <div className="flex flex-col gap-6 w-full">
             {renderTopCards()}
+            <div className="w-full overflow-hidden shrink-0 animate-in fade-in slide-in-from-bottom-4 duration-700">
+                <RankingBoard rankings={stats.csrRanking.map(r => ({ ...r, target: stats.targetTracking.customerTarget }))} currentUserId={user?.id} />
+            </div>
             <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 w-full items-start">
-                <div className="xl:col-span-3 flex flex-col gap-6">{renderSidebars()}</div>
-                <div className="xl:col-span-6 flex flex-col gap-6 overflow-hidden">{renderMiddle()}</div>
-                <div className="xl:col-span-3 flex flex-col gap-6">{renderRight()}</div>
+                <div className="xl:col-span-4 flex flex-col gap-6">{renderSidebars()}</div>
+                <div className="xl:col-span-4 flex flex-col gap-6 overflow-hidden">{renderMiddle()}</div>
+                <div className="xl:col-span-4 flex flex-col gap-6">{renderRight()}</div>
             </div>
         </div>
+
+        <div className="rounded-3xl border border-gray-100 bg-white p-8 shadow-xl shadow-gray-200/40 animate-in fade-in slide-in-from-bottom-4 duration-700 mt-[24px]">
+                <div className="flex justify-between items-center mb-8">
+                    <div>
+                        <h4 className="text-[14px] font-black text-gray-800 uppercase tracking-tight">Complaint Resolution Ranking</h4>
+                        <p className="text-[9px] font-bold text-gray-400 mt-1 uppercase tracking-widest">Efficiency in solving customer issues</p>
+                    </div>
+                    <div className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl">
+                        <MessageCircle size={24} />
+                    </div>
+                </div>
+
+                <div className="flex gap-6 overflow-x-auto p-4 custom-scrollbar snap-x">
+                    {[...csrRanking].sort((a,b) => b.complaintsSolved - a.complaintsSolved).map((csr, i) => (
+                        <div key={csr.userId} className="relative group p-6 rounded-3xl bg-gray-50/50 border border-gray-100 hover:bg-white hover:shadow-xl transition-all duration-500 min-w-[220px] shrink-0 snap-start">
+                            <div className="absolute -top-3 -right-3 h-8 w-8 bg-[#E31E24] text-white rounded-xl flex items-center justify-center font-black text-xs shadow-lg">#{i+1}</div>
+                            <div className="flex flex-col items-center text-center">
+                                <div className="h-16 w-16 rounded-2xl overflow-hidden mb-4 border-2 border-white shadow-md bg-white">
+                                    {csr.image ? <img src={csr.image} className="h-full w-full object-cover" /> : <Users className="text-gray-200 m-auto mt-4" size={24} />}
+                                </div>
+                                <h5 className="text-sm font-black text-gray-800 truncate w-full mb-4">{csr.name}</h5>
+                                
+                                <div className="grid grid-cols-2 gap-4 w-full pt-4 border-t border-gray-100">
+                                    <div>
+                                        <p className="text-[8px] font-black text-emerald-600 uppercase">Solved</p>
+                                        <p className="text-lg font-black text-gray-800">{csr.complaintsSolved}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-[8px] font-black text-amber-600 uppercase">Pending</p>
+                                        <p className="text-lg font-black text-gray-800">{csr.complaintsPending}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+
         <div className="flex gap-6 mt-[24px]">
         <div className="flex gap-6 w-full lg:flex-row flex-col">
           <div className="rounded-3xl border border-gray-100 bg-white p-8 shadow-xl shadow-gray-200/40 w-full">
               <div className="flex justify-between items-center mb-8">
                   <div><h4 className="text-[12px] font-black text-gray-800 uppercase tracking-tight">Revenue Analytics</h4><p className="text-[9px] font-bold text-gray-400">Monthly Performance</p></div>
-                  <div className="flex gap-4"><div className="flex items-center gap-1"><div className="h-2 w-2 rounded-full bg-[#E31E24]"></div><span className="text-[10px] font-black text-gray-500 uppercase">Now</span></div></div>
+                  <div className="flex gap-2">
+                      <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-gray-50 border border-gray-100">
+                          <div className="h-2 w-2 rounded-full bg-[#94A3B8]"></div>
+                          <span className="text-[8px] font-black text-gray-500 uppercase">Prev: PKR {formatCurrency(previousSalesTotal)}</span>
+                      </div>
+                      <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-red-50 border border-red-100">
+                          <div className="h-2 w-2 rounded-full bg-[#E31E24]"></div>
+                          <span className="text-[8px] font-black text-[#E31E24] uppercase">Cur: PKR {formatCurrency(currentSalesTotal)}</span>
+                      </div>
+                  </div>
               </div>
-              <Chart options={chartOptions} series={[{name: 'Current', data: stats.graphData.sales.current}, {name: 'Previous', data: stats.graphData.sales.previous}]} type="area" height={320} />
+              <Chart options={chartOptions} series={[{name: 'Current', data: stats.graphData?.sales?.current || []}, {name: 'Previous', data: stats.graphData?.sales?.previous || []}]} type="area" height={320} />
           </div>
           <div className="rounded-3xl border border-gray-100 bg-white p-8 shadow-xl shadow-gray-200/40 w-full">
               <div className="flex justify-between items-center mb-8">
                   <div><h4 className="text-[12px] font-black text-gray-800 uppercase tracking-tight">Conversion Velocity</h4><p className="text-[9px] font-bold text-gray-400">Successful Deliveries</p></div>
-                  <div className="flex gap-4"><div className="flex items-center gap-1"><div className="h-2 w-2 rounded-full bg-emerald-500"></div><span className="text-[10px] font-black text-gray-500 uppercase">Now</span></div></div>
+                  <div className="flex gap-2">
+                      <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-gray-50 border border-gray-100">
+                          <div className="h-2 w-2 rounded-full bg-[#94A3B8]"></div>
+                          <span className="text-[8px] font-black text-gray-500 uppercase">Prev: {previousCustomersTotal}</span>
+                      </div>
+                      <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-50 border border-emerald-100">
+                          <div className="h-2 w-2 rounded-full bg-[#10B981]"></div>
+                          <span className="text-[8px] font-black text-[#10B981] uppercase">Cur: {currentCustomersTotal}</span>
+                      </div>
+                  </div>
               </div>
-              <Chart options={{...chartOptions, stroke: { ...chartOptions.stroke, colors: ['#10B981', '#6366F1'] }, colors: ['#10B981', '#6366F1']}} series={[{name: 'Current', data: stats.graphData.customers.current}, {name: 'Previous', data: stats.graphData.customers.previous}]} type="area" height={320} />
+              <Chart options={{...chartOptions, stroke: { ...chartOptions.stroke, colors: ['#10B981', '#94A3B8'] }, colors: ['#10B981', '#94A3B8']}} series={[{name: 'Current', data: stats.graphData?.customers?.current || []}, {name: 'Previous', data: stats.graphData?.customers?.previous || []}]} type="area" height={320} />
           </div>
           </div>
         </div>

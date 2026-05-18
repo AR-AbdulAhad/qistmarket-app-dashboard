@@ -528,6 +528,17 @@ const CreateOrders: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Check if customer is blacklisted
+    const isBlacklisted = phoneMatches.some((m: any) => m.is_blacklisted === true);
+    if (isBlacklisted) {
+      toast.error("Order cannot be placed. This customer is blacklisted!", {
+        duration: 5000,
+        icon: '🚫'
+      });
+      return;
+    }
+
     if (!validateForm()) return;
 
     setLoading(true);
@@ -686,13 +697,19 @@ const CreateOrders: React.FC = () => {
                                 <div className="space-y-1">
                                   <div className="flex items-center gap-2">
                                     <span className="text-sm font-black text-gray-900 group-hover:text-red-600 transition-colors">{m.order_ref}</span>
-                                    <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full uppercase ${
-                                      m.status === 'delivered' ? 'bg-emerald-100 text-emerald-700' :
-                                      m.status === 'cancelled' ? 'bg-gray-100 text-gray-600' :
-                                      'bg-amber-100 text-amber-700'
-                                    }`}>
-                                      {m.status}
-                                    </span>
+                                    {m.is_blacklisted ? (
+                                      <span className="text-[9px] font-bold px-2 py-0.5 rounded-full uppercase bg-red-150 text-red-700 border border-red-200 animate-pulse">
+                                        Blacklisted
+                                      </span>
+                                    ) : (
+                                      <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full uppercase ${
+                                        m.status === 'delivered' ? 'bg-emerald-100 text-emerald-700' :
+                                        m.status === 'cancelled' ? 'bg-gray-100 text-gray-600' :
+                                        'bg-amber-100 text-amber-700'
+                                      }`}>
+                                        {m.status}
+                                      </span>
+                                    )}
                                   </div>
                                   <p className="text-[11px] text-gray-500 font-medium">
                                     Customer: <span className="text-gray-900">{m.customer_name}</span>
@@ -718,6 +735,16 @@ const CreateOrders: React.FC = () => {
                             </div>
                           ))}
                         </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {phoneMatches.some((m: any) => m.is_blacklisted === true) && (
+                    <div className="mt-4 p-4 bg-red-50 border-2 border-red-200 rounded-2xl flex items-start gap-3 animate-in slide-in-from-top-2 duration-300">
+                      <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5 animate-bounce" />
+                      <div>
+                        <h4 className="text-sm font-black text-red-800 uppercase tracking-wide">CRITICAL: Customer Blacklisted</h4>
+                        <p className="text-xs text-red-600 font-bold mt-1">This user is marked as blacklisted in the system. Placing any new orders for them is strictly disabled.</p>
                       </div>
                     </div>
                   )}
@@ -1313,7 +1340,7 @@ const CreateOrders: React.FC = () => {
             <div className="flex flex-col sm:flex-row gap-4 pt-8">
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || phoneMatches.some((m: any) => m.is_blacklisted === true)}
                 className="flex-[2] bg-red-600 text-white py-4 rounded-2xl font-bold hover:bg-red-700 hover:shadow-xl hover:shadow-red-100 transition-all disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-3 text-lg"
               >
                 {loading ? (

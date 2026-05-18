@@ -14,7 +14,6 @@ import { useAuth } from '../../../../../contexts/AuthContext';
 import DeliveredProductDetails from '@/components/common/DeliveredProductDetails';
 import RecoveryVisitDetails from '@/components/common/RecoveryVisitDetails';
 import { MediaCard } from '@/components/common/MediaCard';
-import { MediaReplaceModal } from '@/components/common/MediaReplaceModal';
 
 // --- Editable Field Component ---
 const EditableField = ({

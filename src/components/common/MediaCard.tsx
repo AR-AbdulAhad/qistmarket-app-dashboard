@@ -51,11 +51,11 @@ export function MediaCard({
         e.target.value = ''
     }
 
-    const handleConfirmUpload = async () => {
-        if (!selectedFile || !onEdit) return
+    const handleConfirmUpload = async (editedFile: File) => {
+        if (!editedFile || !onEdit) return
         setIsUploading(true)
         try {
-            await onEdit(selectedFile)
+            await onEdit(editedFile)
             setIsReplaceModalOpen(false)
             setSelectedFile(null)
         } catch (err) {

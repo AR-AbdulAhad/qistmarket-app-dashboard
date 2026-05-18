@@ -83,7 +83,6 @@ const RankingBoard: React.FC<RankingBoardProps> = ({ rankings, currentUserId }) 
                 <tr className="bg-gray-50/50 border-b border-gray-100">
                     <th className="px-6 py-4 text-[8px] font-black text-gray-400 uppercase">Rank</th>
                     <th className="px-6 py-4 text-[8px] font-black text-gray-400 uppercase">CSR Participant</th>
-                    <th className="px-6 py-4 text-[8px] font-black text-gray-400 uppercase">Outlet</th>
                     <th className="px-6 py-4 text-[8px] font-black text-gray-400 uppercase text-center">Done</th>
                     <th className="px-6 py-4 text-[8px] font-black text-gray-400 uppercase">Achievement</th>
                     <th className="px-6 py-4 text-[8px] font-black text-gray-400 uppercase">Sale Amount</th>
@@ -122,9 +121,6 @@ const RankingBoard: React.FC<RankingBoardProps> = ({ rankings, currentUserId }) 
                                         <p className="text-[7px] font-bold text-gray-400 uppercase tracking-tighter">@{item.username}</p>
                                     </div>
                                 </div>
-                            </td>
-                            <td className="px-6 py-3">
-                                <span className="text-[9px] font-black text-gray-400 uppercase truncate max-w-[80px] block">{item.outletName || 'Main'}</span>
                             </td>
                             <td className="px-6 py-3 text-center font-black text-gray-800 text-xs">{item.delivered}</td>
                             <td className="px-6 py-3">
