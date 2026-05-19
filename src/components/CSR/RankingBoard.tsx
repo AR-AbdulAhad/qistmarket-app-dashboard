@@ -68,7 +68,7 @@ const RankingBoard: React.FC<RankingBoardProps> = ({ rankings, currentUserId }) 
         ].map(tab => (
           <button 
               key={tab.id}
-              onClick={() => setSortBy(tab.id as any)}
+              onClick={() => setSortBy(tab.id as any)} 
               className={`whitespace-nowrap px-6 py-4 text-[9px] font-black uppercase tracking-widest transition-all border-b-2 ${sortBy === tab.id ? 'border-[#E31E24] text-[#E31E24]' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
           >
               {tab.label}
@@ -82,7 +82,7 @@ const RankingBoard: React.FC<RankingBoardProps> = ({ rankings, currentUserId }) 
             <thead className="sticky top-0 bg-white z-10">
                 <tr className="bg-gray-50/50 border-b border-gray-100">
                     <th className="px-6 py-4 text-[8px] font-black text-gray-400 uppercase">Rank</th>
-                    <th className="px-6 py-4 text-[8px] font-black text-gray-400 uppercase">CSR Participant</th>
+                    <th className="px-4 py-4 text-[8px] font-black text-gray-400 uppercase w-[180px] md:w-[220px]">CSR Participant</th>
                     <th className="px-6 py-4 text-[8px] font-black text-gray-400 uppercase text-center">Done</th>
                     <th className="px-6 py-4 text-[8px] font-black text-gray-400 uppercase">Achievement</th>
                     <th className="px-6 py-4 text-[8px] font-black text-gray-400 uppercase">Sale Amount</th>
@@ -111,7 +111,7 @@ const RankingBoard: React.FC<RankingBoardProps> = ({ rankings, currentUserId }) 
                                     )}
                                 </div>
                             </td>
-                            <td className="px-6 py-3 whitespace-nowrap">
+                            <td className="px-4 py-3 whitespace-nowrap">
                                 <div className="flex items-center gap-3">
                                     <div className="h-8 w-8 overflow-hidden rounded-xl border border-gray-100 bg-gray-50">
                                         {item.image ? <img src={item.image} alt="" className="h-full w-full object-cover" /> : <User size={14} className="text-gray-200 m-auto mt-2" />}

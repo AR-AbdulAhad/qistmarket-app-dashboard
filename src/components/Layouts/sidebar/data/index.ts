@@ -452,8 +452,10 @@ export const NAV_DATA = [
       {
         title: "Installments",
         icon: Icons.HashIcon,
-        url: "/outlet/installments",
-        items: [],
+        items: [
+          { title: "Installment Ledgers", url: "/outlet/installments" },
+          { title: "Installments View", url: "/outlet/installments/view" }
+        ],
       },
       {
         title: "Blacklisted Accounts",
