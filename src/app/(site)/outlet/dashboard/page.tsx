@@ -6,9 +6,9 @@ import Cookies from "js-cookie";
 import dynamic from "next/dynamic";
 import { ApexOptions } from "apexcharts";
 import {
-  Package, Clock, CheckCircle, XCircle, Truck, CreditCard, AlertTriangle, ShoppingBag, RefreshCw, ArrowRight,
+  Package, Clock, CheckCircle2, XCircle, Truck, CreditCard, AlertTriangle, ShoppingBag, RefreshCw, ArrowRight,
   Wallet, Activity, ChevronRight, BoxIcon, ShieldCheck, FileText,
-  Receipt, UserSquare2, Logs
+  Receipt, UserSquare2, Logs, Filter, TrendingUp, TrendingDown, Percent, Award, BadgeDollarSign
 } from "lucide-react";
 import { useAuth } from "../../../../../contexts/AuthContext";
 
@@ -36,6 +36,7 @@ type Stats = {
     dailySales: number;
     weeklySales: number;
     monthlySales: number;
+    periodSales: number;
   };
   installments: {
     totalInstallmentDue: number;
@@ -53,6 +54,22 @@ type Stats = {
     expenses: number;
     closing_cash: number;
   };
+  todayIncrement: {
+    total: number;
+    pending: number;
+    approved: number;
+    deliveryPending: number;
+    delivered: number;
+    cancelled: number;
+    rejected: number;
+    expired: number;
+    sales: number;
+  };
+  graphData: {
+    days: number[];
+    sales: { current: number[]; previous: number[] };
+    customers: { current: number[]; previous: number[] };
+  };
 };
 
 const PKR = (val: number) =>
@@ -62,52 +79,67 @@ const StatCard = ({
   icon: Icon,
   label,
   value,
-  sub,
+  inc = 0,
   accent,
+  bg,
+  bar,
   onClick,
 }: {
   icon: any;
   label: string;
   value: string | number;
-  sub?: string;
+  inc?: number;
   accent: string;
+  bg: string;
+  bar: string;
   onClick?: () => void;
-}) => (
-  <div
-    onClick={onClick}
-    className={`group relative overflow-hidden rounded-2xl border border-stroke bg-white p-6 shadow-default transition-all duration-300 hover:-translate-y-1 hover:shadow-card dark:border-dark-3 dark:bg-boxdark ${onClick ? "cursor-pointer" : ""}`}
-  >
-    <div className={`absolute -right-6 -top-6 size-28 rounded-full ${accent} opacity-10 blur-2xl transition-transform duration-500 group-hover:scale-150`} />
-    <div className="flex items-start justify-between">
-      <div>
-        <p className="text-xs font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">{label}</p>
-        <p className="mt-2 text-3xl font-black text-black dark:text-white">{value}</p>
-        {sub && <p className="mt-1 text-xs font-medium text-gray-400">{sub}</p>}
-      </div>
-      <div className={`flex size-12 items-center justify-center rounded-xl ${accent} shadow-md`}>
-        <Icon className="size-5 text-white" />
+}) => {
+  const isPositive = inc > 0;
+  const isNegative = inc < 0;
+
+  return (
+    <div
+      onClick={onClick}
+      className={`group relative overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm transition-all duration-300 hover:shadow-md hover:-translate-y-0.5 dark:border-dark-3 dark:bg-boxdark flex flex-col ${onClick ? "cursor-pointer" : ""}`}
+    >
+      {/* Top accent bar */}
+      <div className={`h-1 w-full ${bar}`} />
+
+      <div className="p-4 flex flex-col gap-3 flex-1">
+        {/* Icon + label row */}
+        <div className="flex items-center gap-2.5">
+          <div className={`flex size-9 items-center justify-center rounded-xl ${bg} ${accent} shrink-0`}>
+            {Icon}
+          </div>
+          <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 leading-tight whitespace-normal">{label}</p>
+        </div>
+
+        {/* Value */}
+        <p className="text-[28px] font-black text-slate-800 dark:text-white leading-none tracking-tight">{value}</p>
+
+        {/* Increment badge */}
+        <div className={`inline-flex items-center gap-1 self-start rounded-full px-2 py-0.5 text-[9px] font-black ${
+          isPositive ? "bg-emerald-50 text-emerald-600" : isNegative ? "bg-rose-50 text-rose-600" : "bg-slate-50 text-slate-400"
+        }`}>
+          <span>{isPositive ? "↑" : isNegative ? "↓" : "–"}</span>
+          <span>{Math.abs(inc)}%</span>
+        </div>
       </div>
     </div>
-    {onClick && (
-      <div className="mt-4 flex items-center gap-1 text-xs font-bold text-primary opacity-0 transition-opacity group-hover:opacity-100">
-        <span>View Details</span>
-        <ArrowRight className="size-3" />
-      </div>
-    )}
-  </div>
-);
+  );
+};
 
 const QuickLink = ({ icon: Icon, label, href, color }: { icon: any; label: string; href: string; color: string }) => {
   const router = useRouter();
   return (
     <button
       onClick={() => router.push(href)}
-      className="group flex flex-col items-center gap-2 rounded-2xl border border-stroke bg-white p-4 shadow-default transition-all hover:-translate-y-1 hover:shadow-card hover:border-primary/30 dark:border-dark-3 dark:bg-boxdark"
+      className="group flex flex-col items-center gap-1.5 transition-all duration-300 hover:-translate-y-1"
     >
-      <div className={`flex size-12 items-center justify-center rounded-xl ${color} shadow-sm group-hover:scale-110 transition-transform`}>
-        <Icon className="size-5 text-white" />
+      <div className={`flex size-14 items-center justify-center rounded-2xl ${color} shadow-sm group-hover:scale-105 group-hover:shadow-md transition-all duration-300`}>
+        <Icon className="size-6 text-white" />
       </div>
-      <span className="text-[11px] font-bold text-center text-gray-600 dark:text-gray-300 leading-tight">{label}</span>
+      <span className="text-[10px] font-bold text-center text-slate-600 dark:text-slate-300 leading-tight group-hover:text-primary transition-colors max-w-[80px] truncate">{label}</span>
     </button>
   );
 };
@@ -117,8 +149,12 @@ export default function OutletDashboardPage() {
   const router = useRouter();
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
-  const [outletName, setOutletName] = useState("Outlet");
+  const [outletName, setOutletName] = useState("Outlet Portal");
   const [refreshing, setRefreshing] = useState(false);
+
+  const [filterType, setFilterType] = useState<"today" | "month" | "custom">("today");
+  const [startDate, setStartDate] = useState(() => new Date().toISOString().split("T")[0]);
+  const [endDate, setEndDate] = useState(() => new Date().toISOString().split("T")[0]);
 
   useEffect(() => {
     if (!authLoading && user) {
@@ -130,40 +166,46 @@ export default function OutletDashboardPage() {
     }
   }, [user, authLoading, router]);
 
-  useEffect(() => {
-    fetchStats();
-  }, []);
-
   const fetchStats = async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
     else setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/api/outlet/dashboard-stats`, {
+      const query = new URLSearchParams({ filter: filterType });
+      if (filterType === "custom") {
+        if (startDate) query.append("startDate", startDate);
+        if (endDate) query.append("endDate", endDate);
+      }
+
+      const res = await fetch(`${API_BASE}/api/outlet/dashboard-stats?${query.toString()}`, {
         headers: getAuthHeaders(),
       });
       const data = await res.json();
       if (data.success) setStats(data.stats);
     } catch (e) {
-      console.error(e);
+      console.error("Failed to load dashboard metrics", e);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   };
 
-  // Donut chart: Order status breakdown
+  useEffect(() => {
+    fetchStats();
+  }, [filterType]);
+
+  // Donut Chart: Order status breakdown
   const orderDonutOptions: ApexOptions = {
     chart: { type: "donut", fontFamily: "inherit" },
-    labels: ["Today's Orders", "Pending Verification", "Approved", "Picked Orders", "Delivered", "Cancelled", "Rejected", "Expired"],
-    colors: ["#3C50E0", "#F59E0B", "#10B981", "#8B5CF6", "#3C50E0", "#EF4444", "#F43F5E", "#F59E0B"],
-    plotOptions: { pie: { donut: { size: "68%" } } },
+    labels: ["Pending Verification", "Approved", "Picked", "Delivered", "Cancelled", "Rejected", "Expired"],
+    colors: ["#F59E0B", "#3F51B5", "#8B5CF6", "#10B981", "#EF4444", "#F43F5E", "#E2E8F0"],
+    plotOptions: { pie: { donut: { size: "70%" } } },
     dataLabels: { enabled: false },
-    legend: { position: "bottom", fontFamily: "inherit", fontSize: "12px" },
+    legend: { position: "bottom", fontFamily: "inherit", fontSize: "11px", fontWeight: 700 },
     tooltip: { theme: "dark" },
   };
+  
   const orderDonutSeries = stats
     ? [
-        stats.orders.todayOrders,
         stats.orders.pendingVerification,
         stats.orders.approvedOrders,
         stats.orders.deliveryPending,
@@ -172,29 +214,25 @@ export default function OutletDashboardPage() {
         stats.orders.rejectedOrders,
         stats.orders.expiredOrders,
       ]
-    : [0, 0, 0, 0, 0];
+    : [0, 0, 0, 0, 0, 0, 0];
 
-  // Bar chart: Sales comparison
-  const salesBarOptions: ApexOptions = {
-    chart: { type: "bar", fontFamily: "inherit", toolbar: { show: false } },
-    colors: ["#3C50E0"],
-    plotOptions: { bar: { borderRadius: 8, columnWidth: "45%" } },
-    dataLabels: { enabled: false },
-    xaxis: { categories: ["Daily", "Weekly", "Monthly"], axisBorder: { show: false }, axisTicks: { show: false } },
-    yaxis: { labels: { formatter: (val) => `PKR ${(val / 1000).toFixed(0)}K` } },
-    grid: { strokeDashArray: 5 },
-    tooltip: { y: { formatter: (val) => PKR(val) } },
+  // Apex Area Chart options for Revenue & Customers velocity
+  const chartOptions: any = {
+    chart: { type: 'area', toolbar: { show: false }, background: 'transparent', animations: { enabled: true, easing: 'easeinout', speed: 1200 } },
+    stroke: { curve: 'smooth', width: 3, colors: ['#E31E24', '#94A3B8'] },
+    fill: { type: 'gradient', gradient: { shadeIntensity: 1, opacityFrom: 0.35, opacityTo: 0.05, stops: [0, 90, 100] } },
+    xaxis: { categories: stats?.graphData?.days || [], labels: { style: { colors: '#94A3B8', fontSize: '9px', fontWeight: 800 } }, axisBorder: { show: false } },
+    yaxis: { labels: { style: { colors: '#94A3B8', fontSize: '9px', fontWeight: 800 }, formatter: (v: any) => v ? `${(Number(v)/1000).toFixed(0)}k` : '0' } },
+    grid: { borderColor: '#F1F5F9', strokeDashArray: 5 },
+    legend: { show: false },
+    colors: ['#E31E24', '#94A3B8'],
+    tooltip: { theme: 'light', x: { show: false }, marker: { show: true } }
   };
-  const salesBarSeries = [
-    {
-      name: "Sales",
-      data: [
-        stats?.performance.dailySales ?? 0,
-        stats?.performance.weeklySales ?? 0,
-        stats?.performance.monthlySales ?? 0,
-      ],
-    },
-  ];
+
+  const currentSalesTotal = stats?.graphData?.sales?.current?.reduce((a: number, b: number) => a + b, 0) || 0;
+  const previousSalesTotal = stats?.graphData?.sales?.previous?.reduce((a: number, b: number) => a + b, 0) || 0;
+  const currentCustomersTotal = stats?.graphData?.customers?.current?.reduce((a: number, b: number) => a + b, 0) || 0;
+  const previousCustomersTotal = stats?.graphData?.customers?.previous?.reduce((a: number, b: number) => a + b, 0) || 0;
 
   // Radial gauge: Installment collection rate
   const collectionRate =
@@ -206,21 +244,21 @@ export default function OutletDashboardPage() {
     chart: { type: "radialBar", fontFamily: "inherit" },
     plotOptions: {
       radialBar: {
-        hollow: { size: "60%" },
+        hollow: { size: "62%" },
         dataLabels: {
-          name: { show: true, fontSize: "13px", color: "#6B7280", offsetY: -8 },
-          value: { show: true, fontSize: "26px", fontWeight: "700", color: "#111827", formatter: (val) => `${val}%` },
+          name: { show: true, fontSize: "11px", color: "#6B7280", offsetY: -6 },
+          value: { show: true, fontSize: "22px", fontWeight: "800", color: "#111827", formatter: (val) => `${val}%` },
         },
         track: { background: "#F3F4F6" },
       },
     },
     colors: ["#10B981"],
-    labels: ["Collected"],
+    labels: ["Recovered"],
   };
 
   const quickLinks = [
-    { icon: Package, label: "Orders", href: "/orders-list", color: "bg-blue-500" },
-    { icon: CheckCircle, label: "Approved Order list", href: "/approved-order-list", color: "bg-blue-500" },
+    { icon: Package, label: "Orders", href: "/orders-list", color: "bg-red-500" },
+    { icon: CheckCircle2, label: "Approved Orders", href: "/approved-order-list", color: "bg-indigo-500" },
     { icon: BoxIcon, label: "Inventory", href: "/outlet/inventory", color: "bg-violet-500" },
     { icon: CreditCard, label: "Installments", href: "/outlet/installments", color: "bg-emerald-500" },
     { icon: Activity, label: "Recovery", href: "/outlet/recovery", color: "bg-orange-500" },
@@ -250,219 +288,375 @@ export default function OutletDashboardPage() {
   }
 
   return (
-    <div className="mx-auto max-w-7xl space-y-8 pb-12">
-      {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div className="w-full p-4 md:p-6 lg:p-8 min-h-screen animate-in fade-in duration-1000">
+      
+      {/* Header with Advanced Date Range Selector */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between mb-8 gap-8 border-b border-slate-200 pb-8">
         <div>
-          <h1 className="text-3xl font-black text-black dark:text-white">{outletName}</h1>
-          <p className="mt-1 text-sm font-medium text-gray-500 dark:text-gray-400">
-            Live outlet performance — {new Date().toLocaleDateString("en-PK", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
-          </p>
+          <div className="flex items-center gap-3">
+            <div className="p-3 bg-[#E31E24] rounded-2xl shadow-lg shadow-red-200">
+              <Activity className="text-white" size={24} />
+            </div>
+            <h1 className="text-3xl font-black text-slate-800 tracking-tighter uppercase">{outletName}</h1>
+          </div>
+          <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.4em] mt-3 ml-1">Live Outlet Performance</p>
         </div>
-        <button
-          onClick={() => fetchStats(true)}
-          disabled={refreshing}
-          className="flex items-center gap-2 rounded-xl border border-stroke bg-white px-5 py-2.5 text-sm font-bold shadow-default transition-all hover:shadow-card hover:border-primary/30 dark:border-dark-3 dark:bg-boxdark disabled:opacity-60"
-        >
-          <RefreshCw className={`size-4 text-primary ${refreshing ? "animate-spin" : ""}`} />
-          Refresh
-        </button>
+
+        <div className="flex flex-wrap items-center gap-4 bg-white p-2 rounded-2xl border border-slate-100 shadow-xl shadow-slate-200/20">
+          {["today", "month", "custom"].map((type) => (
+            <button
+              key={type}
+              onClick={() => setFilterType(type as any)}
+              className={`px-8 py-3 rounded-xl text-[10px] font-black uppercase transition-all ${filterType === type ? "bg-[#E31E24] text-white shadow-xl shadow-red-200 scale-105" : "text-slate-400 hover:text-slate-600 hover:bg-slate-50"}`}
+            >
+              {type}
+            </button>
+          ))}
+          {filterType === "custom" && (
+            <div className="flex items-center gap-3 pl-4 border-l border-slate-100 ml-2">
+              <input
+                type="date"
+                value={startDate}
+                onChange={e => setStartDate(e.target.value)}
+                className="bg-transparent border-none text-[10px] font-black text-slate-500 uppercase cursor-pointer"
+              />
+              <span className="text-slate-200 font-black">/</span>
+              <input
+                type="date"
+                value={endDate}
+                onChange={e => setEndDate(e.target.value)}
+                className="bg-transparent border-none text-[10px] font-black text-slate-500 uppercase cursor-pointer"
+              />
+              <button
+                onClick={() => fetchStats()}
+                className="h-10 w-10 bg-[#E31E24] text-white rounded-xl shadow-lg shadow-red-200 flex items-center justify-center hover:scale-110"
+              >
+                <Filter size={16} />
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Quick Links */}
-      <section>
-        <h2 className="mb-3 text-sm font-black uppercase tracking-widest text-gray-400">Quick Access</h2>
-        <div className="grid grid-cols-4 gap-3 sm:grid-cols-6 lg:grid-cols-12">
+      {/* Quick Links / Access Menu */}
+      <section className="mb-8">
+        <h2 className="mb-4 text-xs font-black uppercase tracking-widest text-slate-400">Quick Access Portal</h2>
+        <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-12">
           {quickLinks.map((ql) => (
             <QuickLink key={ql.label} {...ql} />
           ))}
         </div>
       </section>
 
-      {/* Order Status KPI Row */}
-      <section>
-        <h2 className="mb-4 text-sm font-black uppercase tracking-widest text-gray-400">Order Pipeline</h2>
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
-          <StatCard
-            icon={ShoppingBag}
-            label="Today's Orders"
-            value={stats?.orders.todayOrders ?? 0}
-            accent="bg-blue-500"
-            onClick={() => router.push("/orders-list")}
-          />
-          <StatCard
-            icon={Clock}
-            label="Pending Verification"
-            value={stats?.orders.pendingVerification ?? 0}
-            accent="bg-amber-500"
-            onClick={() => router.push("/in-progress-orders")}
-          />
-          <StatCard
-            icon={CheckCircle}
-            label="Approved Orders"
-            value={stats?.orders.approvedOrders ?? 0}
-            accent="bg-emerald-500"
-            onClick={() => router.push("/approved-order-list")}
-          />
-          <StatCard
-            icon={Truck}
-            label="Picked Orders"
-            value={stats?.orders.deliveryPending ?? 0}
-            accent="bg-purple-500"
-            onClick={() => router.push("/picked-orders")}
-          />
+      {/* KPI Cards Row */}
+      {stats && (
+        <section className="mb-8">
+          <h2 className="mb-4 text-xs font-black uppercase tracking-widest text-slate-400">Real-Time Indicators</h2>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-9 gap-4 w-full">
             <StatCard
-              icon={CheckCircle}
+              icon={<ShoppingBag size={18} />}
+              label="Total Orders"
+              value={stats.orders.todayOrders}
+              inc={stats.todayIncrement.total}
+              accent="text-blue-600"
+              bg="bg-blue-50"
+              bar="bg-blue-400"
+              onClick={() => router.push("/orders-list")}
+            />
+            <StatCard
+              icon={<Clock size={18} />}
+              label="Pending Verification"
+              value={stats.orders.pendingVerification}
+              inc={stats.todayIncrement.pending}
+              accent="text-amber-600"
+              bg="bg-amber-50"
+              bar="bg-amber-400"
+              onClick={() => router.push("/in-progress-orders")}
+            />
+            <StatCard
+              icon={<CheckCircle2 size={18} />}
+              label="Approved Orders"
+              value={stats.orders.approvedOrders}
+              inc={stats.todayIncrement.approved}
+              accent="text-indigo-600"
+              bg="bg-indigo-50"
+              bar="bg-indigo-400"
+              onClick={() => router.push("/approved-order-list")}
+            />
+            <StatCard
+              icon={<Truck size={18} />}
+              label="Picked Orders"
+              value={stats.orders.deliveryPending}
+              inc={stats.todayIncrement.deliveryPending}
+              accent="text-purple-600"
+              bg="bg-purple-50"
+              bar="bg-purple-400"
+              onClick={() => router.push("/picked-orders")}
+            />
+            <StatCard
+              icon={<Award size={18} />}
               label="Delivered Orders"
-              value={stats?.orders.delivered ?? 0}
-              accent="bg-green-500"
+              value={stats.orders.delivered}
+              inc={stats.todayIncrement.delivered}
+              accent="text-emerald-600"
+              bg="bg-emerald-50"
+              bar="bg-emerald-400"
               onClick={() => router.push("/delivered-orders")}
             />
-          <StatCard
-            icon={XCircle}
-            label="Cancelled Orders"
-            value={stats?.orders.cancelledOrders ?? 0}
-            accent="bg-red-500"
-            onClick={() => router.push("/cancelled-orders")}
-          />
-          <StatCard
-            icon={XCircle}
-            label="Rejected Orders"
-            value={stats?.orders.rejectedOrders ?? 0}
-            accent="bg-rose-500"
-            onClick={() => router.push("/rejected-orders")}
-          />
-          <StatCard
-            icon={Clock}
-            label="Expired Orders"
-            value={stats?.orders.expiredOrders ?? 0}
-            accent="bg-amber-800"
-            onClick={() => router.push("/expired-orders")}
-          />
+            <StatCard
+              icon={<XCircle size={18} />}
+              label="Cancelled Orders"
+              value={stats.orders.cancelledOrders}
+              inc={stats.todayIncrement.cancelled}
+              accent="text-rose-600"
+              bg="bg-rose-50"
+              bar="bg-rose-400"
+              onClick={() => router.push("/cancelled-orders")}
+            />
+            <StatCard
+              icon={<AlertTriangle size={18} />}
+              label="Rejected Orders"
+              value={stats.orders.rejectedOrders}
+              inc={stats.todayIncrement.rejected}
+              accent="text-red-600"
+              bg="bg-red-50"
+              bar="bg-red-400"
+              onClick={() => router.push("/rejected-orders")}
+            />
+            <StatCard
+              icon={<Clock size={18} />}
+              label="Expired Orders"
+              value={stats.orders.expiredOrders}
+              inc={stats.todayIncrement.expired}
+              accent="text-orange-600"
+              bg="bg-orange-50"
+              bar="bg-orange-400"
+              onClick={() => router.push("/expired-orders")}
+            />
+            <StatCard
+              icon={<Wallet size={18} />}
+              label="Period Sales"
+              value={PKR(stats.performance.periodSales)}
+              inc={stats.todayIncrement.sales}
+              accent="text-[#E31E24]"
+              bg="bg-red-50"
+              bar="bg-[#E31E24]"
+            />
+          </div>
+        </section>
+      )}
+
+      {/* Main Charts & Statistics breakdown */}
+      {stats && (
+        <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 w-full items-start mb-8">
+          
+          {/* Revenue Analytics Curve (This Month vs Last Month) */}
+          <div className="col-span-12 xl:col-span-6 rounded-3xl border border-gray-100 bg-white p-6 shadow-xl shadow-gray-200/40">
+            <div className="flex justify-between items-center mb-8">
+              <div>
+                <h4 className="text-sm font-black text-gray-800 uppercase tracking-tight">Revenue Analytics</h4>
+                <p className="text-[9px] font-bold text-gray-400 mt-0.5 uppercase tracking-widest">Delivered order value contrast</p>
+              </div>
+              <div className="flex gap-2">
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-gray-50 border border-gray-100">
+                  <div className="h-1.5 w-1.5 rounded-full bg-[#94A3B8]"></div>
+                  <span className="text-[8px] font-black text-gray-500 uppercase">Prev: {PKR(previousSalesTotal)}</span>
+                </div>
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-red-50 border border-red-100">
+                  <div className="h-1.5 w-1.5 rounded-full bg-[#E31E24]"></div>
+                  <span className="text-[8px] font-black text-[#E31E24] uppercase">Cur: {PKR(currentSalesTotal)}</span>
+                </div>
+              </div>
+            </div>
+            <Chart
+              options={chartOptions}
+              series={[
+                { name: 'Current Month', data: stats.graphData?.sales?.current || [] },
+                { name: 'Previous Month', data: stats.graphData?.sales?.previous || [] }
+              ]}
+              type="area"
+              height={300}
+            />
+          </div>
+
+          {/* Conversion Velocity (Delivered Count) */}
+          <div className="col-span-12 xl:col-span-6 rounded-3xl border border-gray-100 bg-white p-6 shadow-xl shadow-gray-200/40">
+            <div className="flex justify-between items-center mb-8">
+              <div>
+                <h4 className="text-sm font-black text-gray-800 uppercase tracking-tight">Conversion Velocity</h4>
+                <p className="text-[9px] font-bold text-gray-400 mt-0.5 uppercase tracking-widest">Successful order handovers count</p>
+              </div>
+              <div className="flex gap-2">
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-gray-50 border border-gray-100">
+                  <div className="h-1.5 w-1.5 rounded-full bg-[#94A3B8]"></div>
+                  <span className="text-[8px] font-black text-gray-500 uppercase">Prev: {previousCustomersTotal}</span>
+                </div>
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-emerald-50 border border-emerald-100">
+                  <div className="h-1.5 w-1.5 rounded-full bg-[#10B981]"></div>
+                  <span className="text-[8px] font-black text-[#10B981] uppercase">Cur: {currentCustomersTotal}</span>
+                </div>
+              </div>
+            </div>
+            <Chart
+              options={{
+                ...chartOptions,
+                stroke: { ...chartOptions.stroke, colors: ['#10B981', '#94A3B8'] },
+                colors: ['#10B981', '#94A3B8']
+              }}
+              series={[
+                { name: 'Current Month', data: stats.graphData?.customers?.current || [] },
+                { name: 'Previous Month', data: stats.graphData?.customers?.previous || [] }
+              ]}
+              type="area"
+              height={300}
+            />
+          </div>
+
         </div>
-      </section>
+      )}
 
-      {/* Charts Row */}
-      <section className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+      {/* Segment Breakdown & Installments recovery rates */}
+      {stats && (
+        <section className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mb-8">
+          
+          {/* Order Breakdown Donut */}
+          <div className="col-span-12 lg:col-span-5 rounded-3xl border border-gray-100 bg-white p-6 shadow-xl shadow-gray-200/40">
+            <h3 className="text-sm font-black text-gray-800 uppercase tracking-tight">Order Breakdown</h3>
+            <p className="text-[9px] font-bold text-gray-400 mt-0.5 mb-6 uppercase tracking-widest">Status ratio split</p>
+            {orderDonutSeries.reduce((a, b) => a + b, 0) > 0 ? (
+              <Chart options={orderDonutOptions} series={orderDonutSeries} type="donut" height={260} />
+            ) : (
+              <div className="flex h-52 items-center justify-center text-gray-300 font-bold uppercase tracking-widest text-xs">No orders registered</div>
+            )}
+          </div>
 
-        {/* Sales Bar Chart */}
-        <div className="col-span-12 rounded-2xl border border-stroke bg-white px-6 pb-4 pt-6 shadow-default dark:border-dark-3 dark:bg-boxdark lg:col-span-5">
-          <div className="mb-2 flex items-start justify-between">
+          {/* Collection Progress Radial */}
+          <div className="col-span-12 lg:col-span-3 rounded-3xl border border-gray-100 bg-white p-6 shadow-xl shadow-gray-200/40 flex flex-col justify-between">
             <div>
-              <h3 className="text-xl font-black text-black dark:text-white">Sales Performance</h3>
-              <p className="mt-0.5 text-sm text-gray-400">Daily / Weekly / Monthly</p>
+              <h3 className="text-sm font-black text-gray-800 uppercase tracking-tight">Collection Rate</h3>
+              <p className="text-[9px] font-bold text-gray-400 mt-0.5 mb-4 uppercase tracking-widest">Installment returns</p>
+              <Chart options={radialOptions} series={[collectionRate]} type="radialBar" height={190} />
             </div>
-            <div className="rounded-xl bg-primary/10 px-4 py-2 text-right">
-              <p className="text-[10px] font-black uppercase tracking-wider text-primary">Monthly Total</p>
-              <p className="text-base font-black text-primary">{PKR(stats?.performance.monthlySales ?? 0)}</p>
-            </div>
-          </div>
-          <Chart options={salesBarOptions} series={salesBarSeries} type="bar" height={250} width="100%" />
-        </div>
-
-        {/* Order Donut Chart */}
-        <div className="col-span-12 rounded-2xl border border-stroke bg-white px-6 pb-4 pt-6 shadow-default dark:border-dark-3 dark:bg-boxdark lg:col-span-4">
-          <h3 className="mb-1 text-xl font-black text-black dark:text-white">Order Breakdown</h3>
-          <p className="mb-2 text-sm text-gray-400">Status distribution</p>
-          {orderDonutSeries.reduce((a, b) => a + b, 0) > 0 ? (
-            <Chart options={orderDonutOptions} series={orderDonutSeries} type="donut" height={260} />
-          ) : (
-            <div className="flex h-64 items-center justify-center text-gray-300 font-bold">No order data</div>
-          )}
-        </div>
-
-        {/* Installment Radial */}
-        <div className="col-span-12 rounded-2xl border border-stroke bg-white px-6 pb-4 pt-6 shadow-default dark:border-dark-3 dark:bg-boxdark lg:col-span-3">
-          <h3 className="mb-1 text-xl font-black text-black dark:text-white">Collection Rate</h3>
-          <p className="mb-2 text-sm text-gray-400">Installment recovery</p>
-          <Chart options={radialOptions} series={[collectionRate]} type="radialBar" height={200} />
-          <div className="mt-2 space-y-2 border-t border-stroke pt-4 dark:border-dark-3">
-            <div className="flex justify-between text-xs font-bold">
-              <span className="text-gray-400">Total Due</span>
-              <span className="text-black dark:text-white">{PKR(stats?.installments.totalInstallmentDue ?? 0)}</span>
-            </div>
-            <div className="flex justify-between text-xs font-bold">
-              <span className="text-gray-400">Total Paid</span>
-              <span className="text-emerald-500">{PKR(stats?.installments.totalInstallmentPaid ?? 0)}</span>
-            </div>
-            <div className="flex justify-between text-xs font-bold">
-              <span className="text-gray-400">Remaining</span>
-              <span className="text-red-500">{PKR(stats?.installments.totalRemaining ?? 0)}</span>
+            <div className="space-y-2 border-t border-slate-50 pt-4">
+              <div className="flex justify-between text-[10px] font-black uppercase">
+                <span className="text-gray-400">Total Due</span>
+                <span className="text-gray-800">{PKR(stats.installments.totalInstallmentDue)}</span>
+              </div>
+              <div className="flex justify-between text-[10px] font-black uppercase">
+                <span className="text-gray-400">Total Paid</span>
+                <span className="text-emerald-500">{PKR(stats.installments.totalInstallmentPaid)}</span>
+              </div>
+              <div className="flex justify-between text-[10px] font-black uppercase">
+                <span className="text-gray-400">Remaining</span>
+                <span className="text-rose-500">{PKR(stats.installments.totalRemaining)}</span>
+              </div>
             </div>
           </div>
-        </div>
-      </section>
 
-      {/* Installment + Financial Row */}
-      <section className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-
-        {/* Installment Detail Cards */}
-        <div className="rounded-2xl border border-stroke bg-white p-6 shadow-default dark:border-dark-3 dark:bg-boxdark">
-          <div className="mb-5 flex items-center justify-between">
-            <h3 className="text-xl font-black text-black dark:text-white">Installment Summary</h3>
-            <button
-              onClick={() => router.push("/outlet/installments")}
-              className="flex items-center gap-1 rounded-lg bg-primary/10 px-3 py-1.5 text-xs font-bold text-primary transition-all hover:bg-primary hover:text-white"
-            >
-              Manage <ChevronRight className="size-3" />
-            </button>
+          {/* Side Performance Timelines */}
+          <div className="col-span-12 lg:col-span-4 rounded-3xl border border-gray-100 bg-white p-6 shadow-xl shadow-gray-200/40">
+            <h3 className="text-sm font-black text-gray-800 uppercase tracking-tight">Timeline Performance</h3>
+            <p className="text-[9px] font-bold text-gray-400 mt-0.5 mb-6 uppercase tracking-widest">Aggregate delivered order totals</p>
+            <div className="space-y-4">
+              {[
+                { label: "Today's Handovers", value: stats.performance.dailySales, bg: "bg-emerald-50 text-emerald-600 border border-emerald-100" },
+                { label: "Weekly Handovers", value: stats.performance.weeklySales, bg: "bg-blue-50 text-blue-600 border border-blue-100" },
+                { label: "Monthly Handovers", value: stats.performance.monthlySales, bg: "bg-red-50 text-[#E31E24] border border-red-100" }
+              ].map((time) => (
+                <div key={time.label} className={`flex items-center justify-between rounded-2xl px-5 py-4 ${time.bg}`}>
+                  <span className="text-[10px] font-black uppercase tracking-wider">{time.label}</span>
+                  <span className="text-sm font-black">{PKR(time.value)}</span>
+                </div>
+              ))}
+            </div>
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            {[
-              { label: "Pending Installments", value: stats?.installments.pendingInstallmentCount ?? 0, accent: "bg-amber-500", format: "number" },
-              { label: "Orders Affected", value: stats?.installments.ordersWithPendingInstallments ?? 0, accent: "bg-orange-500", format: "number" },
-              { label: "Total Arrears", value: stats?.installments.totalArrears ?? 0, accent: "bg-red-500", format: "currency" },
-              { label: "Total Remaining", value: stats?.installments.totalRemaining ?? 0, accent: "bg-violet-500", format: "currency" },
-            ].map((item) => (
-              <div key={item.label} className="rounded-xl bg-gray-50 p-4 dark:bg-dark-3">
-                <p className="text-xs font-bold uppercase tracking-wider text-gray-400">{item.label}</p>
-                <p className={`mt-1.5 text-xl font-black ${item.accent === "bg-red-500" ? "text-red-500" : item.accent === "bg-amber-500" ? "text-amber-500" : "text-black dark:text-white"}`}>
-                  {item.format === "currency" ? PKR(item.value as number) : item.value}
+
+        </section>
+      )}
+
+      {/* Cumulative Snapshots: Cash Register + Installment Summaries */}
+      {stats && (
+        <section className="grid grid-cols-1 lg:grid-cols-2 gap-6 w-full">
+          
+          {/* Installment Summary */}
+          <div className="rounded-3xl border border-gray-100 bg-white p-8 shadow-xl shadow-gray-200/40">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Installment Recovery</h3>
+              <button
+                onClick={() => router.push("/outlet/installments")}
+                className="flex items-center gap-1 rounded-xl bg-red-50 border border-red-100 px-3.5 py-2 text-[9px] font-black text-[#E31E24] uppercase tracking-wider transition-all hover:bg-[#E31E24] hover:text-white"
+              >
+                Manage <ChevronRight className="size-3" />
+              </button>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              {[
+                { label: "Pending Collections", value: stats.installments.pendingInstallmentCount, bg: "bg-amber-50", text: "text-amber-500", format: "number" },
+                { label: "Impacted Customers", value: stats.installments.ordersWithPendingInstallments, bg: "bg-orange-50", text: "text-orange-500", format: "number" },
+                { label: "Arrears", value: stats.installments.totalArrears, bg: "bg-rose-50", text: "text-rose-500", format: "currency" },
+                { label: "Cumulative Remaining", value: stats.installments.totalRemaining, bg: "bg-violet-50", text: "text-violet-500", format: "currency" },
+              ].map((item) => (
+                <div key={item.label} className={`rounded-2xl p-5 ${item.bg}`}>
+                  <p className="text-[8px] font-black uppercase tracking-wider text-gray-400 mb-1">{item.label}</p>
+                  <p className={`text-lg font-black ${item.text}`}>
+                    {item.format === "currency" ? PKR(item.value as number) : item.value}
+                  </p>
+                </div>
+              ))}
+            </div>
+
+            {stats.installments.totalArrears > 0 && (
+              <div className="flex items-center gap-3 rounded-2xl bg-red-50 border border-red-100 p-4">
+                <AlertTriangle className="size-4 shrink-0 text-[#E31E24]" />
+                <p className="text-[10px] font-black text-[#E31E24] uppercase tracking-wider leading-relaxed">
+                  PKR {stats.installments.totalArrears.toLocaleString()} in arrears require quick follow-up
                 </p>
               </div>
-            ))}
+            )}
           </div>
-          {(stats?.installments.totalArrears ?? 0) > 0 && (
-            <div className="mt-4 flex items-center gap-2.5 rounded-xl bg-red-50 p-3 dark:bg-red-900/20">
-              <AlertTriangle className="size-4 shrink-0 text-red-500" />
-              <p className="text-xs font-bold text-red-600 dark:text-red-400">
-                PKR {(stats?.installments.totalArrears ?? 0).toLocaleString()} in arrears requires immediate follow-up
-              </p>
-            </div>
-          )}
-        </div>
 
-        {/* Financial Overview */}
-        <div className="rounded-2xl border border-stroke bg-white p-6 shadow-default dark:border-dark-3 dark:bg-boxdark">
-          <div className="mb-5 flex items-center justify-between">
-            <h3 className="text-xl font-black text-black dark:text-white">Cash Register</h3>
-            <button
-              onClick={() => router.push("/outlet/cash-register")}
-              className="flex items-center gap-1 rounded-lg bg-primary/10 px-3 py-1.5 text-xs font-bold text-primary transition-all hover:bg-primary hover:text-white"
-            >
-              View <ChevronRight className="size-3" />
-            </button>
-          </div>
-          <div className="space-y-2">
-            {[
-              { label: "Down Payments Collected", value: stats?.financials.down_payments ?? 0, color: "text-emerald-600", bg: "bg-emerald-50 dark:bg-emerald-900/20" },
-              { label: "Installments Received", value: stats?.financials.installments_received ?? 0, color: "text-blue-600", bg: "bg-blue-50 dark:bg-blue-900/20" },
-              { label: "Cash from Recovery", value: stats?.financials.cash_from_recovery ?? 0, color: "text-violet-600", bg: "bg-violet-50 dark:bg-violet-900/20" },
-              { label: "Cash from Delivery", value: stats?.financials.cash_from_delivery ?? 0, color: "text-cyan-600", bg: "bg-cyan-50 dark:bg-cyan-900/20" },
-              { label: "Total Expenses", value: stats?.financials.expenses ?? 0, color: "text-red-600", bg: "bg-red-50 dark:bg-red-900/20" },
-            ].map((row) => (
-              <div key={row.label} className={`flex items-center justify-between rounded-xl px-4 py-3 ${row.bg}`}>
-                <span className="text-sm font-bold text-gray-600 dark:text-gray-300">{row.label}</span>
-                <span className={`text-sm font-black ${row.color}`}>{PKR(row.value)}</span>
+          {/* Cash Register Snapshot */}
+          <div className="rounded-3xl border border-gray-100 bg-white p-8 shadow-xl shadow-gray-200/40">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Cash Register Snapshot</h3>
+              <button
+                onClick={() => router.push("/outlet/cash-register")}
+                className="flex items-center gap-1 rounded-xl bg-red-50 border border-red-100 px-3.5 py-2 text-[9px] font-black text-[#E31E24] uppercase tracking-wider transition-all hover:bg-[#E31E24] hover:text-white"
+              >
+                Log Register <ChevronRight className="size-3" />
+              </button>
+            </div>
+            
+            <div className="space-y-3">
+              {[
+                { label: "Down Payments Collected", value: stats.financials.down_payments, color: "text-emerald-600", bg: "bg-emerald-50/50 border border-emerald-100/30" },
+                { label: "Installments Received", value: stats.financials.installments_received, color: "text-blue-600", bg: "bg-blue-50/50 border border-blue-100/30" },
+                { label: "Cash from Recovery", value: stats.financials.cash_from_recovery, color: "text-violet-600", bg: "bg-violet-50/50 border border-violet-100/30" },
+                { label: "Cash from Delivery", value: stats.financials.cash_from_delivery, color: "text-cyan-600", bg: "bg-cyan-50/50 border border-cyan-100/30" },
+                { label: "Total Outlet Expenses", value: stats.financials.expenses, color: "text-rose-600", bg: "bg-rose-50/50 border border-rose-100/30" },
+              ].map((row) => (
+                <div key={row.label} className={`flex items-center justify-between rounded-xl px-4 py-3.5 ${row.bg}`}>
+                  <span className="text-[10px] font-black text-gray-500 uppercase tracking-wider">{row.label}</span>
+                  <span className={`text-xs font-black ${row.color}`}>{PKR(row.value)}</span>
+                </div>
+              ))}
+              <div className="flex items-center justify-between rounded-2xl bg-red-50 border border-red-100 px-5 py-4 mt-3">
+                <span className="text-[10px] font-black uppercase tracking-widest text-[#E31E24]">Closing balance (Cash on Hand)</span>
+                <span className="text-lg font-black text-[#E31E24]">{PKR(stats.financials.closing_cash)}</span>
               </div>
-            ))}
-            <div className="mt-2 flex items-center justify-between rounded-xl bg-primary/10 px-4 py-4">
-              <span className="text-sm font-black uppercase tracking-wide text-primary">Closing Balance</span>
-              <span className="text-xl font-black text-primary">{PKR(stats?.financials.closing_cash ?? 0)}</span>
             </div>
           </div>
-        </div>
-      </section>
+
+        </section>
+      )}
+
+      <style jsx global>{`
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; height: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f8fafc; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
+      `}</style>
+
     </div>
   );
 }
