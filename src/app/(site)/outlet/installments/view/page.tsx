@@ -87,10 +87,10 @@ function InstallmentsViewContent() {
   });
   const [pagination, setPagination] = useState({ total: 0, totalPages: 1 });
   const [loading, setLoading] = useState(true);
-  
+
   // Selection states
   const [selectedRows, setSelectedRows] = useState<string[]>([]); // Array of orderRef_dueDate keys
-  
+
   // Notes Modal state
   const [noteModalOpen, setNoteModalOpen] = useState(false);
   const [activeOrderForNote, setActiveOrderForNote] = useState<{ id: number; ref: string; customer: string; currentNote: string; monthNumber: number } | null>(null);
@@ -359,7 +359,7 @@ function InstallmentsViewContent() {
 
   return (
     <div className={`mx-auto ${isFullView ? 'fixed inset-0 z-[999999] bg-[#f8fafc] dark:bg-boxdark w-screen h-screen overflow-y-auto p-4 md:p-8 animate-fade-in' : 'max-w-7xl px-4 sm:px-6 lg:px-8 py-8'} transition-all duration-300`}>
-      
+
       {/* HEADER SECTION */}
       <div className="mb-8 flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
         <div>
@@ -375,7 +375,7 @@ function InstallmentsViewContent() {
             High-fidelity flat matrix view of customer installment ledgers with advanced query actions.
           </p>
         </div>
-        
+
         {/* Month Year Selector Controls */}
         <div className="flex items-center gap-2.5 bg-white dark:bg-boxdark p-2 rounded-2xl shadow-sm border border-gray-100 dark:border-strokedark">
           <Calendar className="h-4.5 w-4.5 text-gray-400 ml-1.5" />
@@ -407,7 +407,7 @@ function InstallmentsViewContent() {
 
       {/* STATISTICS CARDS SECTION */}
       <div className="mb-8 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-5">
-        
+
         {/* Total Due This Month */}
         <div className="relative overflow-hidden rounded-2xl border border-gray-100 bg-white p-6 shadow-xl shadow-gray-100/50 dark:bg-boxdark dark:border-strokedark">
           <div className="flex justify-between items-start">
@@ -482,38 +482,35 @@ function InstallmentsViewContent() {
 
       {/* FILTER TABS & CONTROL ACTIONS */}
       <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between bg-white dark:bg-boxdark px-4 py-2.5 rounded-3xl shadow-sm border border-gray-100 dark:border-strokedark">
-        
+
         {/* Navigation Tabs */}
         <div className="flex flex-wrap gap-1 bg-transparent self-start border-b border-gray-50 w-full lg:w-auto">
           <button
             onClick={() => handleTabChange('fresh')}
-            className={`whitespace-nowrap px-6 py-4 text-[10px] font-black uppercase tracking-widest transition-all border-b-2 ${
-              activeTab === 'fresh'
+            className={`whitespace-nowrap px-6 py-4 text-[10px] font-black uppercase tracking-widest transition-all border-b-2 ${activeTab === 'fresh'
                 ? "border-[#E31E24] text-[#E31E24]"
                 : "border-transparent text-gray-400 hover:text-gray-600"
-            }`}
+              }`}
           >
             Fresh
           </button>
-          
+
           <button
             onClick={() => handleTabChange('due')}
-            className={`whitespace-nowrap px-6 py-4 text-[10px] font-black uppercase tracking-widest transition-all border-b-2 ${
-              activeTab === 'due'
+            className={`whitespace-nowrap px-6 py-4 text-[10px] font-black uppercase tracking-widest transition-all border-b-2 ${activeTab === 'due'
                 ? "border-[#E31E24] text-[#E31E24]"
                 : "border-transparent text-gray-400 hover:text-gray-600"
-            }`}
+              }`}
           >
             Due / Overdue
           </button>
-          
+
           <button
             onClick={() => handleTabChange('completed')}
-            className={`whitespace-nowrap px-6 py-4 text-[10px] font-black uppercase tracking-widest transition-all border-b-2 ${
-              activeTab === 'completed'
+            className={`whitespace-nowrap px-6 py-4 text-[10px] font-black uppercase tracking-widest transition-all border-b-2 ${activeTab === 'completed'
                 ? "border-[#E31E24] text-[#E31E24]"
                 : "border-transparent text-gray-400 hover:text-gray-600"
-            }`}
+              }`}
           >
             Fully Paid
           </button>
@@ -521,7 +518,7 @@ function InstallmentsViewContent() {
 
         {/* Global Search and CSV Exports */}
         <div className="flex flex-wrap items-center gap-2.5">
-          
+
           <div className="relative min-w-[220px]">
             <Search className="absolute left-3.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
             <input
@@ -588,9 +585,9 @@ function InstallmentsViewContent() {
       {/* EXCEL SHEET HIGH-FIDELITY GRID CONTAINER */}
       <div className="bg-white dark:bg-boxdark rounded-3xl shadow-xl shadow-gray-100/40 border border-gray-100 dark:border-strokedark overflow-hidden">
         <div className="overflow-x-auto">
-          
+
           <table className="w-full border-collapse text-left text-xs text-gray-500 dark:text-gray-400">
-            
+
             {/* Table Header Row matched with CSR RankingBoard style (Enlarged to text-[10px]) */}
             <thead className="bg-white sticky top-0 z-10 border-b border-gray-100 dark:border-strokedark">
               <tr className="bg-gray-50/50">
@@ -616,6 +613,8 @@ function InstallmentsViewContent() {
                 <th className="px-4 py-4 text-[10px] font-black text-gray-400 uppercase min-w-[140px]">Guarantor 2 Phone</th>
                 <th className="px-4 py-4 text-[10px] font-black text-gray-400 uppercase min-w-[170px]">Item</th>
                 <th className="px-4 py-4 text-[10px] font-black text-gray-400 uppercase min-w-[150px]">IMEI / Device ID</th>
+                <th className="px-4 py-4 text-[10px] font-black text-gray-400 uppercase min-w-[180px]">1Bill Consumer No.</th>
+                <th className="px-4 py-4 text-[10px] font-black text-gray-400 uppercase min-w-[170px]">Recovery Officer</th>
                 <th className="px-4 py-4 text-[10px] font-black text-gray-400 uppercase min-w-[110px] text-right">Monthly Due</th>
                 <th className="px-4 py-4 text-[10px] font-black text-gray-400 uppercase min-w-[125px] text-right">Total Remaining</th>
                 <th className="px-4 py-4 text-[10px] font-black text-gray-400 uppercase min-w-[120px] text-right">Partial Paid</th>
@@ -721,6 +720,8 @@ function InstallmentsViewContent() {
                 <td className="px-2 py-2"></td>
                 <td className="px-2 py-2"></td>
                 <td className="px-2 py-2"></td>
+                <td className="px-2 py-2"></td>
+                <td className="px-2 py-2"></td>
                 <td className="px-2 py-2">
                   <select
                     value={colFilters.status}
@@ -787,6 +788,25 @@ function InstallmentsViewContent() {
                       <td className="px-4 py-3.5 font-semibold text-gray-600">{inst.grantor2Phone}</td>
                       <td className="px-4 py-3.5 font-bold text-gray-700 dark:text-slate-300">{inst.product_name}</td>
                       <td className="px-4 py-3.5 font-mono font-bold text-gray-600">{inst.imei_serial}</td>
+                      <td className="px-4 py-3.5">
+                        {inst.consumer_number ? (
+                          <div className="flex flex-col gap-1">
+                            <span className="font-mono font-bold text-sm tracking-widest text-[#E31E24]">{inst.consumer_number}</span>
+                          </div>
+                        ) : (
+                          <span className="text-gray-400 italic text-xs">Not Generated</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3.5">
+                        {inst.recovery_officer ? (
+                          <div className="flex flex-col gap-0.5">
+                            <span className="font-bold text-slate-800 dark:text-slate-200">{inst.recovery_officer.name}</span>
+                            <span className="text-xs text-gray-500">{inst.recovery_officer.phone || 'No phone'}</span>
+                          </div>
+                        ) : (
+                          <span className="text-gray-400 italic text-xs">Unassigned</span>
+                        )}
+                      </td>
                       <td className="px-4 py-3.5 text-right font-black text-slate-900 dark:text-white">Rs. {inst.monthlyAmount.toLocaleString()}</td>
                       <td className="px-4 py-3.5 text-right font-black text-[#E31E24]">Rs. {inst.remainingAmount.toLocaleString()}</td>
                       <td className="px-4 py-3.5 text-right font-black text-emerald-600 dark:text-emerald-400">
@@ -833,13 +853,12 @@ function InstallmentsViewContent() {
                       </td>
                       <td className="px-4 py-3.5 text-center">
                         <span
-                          className={`inline-flex rounded-full px-3 py-1.5 text-[10px] font-black uppercase tracking-wider ${
-                            inst.status === "paid"
+                          className={`inline-flex rounded-full px-3 py-1.5 text-[10px] font-black uppercase tracking-wider ${inst.status === "paid"
                               ? "bg-emerald-50 text-emerald-600 border border-emerald-200"
                               : inst.status === "partial"
-                              ? "bg-amber-50 text-amber-600 border border-amber-200"
-                              : "bg-red-50 text-[#E31E24] border border-red-200"
-                          }`}
+                                ? "bg-amber-50 text-amber-600 border border-amber-200"
+                                : "bg-red-50 text-[#E31E24] border border-red-200"
+                            }`}
                         >
                           {inst.status === "paid" ? "Paid" : inst.status === "partial" ? "Partial" : "Pending"}
                         </span>
@@ -880,7 +899,7 @@ function InstallmentsViewContent() {
               >
                 Previous
               </button>
-              
+
               <div className="flex gap-1">
                 {Array.from({ length: pagination.totalPages }, (_, i) => i + 1).map((p) => {
                   if (p === 1 || p === pagination.totalPages || Math.abs(p - page) <= 1) {
@@ -888,11 +907,10 @@ function InstallmentsViewContent() {
                       <button
                         key={p}
                         onClick={() => setPage(p)}
-                        className={`rounded-xl h-8 w-8 text-[10px] font-black uppercase flex items-center justify-center transition-all cursor-pointer ${
-                          page === p
+                        className={`rounded-xl h-8 w-8 text-[10px] font-black uppercase flex items-center justify-center transition-all cursor-pointer ${page === p
                             ? "bg-[#E31E24] text-white"
                             : "border border-gray-100 dark:border-strokedark bg-white dark:bg-boxdark text-gray-500 hover:bg-gray-50"
-                        }`}
+                          }`}
                       >
                         {p}
                       </button>
@@ -921,7 +939,7 @@ function InstallmentsViewContent() {
       {noteModalOpen && activeOrderForNote && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="relative w-full max-w-lg rounded-3xl bg-white dark:bg-boxdark p-6 shadow-2xl border border-gray-100 dark:border-strokedark transform animate-fade-in transition-all">
-            
+
             <div className="flex items-center justify-between border-b border-gray-100 dark:border-strokedark pb-4 mb-4">
               <div>
                 <h3 className="text-base font-black text-slate-800 dark:text-white flex items-center gap-1.5">
@@ -931,7 +949,7 @@ function InstallmentsViewContent() {
                   Update specific monthly ledger context for Order {activeOrderForNote.ref}
                 </p>
               </div>
-              
+
               <button
                 onClick={() => setNoteModalOpen(false)}
                 className="rounded-full p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-50 dark:hover:bg-meta-4 transition-all"
@@ -970,7 +988,7 @@ function InstallmentsViewContent() {
               >
                 Cancel
               </button>
-              
+
               <button
                 type="button"
                 onClick={handleSaveNote}

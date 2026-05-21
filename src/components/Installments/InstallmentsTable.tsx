@@ -39,6 +39,9 @@ type OrderInstallment = {
         totalInstallments: number;
     };
     installmentLedger: InstallmentRow[];
+    consumer_number: string | null;
+    consumer_bill_status: string | null;
+    recovery_officer: { id: number; name: string; phone: string } | null;
 };
 
 type Props = {
@@ -64,7 +67,7 @@ export default function InstallmentsTable({ data, onPay, selectedIds = [], onSel
                     <thead>
                         <tr className="bg-gray-50 dark:bg-gray-700/50 text-gray-600 dark:text-gray-300 text-xs font-semibold uppercase tracking-wider">
                             <th className="px-6 py-4 w-10">
-                                <input 
+                                <input
                                     type="checkbox"
                                     className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                                     onChange={(e) => {
@@ -94,7 +97,7 @@ export default function InstallmentsTable({ data, onPay, selectedIds = [], onSel
                             const isExpanded = expandedRows.includes(order.order_id);
                             const nextPending = order.installmentLedger.find(r => r.status === 'pending');
                             const { paidInstallments, totalInstallments, totalRemaining, advanceAmount,
-                                    totalInstallmentDue, totalInstallmentPaid } = order.ledgerSummaries;
+                                totalInstallmentDue, totalInstallmentPaid } = order.ledgerSummaries;
                             const progress = totalInstallments > 0 ? (paidInstallments / totalInstallments) * 100 : 0;
                             const allPaid = totalInstallments > 0 && paidInstallments === totalInstallments;
 
@@ -103,7 +106,7 @@ export default function InstallmentsTable({ data, onPay, selectedIds = [], onSel
                                     {/* ── Summary Row ──────────────────────────────────── */}
                                     <tr className={`hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors ${selectedIds.includes(order.order_id) ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''}`}>
                                         <td className="px-6 py-4">
-                                            <input 
+                                            <input
                                                 type="checkbox"
                                                 checked={selectedIds.includes(order.order_id)}
                                                 onChange={() => onSelectRow?.(order.order_id)}
@@ -116,8 +119,8 @@ export default function InstallmentsTable({ data, onPay, selectedIds = [], onSel
                                         <td className="px-6 py-4">
                                             <div className="flex items-center gap-3">
                                                 {order.purchaser?.profile_photo ? (
-                                                    <img 
-                                                        src={order.purchaser.profile_photo} 
+                                                    <img
+                                                        src={order.purchaser.profile_photo}
                                                         alt={order.customer_name}
                                                         className="w-8 h-8 rounded-full object-cover border border-gray-200"
                                                     />
@@ -200,7 +203,7 @@ export default function InstallmentsTable({ data, onPay, selectedIds = [], onSel
                                     {isExpanded && (
                                         <tr>
                                             <td colSpan={8} className="px-6 py-8 bg-gray-50/70 dark:bg-gray-800/60 border-t border-gray-100 dark:border-gray-700">
-                                                
+
                                                 <div className="flex flex-col xl:flex-row gap-8">
                                                     {/* Left Side: People Details */}
                                                     <div className="xl:w-1/3 space-y-6">
@@ -257,6 +260,48 @@ export default function InstallmentsTable({ data, onPay, selectedIds = [], onSel
                                                                 )}
                                                             </div>
                                                         </div>
+
+                                                        {/* Consumer Number */}
+                                                        {order.consumer_number && (
+                                                            <div>
+                                                                <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+                                                                    <span className="w-1.5 h-1.5 rounded-full bg-purple-500"></span>
+                                                                    1Bill Consumer No.
+                                                                </h4>
+                                                                <div className="bg-white dark:bg-gray-800 rounded-2xl p-4 border border-gray-100 dark:border-gray-700 shadow-sm">
+                                                                    <p className="font-mono font-bold text-lg text-gray-800 dark:text-gray-100 tracking-widest">
+                                                                        {order.consumer_number}
+                                                                    </p>
+                                                                    <span className={`inline-block mt-1 text-[10px] font-bold px-2 py-0.5 rounded-full ${order.consumer_bill_status === 'P'
+                                                                            ? 'bg-green-100 text-green-700'
+                                                                            : order.consumer_bill_status === 'B'
+                                                                                ? 'bg-red-100 text-red-700'
+                                                                                : 'bg-amber-100 text-amber-700'
+                                                                        }`}>
+                                                                        {order.consumer_bill_status === 'P' ? '✓ Paid' : order.consumer_bill_status === 'B' ? '✗ Blocked' : '⏳ Unpaid'}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                        )}
+
+                                                        {/* Recovery Officer */}
+                                                        {order.recovery_officer && (
+                                                            <div>
+                                                                <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+                                                                    <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
+                                                                    Recovery Officer
+                                                                </h4>
+                                                                <div className="bg-white dark:bg-gray-800 rounded-2xl p-3 border border-gray-100 dark:border-gray-700 shadow-sm flex items-center gap-3">
+                                                                    <div className="w-8 h-8 rounded-full bg-rose-100 dark:bg-rose-900/30 flex items-center justify-center text-rose-600 font-bold text-xs flex-shrink-0">
+                                                                        {order.recovery_officer.name.charAt(0)}
+                                                                    </div>
+                                                                    <div className="min-w-0">
+                                                                        <p className="font-bold text-sm text-gray-800 dark:text-gray-200 truncate">{order.recovery_officer.name}</p>
+                                                                        <p className="text-xs text-gray-500">{order.recovery_officer.phone || 'N/A'}</p>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        )}
                                                     </div>
 
                                                     {/* Right Side: Ledger and Summaries */}
@@ -265,7 +310,7 @@ export default function InstallmentsTable({ data, onPay, selectedIds = [], onSel
                                                             <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
                                                             Installment Ledger
                                                         </h4>
-                                                        
+
                                                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
                                                             <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-900/30 rounded-xl p-3 text-center">
                                                                 <p className="text-amber-700 dark:text-amber-400 text-[10px] font-bold uppercase tracking-tight">Advance</p>
@@ -296,15 +341,14 @@ export default function InstallmentsTable({ data, onPay, selectedIds = [], onSel
                                                                 return (
                                                                     <div
                                                                         key={`${order.order_id}-inst-${inst.monthNumber}-${idx}`}
-                                                                        className={`rounded-xl p-3 border transition-all ${
-                                                                            isPaid
-                                                                                ? 'bg-green-50/60 border-green-200 dark:bg-green-900/10 dark:border-green-900/30'
-                                                                                : isPartial
+                                                                        className={`rounded-xl p-3 border transition-all ${isPaid
+                                                                            ? 'bg-green-50/60 border-green-200 dark:bg-green-900/10 dark:border-green-900/30'
+                                                                            : isPartial
                                                                                 ? 'bg-blue-50 border-blue-200 dark:bg-blue-900/10 dark:border-blue-900/30'
                                                                                 : isNext
-                                                                                ? 'bg-orange-50 border-orange-300 dark:bg-orange-900/20 dark:border-orange-700 ring-2 ring-orange-300/40'
-                                                                                : 'bg-white border-gray-100 dark:bg-gray-800 dark:border-gray-700 shadow-sm'
-                                                                        }`}
+                                                                                    ? 'bg-orange-50 border-orange-300 dark:bg-orange-900/20 dark:border-orange-700 ring-2 ring-orange-300/40'
+                                                                                    : 'bg-white border-gray-100 dark:bg-gray-800 dark:border-gray-700 shadow-sm'
+                                                                            }`}
                                                                     >
                                                                         <div className="flex justify-between items-start gap-1">
                                                                             <div className="min-w-0">
@@ -346,7 +390,7 @@ export default function InstallmentsTable({ data, onPay, selectedIds = [], onSel
                                                 {/* Actions */}
                                                 <div className="mt-8 pt-6 border-t border-gray-100 dark:border-gray-700 flex justify-between items-center">
                                                     <div className="flex gap-2">
-                                                        <button 
+                                                        <button
                                                             onClick={() => {
                                                                 const printWindow = window.open('', '_blank');
                                                                 if (printWindow) {
