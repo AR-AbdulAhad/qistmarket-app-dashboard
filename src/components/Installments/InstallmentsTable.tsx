@@ -272,14 +272,6 @@ export default function InstallmentsTable({ data, onPay, selectedIds = [], onSel
                                                                     <p className="font-mono font-bold text-lg text-gray-800 dark:text-gray-100 tracking-widest">
                                                                         {order.consumer_number}
                                                                     </p>
-                                                                    <span className={`inline-block mt-1 text-[10px] font-bold px-2 py-0.5 rounded-full ${order.consumer_bill_status === 'P'
-                                                                            ? 'bg-green-100 text-green-700'
-                                                                            : order.consumer_bill_status === 'B'
-                                                                                ? 'bg-red-100 text-red-700'
-                                                                                : 'bg-amber-100 text-amber-700'
-                                                                        }`}>
-                                                                        {order.consumer_bill_status === 'P' ? '✓ Paid' : order.consumer_bill_status === 'B' ? '✗ Blocked' : '⏳ Unpaid'}
-                                                                    </span>
                                                                 </div>
                                                             </div>
                                                         )}
