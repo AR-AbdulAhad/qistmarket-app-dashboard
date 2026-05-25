@@ -16,6 +16,7 @@ type InstallmentRow = {
     arrears?: number;
     paidAmount?: number;
     remainingAmount?: number;
+    payment_history?: { amount: number; date: string; method: string }[];
 };
 
 type OrderInstallment = {
@@ -42,6 +43,7 @@ type OrderInstallment = {
     consumer_number: string | null;
     consumer_bill_status: string | null;
     recovery_officer: { id: number; name: string; phone: string } | null;
+    tpsPayments?: any[];
 };
 
 type Props = {
@@ -322,55 +324,135 @@ export default function InstallmentsTable({ data, onPay, selectedIds = [], onSel
                                                             </div>
                                                         </div>
 
-                                                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                                                        {/* ── Per-Month Payment Detail Rows ── */}
+                                                        <div className="rounded-2xl border border-gray-100 dark:border-gray-700 overflow-hidden">
+                                                            {/* Header */}
+                                                            <div className="grid grid-cols-[52px_1fr_auto_auto_auto] gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-700/60 text-[9px] font-black text-gray-400 uppercase tracking-widest">
+                                                                <span>Month</span>
+                                                                <span>Amount / Details</span>
+                                                                <span className="text-right">Paid</span>
+                                                                <span className="text-right">Remaining</span>
+                                                                <span className="text-center">Action</span>
+                                                            </div>
                                                             {order.installmentLedger.map((inst, idx) => {
                                                                 const isPaid = inst.status === 'paid';
-                                                                const isPartial = inst.paidAmount && inst.paidAmount > 0 && inst.status !== 'paid';
+                                                                const isPartial = inst.status === 'partial' || (!isPaid && (inst.paidAmount || 0) > 0);
                                                                 const isNext = !isPaid && !isPartial && order.installmentLedger
                                                                     .filter(r => r.monthNumber < inst.monthNumber)
                                                                     .every(r => r.status === 'paid');
+                                                                const instDueDate = inst.dueDate ? new Date(inst.dueDate) : null;
+                                                                instDueDate?.setHours(0, 0, 0, 0);
+                                                                const today = new Date(); today.setHours(0, 0, 0, 0);
+                                                                const isOverdue = !isPaid && instDueDate && instDueDate < today;
+                                                                const hasArrears = (inst.arrears || 0) > 0;
+                                                                const paidAmt = inst.paidAmount || 0;
+                                                                const remAmt = inst.remainingAmount ?? (inst.dueAmount - paidAmt);
+
+                                                                const rowBg = isPaid
+                                                                    ? 'bg-green-50/50 dark:bg-green-900/5'
+                                                                    : isPartial
+                                                                        ? 'bg-blue-50/60 dark:bg-blue-900/10'
+                                                                        : isOverdue
+                                                                            ? 'bg-red-50/50 dark:bg-red-900/10'
+                                                                            : isNext
+                                                                                ? 'bg-orange-50/60 dark:bg-orange-900/10'
+                                                                                : '';
+
+                                                                const statusBadge = isPaid
+                                                                    ? <span className="text-[8px] px-1.5 py-0.5 rounded-full font-black bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400">✓ PAID</span>
+                                                                    : isPartial
+                                                                        ? <span className="text-[8px] px-1.5 py-0.5 rounded-full font-black bg-blue-100 text-blue-700 dark:bg-blue-900/40">PARTIAL</span>
+                                                                        : isOverdue
+                                                                            ? <span className="text-[8px] px-1.5 py-0.5 rounded-full font-black bg-red-100 text-red-700 dark:bg-red-900/40">OVERDUE</span>
+                                                                            : isNext
+                                                                                ? <span className="text-[7px] px-1.5 py-0.5 rounded-full font-black bg-orange-100 text-orange-700 dark:bg-orange-900/40">NEXT DUE</span>
+                                                                                : <span className="text-[8px] px-1.5 py-0.5 rounded-full font-black bg-gray-100 text-gray-500">PENDING</span>;
 
                                                                 return (
                                                                     <div
                                                                         key={`${order.order_id}-inst-${inst.monthNumber}-${idx}`}
-                                                                        className={`rounded-xl p-3 border transition-all ${isPaid
-                                                                            ? 'bg-green-50/60 border-green-200 dark:bg-green-900/10 dark:border-green-900/30'
-                                                                            : isPartial
-                                                                                ? 'bg-blue-50 border-blue-200 dark:bg-blue-900/10 dark:border-blue-900/30'
-                                                                                : isNext
-                                                                                    ? 'bg-orange-50 border-orange-300 dark:bg-orange-900/20 dark:border-orange-700 ring-2 ring-orange-300/40'
-                                                                                    : 'bg-white border-gray-100 dark:bg-gray-800 dark:border-gray-700 shadow-sm'
-                                                                            }`}
+                                                                        className={`grid grid-cols-[52px_1fr_auto_auto_auto] gap-2 items-center px-4 py-3 border-b border-gray-100 dark:border-gray-700/50 last:border-0 transition-colors ${rowBg}`}
                                                                     >
-                                                                        <div className="flex justify-between items-start gap-1">
-                                                                            <div className="min-w-0">
-                                                                                <p className={`text-[8px] uppercase font-bold truncate ${isNext ? 'text-orange-600' : 'text-gray-500'}`}>
-                                                                                    {inst.label || `Month ${inst.monthNumber}`}
-                                                                                </p>
-                                                                                <p className="text-xs font-extrabold text-gray-800 dark:text-gray-200 mt-0.5">
-                                                                                    {pkr(inst.remainingAmount || inst.dueAmount)}
-                                                                                </p>
-                                                                                {inst.paidAmount && inst.paidAmount > 0 && (
-                                                                                    <p className="text-[8px] text-green-600 font-bold -mt-0.5">
-                                                                                        PAID: {pkr(inst.paidAmount)}
-                                                                                    </p>
+                                                                        {/* Month label + status */}
+                                                                        <div className="flex flex-col items-center gap-1">
+                                                                            <span className={`text-[10px] font-black w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                                                                                isPaid ? 'bg-green-100 text-green-700 dark:bg-green-900/40'
+                                                                                : isPartial ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40'
+                                                                                : isOverdue ? 'bg-red-100 text-red-700 dark:bg-red-900/40'
+                                                                                : isNext ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/40'
+                                                                                : 'bg-gray-100 text-gray-500 dark:bg-gray-700'
+                                                                            }`}>M{inst.monthNumber}</span>
+                                                                            {statusBadge}
+                                                                        </div>
+
+                                                                        {/* Amount details */}
+                                                                        <div className="min-w-0">
+                                                                            <div className="flex items-center gap-1.5 flex-wrap">
+                                                                                <span className="text-sm font-extrabold text-gray-800 dark:text-gray-100">{pkr(inst.dueAmount)}</span>
+                                                                                {hasArrears && (
+                                                                                    <span className="text-[9px] px-1.5 py-0.5 rounded-full font-black bg-red-100 text-red-600 dark:bg-red-900/30">+{pkr(inst.arrears || 0)} arrears</span>
                                                                                 )}
                                                                             </div>
+                                                                            <div className="flex flex-col gap-1 mt-1">
+                                                                                <span className="text-[9px] text-gray-400">Due: {instDueDate ? instDueDate.toLocaleDateString('en-PK', { day: '2-digit', month: 'short', year: '2-digit' }) : '—'}</span>
+                                                                                {/* Render explicit payment history if available (for multiple partial payments) */}
+                                                                                {inst.payment_history && inst.payment_history.length > 0 ? (
+                                                                                    <div className="flex flex-col gap-1 mt-1 border-l-2 border-emerald-100 pl-2">
+                                                                                        {inst.payment_history.map((ph: any, phi: number) => (
+                                                                                            <div key={phi} className="flex items-center gap-1.5 flex-wrap">
+                                                                                                <span className="text-[9px] text-emerald-600 font-bold bg-emerald-50 px-1.5 py-0.5 rounded shadow-sm">PAID: {pkr(ph.amount)}</span>
+                                                                                                <span className="text-[9px] text-gray-400">on {new Date(ph.date).toLocaleDateString('en-PK', { day: '2-digit', month: 'short', year: '2-digit' })}</span>
+                                                                                                <span className="text-[8px] font-semibold text-indigo-500 truncate max-w-[120px]" title={ph.method}>via {ph.method}</span>
+                                                                                            </div>
+                                                                                        ))}
+                                                                                    </div>
+                                                                                ) : (
+                                                                                    <div className="flex items-center gap-2 flex-wrap mt-0.5">
+                                                                                        {inst.paymentMethod && (
+                                                                                            <span className="text-[9px] font-semibold text-indigo-500 truncate max-w-[140px]" title={inst.paymentMethod}>via {inst.paymentMethod}</span>
+                                                                                        )}
+                                                                                        {inst.paidAt && (
+                                                                                            <span className="text-[9px] text-emerald-600 font-semibold">· Paid on {new Date(inst.paidAt).toLocaleDateString('en-PK', { day: '2-digit', month: 'short', year: '2-digit' })}</span>
+                                                                                        )}
+                                                                                    </div>
+                                                                                )}
+                                                                            </div>
+                                                                        </div>
+
+                                                                        {/* Paid amount */}
+                                                                        <div className="text-right">
+                                                                            {paidAmt > 0 ? (
+                                                                                <span className="text-sm font-black text-emerald-600">{pkr(paidAmt)}</span>
+                                                                            ) : (
+                                                                                <span className="text-[10px] text-gray-300">—</span>
+                                                                            )}
+                                                                        </div>
+
+                                                                        {/* Remaining */}
+                                                                        <div className="text-right">
+                                                                            {!isPaid && remAmt > 0 ? (
+                                                                                <span className="text-sm font-black text-red-500">{pkr(remAmt)}</span>
+                                                                            ) : isPaid ? (
+                                                                                <span className="text-[10px] text-green-500 font-bold">✓ Done</span>
+                                                                            ) : (
+                                                                                <span className="text-[10px] text-gray-300">—</span>
+                                                                            )}
+                                                                        </div>
+
+                                                                        {/* Action */}
+                                                                        <div className="flex justify-center">
                                                                             {isPaid ? (
-                                                                                <div className="bg-green-100 dark:bg-green-900/30 p-1 rounded-full">
-                                                                                    <svg className="w-3 h-3 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" /></svg>
+                                                                                <div className="w-7 h-7 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center">
+                                                                                    <svg className="w-3.5 h-3.5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" /></svg>
                                                                                 </div>
                                                                             ) : (
                                                                                 <button
                                                                                     onClick={() => onPay(order, inst)}
-                                                                                    className={`text-[8px] font-bold py-1 px-1.5 rounded-full shadow-sm ${isNext ? 'bg-orange-500 text-white' : 'bg-blue-600 text-white'}`}
+                                                                                    className={`text-[9px] font-black py-1.5 px-3 rounded-lg shadow-sm transition-opacity hover:opacity-80 ${isNext ? 'bg-orange-500 text-white' : isOverdue ? 'bg-red-500 text-white' : 'bg-blue-600 text-white'}`}
                                                                                 >
-                                                                                    PAY
+                                                                                    {isPartial ? 'PAY REST' : 'PAY'}
                                                                                 </button>
                                                                             )}
-                                                                        </div>
-                                                                        <div className="mt-2 text-[8px] text-gray-400">
-                                                                            <p>Due: {inst.dueDate ? new Date(inst.dueDate).toLocaleDateString('en-PK') : 'N/A'}</p>
                                                                         </div>
                                                                     </div>
                                                                 );

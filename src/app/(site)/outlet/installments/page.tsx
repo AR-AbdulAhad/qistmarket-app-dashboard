@@ -55,7 +55,6 @@ function GlobalInstallmentSearch({ onPay }: { onPay: (order: any, inst: any) => 
         return () => clearTimeout(timerRef.current);
     }, [query, search]);
 
-    // Close on outside click
     useEffect(() => {
         const handler = (e: MouseEvent) => {
             if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
@@ -106,69 +105,75 @@ function GlobalInstallmentSearch({ onPay }: { onPay: (order: any, inst: any) => 
 
             {/* Results Dropdown */}
             {showPanel && (
-                <div className="absolute z-50 left-0 right-0 top-full mt-3 bg-white dark:bg-gray-800 rounded-[24px] shadow-2xl border border-gray-100 dark:border-gray-700 overflow-hidden max-h-[70vh] overflow-y-auto">
+                <div className="absolute z-50 left-0 right-0 top-full mt-3 bg-white dark:bg-gray-800 rounded-[24px] shadow-2xl border border-gray-100 dark:border-gray-700 overflow-hidden max-h-[80vh] overflow-y-auto">
                     {results.length === 0 ? (
                         <div className="p-8 text-center text-gray-400">
                             <svg className="w-10 h-10 mx-auto mb-3 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
                             <p className="font-semibold text-sm">No orders found</p>
                         </div>
                     ) : (
-                        <div className="divide-y divide-gray-50 dark:divide-gray-700/50">
-                            <div className="px-5 py-3 bg-gray-50 dark:bg-gray-700/50 flex justify-between items-center">
+                        <div className="divide-y divide-gray-100 dark:divide-gray-700/50">
+                            <div className="px-5 py-3 bg-gray-50 dark:bg-gray-700/50 flex justify-between items-center sticky top-0 z-10">
                                 <p className="text-[11px] font-bold text-gray-500 uppercase tracking-widest">{results.length} result{results.length !== 1 ? 's' : ''} found</p>
                                 <button onClick={() => setShowPanel(false)} className="text-gray-400 hover:text-gray-600 text-xs font-bold">Close ✕</button>
                             </div>
                             {results.map(order => {
-                                const nextPending = order.installmentLedger?.find((r: any) => r.status !== 'paid' && r.status !== 'Paid');
-                                const { paidInstallments, totalInstallments, totalRemaining } = order.ledgerSummaries;
+                                const { paidInstallments, totalInstallments, totalRemaining, totalArrears, grandTotalDue, grandTotalPaid, grandTotalRemaining, advanceAmount, advancePaid } = order.ledgerSummaries;
                                 const progress = totalInstallments > 0 ? Math.round((paidInstallments / totalInstallments) * 100) : 0;
+                                const today = new Date(); today.setHours(0, 0, 0, 0);
+                                const hasTps = order.tpsPayments?.length > 0;
 
                                 return (
-                                    <div key={order.order_id} className="p-5">
-                                        {/* Order Header */}
-                                        <div className="flex items-center justify-between mb-4">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 font-black text-sm flex-shrink-0">
-                                                    {order.customer_name?.charAt(0)}
+                                    <div key={order.order_id} className="p-5 hover:bg-gray-50/50 dark:hover:bg-gray-700/20 transition-colors">
+
+                                        {/* ─── Order Header ─── */}
+                                        <div className="flex items-start justify-between mb-4 gap-3">
+                                            <div className="flex items-center gap-3 min-w-0">
+                                                <div className="w-11 h-11 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-black text-sm flex-shrink-0 shadow-sm">
+                                                    {order.customer_name?.charAt(0)?.toUpperCase()}
                                                 </div>
-                                                <div>
-                                                    <p className="font-bold text-gray-800 dark:text-gray-200">{order.customer_name}</p>
-                                                    <p className="text-[11px] text-gray-500">#{order.order_ref} · {order.whatsapp_number}</p>
-                                                    <p className="text-[11px] text-gray-400 truncate max-w-[240px]">{order.product_name} {order.imei_serial ? `· ${order.imei_serial}` : ''}</p>
+                                                <div className="min-w-0">
+                                                    <p className="font-black text-gray-800 dark:text-gray-100 text-base truncate">{order.customer_name}</p>
+                                                    <p className="text-[11px] text-gray-500 font-medium">#{order.order_ref} · {order.whatsapp_number}</p>
+                                                    <p className="text-[11px] text-gray-400 truncate">{order.product_name}{order.imei_serial ? ` · IMEI: ${order.imei_serial}` : ''}</p>
+                                                    {order.outlet_name && order.outlet_name !== 'N/A' && (
+                                                        <p className="text-[10px] text-indigo-500 font-bold">{order.outlet_name} ({order.outlet_code})</p>
+                                                    )}
                                                 </div>
                                             </div>
                                             <div className="text-right flex-shrink-0">
-                                                <p className={`text-sm font-black ${totalRemaining > 0 ? 'text-red-500' : 'text-green-500'}`}>{pkr(totalRemaining)}</p>
-                                                <p className="text-[10px] text-gray-400">{paidInstallments}/{totalInstallments} paid</p>
-                                                <div className="w-24 bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 mt-1 ml-auto">
-                                                    <div className={`h-1.5 rounded-full ${progress === 100 ? 'bg-green-500' : 'bg-blue-500'}`} style={{ width: `${progress}%` }} />
+                                                <p className={`text-base font-black ${totalRemaining > 0 ? 'text-red-500' : 'text-green-500'}`}>{pkr(totalRemaining)}</p>
+                                                <p className="text-[10px] text-gray-400 font-medium">{paidInstallments}/{totalInstallments} months paid</p>
+                                                <div className="w-28 bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 mt-1.5 ml-auto">
+                                                    <div className={`h-1.5 rounded-full transition-all ${progress === 100 ? 'bg-green-500' : progress > 50 ? 'bg-blue-500' : 'bg-orange-500'}`} style={{ width: `${progress}%` }} />
                                                 </div>
+                                                {(totalArrears || 0) > 0 && (
+                                                    <p className="text-[10px] text-red-500 font-bold mt-1">⚠ Arrears: {pkr(totalArrears)}</p>
+                                                )}
                                             </div>
                                         </div>
 
-                                        {/* Verification Details */}
-                                        <div className="flex flex-wrap gap-4 mb-4 p-3 bg-gray-50 dark:bg-gray-700/30 rounded-xl border border-gray-100 dark:border-gray-700">
-                                            {/* Purchaser */}
-                                            {order.purchaser && (
+                                        {/* ─── People + 1Bill Info ─── */}
+                                        <div className="flex flex-wrap gap-3 mb-4 p-3 bg-gray-50 dark:bg-gray-700/30 rounded-2xl border border-gray-100 dark:border-gray-700">
+                                            {order.purchaser?.name && (
                                                 <div className="flex items-center gap-2">
                                                     {order.purchaser.profile_photo ? (
-                                                        <img src={order.purchaser.profile_photo.startsWith('http') ? order.purchaser.profile_photo : `${API_BASE.replace(/\/$/, '')}/${order.purchaser.profile_photo.replace(/^\//, '')}`} alt="Purchaser" className="w-8 h-8 rounded-full object-cover border border-gray-200" />
+                                                        <img src={order.purchaser.profile_photo.startsWith('http') ? order.purchaser.profile_photo : `${API_BASE.replace(/\/$/, '')}/${order.purchaser.profile_photo.replace(/^\//, '')}`} alt="Purchaser" className="w-8 h-8 rounded-full object-cover border border-gray-200 flex-shrink-0" />
                                                     ) : (
-                                                        <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-xs font-bold text-blue-600">P</div>
+                                                        <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-xs font-black text-blue-600 flex-shrink-0">P</div>
                                                     )}
                                                     <div className="text-[10px]">
                                                         <p className="font-bold text-gray-700 dark:text-gray-300">{order.purchaser.name}</p>
-                                                        <p className="text-gray-500">Purchaser</p>
+                                                        <p className="text-gray-500">Purchaser · CNIC: {order.purchaser.cnic_number || '—'}</p>
                                                     </div>
                                                 </div>
                                             )}
-                                            {/* Grantors */}
                                             {order.grantors?.map((g: any, i: number) => (
                                                 <div key={i} className="flex items-center gap-2">
                                                     {g.profile_photo ? (
-                                                        <img src={g.profile_photo.startsWith('http') ? g.profile_photo : `${API_BASE.replace(/\/$/, '')}/${g.profile_photo.replace(/^\//, '')}`} alt={`Grantor ${i + 1}`} className="w-8 h-8 rounded-full object-cover border border-gray-200" />
+                                                        <img src={g.profile_photo.startsWith('http') ? g.profile_photo : `${API_BASE.replace(/\/$/, '')}/${g.profile_photo.replace(/^\//, '')}`} alt={`Grantor ${i + 1}`} className="w-8 h-8 rounded-full object-cover border border-gray-200 flex-shrink-0" />
                                                     ) : (
-                                                        <div className="w-8 h-8 rounded-full bg-orange-100 flex items-center justify-center text-xs font-bold text-orange-600">G{i + 1}</div>
+                                                        <div className="w-8 h-8 rounded-full bg-orange-100 flex items-center justify-center text-xs font-black text-orange-600 flex-shrink-0">G{i + 1}</div>
                                                     )}
                                                     <div className="text-[10px]">
                                                         <p className="font-bold text-gray-700 dark:text-gray-300">{g.name}</p>
@@ -176,63 +181,148 @@ function GlobalInstallmentSearch({ onPay }: { onPay: (order: any, inst: any) => 
                                                     </div>
                                                 </div>
                                             ))}
-                                            
-                                            <div className="h-8 w-[1px] bg-gray-200 dark:bg-gray-600 hidden sm:block"></div>
-
-                                            {/* Delivery & 1Bill */}
-                                            <div className="flex flex-col justify-center text-[10px]">
-                                                <p className="text-gray-600 dark:text-gray-400">
-                                                    <span className="font-bold">Date:</span> {new Date(order.created_at).toLocaleDateString('en-PK')}
-                                                </p>
+                                            <div className="ml-auto flex flex-col justify-center text-[10px] text-right">
+                                                <p className="text-gray-500"><span className="font-bold">Date:</span> {new Date(order.created_at).toLocaleDateString('en-PK')}</p>
                                                 {order.consumer_number && (
-                                                    <p className="text-gray-600 dark:text-gray-400 mt-0.5">
-                                                        <span className="font-bold text-blue-600">1Bill:</span> {order.consumer_number}
+                                                    <p className="text-blue-600 font-bold mt-0.5">1Bill: {order.consumer_number}
                                                     </p>
+                                                )}
+                                                {order.recovery_officer && (
+                                                    <p className="text-gray-500 mt-0.5"><span className="font-bold">RO:</span> {order.recovery_officer.name}</p>
                                                 )}
                                             </div>
                                         </div>
 
-                                        {/* Installment Chips */}
-                                        <div className="flex flex-wrap gap-2">
+                                        {/* ─── Financial Summary Bar ─── */}
+                                        <div className="grid grid-cols-3 gap-2 mb-4">
+                                            <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-2.5 text-center">
+                                                <p className="text-[9px] font-bold text-blue-500 uppercase tracking-widest">Total Due</p>
+                                                <p className="text-sm font-black text-blue-700 dark:text-blue-300">{pkr(grandTotalDue || 0)}</p>
+                                            </div>
+                                            <div className="bg-green-50 dark:bg-green-900/20 rounded-xl p-2.5 text-center">
+                                                <p className="text-[9px] font-bold text-green-500 uppercase tracking-widest">Total Paid</p>
+                                                <p className="text-sm font-black text-green-700 dark:text-green-300">{pkr(grandTotalPaid || 0)}</p>
+                                            </div>
+                                            <div className={`${(grandTotalRemaining || 0) > 0 ? 'bg-red-50 dark:bg-red-900/20' : 'bg-gray-50 dark:bg-gray-700/30'} rounded-xl p-2.5 text-center`}>
+                                                <p className="text-[9px] font-bold text-gray-500 uppercase tracking-widest">Remaining</p>
+                                                <p className={`text-sm font-black ${(grandTotalRemaining || 0) > 0 ? 'text-red-600' : 'text-gray-400'}`}>{pkr(grandTotalRemaining || 0)}</p>
+                                            </div>
+                                        </div>
+
+                                        {/* ─── Installment Ledger Table ─── */}
+                                        <div className="rounded-2xl border border-gray-100 dark:border-gray-700 overflow-hidden mb-4">
+                                            {/* Advance Row */}
+                                            {(advanceAmount || 0) > 0 && (
+                                                <div className="flex items-center justify-between px-3 py-2 bg-gray-50 dark:bg-gray-700/40 border-b border-gray-100 dark:border-gray-700">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest w-7 text-center">ADV</span>
+                                                        <span className="text-xs font-semibold text-gray-600 dark:text-gray-300">Advance Payment</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-xs font-bold text-gray-700 dark:text-gray-200">{pkr(advanceAmount)}</span>
+                                                        <span className={`text-[9px] px-2 py-0.5 rounded-full font-black ${advancePaid ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-orange-100 text-orange-700'}`}>
+                                                            {advancePaid ? '✓ PAID' : 'PENDING'}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            )}
+                                            {/* Monthly Installment Rows */}
                                             {order.installmentLedger?.map((inst: any, idx: number) => {
                                                 const isPaid = inst.status === 'paid' || inst.status === 'Paid';
-                                                const isPartial = !isPaid && (inst.paidAmount || 0) > 0;
+                                                const isPartial = inst.status === 'partial';
+                                                const instDueDate = inst.dueDate ? new Date(inst.dueDate) : null;
+                                                instDueDate?.setHours(0, 0, 0, 0);
+                                                const isOverdue = !isPaid && instDueDate && instDueDate < today;
+                                                const hasArrears = (inst.arrears || 0) > 0;
+
                                                 return (
-                                                    <div
-                                                        key={idx}
-                                                        className={`flex items-center gap-2 px-3 py-2 rounded-xl text-[11px] font-bold border transition-all ${isPaid
-                                                                ? 'bg-green-50 border-green-200 text-green-700 dark:bg-green-900/10 dark:border-green-800 dark:text-green-400'
-                                                                : isPartial
-                                                                    ? 'bg-blue-50 border-blue-200 text-blue-700 dark:bg-blue-900/10 dark:border-blue-800'
-                                                                    : 'bg-orange-50 border-orange-200 text-orange-700 dark:bg-orange-900/10 dark:border-orange-800'
-                                                            }`}
-                                                    >
-                                                        <span>{inst.label || `M${inst.monthNumber}`}</span>
-                                                        <span className="opacity-70">{pkr(inst.remainingAmount ?? inst.dueAmount)}</span>
-                                                        {isPaid ? (
-                                                            <svg className="w-3 h-3 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" /></svg>
-                                                        ) : (
-                                                            <button
-                                                                onClick={() => { onPay(order, inst); setShowPanel(false); }}
-                                                                className="bg-blue-600 text-white px-2 py-0.5 rounded-full text-[9px] font-black uppercase hover:bg-blue-700 transition-colors ml-1"
-                                                            >
-                                                                PAY
-                                                            </button>
-                                                        )}
+                                                    <div key={idx} className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-3 py-2.5 border-b border-gray-50 dark:border-gray-700/50 last:border-0 transition-colors ${isPaid ? 'bg-green-50/30' : isPartial ? 'bg-blue-50/40' : isOverdue ? 'bg-red-50/60 dark:bg-red-900/10' : ''}`}>
+                                                        <div className="flex items-start sm:items-center gap-3 min-w-0">
+                                                            <span className={`text-[10px] font-black w-8 h-8 flex items-center justify-center rounded-lg flex-shrink-0 ${isPaid ? 'text-green-600 bg-green-100 dark:bg-green-900/30' : isPartial ? 'text-blue-600 bg-blue-100 dark:bg-blue-900/30' : isOverdue ? 'text-red-600 bg-red-100 dark:bg-red-900/30' : 'text-gray-500 bg-gray-100 dark:bg-gray-700'}`}>
+                                                                M{inst.monthNumber}
+                                                            </span>
+                                                            <div className="min-w-0">
+                                                                <div className="flex items-center gap-1.5 flex-wrap">
+                                                                    <span className="text-sm font-extrabold text-gray-800 dark:text-gray-100">{pkr(inst.dueAmount)}</span>
+                                                                    {hasArrears && (
+                                                                        <span className="text-[9px] text-red-500 font-bold bg-red-50 dark:bg-red-900/20 px-1.5 py-0.5 rounded-full">+{pkr(inst.arrears)} arr.</span>
+                                                                    )}
+                                                                </div>
+                                                                <div className="flex flex-col gap-1 mt-1">
+                                                                    <span className="text-[9px] text-gray-400">Due: {instDueDate ? instDueDate.toLocaleDateString('en-PK', { day: '2-digit', month: 'short', year: '2-digit' }) : '—'}</span>
+                                                                    {inst.payment_history && inst.payment_history.length > 0 ? (
+                                                                        <div className="flex flex-col gap-1 mt-0.5 border-l-2 border-emerald-100 pl-2">
+                                                                            {inst.payment_history.map((ph: any, phi: number) => (
+                                                                                <div key={phi} className="flex items-center gap-1.5 flex-wrap">
+                                                                                    <span className="text-[9px] text-emerald-600 font-bold bg-emerald-50 px-1.5 py-0.5 rounded shadow-sm">PAID: {pkr(ph.amount)}</span>
+                                                                                    <span className="text-[9px] text-gray-400">on {new Date(ph.date).toLocaleDateString('en-PK', { day: '2-digit', month: 'short', year: '2-digit' })}</span>
+                                                                                    <span className="text-[8px] font-semibold text-indigo-500 truncate max-w-[120px]" title={ph.method}>via {ph.method}</span>
+                                                                                </div>
+                                                                            ))}
+                                                                            {isPartial && (
+                                                                                <div className="mt-1">
+                                                                                    <span className="text-[9px] font-bold text-red-500 bg-red-50 px-1.5 py-0.5 rounded shadow-sm">REM: {pkr(inst.remainingAmount ?? (inst.dueAmount - (inst.paidAmount || 0)))}</span>
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+                                                                    ) : (
+                                                                        <div className="flex flex-col gap-1">
+                                                                            <div className="flex items-center gap-2 flex-wrap">
+                                                                                {inst.paymentMethod && (
+                                                                                    <span className="text-[9px] text-indigo-500 font-semibold truncate max-w-[120px]">{inst.paymentMethod}</span>
+                                                                                )}
+                                                                                {inst.paidAt && (
+                                                                                    <span className="text-[9px] text-emerald-600 font-semibold">· Paid {new Date(inst.paidAt).toLocaleDateString('en-PK', { day: '2-digit', month: 'short' })}</span>
+                                                                                )}
+                                                                            </div>
+                                                                            {isPartial && (
+                                                                                <div className="flex items-center gap-2 mt-0.5">
+                                                                                    <span className="text-[9px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">PAID: {pkr(inst.paidAmount)}</span>
+                                                                                    <span className="text-[9px] font-bold text-red-500 bg-red-50 px-1.5 py-0.5 rounded">REM: {pkr(inst.remainingAmount ?? (inst.dueAmount - (inst.paidAmount || 0)))}</span>
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex items-center gap-2 flex-shrink-0 self-end sm:self-auto">
+                                                            <span className={`text-[9px] px-2 py-1 rounded-md font-black ${
+                                                                isPaid ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                                                                : isPartial ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30'
+                                                                : isOverdue ? 'bg-red-100 text-red-700 dark:bg-red-900/30'
+                                                                : 'bg-orange-100 text-orange-700 dark:bg-orange-900/30'
+                                                            }`}>
+                                                                {isPaid ? '✓ PAID' : isPartial ? 'PARTIAL' : isOverdue ? 'OVERDUE' : 'PENDING'}
+                                                            </span>
+                                                            {!isPaid && (
+                                                                <button
+                                                                    onClick={() => { onPay(order, inst); setShowPanel(false); }}
+                                                                    className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-[9px] font-black uppercase shadow-sm transition-colors"
+                                                                >
+                                                                    {isPartial ? 'PAY REST' : 'PAY'}
+                                                                </button>
+                                                            )}
+                                                        </div>
                                                     </div>
                                                 );
                                             })}
                                         </div>
-                                        {nextPending && (
-                                            <div className="mt-3 flex items-center gap-2">
+                                        
+
+                                        {/* ─── Quick Pay Next Due Button ─── */}
+                                        {(() => {
+                                            const nextPending = order.installmentLedger?.find((r: any) => r.status !== 'paid' && r.status !== 'Paid');
+                                            return nextPending ? (
                                                 <button
                                                     onClick={() => { onPay(order, nextPending); setShowPanel(false); }}
                                                     className="w-full py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl font-bold text-xs shadow-sm hover:opacity-90 transition-opacity"
                                                 >
                                                     Collect Next Due · {pkr(nextPending.remainingAmount ?? nextPending.dueAmount)}
+                                                    {(nextPending.arrears || 0) > 0 && ` (incl. ${pkr(nextPending.arrears)} arrears)`}
                                                 </button>
-                                            </div>
-                                        )}
+                                            ) : null;
+                                        })()}
                                     </div>
                                 );
                             })}
