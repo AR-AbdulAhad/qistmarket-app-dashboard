@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import SmartPayQrModal from "./SmartPayQrModal";
 
 const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
 const pkr = (n: number) => `PKR ${Number(n || 0).toLocaleString()}`;
@@ -41,6 +42,7 @@ type OrderInstallment = {
     };
     installmentLedger: InstallmentRow[];
     consumer_number: string | null;
+    smartpay_consumer_number: string | null;
     consumer_bill_status: string | null;
     recovery_officer: { id: number; name: string; phone: string } | null;
     tpsPayments?: any[];
@@ -55,6 +57,12 @@ type Props = {
 
 export default function InstallmentsTable({ data, onPay, selectedIds = [], onSelectRow }: Props) {
     const [expandedRows, setExpandedRows] = useState<number[]>([]);
+
+    const [qrModalOpen, setQrModalOpen] = useState(false);
+    const [qrOrderId, setQrOrderId] = useState<number | null>(null);
+    const [qrMonthNumber, setQrMonthNumber] = useState<number | null>(null);
+    const [qrDefaultAmount, setQrDefaultAmount] = useState<number | null>(null);
+    const [qrCustomerName, setQrCustomerName] = useState("");
 
     const toggleRow = (id: number) => {
         setExpandedRows(prev =>
@@ -263,7 +271,7 @@ export default function InstallmentsTable({ data, onPay, selectedIds = [], onSel
                                                             </div>
                                                         </div>
 
-                                                        {/* Consumer Number */}
+                                                        {/* Consumer Numbers */}
                                                         {order.consumer_number && (
                                                             <div>
                                                                 <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-2">
@@ -273,6 +281,20 @@ export default function InstallmentsTable({ data, onPay, selectedIds = [], onSel
                                                                 <div className="bg-white dark:bg-gray-800 rounded-2xl p-4 border border-gray-100 dark:border-gray-700 shadow-sm">
                                                                     <p className="font-mono font-bold text-lg text-gray-800 dark:text-gray-100 tracking-widest">
                                                                         {order.consumer_number}
+                                                                    </p>
+                                                                </div>
+                                                            </div>
+                                                        )}
+
+                                                        {order.smartpay_consumer_number && (
+                                                            <div>
+                                                                <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+                                                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                                                    SmartPay Consumer No.
+                                                                </h4>
+                                                                <div className="bg-white dark:bg-gray-800 rounded-2xl p-4 border border-gray-100 dark:border-gray-700 shadow-sm">
+                                                                    <p className="font-mono font-bold text-lg text-gray-800 dark:text-gray-100 tracking-widest">
+                                                                        {order.smartpay_consumer_number}
                                                                     </p>
                                                                 </div>
                                                             </div>
@@ -375,13 +397,12 @@ export default function InstallmentsTable({ data, onPay, selectedIds = [], onSel
                                                                     >
                                                                         {/* Month label + status */}
                                                                         <div className="flex flex-col items-center gap-1">
-                                                                            <span className={`text-[10px] font-black w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                                                                                isPaid ? 'bg-green-100 text-green-700 dark:bg-green-900/40'
-                                                                                : isPartial ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40'
-                                                                                : isOverdue ? 'bg-red-100 text-red-700 dark:bg-red-900/40'
-                                                                                : isNext ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/40'
-                                                                                : 'bg-gray-100 text-gray-500 dark:bg-gray-700'
-                                                                            }`}>M{inst.monthNumber}</span>
+                                                                            <span className={`text-[10px] font-black w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${isPaid ? 'bg-green-100 text-green-700 dark:bg-green-900/40'
+                                                                                    : isPartial ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40'
+                                                                                        : isOverdue ? 'bg-red-100 text-red-700 dark:bg-red-900/40'
+                                                                                            : isNext ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/40'
+                                                                                                : 'bg-gray-100 text-gray-500 dark:bg-gray-700'
+                                                                                }`}>M{inst.monthNumber}</span>
                                                                             {statusBadge}
                                                                         </div>
 
@@ -440,18 +461,35 @@ export default function InstallmentsTable({ data, onPay, selectedIds = [], onSel
                                                                         </div>
 
                                                                         {/* Action */}
-                                                                        <div className="flex justify-center">
+                                                                        <div className="flex justify-center gap-2 items-center">
                                                                             {isPaid ? (
                                                                                 <div className="w-7 h-7 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center">
                                                                                     <svg className="w-3.5 h-3.5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" /></svg>
                                                                                 </div>
                                                                             ) : (
-                                                                                <button
-                                                                                    onClick={() => onPay(order, inst)}
-                                                                                    className={`text-[9px] font-black py-1.5 px-3 rounded-lg shadow-sm transition-opacity hover:opacity-80 ${isNext ? 'bg-orange-500 text-white' : isOverdue ? 'bg-red-500 text-white' : 'bg-blue-600 text-white'}`}
-                                                                                >
-                                                                                    {isPartial ? 'PAY REST' : 'PAY'}
-                                                                                </button>
+                                                                                <>
+                                                                                    <button
+                                                                                        onClick={() => onPay(order, inst)}
+                                                                                        className={`text-[9px] font-black py-1.5 px-3 rounded-lg shadow-sm transition-opacity hover:opacity-80 ${isNext ? 'bg-orange-500 text-white' : isOverdue ? 'bg-red-500 text-white' : 'bg-blue-600 text-white'}`}
+                                                                                    >
+                                                                                        {isPartial ? 'PAY REST' : 'PAY'}
+                                                                                    </button>
+                                                                                    <button
+                                                                                        onClick={() => {
+                                                                                            setQrOrderId(order.order_id);
+                                                                                            setQrMonthNumber(inst.monthNumber);
+                                                                                            setQrDefaultAmount(remAmt);
+                                                                                            setQrCustomerName(order.customer_name);
+                                                                                            setQrModalOpen(true);
+                                                                                        }}
+                                                                                        className="text-gray-500 hover:text-[#2b6cb0] hover:bg-blue-50 dark:hover:bg-gray-700 p-1.5 rounded-lg transition-colors border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800"
+                                                                                        title="Generate SmartPay QR"
+                                                                                    >
+                                                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm14 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+                                                                                        </svg>
+                                                                                    </button>
+                                                                                </>
                                                                             )}
                                                                         </div>
                                                                     </div>
@@ -617,6 +655,15 @@ export default function InstallmentsTable({ data, onPay, selectedIds = [], onSel
                     </div>
                 )}
             </div>
+
+            <SmartPayQrModal 
+                open={qrModalOpen} 
+                onClose={() => setQrModalOpen(false)} 
+                orderId={qrOrderId} 
+                monthNumber={qrMonthNumber} 
+                defaultAmount={qrDefaultAmount}
+                customerName={qrCustomerName}
+            />
         </div>
     );
 }

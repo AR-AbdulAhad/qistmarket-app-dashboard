@@ -74,8 +74,8 @@ export default function OutletInventoryPage() {
     const [selectedGroup, setSelectedGroup] = useState<GroupedItem | null>(null);
     const [unitRows, setUnitRows] = useState<{ imei_serial: string, color_variant: string, purchase_price: number, quantity: number }[]>([]);
 
-    useEffect(() => { 
-        fetchInventory(); 
+    useEffect(() => {
+        fetchInventory();
     }, [page, search]);
 
 
@@ -332,11 +332,10 @@ export default function OutletInventoryPage() {
 
             {/* Floating Alert */}
             {alert && (
-                <div className={`fixed top-4 right-4 z-[99] px-6 py-4 rounded-xl shadow-lg border flex items-center gap-3 animate-fadeIn ${
-                    alert.type === "success"
-                    ? "bg-white border-green-200 text-green-700 dark:bg-boxdark dark:border-green-900/50"
-                    : "bg-white border-red-200 text-red-700 dark:bg-boxdark dark:border-red-900/50"
-                }`}>
+                <div className={`fixed top-4 right-4 z-[99] px-6 py-4 rounded-xl shadow-lg border flex items-center gap-3 animate-fadeIn ${alert.type === "success"
+                        ? "bg-white border-green-200 text-green-700 dark:bg-boxdark dark:border-green-900/50"
+                        : "bg-white border-red-200 text-red-700 dark:bg-boxdark dark:border-red-900/50"
+                    }`}>
                     {alert.type === "success" ? <CheckSquare size={20} /> : <AlertCircle size={20} />}
                     <span className="font-semibold text-sm">{alert.message}</span>
                 </div>
@@ -429,9 +428,8 @@ export default function OutletInventoryPage() {
                                             {/* ── GROUP (MASTER) ROW ── */}
                                             <tr
                                                 key={`grp-${grp.key}`}
-                                                className={`border-b border-stroke dark:border-strokedark cursor-pointer transition-colors ${
-                                                    isExpanded ? "bg-primary/5 dark:bg-primary/10" : "hover:bg-gray-50 dark:hover:bg-meta-4/20"
-                                                }`}
+                                                className={`border-b border-stroke dark:border-strokedark cursor-pointer transition-colors ${isExpanded ? "bg-primary/5 dark:bg-primary/10" : "hover:bg-gray-50 dark:hover:bg-meta-4/20"
+                                                    }`}
                                             >
                                                 {/* Expand toggle */}
                                                 <td className="px-4 py-4 text-center" onClick={() => toggleExpand(grp.key)}>
@@ -457,11 +455,10 @@ export default function OutletInventoryPage() {
                                                     {grp.totalQty}
                                                 </td>
                                                 <td className="px-4 py-4 text-center" onClick={() => toggleExpand(grp.key)}>
-                                                    <span className={`px-2 py-1 rounded-full text-xs font-bold ${
-                                                        grp.inStockQty > 0
+                                                    <span className={`px-2 py-1 rounded-full text-xs font-bold ${grp.inStockQty > 0
                                                             ? "bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400"
                                                             : "bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-400"
-                                                    }`}>
+                                                        }`}>
                                                         {grp.inStockQty}
                                                     </span>
                                                 </td>
@@ -484,7 +481,7 @@ export default function OutletInventoryPage() {
                                             {isExpanded && grp.children.map((item, idx) => {
                                                 const isEditing = editingId === item.id;
                                                 const isChildSelected = selectedIds.includes(item.id);
-                                                
+
                                                 // Quick edit state for skeletons
                                                 const hasImei = !!item.imei_serial;
                                                 const hasColor = !!item.color_variant;
@@ -492,9 +489,8 @@ export default function OutletInventoryPage() {
                                                 return (
                                                     <tr
                                                         key={`child-${item.id}`}
-                                                        className={`border-b border-dashed border-stroke/50 dark:border-strokedark/50 text-sm ${
-                                                            isChildSelected ? "bg-primary/5 dark:bg-primary/10" : "bg-gray-50/50 dark:bg-meta-4/10"
-                                                        } ${isEditing ? "bg-yellow-50 dark:bg-yellow-900/10" : ""}`}
+                                                        className={`border-b border-dashed border-stroke/50 dark:border-strokedark/50 text-sm ${isChildSelected ? "bg-primary/5 dark:bg-primary/10" : "bg-gray-50/50 dark:bg-meta-4/10"
+                                                            } ${isEditing ? "bg-yellow-50 dark:bg-yellow-900/10" : ""}`}
                                                     >
                                                         <td className="px-4 py-3 text-center">
                                                             <div className="flex justify-center">
@@ -598,9 +594,9 @@ export default function OutletInventoryPage() {
                 <div className="text-xs text-gray-400 dark:text-gray-500 font-bold uppercase tracking-widest">
                     Showing {(page - 1) * limit + 1} to {Math.min(page * limit, totalItemsCount)} of {totalItemsCount} Records
                 </div>
-                
+
                 <div className="flex items-center gap-2">
-                    <button 
+                    <button
                         disabled={page === 1}
                         onClick={() => setPage(p => p - 1)}
                         className="px-4 py-2 rounded-lg border border-stroke dark:border-strokedark text-sm font-bold disabled:opacity-50 hover:bg-gray-50 dark:hover:bg-meta-4 transition-all"
@@ -611,16 +607,15 @@ export default function OutletInventoryPage() {
                         <button
                             key={i}
                             onClick={() => setPage(i + 1)}
-                            className={`w-10 h-10 rounded-lg text-sm font-bold transition-all ${
-                                page === i + 1 
-                                ? "bg-primary text-white shadow-lg shadow-primary/20" 
-                                : "border border-stroke dark:border-strokedark hover:bg-gray-50 dark:hover:bg-meta-4"
-                            }`}
+                            className={`w-10 h-10 rounded-lg text-sm font-bold transition-all ${page === i + 1
+                                    ? "bg-primary text-white shadow-lg shadow-primary/20"
+                                    : "border border-stroke dark:border-strokedark hover:bg-gray-50 dark:hover:bg-meta-4"
+                                }`}
                         >
                             {i + 1}
                         </button>
                     )).slice(Math.max(0, page - 3), Math.min(totalPages, page + 2))}
-                    <button 
+                    <button
                         disabled={page >= totalPages || totalPages === 0}
                         onClick={() => setPage(p => p + 1)}
                         className="px-4 py-2 rounded-lg border border-stroke dark:border-strokedark text-sm font-bold disabled:opacity-50 hover:bg-gray-50 dark:hover:bg-meta-4 transition-all"
@@ -662,8 +657,8 @@ export default function OutletInventoryPage() {
                                     {unitRows.map((row, idx) => (
                                         <tr key={idx} className="border-b border-stroke/50 dark:border-strokedark/50 group">
                                             <td className="py-3 px-2">
-                                                <input 
-                                                    type="text" 
+                                                <input
+                                                    type="text"
                                                     placeholder="Scan or Type..."
                                                     value={row.imei_serial}
                                                     onChange={e => updateUnitRow(idx, "imei_serial", e.target.value)}
@@ -671,8 +666,8 @@ export default function OutletInventoryPage() {
                                                 />
                                             </td>
                                             <td className="py-3 px-2">
-                                                <input 
-                                                    type="text" 
+                                                <input
+                                                    type="text"
                                                     placeholder="Color..."
                                                     value={row.color_variant}
                                                     onChange={e => updateUnitRow(idx, "color_variant", e.target.value)}
@@ -680,8 +675,8 @@ export default function OutletInventoryPage() {
                                                 />
                                             </td>
                                             <td className="py-3 px-2">
-                                                <input 
-                                                    type="number" 
+                                                <input
+                                                    type="number"
                                                     min="1"
                                                     value={row.quantity}
                                                     disabled={!!row.imei_serial.trim()}
@@ -690,8 +685,8 @@ export default function OutletInventoryPage() {
                                                 />
                                             </td>
                                             <td className="py-3 px-2">
-                                                <input 
-                                                    type="number" 
+                                                <input
+                                                    type="number"
                                                     value={row.purchase_price}
                                                     onChange={e => updateUnitRow(idx, "purchase_price", parseFloat(e.target.value) || 0)}
                                                     className="w-full bg-gray-50 dark:bg-meta-4 border border-stroke dark:border-strokedark rounded-lg px-3 py-2 text-xs focus:border-primary outline-none font-bold"
@@ -699,7 +694,7 @@ export default function OutletInventoryPage() {
                                             </td>
                                             <td className="py-3 px-2 text-center">
                                                 {unitRows.length > 1 && (
-                                                    <button 
+                                                    <button
                                                         onClick={() => removeUnitRow(idx)}
                                                         className="text-gray-400 hover:text-red-500 transition-colors p-1"
                                                     >

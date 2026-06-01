@@ -4,10 +4,10 @@ import { useEffect, useState, useMemo, Fragment } from "react";
 import { useRouter } from "next/navigation";
 import Cookies from "js-cookie";
 import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
-import { 
-    Plus, Search, Download, FileText, 
-    ChevronDown, ChevronRight, Wallet, 
-    CreditCard, AlertCircle, CheckCircle2, 
+import {
+    Plus, Search, Download, FileText,
+    ChevronDown, ChevronRight, Wallet,
+    CreditCard, AlertCircle, CheckCircle2,
     Calendar, Trash2, PieChart, TrendingUp,
     Receipt
 } from "lucide-react";
@@ -62,10 +62,10 @@ export default function ExpensesPage() {
                 fetch(`${API_BASE}/api/outlet/expenses`, { headers: getAuthHeaders() }),
                 fetch(`${API_BASE}/api/outlet/expenses/summary`, { headers: getAuthHeaders() })
             ]);
-            
+
             const vData = await vRes.json();
             const sData = await sRes.json();
-            
+
             if (vData.success) setVouchers(vData.vouchers);
             if (sData.success) setSummary(sData.summary);
         } catch (e) {
@@ -107,7 +107,7 @@ export default function ExpensesPage() {
     };
 
     const filteredVouchers = useMemo(() => {
-        return vouchers.filter(v => 
+        return vouchers.filter(v =>
             v.voucher_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
             v.payment_method.toLowerCase().includes(searchTerm.toLowerCase()) ||
             v.items.some(item => item.category.toLowerCase().includes(searchTerm.toLowerCase()))
@@ -129,7 +129,7 @@ export default function ExpensesPage() {
                     <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 font-medium italic">Track and categorize all outlet operational costs</p>
                 </div>
                 <div className="flex gap-3">
-                    <button 
+                    <button
                         onClick={() => router.push("/outlet/expenses/add")}
                         className="bg-primary hover:bg-opacity-90 text-white px-6 py-3 rounded-2xl text-sm font-black flex items-center gap-2 shadow-lg shadow-primary/20 transition-all active:scale-95"
                     >
@@ -189,8 +189,8 @@ export default function ExpensesPage() {
                 <div className="p-5 border-b border-stroke dark:border-strokedark flex flex-col sm:flex-row sm:items-center gap-4">
                     <div className="relative flex-1 max-w-md">
                         <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                        <input 
-                            type="text" 
+                        <input
+                            type="text"
                             placeholder="Search vouchers, categories, or method..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
@@ -225,7 +225,7 @@ export default function ExpensesPage() {
                                 const isExpanded = expandedIds.has(v.id);
                                 return (
                                     <Fragment key={v.id}>
-                                        <tr 
+                                        <tr
                                             onClick={() => toggleExpand(v.id)}
                                             className={`group border-b border-stroke dark:border-strokedark hover:bg-gray-50 dark:hover:bg-meta-4/20 transition-all cursor-pointer ${isExpanded ? 'bg-primary/5 dark:bg-primary/10' : ''}`}
                                         >
@@ -256,7 +256,7 @@ export default function ExpensesPage() {
                                             </td>
                                             <td className="p-5 text-right" onClick={(e) => e.stopPropagation()}>
                                                 <div className="flex items-center justify-end gap-2">
-                                                    <button 
+                                                    <button
                                                         onClick={() => handleDelete(v.id)}
                                                         disabled={deletingId === v.id}
                                                         className="p-2.5 hover:bg-red-50 text-red-500 rounded-xl transition-all active:scale-95 disabled:opacity-50 border border-transparent hover:border-red-100"

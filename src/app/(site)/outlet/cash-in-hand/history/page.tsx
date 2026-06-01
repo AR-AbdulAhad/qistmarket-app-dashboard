@@ -257,8 +257,8 @@ export default function CashHistoryPage() {
                                     </td>
                                     <td className="px-6 py-4 text-center">
                                         <div className="flex items-center justify-center gap-1.5 bg-green-50 dark:bg-green-900/10 py-1 px-2 rounded-lg border border-green-100 dark:border-green-900/20">
-                                           <div className="w-1.5 h-1.5 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]" />
-                                           <span className="text-[9px] font-black text-green-600 uppercase tracking-widest">{entry.status}</span>
+                                            <div className="w-1.5 h-1.5 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]" />
+                                            <span className="text-[9px] font-black text-green-600 uppercase tracking-widest">{entry.status}</span>
                                         </div>
                                     </td>
                                 </tr>
@@ -269,7 +269,7 @@ export default function CashHistoryPage() {
             </div>
 
             <div className="flex justify-center items-center gap-4 mt-6">
-                <button 
+                <button
                     disabled={page <= 1}
                     onClick={() => setPage(p => Math.max(1, p - 1))}
                     className="px-4 py-2 bg-white dark:bg-boxdark border border-stroke dark:border-strokedark rounded-lg text-sm font-bold text-gray-700 dark:text-gray-300 disabled:opacity-50 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
@@ -277,7 +277,7 @@ export default function CashHistoryPage() {
                     Previous
                 </button>
                 <span className="text-sm font-bold text-gray-500 dark:text-gray-400">Page {page} of {totalPages}</span>
-                <button 
+                <button
                     disabled={page >= totalPages}
                     onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                     className="px-4 py-2 bg-white dark:bg-boxdark border border-stroke dark:border-strokedark rounded-lg text-sm font-bold text-gray-700 dark:text-gray-300 disabled:opacity-50 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"

@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import Cookies from "js-cookie";
 import InstallmentsTable from "@/components/Installments/InstallmentsTable";
 import InstallmentPaymentModal from "@/components/Installments/InstallmentPaymentModal";
+import SmartPayQrModal from "@/components/Installments/SmartPayQrModal";
 
 const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
 
@@ -16,7 +17,7 @@ const getAuthHeaders = () => {
 const pkr = (n: number) => `PKR ${Number(n || 0).toLocaleString()}`;
 
 // ── Global Search Panel ──────────────────────────────────────────────────────
-function GlobalInstallmentSearch({ onPay }: { onPay: (order: any, inst: any) => void }) {
+function GlobalInstallmentSearch({ onPay, onGenerateQR }: { onPay: (order: any, inst: any) => void, onGenerateQR: (order: any, inst: any) => void }) {
     const [query, setQuery] = useState("");
     const [results, setResults] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
@@ -187,6 +188,10 @@ function GlobalInstallmentSearch({ onPay }: { onPay: (order: any, inst: any) => 
                                                     <p className="text-blue-600 font-bold mt-0.5">1Bill: {order.consumer_number}
                                                     </p>
                                                 )}
+                                                {order.smartpay_consumer_number && (
+                                                    <p className="text-emerald-600 font-bold mt-0.5">SmartPay: {order.smartpay_consumer_number}
+                                                    </p>
+                                                )}
                                                 {order.recovery_officer && (
                                                     <p className="text-gray-500 mt-0.5"><span className="font-bold">RO:</span> {order.recovery_officer.name}</p>
                                                 )}
@@ -296,12 +301,23 @@ function GlobalInstallmentSearch({ onPay }: { onPay: (order: any, inst: any) => 
                                                                 {isPaid ? '✓ PAID' : isPartial ? 'PARTIAL' : isOverdue ? 'OVERDUE' : 'PENDING'}
                                                             </span>
                                                             {!isPaid && (
-                                                                <button
-                                                                    onClick={() => { onPay(order, inst); setShowPanel(false); }}
-                                                                    className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-[9px] font-black uppercase shadow-sm transition-colors"
-                                                                >
-                                                                    {isPartial ? 'PAY REST' : 'PAY'}
-                                                                </button>
+                                                                <>
+                                                                    <button
+                                                                        onClick={() => { onPay(order, inst); setShowPanel(false); }}
+                                                                        className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-[9px] font-black uppercase shadow-sm transition-colors"
+                                                                    >
+                                                                        {isPartial ? 'PAY REST' : 'PAY'}
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => { onGenerateQR(order, inst); setShowPanel(false); }}
+                                                                        className="text-gray-500 hover:text-[#2b6cb0] hover:bg-blue-50 dark:hover:bg-gray-700 p-1.5 rounded-lg transition-colors border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800"
+                                                                        title="Generate SmartPay QR"
+                                                                    >
+                                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm14 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+                                                                        </svg>
+                                                                    </button>
+                                                                </>
                                                             )}
                                                         </div>
                                                     </div>
@@ -355,6 +371,13 @@ function InstallmentsContent() {
     const [selectedOrder, setSelectedOrder] = useState<any>(null);
     const [selectedInstallment, setSelectedInstallment] = useState<any>(null);
 
+    // QR Modal state
+    const [qrModalOpen, setQrModalOpen] = useState(false);
+    const [qrOrderId, setQrOrderId] = useState<number | null>(null);
+    const [qrMonthNumber, setQrMonthNumber] = useState<number | null>(null);
+    const [qrDefaultAmount, setQrDefaultAmount] = useState<number | null>(null);
+    const [qrCustomerName, setQrCustomerName] = useState("");
+
     // Sync search from URL if it changes
     useEffect(() => {
         if (initialSearch) setSearch(initialSearch);
@@ -398,6 +421,14 @@ function InstallmentsContent() {
         setSelectedOrder(order);
         setSelectedInstallment(installment);
         setModalOpen(true);
+    };
+
+    const handleGenerateQR = (order: any, installment: any) => {
+        setQrOrderId(order.order_id);
+        setQrMonthNumber(installment.monthNumber);
+        setQrDefaultAmount(installment.remainingAmount ?? (installment.dueAmount - (installment.paidAmount || 0)));
+        setQrCustomerName(order.customer_name);
+        setQrModalOpen(true);
     };
 
     const toggleRowSelection = (id: number) => {
@@ -489,7 +520,7 @@ function InstallmentsContent() {
 
     return (
         <div className="p-6 max-w-[1600px] mx-auto min-h-screen">
-            <GlobalInstallmentSearch onPay={handlePayClick} />
+            <GlobalInstallmentSearch onPay={handlePayClick} onGenerateQR={handleGenerateQR} />
 
             {/* Header & Stats */}
             <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 mb-8">
@@ -639,6 +670,15 @@ function InstallmentsContent() {
                 orderRef={selectedOrder?.order_ref}
                 customerName={selectedOrder?.customer_name}
                 installment={selectedInstallment}
+            />
+
+            <SmartPayQrModal 
+                open={qrModalOpen} 
+                onClose={() => setQrModalOpen(false)} 
+                orderId={qrOrderId} 
+                monthNumber={qrMonthNumber} 
+                defaultAmount={qrDefaultAmount}
+                customerName={qrCustomerName}
             />
         </div>
     );

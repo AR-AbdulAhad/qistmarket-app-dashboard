@@ -169,9 +169,9 @@ export default function WebsiteOrdersTable() {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           reason: cancelReason,
-          orderData: cancelModal 
+          orderData: cancelModal
         })
       })
 

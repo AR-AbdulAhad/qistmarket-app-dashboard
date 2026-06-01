@@ -22,6 +22,7 @@ import {
   Maximize2,
   Minimize2
 } from "lucide-react";
+import SmartPayQrModal from "@/components/Installments/SmartPayQrModal";
 
 const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
 
@@ -96,6 +97,13 @@ function InstallmentsViewContent() {
   const [activeOrderForNote, setActiveOrderForNote] = useState<{ id: number; ref: string; customer: string; currentNote: string; monthNumber: number } | null>(null);
   const [noteText, setNoteText] = useState("");
   const [savingNote, setSavingNote] = useState(false);
+
+  // QR Modal state
+  const [qrModalOpen, setQrModalOpen] = useState(false);
+  const [qrOrderId, setQrOrderId] = useState<number | null>(null);
+  const [qrMonthNumber, setQrMonthNumber] = useState<number | null>(null);
+  const [qrDefaultAmount, setQrDefaultAmount] = useState<number | null>(null);
+  const [qrCustomerName, setQrCustomerName] = useState("");
 
   // Sync search URL
   useEffect(() => {
@@ -614,6 +622,7 @@ function InstallmentsViewContent() {
                 <th className="px-4 py-4 text-[10px] font-black text-gray-400 uppercase min-w-[170px]">Item</th>
                 <th className="px-4 py-4 text-[10px] font-black text-gray-400 uppercase min-w-[150px]">IMEI / Device ID</th>
                 <th className="px-4 py-4 text-[10px] font-black text-gray-400 uppercase min-w-[180px]">1Bill Consumer No.</th>
+                <th className="px-4 py-4 text-[10px] font-black text-gray-400 uppercase min-w-[180px]">SmartPay Consumer No.</th>
                 <th className="px-4 py-4 text-[10px] font-black text-gray-400 uppercase min-w-[170px]">Recovery Officer</th>
                 <th className="px-4 py-4 text-[10px] font-black text-gray-400 uppercase min-w-[110px] text-right">Monthly Due</th>
                 <th className="px-4 py-4 text-[10px] font-black text-gray-400 uppercase min-w-[125px] text-right">Total Remaining</th>
@@ -742,7 +751,7 @@ function InstallmentsViewContent() {
             <tbody className="divide-y divide-gray-100 dark:divide-strokedark text-[13px]">
               {loading ? (
                 <tr>
-                  <td colSpan={22} className="py-20 text-center">
+                  <td colSpan={25} className="py-20 text-center">
                     <div className="flex flex-col items-center justify-center gap-3">
                       <Loader2 className="h-8 w-8 text-[#E31E24] animate-spin" />
                       <span className="text-xs font-black tracking-wider uppercase text-gray-400">Querying installments database...</span>
@@ -751,7 +760,7 @@ function InstallmentsViewContent() {
                 </tr>
               ) : filteredInstallments.length === 0 ? (
                 <tr>
-                  <td colSpan={22} className="py-16 text-center text-gray-400">
+                  <td colSpan={25} className="py-16 text-center text-gray-400">
                     <div className="flex flex-col items-center justify-center gap-2">
                       <AlertCircle className="h-8 w-8 text-gray-300" />
                       <span className="text-xs font-black uppercase tracking-wider">No installments found for the selected month and filters</span>
@@ -792,6 +801,15 @@ function InstallmentsViewContent() {
                         {inst.consumer_number ? (
                           <div className="flex flex-col gap-1">
                             <span className="font-mono font-bold text-sm tracking-widest text-[#E31E24]">{inst.consumer_number}</span>
+                          </div>
+                        ) : (
+                          <span className="text-gray-400 italic text-xs">Not Generated</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3.5">
+                        {inst.smartpay_consumer_number ? (
+                          <div className="flex flex-col gap-1">
+                            <span className="font-mono font-bold text-sm tracking-widest text-emerald-600">{inst.smartpay_consumer_number}</span>
                           </div>
                         ) : (
                           <span className="text-gray-400 italic text-xs">Not Generated</span>
@@ -864,13 +882,32 @@ function InstallmentsViewContent() {
                         </span>
                       </td>
                       <td className="px-4 py-3.5 text-center">
-                        <button
-                          onClick={() => openNoteDialog(inst)}
-                          className="rounded-lg p-1.5 text-gray-400 hover:text-[#E31E24] hover:bg-gray-100 dark:hover:bg-meta-4 transition-all cursor-pointer"
-                          title="Update Monthly Note"
-                        >
-                          <Edit3 className="h-4.5 w-4.5" />
-                        </button>
+                        <div className="flex flex-col items-center justify-center gap-1">
+                          <button
+                            onClick={() => openNoteDialog(inst)}
+                            className="rounded-lg p-1.5 text-gray-400 hover:text-[#E31E24] hover:bg-gray-100 dark:hover:bg-meta-4 transition-all cursor-pointer"
+                            title="Update Monthly Note"
+                          >
+                            <Edit3 className="h-4.5 w-4.5" />
+                          </button>
+                          {inst.status !== "paid" && (
+                              <button
+                                  onClick={() => {
+                                      setQrOrderId(inst.order_id);
+                                      setQrMonthNumber(inst.monthNumber);
+                                      setQrDefaultAmount(inst.remainingAmount);
+                                      setQrCustomerName(inst.customer_name);
+                                      setQrModalOpen(true);
+                                  }}
+                                  className="rounded-lg p-1.5 text-gray-400 hover:text-[#E31E24] hover:bg-gray-100 dark:hover:bg-meta-4 transition-all cursor-pointer"
+                                  title="Generate SmartPay QR"
+                              >
+                                  <svg className="w-4.5 h-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm14 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+                                  </svg>
+                              </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );
@@ -1009,6 +1046,14 @@ function InstallmentsViewContent() {
         </div>
       )}
 
+      <SmartPayQrModal 
+          open={qrModalOpen} 
+          onClose={() => setQrModalOpen(false)} 
+          orderId={qrOrderId} 
+          monthNumber={qrMonthNumber} 
+          defaultAmount={qrDefaultAmount}
+          customerName={qrCustomerName}
+      />
     </div>
   );
 }

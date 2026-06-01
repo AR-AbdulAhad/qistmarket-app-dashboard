@@ -266,8 +266,8 @@ const AssignedVerifications = () => {
             {homeLocationRequired && (
               <span className={cn(
                 "inline-flex w-fit items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold border",
-                homeLocationVerified 
-                  ? "bg-green-50 border-green-200 text-green-700 dark:bg-green-900/20 dark:text-green-400" 
+                homeLocationVerified
+                  ? "bg-green-50 border-green-200 text-green-700 dark:bg-green-900/20 dark:text-green-400"
                   : "bg-red-50 border-red-200 text-red-700 dark:bg-red-900/20 dark:text-red-400 animate-pulse"
               )}>
                 📍 Home Location {homeLocationVerified ? 'Verified' : 'Required'}
@@ -605,7 +605,7 @@ const AssignedVerifications = () => {
           isLoading={loading}
         />
         <p className="font-medium text-dark dark:text-white">
-           Showing page {pagination.page} of {pagination.totalPages} ({pagination.total} records)
+          Showing page {pagination.page} of {pagination.totalPages} ({pagination.total} records)
         </p>
       </div>
 

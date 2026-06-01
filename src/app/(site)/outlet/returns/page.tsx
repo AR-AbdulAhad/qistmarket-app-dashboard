@@ -16,7 +16,7 @@ export default function ReturnExchangesPage() {
     const [loading, setLoading] = useState(true);
     const [verifyingRecord, setVerifyingRecord] = useState<any | null>(null);
     const [search, setSearch] = useState("");
-    
+
     // Direct Return Modal States
     const [showDirectModal, setShowDirectModal] = useState(false);
     const [orderQuery, setOrderQuery] = useState("");
@@ -49,7 +49,7 @@ export default function ReturnExchangesPage() {
 
     useEffect(() => {
         fetchRecords();
-        
+
         const handleRefresh = () => fetchRecords();
         window.addEventListener('refreshReturnList', handleRefresh);
         return () => window.removeEventListener('refreshReturnList', handleRefresh);
@@ -104,7 +104,7 @@ export default function ReturnExchangesPage() {
             const result = await res.json();
             if (result.success) {
                 toast.success(result.message || "OTP Sent to Customer");
-                
+
                 // Immediately open verification popup for this new record
                 setVerifyingRecord({
                     id: result.data.record_id,
@@ -132,7 +132,7 @@ export default function ReturnExchangesPage() {
         }
     };
 
-    const filteredRecords = records.filter(r => 
+    const filteredRecords = records.filter(r =>
         r.order?.order_ref?.toLowerCase().includes(search.toLowerCase()) ||
         r.order?.customer_name?.toLowerCase().includes(search.toLowerCase()) ||
         r.order?.product_name?.toLowerCase().includes(search.toLowerCase()) ||
@@ -158,23 +158,23 @@ export default function ReturnExchangesPage() {
                 <div className="flex items-center gap-3">
                     <div className="relative">
                         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-                           <Search size={16} />
+                            <Search size={16} />
                         </span>
-                        <input 
-                            type="text" 
-                            placeholder="Search records..." 
+                        <input
+                            type="text"
+                            placeholder="Search records..."
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
                             className="pl-9 pr-4 py-2 border border-stroke dark:border-strokedark bg-white dark:bg-boxdark rounded-xl text-sm outline-none focus:border-primary transition-all w-64 shadow-sm"
                         />
                     </div>
-                    <button 
+                    <button
                         onClick={() => setShowDirectModal(true)}
                         className="bg-primary hover:bg-opacity-90 text-white px-4 py-2 rounded-xl text-sm font-black uppercase tracking-tight flex items-center gap-2 shadow-lg shadow-primary/20 transition-all active:scale-95"
                     >
                         <Plus size={16} /> Direct Return
                     </button>
-                    <button 
+                    <button
                         onClick={fetchRecords}
                         className="bg-white dark:bg-boxdark border border-stroke dark:border-strokedark hover:bg-gray-50 dark:hover:bg-meta-4 text-gray-600 dark:text-gray-300 px-4 py-2 rounded-xl text-sm font-medium flex items-center gap-2 shadow-sm transition-all active:scale-95"
                     >
@@ -218,9 +218,8 @@ export default function ReturnExchangesPage() {
                         {pendingRecords.map(r => (
                             <div key={r.id} className="bg-white dark:bg-boxdark rounded-2xl p-5 border border-warning/30 border-l-4 border-l-warning shadow-sm hover:shadow-md transition-all">
                                 <div className="flex justify-between items-start mb-3">
-                                    <div className={`text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-md ${
-                                        r.type === 'Exchange' ? 'bg-amber-100 text-amber-600' : 'bg-red-100 text-red-600'
-                                    }`}>
+                                    <div className={`text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-md ${r.type === 'Exchange' ? 'bg-amber-100 text-amber-600' : 'bg-red-100 text-red-600'
+                                        }`}>
                                         {r.type} Request
                                     </div>
                                     <span className="text-[10px] font-bold text-gray-400 bg-gray-50 dark:bg-meta-4 px-2 py-1 rounded italic">
@@ -235,7 +234,7 @@ export default function ReturnExchangesPage() {
                                         Ref: <span className="underline italic tracking-tighter">#{r.order?.order_ref || r.order_id}</span>
                                     </p>
                                 </div>
-                                
+
                                 {r.is_cash_refund && (
                                     <div className="mb-4 bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-900/30 p-3 rounded-xl flex items-center justify-between">
                                         <div className="flex items-center gap-2">
@@ -268,7 +267,7 @@ export default function ReturnExchangesPage() {
                                     </div>
                                     <div className="flex items-center gap-2 mt-2 px-1">
                                         <div className="w-8 h-8 rounded-full bg-gray-100 dark:bg-meta-4 flex items-center justify-center text-gray-400">
-                                           <Clock size={14} />
+                                            <Clock size={14} />
                                         </div>
                                         <div>
                                             <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest leading-none">Drop-off By</p>
@@ -276,7 +275,7 @@ export default function ReturnExchangesPage() {
                                         </div>
                                     </div>
                                 </div>
-                                <button 
+                                <button
                                     onClick={() => setVerifyingRecord(r)}
                                     className="w-full py-4 bg-warning hover:bg-opacity-90 text-white rounded-2xl text-[11px] font-black uppercase tracking-widest shadow-xl shadow-warning/20 transition-all active:scale-95 flex items-center justify-center gap-2"
                                 >
@@ -330,9 +329,8 @@ export default function ReturnExchangesPage() {
                                         <td className="px-5 py-4">
                                             <p className="font-black text-gray-800 dark:text-white leading-none mb-1 group-hover:text-primary transition-colors">#{r.order?.order_ref}</p>
                                             <div className="flex items-center gap-1">
-                                                <span className={`text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-tighter ${
-                                                    r.is_used ? 'bg-primary/10 text-primary border border-primary/20' : 'bg-success/10 text-success border border-success/20'
-                                                }`}>
+                                                <span className={`text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-tighter ${r.is_used ? 'bg-primary/10 text-primary border border-primary/20' : 'bg-success/10 text-success border border-success/20'
+                                                    }`}>
                                                     {r.is_used ? 'Used Stock' : 'Ready Stock'}
                                                 </span>
                                             </div>
@@ -346,9 +344,8 @@ export default function ReturnExchangesPage() {
                                             <p className="text-[9px] text-primary/60 font-mono tracking-tighter italic">{r.imei_returned || 'No IMEI'}</p>
                                         </td>
                                         <td className="px-5 py-4 text-center">
-                                            <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-tight ${
-                                                r.type === 'Exchange' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'
-                                            }`}>
+                                            <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-tight ${r.type === 'Exchange' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'
+                                                }`}>
                                                 {r.type}
                                             </span>
                                         </td>
@@ -404,7 +401,7 @@ export default function ReturnExchangesPage() {
                             </h2>
                             <p className="text-xs text-gray-400 mt-1">Process returns for walk-in customers instantly.</p>
                         </div>
-                        <button 
+                        <button
                             onClick={() => setShowDirectModal(false)}
                             className="bg-gray-100 dark:bg-meta-4 text-gray-500 p-2 rounded-full hover:bg-gray-200 transition-all"
                         >
@@ -420,9 +417,9 @@ export default function ReturnExchangesPage() {
                             </label>
                             <div className="relative">
                                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                                <input 
-                                    type="text" 
-                                    placeholder="Enter Order Reference or Customer Name" 
+                                <input
+                                    type="text"
+                                    placeholder="Enter Order Reference or Customer Name"
                                     value={orderQuery}
                                     onChange={(e) => setOrderQuery(e.target.value)}
                                     className="w-full pl-12 pr-4 py-4 bg-gray-50 dark:bg-gray-900 border-2 border-stroke dark:border-strokedark rounded-2xl focus:border-primary outline-none font-bold text-gray-800 dark:text-white transition-all shadow-inner"
@@ -512,15 +509,15 @@ export default function ReturnExchangesPage() {
                                         <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Delivered Product Details</p>
                                         <p className="font-black text-gray-800 dark:text-white text-sm leading-none">{selectedOrder.customer_name}</p>
                                         <p className="text-[10px] text-gray-500 font-bold mt-1 tracking-tight">
-                                            {selectedOrder.delivered_product_name} 
-                                            {(selectedOrder.delivered_color && selectedOrder.delivered_color !== 'N/A') ? ` (${selectedOrder.delivered_color}${selectedOrder.delivered_variant && selectedOrder.delivered_variant !== 'N/A' ? ` - ${selectedOrder.delivered_variant}` : ''})` : ''} 
+                                            {selectedOrder.delivered_product_name}
+                                            {(selectedOrder.delivered_color && selectedOrder.delivered_color !== 'N/A') ? ` (${selectedOrder.delivered_color}${selectedOrder.delivered_variant && selectedOrder.delivered_variant !== 'N/A' ? ` - ${selectedOrder.delivered_variant}` : ''})` : ''}
                                             • IMEI: {selectedOrder.delivered_imei}
                                         </p>
                                     </div>
                                     <button onClick={() => setSelectedOrder(null)} className="text-xs font-black text-gray-400 hover:text-red-500 transition-colors uppercase">Change</button>
                                 </div>
 
-                                <button 
+                                <button
                                     onClick={handleDirectSubmit}
                                     disabled={submittingDirect || (isCashRefund && !refundAmount)}
                                     className="w-full py-5 bg-primary hover:bg-opacity-90 disabled:opacity-50 text-white rounded-2xl text-sm font-black uppercase tracking-widest shadow-2xl shadow-primary/30 transition-all active:scale-[0.98] flex items-center justify-center gap-3"
@@ -543,7 +540,7 @@ export default function ReturnExchangesPage() {
             </Modal>
 
             {verifyingRecord && (
-                <ReturnVerificationPopup 
+                <ReturnVerificationPopup
                     isOpen={!!verifyingRecord}
                     onClose={() => setVerifyingRecord(null)}
                     recordId={verifyingRecord.id}
