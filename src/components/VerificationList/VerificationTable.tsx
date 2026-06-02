@@ -23,6 +23,7 @@ import { useRouter } from 'next/navigation'
 import { createPortal } from 'react-dom'
 import { useRef } from 'react'
 import Pagination from '../common/Pagination'
+import { formatExactDate } from "@/utils/dateUtils";
 
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL
@@ -203,11 +204,11 @@ const AssignedVerifications = () => {
         return (
           <div className="flex flex-col">
             <span className="font-bold text-dark dark:text-white">
-              {val ? dayjs(val).format('MMM DD, YYYY hh:mm A') : 'N/A'}
+              {val ? formatExactDate(val, 'MMM DD, YYYY hh:mm A') : 'N/A'}
             </span>
             {createdAt && (
               <span className="text-[10px] text-gray-400">
-                Placed: {dayjs(createdAt).format('MMM DD, YYYY')}
+                Placed: {formatExactDate(createdAt, 'MMM DD, YYYY')}
               </span>
             )}
           </div>

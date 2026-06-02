@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import dayjs from 'dayjs';
+import { formatExactDate } from "@/utils/dateUtils";
 
 interface ProfileHistory {
   updatedAt: string;
@@ -28,13 +28,11 @@ const convertTo12HourFormat = (time?: string): string => {
 
   // Agar full datetime aa raha ho
   if (time.includes(" ")) {
-    const parsed = dayjs(time);
-    return parsed.isValid() ? parsed.format("h:mm A") : time;
+    return formatExactDate(time, "h:mm A");
   }
 
   // Agar sirf HH:mm:ss ya HH:mm ho
-  const parsed = dayjs(`2000-01-01T${time}`);
-  return parsed.isValid() ? parsed.format("h:mm A") : time;
+  return formatExactDate(`2000-01-01T${time}`, "h:mm A");
 };
 
 export const OfficerProfileHistory: React.FC<OfficerProfileHistoryProps> = ({
@@ -60,9 +58,8 @@ export const OfficerProfileHistory: React.FC<OfficerProfileHistoryProps> = ({
       <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
       <div className="mt-4 space-y-4 max-h-96 overflow-y-auto">
         {sortedHistory.map((entry, idx) => {
-          const date = dayjs(entry.updatedAt);
-          const formattedDate = date.format('dddd, MMMM D, YYYY'); // e.g., "Monday, April 1, 2026"
-          const formattedTime = date.format('h:mm:ss A'); // e.g., "3:45:30 PM"
+          const formattedDate = formatExactDate(entry.updatedAt, 'dddd, MMMM D, YYYY'); // e.g., "Monday, April 1, 2026"
+          const formattedTime = formatExactDate(entry.updatedAt, 'h:mm:ss A'); // e.g., "3:45:30 PM"
           
           return (
             <div

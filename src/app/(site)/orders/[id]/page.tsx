@@ -14,6 +14,7 @@ import { useAuth } from '../../../../../contexts/AuthContext';
 import DeliveredProductDetails from '@/components/common/DeliveredProductDetails';
 import RecoveryVisitDetails from '@/components/common/RecoveryVisitDetails';
 import { MediaCard } from '@/components/common/MediaCard';
+import { formatExactDate } from "@/utils/dateUtils";
 
 // --- Editable Field Component ---
 const EditableField = ({
@@ -208,13 +209,11 @@ dayjs.extend(utc);
 
 const formatDateTimeUTC = (value?: string): string => {
     if (!value) return "Not set";
-    const parsed = dayjs(value);
-    return parsed.isValid() ? parsed.format("MMM D, YYYY h:mm A") : value;
+    return formatExactDate(value, "MMM D, YYYY h:mm A");
 };
 const formatDateTimeLocal = (value?: string): string => {
     if (!value) return "Not set";
-    const parsed = dayjs(value);
-    return parsed.isValid() ? parsed.format("MMM D, YYYY h:mm A") : value;
+    return formatExactDate(value, "MMM D, YYYY h:mm A");
 };
 
 const shouldDisplay = (value: any): boolean => {
@@ -659,7 +658,7 @@ export default function OrderDetailsPage() {
                                 </div>
                                 <div>
                                     <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">Captured At</p>
-                                    <p className="font-semibold text-gray-900 dark:text-gray-200">{dayjs(order.dummyCustomer.moved_at).format('MMM D, YYYY h:mm A')}</p>
+                                    <p className="font-semibold text-gray-900 dark:text-gray-200">{formatExactDate(order.dummyCustomer.moved_at, 'MMM D, YYYY h:mm A')}</p>
                                 </div>
                             </div>
                             

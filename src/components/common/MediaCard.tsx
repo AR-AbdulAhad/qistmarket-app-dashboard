@@ -1,12 +1,11 @@
 import { useState, useRef, useEffect } from 'react';
-import dayjs from 'dayjs';
 import { MediaReplaceModal } from './MediaReplaceModal';
 import { cn } from '@/lib/utils';
+import { formatExactDate } from "@/utils/dateUtils";
 
 const formatDateTimeUTC = (value?: string): string => {
     if (!value) return "Not set";
-    const parsed = dayjs(value);
-    return parsed.isValid() ? parsed.format("MMM D, YYYY h:mm A") : value;
+    return formatExactDate(value, "MMM D, YYYY h:mm A");
 };
 
 interface MediaCardProps {

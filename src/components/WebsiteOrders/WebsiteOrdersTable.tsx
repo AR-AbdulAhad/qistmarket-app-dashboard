@@ -20,6 +20,7 @@ import Pagination from '../common/Pagination'
 import Loader from '@/components/common/Loader'
 import { cn } from '@/lib/utils'
 import { X, Check, AlertCircle } from 'lucide-react'
+import { formatExactDate } from "@/utils/dateUtils";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL
 
@@ -217,7 +218,7 @@ export default function WebsiteOrdersTable() {
       header: 'Date',
       cell: ({ getValue }) => {
         const val = getValue() as string
-        return val ? dayjs(val).format('MMM DD, YYYY hh:mm A') : 'N/A'
+        return val ? formatExactDate(val, 'MMM DD, YYYY hh:mm A') : 'N/A'
       }
     },
     { accessorKey: 'tokenNumber', header: 'Web Token' },

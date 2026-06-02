@@ -2,6 +2,7 @@
 
 import React from 'react';
 import dayjs from 'dayjs';
+import { formatExactDate } from "@/utils/dateUtils";
 
 
 interface Session {
@@ -84,7 +85,7 @@ export const OfficerAttendanceHistory: React.FC<OfficerAttendanceHistoryProps> =
               >
                 <div className="flex items-center justify-between">
                   <p className={`text-sm font-medium ${isToday ? 'text-green-900' : 'text-gray-900'}`}> 
-                    {date.format('ddd, MMM DD')}
+                    {formatExactDate(stat.date, 'ddd, MMM DD')}
                     {isToday && <span className="ml-2 text-xs text-green-600 font-semibold">TODAY</span>}
                   </p>
                   <span className="text-xs text-gray-600">Total: <span className="font-semibold text-green-600">{dayTotalHours.toFixed(2)}h</span></span>
@@ -102,9 +103,9 @@ export const OfficerAttendanceHistory: React.FC<OfficerAttendanceHistoryProps> =
                         return (
                           <li key={sidx} className="flex items-center gap-2 text-xs">
                             <span className="font-mono text-blue-700">
-                              {start.format('hh:mm A')}
+                              {formatExactDate(sess.start_time, 'hh:mm A')}
                               {' - '}
-                              {end ? end.format('hh:mm A') : <span className="text-orange-500">Ongoing</span>}
+                              {end ? formatExactDate(sess.end_time, 'hh:mm A') : <span className="text-orange-500">Ongoing</span>}
                             </span>
                             <span className="ml-2 text-gray-500">({(duration / 60).toFixed(2)}h)</span>
                           </li>

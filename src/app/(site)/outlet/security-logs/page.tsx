@@ -18,8 +18,8 @@ import {
     ExternalLink
 } from "lucide-react";
 import axios from "axios";
-import dayjs from "dayjs";
 import Cookies from "js-cookie";
+import { formatExactDate } from "@/utils/dateUtils";
 
 interface LogEntry {
     id: number;
@@ -206,8 +206,8 @@ export default function SecurityLogsPage() {
                                     <tr key={log.id} className="hover:bg-gray-50 dark:hover:bg-meta-4/10 transition-colors group">
                                         <td className="px-8 py-6">
                                             <div className="flex flex-col">
-                                                <span className="text-sm font-bold text-gray-800 dark:text-gray-200">{dayjs(log.created_at).format('hh:mm A')}</span>
-                                                <span className="text-[10px] font-medium text-gray-400 uppercase tracking-tighter">{dayjs(log.created_at).format('DD MMM YYYY')}</span>
+                                                <span className="text-sm font-bold text-gray-800 dark:text-gray-200">{formatExactDate(log.created_at, 'hh:mm A')}</span>
+                                                <span className="text-[10px] font-medium text-gray-400 uppercase tracking-tighter">{formatExactDate(log.created_at, 'DD MMM YYYY')}</span>
                                             </div>
                                         </td>
                                         <td className="px-8 py-6">

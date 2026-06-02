@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import dayjs from 'dayjs';
 import { cn } from '@/lib/utils';
 import { Calendar, Trash2, Plus, ArrowRight, Smartphone, Key, Camera, CheckCircle2, UserCheck, Calculator, AlertCircle } from 'lucide-react';
+import { formatExactDate } from "@/utils/dateUtils";
 
 interface LedgerRow {
     month: number;
@@ -94,7 +95,7 @@ export const InstallmentLedgerEditor = ({
                                         />
                                     ) : (
                                         <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                                            {dayjs(r.date).format('DD MMM, YYYY')}
+                                            {formatExactDate(r.date, 'DD MMM, YYYY')}
                                         </span>
                                     )}
                                 </td>

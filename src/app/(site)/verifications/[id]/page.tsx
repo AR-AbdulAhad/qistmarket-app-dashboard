@@ -13,6 +13,7 @@ import utc from "dayjs/plugin/utc";
 import { useAuth } from '../../../../../contexts/AuthContext'
 import OrderCustomerInfo from '@/components/common/OrderCustomerInfo'
 import { MediaCard } from '@/components/common/MediaCard'
+import { formatExactDate } from "@/utils/dateUtils";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL
 
@@ -226,17 +227,13 @@ dayjs.extend(utc);
 const formatDateTimeUTC = (value?: string): string => {
   if (!value) return "Not set";
 
-  const parsed = dayjs(value);
-
-  return parsed.isValid() ? parsed.format("MMM D, YYYY h:mm A") : value;
+  return formatExactDate(value, "MMM D, YYYY h:mm A");
 };
 
 const formatDateTimeLocal = (value?: string): string => {
   if (!value) return "Not set";
 
-  const parsed = dayjs(value);
-
-  return parsed.isValid() ? parsed.format("MMM D, YYYY h:mm A") : value;
+  return formatExactDate(value, "MMM D, YYYY h:mm A");
 };
 
 

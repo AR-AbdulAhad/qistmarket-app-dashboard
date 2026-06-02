@@ -9,6 +9,7 @@ import relativeTime from "dayjs/plugin/relativeTime";
 import { cn } from "@/lib/utils";
 import { CheckCheck, Trash2, Bell, BellOff } from "lucide-react";
 import Pagination from "@/components/common/Pagination";
+import { formatExactDate } from "@/utils/dateUtils";
 
 dayjs.extend(relativeTime);
 
@@ -133,7 +134,7 @@ const NotificationsPage = () => {
                                             </div>
                                             <div className="text-right shrink-0">
                                                 <span className="block text-xs font-medium text-dark-6 dark:text-dark-7">
-                                                    {dayjs(notif.createdAt).format("MMM DD, YYYY")}
+                                                    {formatExactDate(notif.createdAt, "MMM DD, YYYY")}
                                                 </span>
                                                 <span className="mt-1 block text-[10px] text-dark-6 dark:text-dark-7">
                                                     {dayjs(notif.createdAt).fromNow()}

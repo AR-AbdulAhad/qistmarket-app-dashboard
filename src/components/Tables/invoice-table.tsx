@@ -8,9 +8,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
-import dayjs from "dayjs";
 import { getInvoiceTableData } from "./fetch";
 import { DownloadIcon, PreviewIcon } from "./icons";
+import { formatExactDate } from "@/utils/dateUtils";
 
 export async function InvoiceTable() {
   const data = await getInvoiceTableData();
@@ -39,7 +39,7 @@ export async function InvoiceTable() {
 
               <TableCell>
                 <p className="text-dark dark:text-white">
-                  {dayjs(item.date).format("MMM DD, YYYY")}
+                  {formatExactDate(item.date, "MMM DD, YYYY")}
                 </p>
               </TableCell>
 

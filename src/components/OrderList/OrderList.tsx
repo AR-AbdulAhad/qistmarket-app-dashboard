@@ -28,6 +28,7 @@ import Pagination from '../common/Pagination'
 import { useAuth } from '../../../contexts/AuthContext'
 import { ArrowRightLeft, Send } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { formatExactDate } from "@/utils/dateUtils";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL
 
@@ -799,11 +800,11 @@ const OrderListContent = ({ forcedStatus, forcedChannel, hideActions, hideSelect
         return (
           <div className="flex flex-col">
             <span className="font-bold text-dark dark:text-white">
-              {val ? dayjs(val).format('MMM DD, YYYY hh:mm A') : 'N/A'}
+              {val ? formatExactDate(val, 'MMM DD, YYYY hh:mm A') : 'N/A'}
             </span>
             {createdAt && (
               <span className="text-[10px] text-gray-400">
-                Placed: {dayjs(createdAt).format('MMM DD, YYYY')}
+                Placed: {formatExactDate(createdAt, 'MMM DD, YYYY')}
               </span>
             )}
           </div>

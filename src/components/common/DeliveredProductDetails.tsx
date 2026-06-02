@@ -1,17 +1,16 @@
 import { useEffect, useState } from "react";
 import Cookies from "js-cookie";
-import dayjs from "dayjs";
 import { cn } from '@/lib/utils';
 import { MediaCard } from "./MediaCard";
 import toast from "react-hot-toast";
 import { useAuth } from "../../../contexts/AuthContext";
+import { formatExactDate } from "@/utils/dateUtils";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
 
 const formatDateTimeUTC = (value?: string): string => {
     if (!value) return "Not set";
-    const parsed = dayjs(value);
-    return parsed.isValid() ? parsed.format("MMM D, YYYY h:mm A") : value;
+    return formatExactDate(value, "MMM D, YYYY h:mm A");
 };
 
 // DeliveryPhotoCard Component - Now replaced by shared MediaCard

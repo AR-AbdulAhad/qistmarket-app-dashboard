@@ -7,13 +7,13 @@ import Loader from "@/components/common/Loader";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
 import Cookies from "js-cookie";
+import { formatExactDate } from "@/utils/dateUtils";
 
 dayjs.extend(utc);
 
 const formatDateTimeUTC = (value?: string): string => {
   if (!value) return "Not set";
-  const parsed = dayjs(value);
-  return parsed.isValid() ? parsed.format("MMM D, YYYY h:mm A") : value;
+  return formatExactDate(value, "MMM D, YYYY h:mm A");
 };
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
