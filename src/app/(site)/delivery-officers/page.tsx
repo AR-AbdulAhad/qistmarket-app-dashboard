@@ -11,6 +11,7 @@ import { DeliveryTable } from '@/components/DeliveryManagement/DeliveryTable';
 import { DeliveryStats } from '@/components/DeliveryManagement/DeliveryStats';
 import { SearchIcon } from '@/assets/icons';
 import io from 'socket.io-client';
+import { formatExactDate } from '@/utils/dateUtils';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000';
 
@@ -188,7 +189,7 @@ export default function DeliveryOfficers() {
           boy: {
             ...prev.boy,
             is_online: data.is_online,
-            last_online_at: data.is_online ? prev.boy.last_online_at : (data.timestamp || new Date().toISOString())
+            last_online_at: data.is_online ? prev.boy.last_online_at : (formatExactDate(new Date()))
           }
         } : null);
       }
@@ -552,7 +553,7 @@ const fetchAllDeliveries = async () => {
                           {(boyDetails.boy.current_location || boyDetails.boy.last_known_location)?.longitude.toFixed(6)}
                         </p>
                         <p className="text-xs text-gray-500 mt-2">
-                          {boyDetails.boy.is_online ? 'Tracking active' : `Last seen: ${new Date(boyDetails.boy.last_known_location?.timestamp || boyDetails.boy.last_online_at || '').toLocaleString()}`}
+                          {boyDetails.boy.is_online ? 'Tracking active' : `Last seen: ${formatExactDate(new Date(boyDetails.boy.last_known_location?.timestamp || boyDetails.boy.last_online_at || ''))}`}
                         </p>
                       </div>
                     ) : <p className="text-gray-500 text-center py-10">No location data available</p>}

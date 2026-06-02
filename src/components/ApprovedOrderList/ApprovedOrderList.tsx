@@ -1,9 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
-import dayjs from 'dayjs'
 import toast from 'react-hot-toast'
-import utc from 'dayjs/plugin/utc'
-dayjs.extend(utc)
 import Loader from '@/components/common/Loader'
 import {
   ColumnDef,

@@ -8,8 +8,6 @@ import { Modal } from '@/components/Modal/Modal'
 
 import toast from "react-hot-toast";
 import Loader from '@/components/common/Loader';
-import dayjs from "dayjs";
-import utc from "dayjs/plugin/utc";
 import { useAuth } from '../../../../../contexts/AuthContext'
 import OrderCustomerInfo from '@/components/common/OrderCustomerInfo'
 import { MediaCard } from '@/components/common/MediaCard'
@@ -222,7 +220,6 @@ interface EditHistory {
   edited_at: string
 }
 
-dayjs.extend(utc);
 
 const formatDateTimeUTC = (value?: string): string => {
   if (!value) return "Not set";

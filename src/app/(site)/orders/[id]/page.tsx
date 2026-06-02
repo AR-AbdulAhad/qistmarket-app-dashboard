@@ -8,8 +8,6 @@ import { cn } from '@/lib/utils';
 import { Modal } from '@/components/Modal/Modal';
 import Loader from '@/components/common/Loader';
 import toast from "react-hot-toast";
-import dayjs from "dayjs";
-import utc from "dayjs/plugin/utc";
 import { useAuth } from '../../../../../contexts/AuthContext';
 import DeliveredProductDetails from '@/components/common/DeliveredProductDetails';
 import RecoveryVisitDetails from '@/components/common/RecoveryVisitDetails';
@@ -205,7 +203,6 @@ interface VerificationData {
     home_location_verified: boolean;
 }
 
-dayjs.extend(utc);
 
 const formatDateTimeUTC = (value?: string): string => {
     if (!value) return "Not set";
@@ -793,7 +790,7 @@ export default function OrderDetailsPage() {
                         <h3 className="text-xl font-bold text-red-800 dark:text-red-400 mb-4">Cancellation Details</h3>
                         <div className="space-y-2">
                             <p><span className="font-medium text-red-700 dark:text-red-300">Reason:</span> {order.cancelled_reason}</p>
-                            <p><span className="font-medium text-red-700 dark:text-red-300">Cancelled At:</span> {order.cancelled_at ? new Date(order.cancelled_at).toLocaleString() : 'N/A'}</p>
+                            <p><span className="font-medium text-red-700 dark:text-red-300">Cancelled At:</span> {order.cancelled_at ? formatExactDate(new Date(order.cancelled_at)) : 'N/A'}</p>
                             {cancellationHistory && (
                                 <p>
                                     <span className="font-medium text-red-700 dark:text-red-300">Cancelled By:</span> {cancellationHistory.user?.full_name || 'System'} (@{cancellationHistory.user?.username || 'system'}) [{cancellationHistory.role_name || 'N/A'}]
@@ -813,7 +810,7 @@ export default function OrderDetailsPage() {
                                         <span className="font-medium text-yellow-700 dark:text-yellow-300">Postponed By:</span> {postponementHistory.user?.full_name || 'System'} (@{postponementHistory.user?.username || 'system'}) [{postponementHistory.role_name || 'N/A'}]
                                     </p>
                                     <p>
-                                        <span className="font-medium text-yellow-700 dark:text-yellow-300">Postponed At:</span> {new Date(postponementHistory.created_at).toLocaleString()}
+                                        <span className="font-medium text-yellow-700 dark:text-yellow-300">Postponed At:</span> {formatExactDate(new Date(postponementHistory.created_at))}
                                     </p>
                                 </>
                             )}
@@ -908,7 +905,7 @@ export default function OrderDetailsPage() {
                                             <td className="px-4 py-3 border dark:border-dark-3 font-medium">{h.previous_product}</td>
                                             <td className="px-4 py-3 border dark:border-dark-3 font-medium text-primary">{h.current_product}</td>
                                             <td className="px-4 py-3 border dark:border-dark-3">{h.changed_by.full_name} (@{h.changed_by.username})</td>
-                                            <td className="px-4 py-3 border dark:border-dark-3">{new Date(h.changed_at).toLocaleString()}</td>
+                                            <td className="px-4 py-3 border dark:border-dark-3">{formatExactDate(new Date(h.changed_at))}</td>
                                         </tr>
                                     ))}
                                 </tbody>

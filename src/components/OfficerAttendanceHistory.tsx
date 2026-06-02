@@ -1,8 +1,7 @@
 'use client';
 
 import React from 'react';
-import dayjs from 'dayjs';
-import { formatExactDate } from "@/utils/dateUtils";
+import { formatExactDate, isExactToday } from "@/utils/dateUtils";
 
 
 interface Session {
@@ -72,8 +71,7 @@ export const OfficerAttendanceHistory: React.FC<OfficerAttendanceHistoryProps> =
       <div className="mt-4 max-h-80 overflow-y-auto">
         <div className="grid grid-cols-1 gap-2">
           {sortedStats.map((stat, idx) => {
-            const date = dayjs(stat.date);
-            const isToday = date.isSame(dayjs(), 'day');
+            const isToday = isExactToday(stat.date);
             const sessions = stat.sessions || [];
             const dayTotalMinutes = sessions.reduce((sum, sess) => sum + (sess.duration_minutes || 0), 0);
             const dayTotalHours = dayTotalMinutes / 60;
@@ -97,15 +95,14 @@ export const OfficerAttendanceHistory: React.FC<OfficerAttendanceHistoryProps> =
                   ) : (
                     <ul className="space-y-1">
                       {sessions.map((sess, sidx) => {
-                        const start = dayjs(sess.start_time);
-                        const end = sess.end_time ? dayjs(sess.end_time) : null;
+                        
                         const duration = sess.duration_minutes || 0;
                         return (
                           <li key={sidx} className="flex items-center gap-2 text-xs">
                             <span className="font-mono text-blue-700">
                               {formatExactDate(sess.start_time, 'hh:mm A')}
                               {' - '}
-                              {end ? formatExactDate(sess.end_time, 'hh:mm A') : <span className="text-orange-500">Ongoing</span>}
+                              {sess.end_time ? formatExactDate(sess.end_time, 'hh:mm A') : <span className="text-orange-500">Ongoing</span>}
                             </span>
                             <span className="ml-2 text-gray-500">({(duration / 60).toFixed(2)}h)</span>
                           </li>

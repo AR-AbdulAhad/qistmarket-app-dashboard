@@ -12,10 +12,8 @@ import Link from "next/link";
 import { useState } from "react";
 import { BellIcon } from "./icons";
 import { useNotifications } from "../../../../../contexts/NotificationContext";
-import dayjs from "dayjs";
-import relativeTime from "dayjs/plugin/relativeTime";
+import { timeAgo } from "@/utils/dateUtils";
 
-dayjs.extend(relativeTime);
 
 export function Notification() {
   const [isOpen, setIsOpen] = useState(false);
@@ -93,7 +91,7 @@ export function Notification() {
                     </span>
 
                     <span className="text-[10px] text-dark-6 dark:text-dark-7 mt-1 block">
-                      {dayjs(item.createdAt).fromNow()}
+                      {timeAgo(item.createdAt)}
                     </span>
                   </div>
                   {!item.isRead && (

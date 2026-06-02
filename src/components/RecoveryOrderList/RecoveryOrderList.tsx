@@ -1,8 +1,5 @@
 'use client'
 import { useEffect, useState, useRef } from 'react'
-import dayjs from 'dayjs'
-import utc from 'dayjs/plugin/utc'
-dayjs.extend(utc)
 import Pagination from '../common/Pagination'
 import Loader from '@/components/common/Loader'
 import {

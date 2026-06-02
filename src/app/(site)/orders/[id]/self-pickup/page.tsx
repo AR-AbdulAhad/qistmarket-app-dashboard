@@ -13,7 +13,6 @@ import {
 import { InstallmentLedgerEditor } from '@/components/Installments/InstallmentLedgerEditor';
 import toast from 'react-hot-toast';
 import Cookies from 'js-cookie';
-import dayjs from 'dayjs';
 import { cn } from '@/lib/utils';
 import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
 import Loader from '@/components/common/Loader';

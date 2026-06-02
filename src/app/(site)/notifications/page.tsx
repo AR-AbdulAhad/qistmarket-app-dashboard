@@ -4,14 +4,12 @@ import { useEffect, useState } from "react";
 import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
 import Loader from "@/components/common/Loader";
 import { useNotifications } from "../../../../contexts/NotificationContext";
-import dayjs from "dayjs";
-import relativeTime from "dayjs/plugin/relativeTime";
 import { cn } from "@/lib/utils";
 import { CheckCheck, Trash2, Bell, BellOff } from "lucide-react";
 import Pagination from "@/components/common/Pagination";
 import { formatExactDate } from "@/utils/dateUtils";
+import { timeAgo } from "@/utils/dateUtils";
 
-dayjs.extend(relativeTime);
 
 const NotificationsPage = () => {
     const {
@@ -137,7 +135,7 @@ const NotificationsPage = () => {
                                                     {formatExactDate(notif.createdAt, "MMM DD, YYYY")}
                                                 </span>
                                                 <span className="mt-1 block text-[10px] text-dark-6 dark:text-dark-7">
-                                                    {dayjs(notif.createdAt).fromNow()}
+                                                    {timeAgo(notif.createdAt)}
                                                 </span>
                                             </div>
                                         </div>

@@ -61,3 +61,79 @@ export const formatExactDate = (dateInput: string | Date | null | undefined, for
     
     return formatted;
 }
+
+export const timeAgo = (dateInput: string | Date | null | undefined) => {
+    if (!dateInput) return 'N/A';
+    if (typeof dateInput === 'string' && dateInput.trim() === '') return 'N/A';
+
+    const date = new Date(dateInput);
+    if (isNaN(date.getTime())) return typeof dateInput === 'string' ? dateInput : 'N/A';
+
+    const exactLocalTime = new Date(
+        date.getUTCFullYear(),
+        date.getUTCMonth(),
+        date.getUTCDate(),
+        date.getUTCHours(),
+        date.getUTCMinutes(),
+        date.getUTCSeconds()
+    );
+
+    const now = new Date();
+    const seconds = Math.floor((now.getTime() - exactLocalTime.getTime()) / 1000);
+    
+    if (seconds < 0) return "just now";
+
+    let interval = seconds / 31536000;
+    if (interval > 1) return Math.floor(interval) + " years ago";
+    interval = seconds / 2592000;
+    if (interval > 1) return Math.floor(interval) + " months ago";
+    interval = seconds / 86400;
+    if (interval > 1) return Math.floor(interval) + " days ago";
+    interval = seconds / 3600;
+    if (interval > 1) return Math.floor(interval) + " hours ago";
+    interval = seconds / 60;
+    if (interval > 1) return Math.floor(interval) + " minutes ago";
+    return Math.floor(seconds) + " seconds ago";
+};
+
+export const isExactToday = (dateInput: string | Date | null | undefined) => {
+    if (!dateInput) return false;
+    const date = new Date(dateInput);
+    if (isNaN(date.getTime())) return false;
+    
+    const now = new Date();
+    return date.getUTCFullYear() === now.getFullYear() && 
+           date.getUTCMonth() === now.getMonth() && 
+           date.getUTCDate() === now.getDate();
+};
+
+export const addMonths = (dateInput: Date | string, months: number): Date => {
+    const d = new Date(dateInput);
+    d.setMonth(d.getMonth() + months);
+    return d;
+};
+
+export const addDays = (dateInput: Date | string, days: number): Date => {
+    const d = new Date(dateInput);
+    d.setDate(d.getDate() + days);
+    return d;
+};
+
+export const todayDate = (): Date => {
+    return new Date();
+};
+
+export const formatStandardDate = (dateInput: Date | string, format: string): string => {
+    const d = new Date(dateInput);
+    if (isNaN(d.getTime())) return typeof dateInput === 'string' ? dateInput : '';
+    
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    
+    let formatted = format;
+    formatted = formatted.replace('YYYY', String(year));
+    formatted = formatted.replace('MM', month);
+    formatted = formatted.replace('DD', day);
+    return formatted;
+};

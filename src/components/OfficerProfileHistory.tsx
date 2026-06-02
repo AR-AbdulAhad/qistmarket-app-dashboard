@@ -105,10 +105,10 @@ export const OfficerProfileHistory: React.FC<OfficerProfileHistoryProps> = ({
                       <span className="text-gray-700 font-medium">⏰ Working Hours:</span>
                       <span className="font-medium text-right">
                         <span className="block text-gray-500 text-xs mb-1">
-                          Previous: {convertTo12HourFormat(entry.previous.working_hours_start)} - {convertTo12HourFormat(entry.previous.working_hours_end)}
+                          Previous: {formatExactDate(entry.previous.working_hours_start, 'h:mm A')} - {formatExactDate(entry.previous.working_hours_end, 'h:mm A')}
                         </span>
                         <span className="block text-green-600 font-bold">
-                          Updated: {convertTo12HourFormat(entry.updated.working_hours_start)} - {convertTo12HourFormat(entry.updated.working_hours_end)}
+                          Updated: {formatExactDate(entry.updated.working_hours_start, 'h:mm A')} - {formatExactDate(entry.updated.working_hours_end, 'h:mm A')}
                         </span>
                       </span>
                     </div>

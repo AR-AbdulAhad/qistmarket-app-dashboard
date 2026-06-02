@@ -6,9 +6,6 @@ import {
   getCoreRowModel,
   useReactTable,
 } from '@tanstack/react-table'
-import dayjs from 'dayjs'
-import utc from 'dayjs/plugin/utc'
-dayjs.extend(utc)
 import toast from 'react-hot-toast'
 import Cookies from 'js-cookie'
 import { createPortal } from 'react-dom'

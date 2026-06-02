@@ -4,12 +4,9 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
 import Loader from "@/components/common/Loader";
-import dayjs from "dayjs";
-import utc from "dayjs/plugin/utc";
 import Cookies from "js-cookie";
 import { formatExactDate } from "@/utils/dateUtils";
 
-dayjs.extend(utc);
 
 const formatDateTimeUTC = (value?: string): string => {
   if (!value) return "Not set";

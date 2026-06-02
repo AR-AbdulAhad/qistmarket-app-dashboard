@@ -8,6 +8,7 @@ import { OfficerProfileHistory } from '@/components/OfficerProfileHistory';
 import { OfficerAttendanceHistory } from '@/components/OfficerAttendanceHistory';
 import { SearchIcon } from '@/assets/icons';
 import io from 'socket.io-client';
+import { formatExactDate } from '@/utils/dateUtils';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000';
 
@@ -409,7 +410,7 @@ export default function RecoveryOfficersPage() {
                                                 <p className="text-xs text-gray-500 mt-2">
                                                     {selectedOfficer.is_online
                                                         ? 'Tracking active'
-                                                        : `Last seen: ${new Date(selectedOfficer.last_known_location?.timestamp || '').toLocaleString()}`}
+                                                        : `Last seen: ${formatExactDate(new Date(selectedOfficer.last_known_location?.timestamp || ''))}`}
                                                 </p>
                                             </div>
                                             <button className="w-full py-2.5 bg-primary text-white rounded-lg font-semibold hover:bg-primary/90 transition">

@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
-import dayjs from 'dayjs';
 import { cn } from '@/lib/utils';
 import { Calendar, Trash2, Plus, ArrowRight, Smartphone, Key, Camera, CheckCircle2, UserCheck, Calculator, AlertCircle } from 'lucide-react';
-import { formatExactDate } from "@/utils/dateUtils";
+import { formatExactDate, todayDate, addMonths, addDays, formatStandardDate } from "@/utils/dateUtils";
 
 interface LedgerRow {
     month: number;
@@ -26,13 +25,13 @@ export const InstallmentLedgerEditor = ({
     onLedgerChange
 }: InstallmentLedgerEditorProps) => {
     const [ledger, setLedger] = useState<LedgerRow[]>([]);
-    const today = dayjs();
+    const today = todayDate();
 
     // Initial ledger generation
     useEffect(() => {
         const initialLedger = Array.from({ length: months }, (_, i) => ({
             month: i + 1,
-            date: today.add(i + 1, 'month').format('YYYY-MM-DD'),
+            date: formatStandardDate(addMonths(today, i + 1), 'YYYY-MM-DD'),
             amount: monthlyAmount,
         }));
         setLedger(initialLedger);
@@ -48,11 +47,11 @@ export const InstallmentLedgerEditor = ({
 
         if (field === 'date' && index === 0) {
             // First installment date changed -> cascade to others
-            const newStartDate = dayjs(value as string);
+            const newStartDate = new Date(value as string);
             for (let i = 0; i < updated.length; i++) {
                 updated[i] = {
                     ...updated[i],
-                    date: newStartDate.add(i, 'month').format('YYYY-MM-DD')
+                    date: formatStandardDate(addMonths(newStartDate, i), 'YYYY-MM-DD')
                 };
             }
         } else {
@@ -88,8 +87,8 @@ export const InstallmentLedgerEditor = ({
                                         <input
                                             type="date"
                                             value={r.date}
-                                            min={today.format('YYYY-MM-DD')}
-                                            max={today.add(40, 'day').format('YYYY-MM-DD')}
+                                            min={formatStandardDate(today, 'YYYY-MM-DD')}
+                                            max={formatStandardDate(addDays(today, 40), 'YYYY-MM-DD')}
                                             onChange={e => updateLedgerRow(index, 'date', e.target.value)}
                                             className="bg-transparent border-none p-0 text-sm font-medium text-gray-600 dark:text-gray-400 outline-none focus:text-primary transition-colors cursor-pointer"
                                         />

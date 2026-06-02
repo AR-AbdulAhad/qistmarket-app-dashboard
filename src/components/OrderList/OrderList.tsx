@@ -1,8 +1,5 @@
 'use client'
 import { useEffect, useState, Suspense } from 'react'
-import dayjs from 'dayjs'
-import utc from 'dayjs/plugin/utc'
-dayjs.extend(utc)
 import Loader from '@/components/common/Loader'
 import {
   ColumnDef,
