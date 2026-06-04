@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo, Fragment } from "react";
 import { useRouter } from "next/navigation";
 import Cookies from "js-cookie";
+import { formatExactDate } from "@/utils/dateUtils";
 import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
 import { 
     Plus, Search, Download, Upload, Printer, Trash2, 
@@ -953,7 +954,7 @@ export default function VendorPurchasesPage() {
                                             <div className="absolute -left-[9px] top-0 w-4 h-4 rounded-full bg-primary border-4 border-white dark:border-boxdark shadow-sm" />
                                             <div className="flex items-center justify-between mb-2">
                                                 <div className="text-[10px] font-black text-primary uppercase tracking-widest bg-primary/10 px-2 py-1 rounded-md">
-                                                    {new Date(h.edited_at).toLocaleString()}
+                                                    {formatExactDate(h.edited_at)}
                                                 </div>
                                                 <div className="text-[10px] font-bold text-gray-500 flex items-center gap-1">
                                                     Edited by: <span className="text-gray-800 dark:text-gray-200">ID #{h.edited_by_id || 'System'}</span>

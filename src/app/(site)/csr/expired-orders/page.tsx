@@ -6,6 +6,7 @@ import Cookies from "js-cookie";
 import Pagination from "@/components/common/Pagination";
 import Loader from "@/components/common/Loader";
 import { Calendar, Clock, User, MapPin, Phone, DollarSign, AlertTriangle } from "lucide-react";
+import { formatExactDate } from "@/utils/dateUtils";
 
 interface ExpiredOrder {
   id: number;
@@ -76,17 +77,6 @@ export default function ExpiredOrdersPage() {
     fetchExpiredOrders(newPage);
   };
 
-  const formatDate = (dateString: string) => {
-    try {
-      return new Date(dateString).toLocaleDateString("en-PK", {
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-      });
-    } catch {
-      return dateString;
-    }
-  };
 
   return (
     <div className="mx-auto w-full max-w-7xl">
@@ -223,13 +213,13 @@ export default function ExpiredOrdersPage() {
                     <div className="flex items-center gap-2 text-xs">
                       <Calendar size={14} className="text-dark-5 dark:text-dark-6" />
                       <span className="text-dark-5 dark:text-dark-6">
-                        Created: {formatDate(order.created_at)}
+                        Created: {formatExactDate(order.created_at)}
                       </span>
                     </div>
                     <div className="flex items-center gap-2 text-xs">
                       <Clock size={14} className="text-red-500" />
                       <span className="font-medium text-red-600 dark:text-red-400">
-                        Expired: {formatDate(order.updated_at)}
+                        Expired: {formatExactDate(order.updated_at)}
                       </span>
                     </div>
                   </div>

@@ -8,6 +8,7 @@ import {
 import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
 import Link from "next/link";
 import { toast } from "react-hot-toast";
+import { formatExactDate } from "@/utils/dateUtils";
 
 const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
 const getAuthHeaders = () => ({
@@ -226,10 +227,10 @@ export default function CashHistoryPage() {
                                 <tr key={entry.id} className="hover:bg-gray-50 dark:hover:bg-meta-4/10 transition-colors group">
                                     <td className="px-6 py-4">
                                         <p className="text-sm font-bold text-gray-800 dark:text-gray-200 whitespace-nowrap">
-                                            {new Date(entry.created_at).toLocaleDateString()}
+                                            {formatExactDate(entry.created_at, 'MMM DD, YYYY')}
                                         </p>
                                         <p className="text-[10px] text-gray-400 font-medium">
-                                            {new Date(entry.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                            {formatExactDate(entry.created_at, 'h:mm A')}
                                         </p>
                                     </td>
                                     <td className="px-6 py-4">

@@ -410,7 +410,7 @@ export default function RecoveryOfficersPage() {
                                                 <p className="text-xs text-gray-500 mt-2">
                                                     {selectedOfficer.is_online
                                                         ? 'Tracking active'
-                                                        : `Last seen: ${formatExactDate(new Date(selectedOfficer.last_known_location?.timestamp || ''))}`}
+                                                        : `Last seen: ${formatExactDate((selectedOfficer.last_known_location?.timestamp || ''))}`}
                                                 </p>
                                             </div>
                                             <button className="w-full py-2.5 bg-primary text-white rounded-lg font-semibold hover:bg-primary/90 transition">

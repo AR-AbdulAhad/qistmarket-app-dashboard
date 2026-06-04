@@ -138,7 +138,7 @@ const EditableField = ({
                                     <div key={history.id} className="text-xs border-b border-gray-100 dark:border-gray-700 pb-2">
                                         <div className="flex justify-between text-gray-600 dark:text-gray-400">
                                             <span className="font-medium">{history.edited_by_name}</span>
-                                            <span>{formatDateTimeUTC(history.edited_at)}</span>
+                                            <span>{formatExactDate(history.edited_at)}</span>
                                         </div>
                                         <div className="mt-1 text-gray-700 dark:text-gray-300">
                                             <span className="line-through text-red-500">{history.old_value || '(empty)'}</span>
@@ -204,14 +204,6 @@ interface VerificationData {
 }
 
 
-const formatDateTimeUTC = (value?: string): string => {
-    if (!value) return "Not set";
-    return formatExactDate(value, "MMM D, YYYY h:mm A");
-};
-const formatDateTimeLocal = (value?: string): string => {
-    if (!value) return "Not set";
-    return formatExactDate(value, "MMM D, YYYY h:mm A");
-};
 
 const shouldDisplay = (value: any): boolean => {
     if (value === null || value === undefined) return false;
@@ -877,7 +869,7 @@ export default function OrderDetailsPage() {
                                         <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                                         </svg>
-                                        {formatDateTimeUTC(review.created_at)}
+                                        {formatExactDate(review.created_at)}
                                     </div>
                                 </div>
                             ))}
@@ -965,7 +957,7 @@ export default function OrderDetailsPage() {
                                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                                 </svg>
-                                {formatDateTimeUTC(order.created_at)}
+                                {formatExactDate(order.created_at)}
                             </div>
                         </div>
                     </div>
@@ -996,7 +988,7 @@ export default function OrderDetailsPage() {
                                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                                     </svg>
-                                    {formatDateTimeUTC(order.verification_assigned_at)}
+                                    {formatExactDate(order.verification_assigned_at)}
                                 </div>
                             </div>
                         </div>
@@ -1028,7 +1020,7 @@ export default function OrderDetailsPage() {
                                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                                     </svg>
-                                    {formatDateTimeUTC(order.delivery_assigned_at)}
+                                    {formatExactDate(order.delivery_assigned_at)}
                                 </div>
                             </div>
                         </div>
@@ -1060,7 +1052,7 @@ export default function OrderDetailsPage() {
                                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                                     </svg>
-                                    {formatDateTimeUTC(order.recovery_assigned_at)}
+                                    {formatExactDate(order.recovery_assigned_at)}
                                 </div>
                             </div>
                         </div>
@@ -1142,7 +1134,7 @@ export default function OrderDetailsPage() {
                                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                                         </svg>
-                                        {formatDateTimeUTC(h.created_at)}
+                                        {formatExactDate(h.created_at)}
                                     </div>
                                 </div>
                             </div>
@@ -1176,8 +1168,8 @@ export default function OrderDetailsPage() {
                             {verification.verification_officer && (
                                 <Field label="Officer" value={`${verification.verification_officer.full_name} (${verification.verification_officer.username})`} />
                             )}
-                            <Field label="Start Time" value={verification.start_time ? formatDateTimeUTC(verification.start_time) : null} />
-                            <Field label="End Time" value={verification.end_time ? formatDateTimeUTC(verification.end_time) : null} />
+                            <Field label="Start Time" value={verification.start_time ? formatExactDate(verification.start_time) : null} />
+                            <Field label="End Time" value={verification.end_time ? formatExactDate(verification.end_time) : null} />
                             <Field label="Verification Feedback" value={verification.verification_feedback} />
                         </div>
                         {verification.home_location_required && (
@@ -1456,7 +1448,7 @@ export default function OrderDetailsPage() {
                                                             <td className="px-4 py-2">{loc.latitude}</td>
                                                             <td className="px-4 py-2">{loc.longitude}</td>
                                                             <td className="px-4 py-2">{loc.accuracy ? `${loc.accuracy} meters` : '—'}</td>
-                                                            <td className="px-4 py-2">{formatDateTimeUTC(loc.timestamp)}</td>
+                                                            <td className="px-4 py-2">{formatExactDate(loc.timestamp)}</td>
                                                             <td className="px-4 py-2">
                                                                 <a
                                                                     href={`https://www.google.com/maps/search/?api=1&query=${loc.latitude},${loc.longitude}`}
@@ -1504,7 +1496,7 @@ export default function OrderDetailsPage() {
                                                             </div>
                                                         </div>
                                                         <Field label="Address" value={loc.address} />
-                                                        <Field label="Captured At" value={loc.created_at ? formatDateTimeUTC(loc.created_at) : null} />
+                                                        <Field label="Captured At" value={loc.created_at ? formatExactDate(loc.created_at) : null} />
                                                     </div>
 
                                                     {loc.photos && loc.photos.length > 0 && (

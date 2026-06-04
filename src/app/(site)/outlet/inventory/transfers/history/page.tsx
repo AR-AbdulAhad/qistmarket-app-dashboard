@@ -10,6 +10,7 @@ import Loader from "@/components/common/Loader";
 import { toast } from "react-hot-toast";
 import { useNotifications } from "../../../../../../../contexts/NotificationContext";
 import { useAuth } from "../../../../../../../contexts/AuthContext";
+import { formatExactDate } from "@/utils/dateUtils";
 
 const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
 const getAuthHeaders = () => ({
@@ -50,13 +51,6 @@ interface GroupedTransfer {
     total_quantity: number;
     latest_at: string;
     records: TransferRecord[];
-}
-
-function formatDate(d: string) {
-    return new Date(d).toLocaleString("en-PK", {
-        year: "numeric", month: "short", day: "numeric",
-        hour: "2-digit", minute: "2-digit"
-    });
 }
 
 export default function TransferHistoryPage() {
@@ -498,7 +492,7 @@ export default function TransferHistoryPage() {
                                             </td>
 
                                             <td className="p-4 text-right text-xs text-gray-500">
-                                                {formatDate(grp.latest_at)}
+                                                {formatExactDate(grp.latest_at)}
                                             </td>
                                         </tr>
 
@@ -520,7 +514,7 @@ export default function TransferHistoryPage() {
                                                         </span>
                                                         {rec.status === 'Stock Back' && rec.updated_at && (
                                                             <span className="text-[10px] text-gray-400">
-                                                                on {formatDate(rec.updated_at)}
+                                                                on {formatExactDate(rec.updated_at)}
                                                             </span>
                                                         )}
                                                         
@@ -571,7 +565,7 @@ export default function TransferHistoryPage() {
                                                     </div>
                                                 </td>
                                                 <td className="p-3 text-right text-gray-400">
-                                                    {formatDate(rec.created_at)}
+                                                    {formatExactDate(rec.created_at)}
                                                 </td>
                                             </tr>
                                         ))}

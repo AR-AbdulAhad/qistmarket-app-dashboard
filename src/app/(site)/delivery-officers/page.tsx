@@ -553,7 +553,7 @@ const fetchAllDeliveries = async () => {
                           {(boyDetails.boy.current_location || boyDetails.boy.last_known_location)?.longitude.toFixed(6)}
                         </p>
                         <p className="text-xs text-gray-500 mt-2">
-                          {boyDetails.boy.is_online ? 'Tracking active' : `Last seen: ${formatExactDate(new Date(boyDetails.boy.last_known_location?.timestamp || boyDetails.boy.last_online_at || ''))}`}
+                          {boyDetails.boy.is_online ? 'Tracking active' : `Last seen: ${formatExactDate(boyDetails.boy.last_known_location?.timestamp || boyDetails.boy.last_online_at || '')}`}
                         </p>
                       </div>
                     ) : <p className="text-gray-500 text-center py-10">No location data available</p>}

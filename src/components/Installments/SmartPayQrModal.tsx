@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import Cookies from "js-cookie";
+import { formatExactDate } from "@/utils/dateUtils";
 
 const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
 
@@ -142,7 +143,7 @@ export default function SmartPayQrModal({ open, onClose, orderId, monthNumber, d
                                     
                                     {qrData.expires_at && (
                                         <p className="text-xs text-orange-500 font-bold mt-2 bg-orange-50 px-3 py-1.5 rounded-lg border border-orange-100">
-                                            Expires: {new Date(qrData.expires_at).toLocaleString('en-PK', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short' })}
+                                            Expires: {formatExactDate(qrData.expires_at)}
                                         </p>
                                     )}
 

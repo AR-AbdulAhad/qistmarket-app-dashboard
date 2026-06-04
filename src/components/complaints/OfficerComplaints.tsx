@@ -5,6 +5,7 @@ import toast from "react-hot-toast";
 import Cookies from "js-cookie";
 import { Image as ImageIcon, Search, Clock, CheckCircle, AlertCircle, X } from "lucide-react";
 import CnicSearch from "./CnicSearch";
+import { formatExactDate } from "@/utils/dateUtils";
 
 interface ComplaintItem {
   id: number;
@@ -306,7 +307,7 @@ export default function OfficerComplaints() {
                     </div>
                   )}
                   
-                  <p className="mt-4 text-[10px] text-gray-400">Filed on: {new Date(item.created_at).toLocaleString()}</p>
+                  <p className="mt-4 text-[10px] text-gray-400">Filed on: {formatExactDate(item.created_at)}</p>
                 </div>
               ))
             ) : (

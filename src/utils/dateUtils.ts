@@ -31,35 +31,31 @@ export const formatExactDate = (dateInput: string | Date | null | undefined, for
     const ampmLower = hours >= 12 ? 'pm' : 'am';
     
     let displayHours = hours % 12;
-    displayHours = displayHours ? displayHours : 12; // the hour '0' should be '12'
+    displayHours = displayHours ? displayHours : 12;
     const strHours12 = String(displayHours).padStart(2, '0');
     const strHours12Unpadded = String(displayHours);
     const strHours24 = String(hours).padStart(2, '0');
 
-    let formatted = formatStr;
-    formatted = formatted.replace('YYYY', String(year));
-    formatted = formatted.replace('dddd', dayOfWeekFull);
-    formatted = formatted.replace('ddd', dayOfWeekShort);
-    
-    formatted = formatted.replace('MMMM', monthFullStr);
-    formatted = formatted.replace('MMM', monthShortStr);
-    formatted = formatted.replace('MM', monthNum);
-    
-    // Replace DD first, then D
-    formatted = formatted.replace('DD', day);
-    formatted = formatted.replace('D', dayUnpadded);
-    
-    // Replace hh first, then h
-    formatted = formatted.replace('hh', strHours12);
-    formatted = formatted.replace('h', strHours12Unpadded);
-    formatted = formatted.replace('HH', strHours24);
-    
-    formatted = formatted.replace('mm', minutes);
-    formatted = formatted.replace('ss', seconds);
-    formatted = formatted.replace('A', ampm);
-    formatted = formatted.replace('a', ampmLower);
-    
-    return formatted;
+    const tokens: Record<string, string> = {
+        'YYYY': String(year),
+        'dddd': dayOfWeekFull,
+        'ddd': dayOfWeekShort,
+        'MMMM': monthFullStr,
+        'MMM': monthShortStr,
+        'MM': monthNum,
+        'DD': day,
+        'D': dayUnpadded,
+        'hh': strHours12,
+        'h': strHours12Unpadded,
+        'HH': strHours24,
+        'mm': minutes,
+        'ss': seconds,
+        'A': ampm,
+        'a': ampmLower,
+    };
+
+    const tokenPattern = /YYYY|dddd|ddd|MMMM|MMM|MM|DD|D|hh|h|HH|mm|ss|A|a/g;
+    return formatStr.replace(tokenPattern, (match) => tokens[match] ?? match);
 }
 
 export const timeAgo = (dateInput: string | Date | null | undefined) => {

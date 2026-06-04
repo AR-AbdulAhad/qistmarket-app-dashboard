@@ -8,11 +8,6 @@ import { formatExactDate } from "@/utils/dateUtils";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
 
-const formatDateTimeUTC = (value?: string): string => {
-    if (!value) return "Not set";
-    return formatExactDate(value, "MMM D, YYYY h:mm A");
-};
-
 // RecoveryPhotoCard Component - Now replaced by shared MediaCard
 
 export default function RecoveryVisitDetails({ 
@@ -85,17 +80,6 @@ export default function RecoveryVisitDetails({
         return `Rs. ${amount?.toLocaleString() || 0}`;
     };
 
-    const formatDateTime = (dateTime: string) => {
-        if (!dateTime) return 'N/A';
-        return new Date(dateTime).toLocaleString('en-PK', {
-            day: '2-digit',
-            month: '2-digit',
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-            hour12: true
-        });
-    };
 
     if (loading) {
         return (
@@ -226,7 +210,7 @@ export default function RecoveryVisitDetails({
                                         Recovery Visit #{index + 1}
                                     </p>
                                     <p className="text-sm text-gray-500 dark:text-gray-400">
-                                        {formatDateTime(visit.visit_time)}
+                                        {formatExactDate(visit.visit_time)}
                                     </p>
                                 </div>
                             </div>
