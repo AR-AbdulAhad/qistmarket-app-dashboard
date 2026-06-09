@@ -118,7 +118,8 @@ export const StockTransferOTPPopup = () => {
                     Authorization: `Bearer ${Cookies.get("auth_token")}`,
                 },
                 body: JSON.stringify({
-                    transfer_id: stockBackData.transfer_id,
+                    transfer_id: Array.isArray(stockBackData.transfer_id) ? undefined : stockBackData.transfer_id,
+                    transfer_ids: stockBackData.transfer_ids || undefined,
                     otp: otpInput
                 }),
             });
