@@ -504,6 +504,67 @@ export const NAV_DATA = [
       },
     ],
   },
+  {
+    label: "HR PORTAL",
+    items: [
+      {
+        title: "HR Dashboard",
+        icon: Icons.LayoutDashboardIcon,
+        url: "/hr/dashboard",
+        items: [],
+      },
+      {
+        title: "Employees",
+        icon: Icons.UsersIcon,
+        items: [
+          { title: "Employee List", url: "/hr/employees" },
+          { title: "Add Employee", url: "/hr/employees/create" },
+        ],
+      },
+      {
+        title: "Attendance",
+        icon: Icons.ClockIcon,
+        url: "/hr/attendance",
+        items: [],
+      },
+      {
+        title: "Loans",
+        icon: Icons.HashIcon,
+        url: "/hr/loans",
+        items: [],
+      },
+      {
+        title: "Documents",
+        icon: Icons.FileTextIcon,
+        url: "/hr/documents",
+        items: [],
+      },
+      {
+        title: "Payroll",
+        icon: Icons.CreditCardIcon,
+        url: "/hr/payroll",
+        items: [],
+      },
+      {
+        title: "Performance",
+        icon: Icons.BarChartIcon,
+        url: "/hr/performance",
+        items: [],
+      },
+      {
+        title: "Pending Leaves",
+        icon: Icons.ClipboardCheckIcon,
+        url: "/hr/leaves",
+        items: [],
+      },
+      {
+        title: "Announcements",
+        icon: Icons.BellIcon,
+        url: "/hr/announcements",
+        items: [],
+      },
+    ],
+  },
 ];
 
 

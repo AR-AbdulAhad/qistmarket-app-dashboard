@@ -46,11 +46,21 @@ export function Sidebar() {
       return section.label === "CSR PORTAL";
     }
 
+    // HR role sees only HR PORTAL
+    if (userRole === "hr") {
+      return section.label === "HR PORTAL";
+    }
+
     // Hide Outlet Portal from Admin and Super Admin
     if (section.label === "OUTLET PORTAL" && (userRole === "admin" || userRole === "super admin")) {
       return false;
     }
     if (section.label === "CSR PORTAL" && (userRole === "admin" || userRole === "super admin" || userRole === "branch user")) {
+      return false;
+    }
+
+    // Hide HR PORTAL from non-HR roles
+    if (section.label === "HR PORTAL" && userRole !== "hr") {
       return false;
     }
 
@@ -106,7 +116,9 @@ export function Sidebar() {
                   ? "/csr/dashboard" 
                   : userRole === "branch user" 
                     ? "/outlet/dashboard" 
-                    : "/"
+                    : userRole === "hr"
+                      ? "/hr/dashboard"
+                      : "/"
               }
               onClick={() => isMobile && toggleSidebar()}
               className="px-0 py-2.5 min-[850px]:py-0"

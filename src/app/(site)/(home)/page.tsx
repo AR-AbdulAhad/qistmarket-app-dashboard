@@ -102,6 +102,8 @@ export default function Home() {
         router.push('/csr/dashboard')
       } else if (userRole === 'branch user') {
         router.push('/outlet/dashboard')
+      } else if (userRole === 'hr') {
+        router.push('/hr/dashboard')
       }
     }
   }, [user, authLoading, router])

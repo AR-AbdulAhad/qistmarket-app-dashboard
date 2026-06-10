@@ -90,6 +90,13 @@ const CreateUsers: React.FC = () => {
       platform: 'web',
       icon: Package,
       description: 'Analyze and manage form data and submissions'
+    },
+    {
+      id: 10,
+      name: 'HR',
+      platform: 'web',
+      icon: Monitor,
+      description: 'Manage employee records, attendance, leaves, payroll and announcements'
     }
   ];
 
