@@ -45,8 +45,8 @@ interface VerificationData {
     verification_assigned_at: string | null,
     created_by: { username: string, full_name: string } | null,
     assigned_to: { username: string, full_name: string } | null,
-    delivery_officer: { username: string, full_name: string } | null,
-    recovery_officer: { username: string, full_name: string } | null,
+    delivery_officer: { username: string, full_name: string; id: number } | null,
+    recovery_officer: { username: string, full_name: string; id: number } | null,
     statusHistories?: {
       id: number;
       old_status: string | null;
@@ -813,13 +813,19 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
           {data.order?.status && <Field label="Order Status" value={data.order.status} />}
           {data.verification_officer && (
             <Field
-              label="Officer"
+              label="Verification Officer"
               value={`${data.verification_officer.full_name} (${data.verification_officer.username})`}
+            />
+          )}
+          {data.order.delivery_officer && (
+            <Field
+              label="Delivery Officer"
+              value={`${data.order.delivery_officer.full_name} (${data.order.delivery_officer.username})`}
             />
           )}
           {data.status && (
             <div>
-              <label className="block text-sm font-medium text-gray-500 dark:text-gray-400">Status</label>
+              <label className="block text-sm font-medium text-gray-500 dark:text-gray-400">Verification Status</label>
               <div className="mt-1 rounded-lg bg-gray-100 px-4 py-2.5 dark:bg-dark-3">
                 <span className={cn(
                   "inline-flex rounded-full px-2 py-1 text-xs font-medium",
@@ -837,22 +843,6 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
           <Field label="Created At" value={data.created_at ? formatDateTimeLocal(data.created_at) : null} />
           <Field label="Updated At" value={data.updated_at ? formatDateTimeLocal(data.updated_at) : null} />
           <Field label="Verification Feedback" value={(data as any).verification_feedback} />
-          {(data as any).home_location_required && (
-            <div className="col-span-full mt-4">
-              <div className={cn(
-                "flex items-center gap-2 rounded-lg p-4 font-bold border-2",
-                (data as any).home_location_verified
-                  ? "bg-green-50 border-green-200 text-green-700 dark:bg-green-900/10 dark:border-green-800"
-                  : "bg-red-50 border-red-200 text-red-700 dark:bg-red-900/10 dark:border-red-800 animate-pulse"
-              )}>
-                <span className="text-xl">📍</span>
-                <span>HOME LOCATION REQUIRED</span>
-                {(data as any).home_location_verified && (
-                  <span className="ml-auto text-sm font-medium bg-green-100 px-2 py-0.5 rounded text-green-800">Verified</span>
-                )}
-              </div>
-            </div>
-          )}
         </div>
       </div>
 
@@ -1094,6 +1084,22 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
       )}
 
       {/* Location Management Actions (For Outlet/Admin) */}
+    {(data as any).home_location_required && (
+          <div className="col-span-full mt-4 mb-4">
+            <div className={cn(
+              "flex items-center gap-2 rounded-lg p-4 font-bold border-2",
+              (data as any).home_location_verified
+                ? "bg-green-50 border-green-200 text-green-700 dark:bg-green-900/10 dark:border-green-800"
+                : "bg-red-50 border-red-200 text-red-700 dark:bg-red-900/10 dark:border-red-800 animate-pulse"
+            )}>
+              <span className="text-xl">📍</span>
+              <span>HOME LOCATION REQUIRED</span>
+              {(data as any).home_location_verified && (
+                <span className="ml-auto text-sm font-medium bg-green-100 px-2 py-0.5 rounded text-green-800">Verified</span>
+              )}
+            </div>
+          </div>
+        )}
       {(data as any).home_location_required && !(data as any).home_location_verified && (
         <div className="mb-12 rounded-xl border border-warning bg-warning/5 p-6 dark:border-warning/30">
           <div className="flex items-center gap-3 mb-4">
@@ -1127,7 +1133,7 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
                 Option 1: Send to Verification Officer
               </button>
             )}
-            {(data as any).delivery_officer && (
+            {data.order.delivery_officer && (
               <button
                 onClick={() => {
                   setModalOfficerType('do');
@@ -1167,11 +1173,11 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
               <div>Username: {data.verification_officer.username}</div>
             </div>
           )}
-          {modalOfficerType === 'do' && (data as any).delivery_officer && (
+          {modalOfficerType === 'do' && data.order.delivery_officer && (
             <div className="mb-4 p-3 rounded bg-gray-100 dark:bg-gray-800">
               <div className="font-semibold">Officer Details:</div>
-              <div>Name: {(data as any).delivery_officer.full_name}</div>
-              <div>Username: {(data as any).delivery_officer.username}</div>
+              <div>Name: {data.order.delivery_officer.full_name}</div>
+              <div>Username: {data.order.delivery_officer.username}</div>
             </div>
           )}
           <div className="flex gap-4">
@@ -1182,11 +1188,11 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
                 setModalOpen(false);
                 await handleLocationAction(
                   modalOfficerType === 'vo' ? 'send-to-vo' : 'send-to-do',
-                  modalOfficerType === 'vo' ? String(data.verification_officer_id) : String((data as any).delivery_officer_id)
+                  modalOfficerType === 'vo' ? String(data.verification_officer_id) : String(data.order.delivery_officer?.id)
                 );
                 setLocationRequestPending(false);
               }}
-              disabled={locationRequestPending || (modalOfficerType === 'vo' && !data.verification_officer) || (modalOfficerType === 'do' && !(data as any).delivery_officer)}
+              disabled={locationRequestPending || (modalOfficerType === 'vo' && !data.verification_officer) || (modalOfficerType === 'do' && !data.order.delivery_officer)}
             >
               Confirm & Send
             </button>

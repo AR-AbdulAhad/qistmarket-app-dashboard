@@ -25,7 +25,9 @@ type CashEntry = {
     cash_type: string;
     officer: {
         full_name: string;
+        username: string;
         phone: string;
+        image: string | null;
     };
     order: {
         order_ref: string;
@@ -235,12 +237,16 @@ export default function CashHistoryPage() {
                                     </td>
                                     <td className="px-6 py-4">
                                         <div className="flex items-center gap-3">
-                                            <div className="w-8 h-8 rounded-full bg-gray-100 dark:bg-meta-4 flex items-center justify-center text-gray-500 text-xs font-bold">
-                                                {entry.officer?.full_name?.charAt(0) || '?'}
-                                            </div>
+                                            {entry.officer?.image ? (
+                                                <img src={entry.officer.image} alt="" className="h-8 w-8 rounded-full object-cover ring-2 ring-white dark:ring-gray-700" />
+                                            ) : (
+                                                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-500 text-xs font-bold text-white ring-2 ring-white dark:ring-gray-700">
+                                                    {(entry.officer?.full_name || '?').charAt(0).toUpperCase()}
+                                                </div>
+                                            )}
                                             <div>
                                                 <p className="text-sm font-bold text-gray-700 dark:text-gray-300 truncate max-w-[120px]">{entry.officer?.full_name || 'Unknown'}</p>
-                                                <p className="text-[10px] text-gray-500">{entry.officer?.phone || 'N/A'}</p>
+                                                <p className="text-[10px] text-gray-500">@{entry.officer?.username || 'N/A'}</p>
                                             </div>
                                         </div>
                                     </td>

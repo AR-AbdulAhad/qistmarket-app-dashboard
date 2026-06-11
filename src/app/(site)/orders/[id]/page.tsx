@@ -255,6 +255,8 @@ interface Order {
     order_notes?: string | null;
     gender?: string | null;
     residential_type?: string | null;
+    assigned_to: { username: string; full_name: string } | null;
+    assigned_to_user_id: number;
     zone?: string | null;
     block?: string | null;
     house_no?: string | null;
@@ -273,9 +275,8 @@ interface Order {
     postponed_feedback?: string | null;
     cancelled_at?: string | null;
     created_by: { username: string; full_name: string } | null;
-    assigned_to: { username: string; full_name: string } | null;
-    delivery_officer?: { username: string; full_name: string } | null;
-    recovery_officer?: { username: string; full_name: string } | null;
+    delivery_officer?: { username: string; full_name: string; id: number } | null;
+    recovery_officer?: { username: string; full_name: string; id: number } | null;
     delivery_assigned_at?: string | null;
     recovery_assigned_at?: string | null;
     verification_assigned_at?: string | null;
@@ -1165,8 +1166,11 @@ export default function OrderDetailsPage() {
                             <Field label="Verification ID" value={verification.id} />
                             <Field label="Order ID" value={verification.order_id} />
                             <Field label="Status" value={verification.status} />
-                            {verification.verification_officer && (
-                                <Field label="Officer" value={`${verification.verification_officer.full_name} (${verification.verification_officer.username})`} />
+                            {order.assigned_to && (
+                                <Field label="Verification Officer" value={`${order.assigned_to?.full_name} (${order.assigned_to?.username})`} />
+                            )}
+                            {order.delivery_officer && (
+                                <Field label="Delivery Officer" value={`${order.delivery_officer.full_name} (${order.delivery_officer.username})`} />
                             )}
                             <Field label="Start Time" value={verification.start_time ? formatExactDate(verification.start_time) : null} />
                             <Field label="End Time" value={verification.end_time ? formatExactDate(verification.end_time) : null} />
@@ -1197,7 +1201,7 @@ export default function OrderDetailsPage() {
                                     This verification requires a customer home location capture. Assign an officer to proceed. Once a request is sent, you cannot assign again until the current request is resolved.
                                 </p>
                                 <div className="flex flex-wrap gap-4">
-                                    {verification.verification_officer && (
+                                    {order.assigned_to && (
                                         <button
                                             onClick={() => {
                                                 setModalOfficerType('vo');
@@ -1214,6 +1218,23 @@ export default function OrderDetailsPage() {
                                             Option 1: Send to Verification Officer
                                         </button>
                                     )}
+                                    {order.delivery_officer && (
+                                    <button
+                                        onClick={() => {
+                                        setModalOfficerType('do');
+                                        setModalOpen(true);
+                                        }}
+                                        className={cn(
+                                        "rounded-lg px-6 py-2.5 font-semibold shadow-sm transition-colors",
+                                        locationRequestPending || verification.status === 'location_capture_pending'
+                                            ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                                            : "bg-dark text-white hover:bg-dark/90"
+                                        )}
+                                        disabled={locationRequestPending || verification.status === 'location_capture_pending'}
+                                    >
+                                        Option 2: Send to Delivery Officer
+                                    </button>
+                                    )}
                                 </div>
                                 {(locationRequestPending || verification.status === 'location_capture_pending') && (
                                     <div className="mt-6 flex items-center gap-2 text-yellow-800 dark:text-yellow-200 text-base font-medium">
@@ -1225,42 +1246,49 @@ export default function OrderDetailsPage() {
                         )}
                         {/* Officer Selection Modal */}
                         <Modal open={modalOpen} onClose={() => setModalOpen(false)}>
-                            <div className="rounded-2xl bg-white p-8 shadow-xl dark:bg-gray-800">
-                                <h2 className="text-lg font-bold mb-4">
-                                    {modalOfficerType === 'vo' ? 'Send to Verification Officer' : 'Send to Delivery Officer'}
-                                </h2>
-                                {modalOfficerType === 'vo' && verification.verification_officer && (
-                                    <div className="mb-4 p-3 rounded bg-gray-100 dark:bg-gray-800">
-                                        <div className="font-semibold">Officer Details:</div>
-                                        <div>Name: {verification.verification_officer.full_name}</div>
-                                        <div>Username: {verification.verification_officer.username}</div>
-                                    </div>
-                                )}
-                                <div className="flex gap-4">
-                                    <button
-                                        className="bg-primary text-white px-4 py-2 rounded"
-                                        onClick={async () => {
-                                            setLocationRequestPending(true);
-                                            setModalOpen(false);
-                                            await handleLocationAction(
-                                                modalOfficerType === 'vo' ? 'send-to-vo' : 'send-to-do',
-                                                modalOfficerType === 'vo' ? String(verification.verification_officer_id) : ''
-                                            );
-                                            setLocationRequestPending(false);
-                                        }}
-                                        disabled={locationRequestPending || (modalOfficerType === 'vo' && !verification.verification_officer)}
-                                    >
-                                        Confirm & Send
-                                    </button>
-                                    <button
-                                        className="bg-gray-300 px-4 py-2 rounded"
-                                        onClick={() => setModalOpen(false)}
-                                    >
-                                        Cancel
-                                    </button>
-                                </div>
+                        <div className="rounded-2xl bg-white p-8 shadow-xl dark:bg-gray-800">
+                        <h2 className="text-lg font-bold mb-4">
+                            {modalOfficerType === 'vo' ? 'Send to Verification Officer' : 'Send to Delivery Officer'}
+                        </h2>
+                        {modalOfficerType === 'vo' && order.assigned_to && (
+                            <div className="mb-4 p-3 rounded bg-gray-100 dark:bg-gray-800">
+                            <div className="font-semibold">Officer Details:</div>
+                            <div>Name: {order.assigned_to.full_name}</div>
+                            <div>Username: {order.assigned_to.username}</div>
                             </div>
-                        </Modal>
+                        )}
+                        {modalOfficerType === 'do' && order.delivery_officer && (
+                            <div className="mb-4 p-3 rounded bg-gray-100 dark:bg-gray-800">
+                            <div className="font-semibold">Officer Details:</div>
+                            <div>Name: {order.delivery_officer.full_name}</div>
+                            <div>Username: {order.delivery_officer.username}</div>
+                            </div>
+                        )}
+                        <div className="flex gap-4">
+                            <button
+                            className="bg-primary text-white px-4 py-2 rounded"
+                            onClick={async () => {
+                                setLocationRequestPending(true);
+                                setModalOpen(false);
+                                await handleLocationAction(
+                                modalOfficerType === 'vo' ? 'send-to-vo' : 'send-to-do',
+                                modalOfficerType === 'vo' ? String( order.assigned_to_user_id) : String(order.delivery_officer?.id ?? '')
+                                );
+                                setLocationRequestPending(false);
+                            }}
+                            disabled={locationRequestPending || (modalOfficerType === 'vo' && !verification.verification_officer) || (modalOfficerType === 'do' && !order.delivery_officer)}
+                            >
+                            Confirm & Send
+                            </button>
+                            <button
+                            className="bg-gray-300 px-4 py-2 rounded"
+                            onClick={() => setModalOpen(false)}
+                            >
+                            Cancel
+                            </button>
+                        </div>
+                        </div>
+                    </Modal>
 
                         {/* Purchaser Details */}
                         {verification.purchaser && (
