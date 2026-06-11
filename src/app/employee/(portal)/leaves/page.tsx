@@ -58,10 +58,11 @@ export default function EmployeeLeavesPage() {
       {balances && (
         <div className="mb-6 grid gap-3 sm:grid-cols-3">
           {(["annual", "sick", "emergency"] as const).map((type) => (
-            <div key={type} className="rounded-xl border border-stroke bg-white p-4 dark:border-stroke-dark dark:bg-dark-2">
+            <div key={type} className={`rounded-xl border p-4 ${balances[type].remaining < 1 ? "border-red/30 bg-red/5" : "border-stroke bg-white dark:border-stroke-dark dark:bg-dark-2"}`}>
               <p className="text-xs capitalize text-gray-500">{type} Leave</p>
               <p className="text-lg font-bold text-dark dark:text-white">{balances[type].remaining} / {balances[type].total}</p>
               <p className="text-xs text-gray-500">Used: {balances[type].used}</p>
+              {balances[type].remaining < 1 && <p className="text-xs font-medium text-red">Exhausted</p>}
             </div>
           ))}
         </div>
@@ -79,6 +80,10 @@ export default function EmployeeLeavesPage() {
               <option value="emergency">Emergency</option>
               <option value="unpaid">Unpaid</option>
             </select>
+            {balances && form.leave_type !== "unpaid" && (() => {
+              const b = balances[form.leave_type as keyof typeof balances] as { remaining: number } | undefined;
+              return b && b.remaining < 1 ? <p className="mt-1 text-xs text-red">No {form.leave_type} leave remaining</p> : null;
+            })()}
           </div>
           <div>
             <label className="mb-1 block text-sm text-gray-500">From Date</label>
@@ -87,7 +92,7 @@ export default function EmployeeLeavesPage() {
           </div>
           <div>
             <label className="mb-1 block text-sm text-gray-500">To Date</label>
-            <input type="date" required value={form.to_date} onChange={(e) => setForm({ ...form, to_date: e.target.value })}
+            <input type="date" required value={form.to_date} min={form.from_date} onChange={(e) => setForm({ ...form, to_date: e.target.value })}
               className="w-full rounded-lg border border-stroke px-3 py-2 text-sm dark:border-stroke-dark dark:bg-dark-3" />
           </div>
           <div className="sm:col-span-2">
