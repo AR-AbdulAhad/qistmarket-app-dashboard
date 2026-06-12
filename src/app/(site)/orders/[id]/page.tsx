@@ -315,6 +315,9 @@ export default function OrderDetailsPage() {
     const [modalOpen, setModalOpen] = useState(false);
     const [modalOfficerType, setModalOfficerType] = useState<'vo' | 'do' | null>(null);
     const [locationRequestPending, setLocationRequestPending] = useState(false);
+    const [statusModalOpen, setStatusModalOpen] = useState(false);
+    const [pendingStatus, setPendingStatus] = useState<string | null>(null);
+    const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
     const { user } = useAuth();
     // Fetch verification data for this order
     const fetchVerification = async () => {
@@ -749,10 +752,33 @@ export default function OrderDetailsPage() {
                             <p className="text-sm text-gray-500 dark:text-gray-400">Status</p>
                             <span className={cn(
                                 "inline-block px-3 py-1 rounded-full text-xs font-bold uppercase mt-1",
-                                order.status === 'cancelled' ? "bg-red-100 text-red-600" : "bg-green-100 text-green-600"
+                                order.status === 'cancelled' || order.status === 'expired' ? "bg-red-100 text-red-600" : "bg-green-100 text-green-600"
                             )}>
                                 {order.status}
                             </span>
+                            {user?.role === 'Super Admin' && (
+                                <div className="mt-3 flex items-center gap-2">
+                                    <select
+                                        className="w-full rounded border border-stroke bg-gray-50 px-3 py-1.5 text-sm dark:border-dark-3 dark:bg-gray-700 dark:text-white"
+                                        defaultValue=""
+                                        onChange={(e) => {
+                                            const newStatus = e.target.value;
+                                            if (!newStatus) { e.target.value = ""; return; }
+                                            setPendingStatus(newStatus);
+                                            setStatusModalOpen(true);
+                                            e.target.value = "";
+                                        }}
+                                    >
+                                        <option value="" disabled>Change status...</option>
+                                        <option value="approved">Approved</option>
+                                        <option value="picked">Picked</option>
+                                        <option value="delivered">Delivered</option>
+                                        <option value="cancelled">Cancelled</option>
+                                        <option value="in_progress">In Progress</option>
+                                        <option value="pending">Pending</option>
+                                    </select>
+                                </div>
+                            )}
                         </div>
                         <div>
                             <p className="text-sm text-gray-500 dark:text-gray-400">Reference Number</p>
@@ -1581,6 +1607,55 @@ export default function OrderDetailsPage() {
             )}
 
             {/* Action Modals (Edit/Cancel) */}
+            <Modal open={statusModalOpen} onClose={() => { if (!isUpdatingStatus) { setStatusModalOpen(false); setPendingStatus(null); } }}>
+                <div className="rounded-2xl bg-white p-8 shadow-xl dark:bg-gray-800">
+                    <h2 className="text-xl font-bold mb-2 dark:text-white">Change Order Status</h2>
+                    <p className="text-gray-600 dark:text-gray-400 mb-6">
+                        Change status from <strong>{order?.status}</strong> to <strong>{pendingStatus}</strong>?
+                    </p>
+                    <div className="flex justify-end gap-3 text-sm font-medium">
+                        <button
+                            onClick={() => { setStatusModalOpen(false); setPendingStatus(null); }}
+                            disabled={isUpdatingStatus}
+                            className="rounded border border-stroke px-6 py-2 hover:bg-gray-50 dark:border-dark-3 dark:hover:bg-dark-2"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            onClick={async () => {
+                                if (!pendingStatus) return;
+                                setIsUpdatingStatus(true);
+                                const token = Cookies.get('auth_token');
+                                try {
+                                    const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/orders/${order?.id}/status`, {
+                                        method: 'PATCH',
+                                        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                                        body: JSON.stringify({ status: pendingStatus, remarks: `Status changed to ${pendingStatus} by Super Admin` }),
+                                    });
+                                    const json = await res.json();
+                                    if (json.success) {
+                                        toast.success(json.message);
+                                        setOrder(prev => ({ ...(prev as Order), status: pendingStatus }));
+                                    } else {
+                                        toast.error(json.message || 'Failed to update status');
+                                    }
+                                } catch {
+                                    toast.error('Failed to update status');
+                                } finally {
+                                    setIsUpdatingStatus(false);
+                                    setStatusModalOpen(false);
+                                    setPendingStatus(null);
+                                }
+                            }}
+                            disabled={isUpdatingStatus}
+                            className="bg-primary text-white rounded px-8 py-2 hover:bg-opacity-90 disabled:opacity-50"
+                        >
+                            {isUpdatingStatus ? 'Updating...' : 'Confirm'}
+                        </button>
+                    </div>
+                </div>
+            </Modal>
+
             <Modal open={editModalOpen} onClose={() => setEditModalOpen(false)}>
                 <div className="rounded-2xl bg-white p-8 shadow-xl dark:bg-gray-800 max-w-lg w-full">
                     <h2 className="text-2xl font-bold mb-4 dark:text-white">Edit Product Selection</h2>
