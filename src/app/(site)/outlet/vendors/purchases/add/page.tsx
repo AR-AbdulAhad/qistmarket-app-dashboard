@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Cookies from "js-cookie";
 import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
@@ -13,6 +13,8 @@ import {
 import Papa from "papaparse";
 import Loader from "@/components/common/Loader";
 import SearchableSelect from "@/components/common/SearchableSelect";
+import toast from "react-hot-toast";
+import { cn } from "@/lib/utils";
 
 const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
 const getAuthHeaders = () => ({
@@ -51,6 +53,127 @@ export default function AddVendorPurchasePage() {
         { tempId: Math.random().toString(), product_name: "", category: "", color_variant: "", imei_serials: [""], quantity: 1, unit_price: 0 }
     ]);
 
+    // Barcode Scanner Logic
+    const [scannerConnected, setScannerConnected] = useState(false);
+    const [scannerDeviceName, setScannerDeviceName] = useState('Hardware Barcode Scanner');
+    const barcodeBuffer = useRef('');
+    const lastKeyTime = useRef(Date.now());
+    const itemsRef = useRef(items);
+
+    useEffect(() => {
+        itemsRef.current = items;
+    }, [items]);
+
+    useEffect(() => {
+        const checkExistingScanner = async () => {
+            try {
+                if ('hid' in navigator) {
+                    const devices = await (navigator as any).hid.getDevices();
+                    if (devices && devices.length > 0) {
+                        setScannerDeviceName(devices[0].productName || 'Hardware Barcode Scanner');
+                        setScannerConnected(true);
+                    }
+                }
+            } catch (err) {
+                console.error("Failed to check existing scanner", err);
+            }
+        };
+        checkExistingScanner();
+    }, []);
+
+    const connectScanner = async () => {
+        try {
+            const devices = await (navigator as any).hid.requestDevice({ filters: [] });
+            if (devices && devices.length > 0) {
+                setScannerDeviceName(devices[0].productName || 'Hardware Barcode Scanner');
+                setScannerConnected(true);
+                toast.success(`Scanner Connected: ${devices[0].productName}`);
+            }
+        } catch (err) {
+            console.error('Error connecting scanner:', err);
+        }
+    };
+
+    const itemsSnapshotBeforeScan = useRef<PurchaseItemInput[] | null>(null);
+
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            const target = e.target as HTMLElement;
+            const isInputFocused = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA';
+
+            const currentTime = Date.now();
+            const timeDiff = currentTime - lastKeyTime.current;
+
+            if (timeDiff > 50) {
+                barcodeBuffer.current = '';
+                // Save a snapshot of the state before the scan begins.
+                // This allows us to "undo" any characters that leak into the focused native input.
+                itemsSnapshotBeforeScan.current = itemsRef.current;
+            } else if (barcodeBuffer.current.length >= 1 && isInputFocused) {
+                // Prevent native input from capturing rapid scanner keystrokes to avoid UI freeze/crash
+                e.preventDefault();
+            }
+
+            if (e.key === 'Enter') {
+                if (barcodeBuffer.current.length > 3) {
+                    const scannedCode = barcodeBuffer.current;
+                    if (!scannerConnected) setScannerConnected(true);
+                    
+                    let updated = false;
+                    // Use the snapshot to completely undo the leaked first-character onChange event!
+                    const prevItems = itemsSnapshotBeforeScan.current || itemsRef.current;
+                    let newItems = [...prevItems];
+
+                    newItems = newItems.map(item => {
+                        if (updated) return item;
+                        
+                        const emptyIndex = item.imei_serials.findIndex(i => !i.trim());
+                        if (emptyIndex !== -1) {
+                            const newImeis = [...item.imei_serials];
+                            newImeis[emptyIndex] = scannedCode;
+                            updated = true;
+                            return { ...item, imei_serials: newImeis };
+                        }
+                        return item;
+                    });
+
+                    if (updated) {
+                        toast.success(`Barcode Scanned: ${scannedCode}`);
+                        setItems(newItems);
+                    } else {
+                        // Automatically increase quantity of the last item and add the new IMEI
+                        const lastItemIndex = newItems.length - 1;
+                        if (lastItemIndex >= 0) {
+                            const lastItem = { ...newItems[lastItemIndex] };
+                            lastItem.quantity = Number(lastItem.quantity || 1) + 1;
+                            lastItem.imei_serials = [...lastItem.imei_serials, scannedCode];
+                            newItems[lastItemIndex] = lastItem;
+                            
+                            toast.success(`Increased Quantity & Added: ${scannedCode}`);
+                            setItems(newItems);
+                        } else {
+                            toast.error('Please add at least one row first.');
+                        }
+                    }
+
+                    if (isInputFocused) {
+                        e.preventDefault();
+                        target.blur(); // Blur the input so subsequent scans don't continue to target it
+                    }
+                }
+                barcodeBuffer.current = '';
+                itemsSnapshotBeforeScan.current = null;
+            } else if (e.key.length === 1) {
+                barcodeBuffer.current += e.key;
+            }
+
+            lastKeyTime.current = currentTime;
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [scannerConnected]);
+
     useEffect(() => {
         const fetchData = async () => {
             try {
@@ -76,7 +199,7 @@ export default function AddVendorPurchasePage() {
     }, []);
 
     const handleProductSelectByRow = (tempId: string, product: any) => {
-        setItems(items.map(i => {
+        setItems(prevItems => prevItems.map(i => {
             if (i.tempId === tempId) {
                 return {
                     ...i,
@@ -93,7 +216,7 @@ export default function AddVendorPurchasePage() {
     const [importing, setImporting] = useState(false);
 
     const addItem = () => {
-        setItems([...items, { 
+        setItems(prevItems => [...prevItems, { 
             tempId: Math.random().toString(), 
             product_name: "", 
             category: "", 
@@ -105,16 +228,20 @@ export default function AddVendorPurchasePage() {
     };
 
     const removeItem = (tempId: string) => {
-        if (items.length === 1) return;
-        setItems(items.filter(i => i.tempId !== tempId));
+        setItems(prevItems => {
+            if (prevItems.length === 1) return prevItems;
+            return prevItems.filter(i => i.tempId !== tempId);
+        });
     };
 
     const updateItem = (tempId: string, field: keyof PurchaseItemInput, value: any) => {
-        setItems(items.map(i => {
+        setItems(prevItems => prevItems.map(i => {
             if (i.tempId === tempId) {
                 const updated = { ...i, [field]: value };
                 if (field === "quantity") {
-                    const qty = parseInt(value) || 1;
+                    let qty = parseInt(value) || 1;
+                    if (qty > 1000) qty = 1000; // PREVENT OOM CRASH
+                    updated.quantity = qty;
                     let newImeis = [...updated.imei_serials];
                     if (qty > newImeis.length) {
                         newImeis = [...newImeis, ...Array(qty - newImeis.length).fill("")];
@@ -130,7 +257,7 @@ export default function AddVendorPurchasePage() {
     };
 
     const updateImei = (tempId: string, index: number, value: string) => {
-        setItems(items.map(i => {
+        setItems(prevItems => prevItems.map(i => {
             if (i.tempId === tempId) {
                 const newImeis = [...i.imei_serials];
                 newImeis[index] = value;
@@ -429,10 +556,30 @@ export default function AddVendorPurchasePage() {
                     {/* RIGHT: Items Table */}
                     <div className="lg:col-span-2">
                         <div className="bg-white dark:bg-boxdark p-6 rounded-3xl border border-stroke dark:border-strokedark shadow-sm overflow-hidden">
-                            <div className="flex items-center justify-between mb-6 px-1">
-                                <h3 className="text-base font-black flex items-center gap-2">
-                                    <Package size={20} className="text-primary" /> Purchase Items ({items.length})
-                                </h3>
+                            <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 px-1 gap-4">
+                                <div className="space-y-2">
+                                    <h3 className="text-base font-black flex items-center gap-2">
+                                        <Package size={20} className="text-primary" /> Purchase Items ({items.length})
+                                    </h3>
+                                    <div className="flex items-center gap-2">
+                                        <div className={cn(
+                                            "w-2 h-2 rounded-full animate-pulse",
+                                            scannerConnected ? "bg-emerald-500" : "bg-amber-500"
+                                        )}></div>
+                                        <span className="text-xs font-bold text-gray-500">
+                                            {scannerConnected ? `Connected: ${scannerDeviceName}` : "Waiting for Barcode Scanner..."}
+                                        </span>
+                                        {!scannerConnected && (
+                                            <button
+                                                type="button"
+                                                onClick={connectScanner}
+                                                className="text-[10px] font-bold text-blue-500 hover:text-blue-700 bg-blue-50 px-2 py-0.5 rounded transition-colors"
+                                            >
+                                                Connect Scanner
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
                                 <div className="flex items-center gap-2">
                                     <label className="cursor-pointer px-4 py-2 rounded-xl text-xs font-black bg-gray-100 text-gray-600 hover:bg-gray-200 transition-all flex items-center gap-2 active:scale-95">
                                         <Upload size={14} />
@@ -526,6 +673,9 @@ export default function AddVendorPurchasePage() {
                                                                     value={imei}
                                                                     onChange={(e) => updateImei(item.tempId, idx, e.target.value)}
                                                                     placeholder={`Scan IMEI ${idx + 1}...`}
+                                                                    data-tempid={item.tempId}
+                                                                    data-index={idx}
+                                                                    data-is-imei="true"
                                                                     className="w-full bg-white dark:bg-boxdark border border-stroke dark:border-strokedark rounded-lg px-2 py-1 outline-none focus:border-primary font-mono text-gray-600 dark:text-gray-400 placeholder:text-gray-300 text-xs shadow-sm"
                                                                 />
                                                             </div>
@@ -696,6 +846,9 @@ export default function AddVendorPurchasePage() {
                                                             value={imei}
                                                             onChange={(e) => updateImei(item.tempId, idx, e.target.value)}
                                                             placeholder={`Scan Serial / IMEI ${idx + 1}...`}
+                                                            data-tempid={item.tempId}
+                                                            data-index={idx}
+                                                            data-is-imei="true"
                                                             className="w-full bg-gray-50 dark:bg-meta-4 border border-stroke dark:border-strokedark rounded-xl px-4 py-3 outline-none focus:border-primary text-sm font-bold text-gray-600 dark:text-gray-400 focus:shadow-md transition-all"
                                                         />
                                                     </div>

@@ -112,12 +112,39 @@ export default function PendingCashPage() {
                         Cash held by officers assigned to this outlet awaiting submission.
                     </p>
                 </div>
-                <button
-                    onClick={fetchCollections}
-                    className="bg-white dark:bg-boxdark border border-stroke dark:border-strokedark text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-meta-4 px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 shadow-sm transition-colors"
-                >
-                    <RefreshCw size={16} className={loading ? "animate-spin" : ""} /> Refresh
-                </button>
+                <div className="flex items-center gap-3">
+                    <button
+                        onClick={() => window.location.href = '/outlet/cash-in-hand/pending-submissions'}
+                        className="bg-amber-100 hover:bg-amber-200 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300 dark:hover:bg-amber-900/50 px-4 py-2 rounded-lg text-sm font-bold shadow-sm transition-colors flex items-center gap-2 border border-amber-200 dark:border-amber-800"
+                    >
+                        <Clock size={16} /> Submissions Awaiting OTP
+                    </button>
+                    <button
+                        onClick={fetchCollections}
+                        className="bg-white dark:bg-boxdark border border-stroke dark:border-strokedark text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-meta-4 px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 shadow-sm transition-colors"
+                    >
+                        <RefreshCw size={16} className={loading ? "animate-spin" : ""} /> Refresh
+                    </button>
+                </div>
+            </div>
+
+            {/* Premium Stats Banner */}
+            <div className="bg-gradient-to-r from-primary to-primary/80 rounded-2xl shadow-lg p-6 mb-8 text-white relative overflow-hidden">
+                <div className="absolute top-0 right-0 p-8 opacity-10">
+                    <Wallet size={120} />
+                </div>
+                <div className="relative z-10 flex flex-col md:flex-row justify-between items-center gap-6">
+                    <div>
+                        <p className="text-white/80 font-medium tracking-wide uppercase text-sm mb-1">Total Outstanding Cash</p>
+                        <h2 className="text-4xl font-black">PKR {grandTotal.toLocaleString()}</h2>
+                    </div>
+                    <div className="flex gap-4">
+                        <div className="bg-white/20 backdrop-blur-sm rounded-xl p-4 min-w-[120px] border border-white/10">
+                            <p className="text-white/80 text-xs uppercase font-bold tracking-wider mb-1">Officers</p>
+                            <p className="text-2xl font-bold">{groupedData.length}</p>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <div className="bg-white dark:bg-boxdark rounded-xl shadow-sm border border-stroke dark:border-strokedark p-4 mb-6 flex flex-col lg:flex-row gap-4 justify-between items-center">
@@ -125,21 +152,11 @@ export default function PendingCashPage() {
                     <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                     <input
                         type="text"
-                        placeholder="Search by name, username, role, cash type..."
+                        placeholder="Search by name, username, role..."
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
-                        className="w-full border border-stroke dark:border-strokedark rounded-lg pl-10 pr-4 py-2.5 text-sm bg-gray-50 dark:bg-form-input focus:border-primary outline-none dark:text-white"
+                        className="w-full border border-stroke dark:border-strokedark rounded-lg pl-10 pr-4 py-2.5 text-sm bg-gray-50 dark:bg-form-input focus:border-primary outline-none dark:text-white transition-all focus:ring-2 focus:ring-primary/20"
                     />
-                </div>
-                <div className="flex items-center gap-6 text-sm flex-wrap">
-                    <div className="flex flex-col items-end">
-                        <span className="text-gray-500 dark:text-gray-400">Officers</span>
-                        <span className="font-bold text-lg text-gray-800 dark:text-white">{groupedData.length}</span>
-                    </div>
-                    <div className="flex flex-col items-end">
-                        <span className="text-gray-500 dark:text-gray-400">Grand Total</span>
-                        <span className="font-black text-xl text-primary">PKR {grandTotal.toLocaleString()}</span>
-                    </div>
                 </div>
             </div>
 
@@ -149,30 +166,30 @@ export default function PendingCashPage() {
                     <p className="text-sm font-medium">Loading collections...</p>
                 </div>
             ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
                     {groupedData.length === 0 ? (
                         <div className="col-span-full bg-white dark:bg-boxdark rounded-2xl border border-dashed border-stroke dark:border-strokedark p-20 text-center text-gray-500">
                             <Wallet size={48} className="mx-auto mb-4 text-gray-300 dark:text-gray-600" />
                             No pending collections found.
                         </div>
                     ) : groupedData.map((group) => (
-                        <div key={group.officer.full_name} className="bg-white dark:bg-boxdark rounded-2xl border border-stroke dark:border-strokedark p-5 shadow-sm hover:shadow-md transition-all">
+                        <div key={group.officer.full_name} className="bg-white dark:bg-boxdark rounded-2xl border border-stroke dark:border-strokedark p-5 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group">
                             <div className="flex items-start justify-between">
                                 <div className="flex items-center gap-3 min-w-0">
                                     <Avatar name={group.officer.full_name} />
                                     <div className="min-w-0">
-                                        <h3 className="font-bold text-gray-800 dark:text-gray-200 truncate">{group.officer.full_name}</h3>
+                                        <h3 className="font-bold text-gray-800 dark:text-gray-200 truncate group-hover:text-primary transition-colors">{group.officer.full_name}</h3>
                                         <div className="flex items-center gap-2 mt-0.5 text-xs text-gray-500 dark:text-gray-400 flex-wrap">
                                             <span className="flex items-center gap-1"><User size={11} /> @{group.officer.username}</span>
                                             <span className="flex items-center gap-1"><Phone size={11} /> {group.officer.phone}</span>
                                         </div>
-                                        <span className="mt-1 inline-block rounded bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase text-primary">{group.officer.role}</span>
+                                        <span className="mt-2 inline-block rounded-full bg-primary/10 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-primary">{group.officer.role}</span>
                                     </div>
                                 </div>
-                                <div className="text-right shrink-0">
-                                    <p className="text-xs text-gray-500 dark:text-gray-400">Total Pending</p>
-                                    <p className="text-lg font-black text-primary">PKR {group.total_amount.toLocaleString()}</p>
-                                </div>
+                            </div>
+                            <div className="mt-4 pt-4 border-t border-stroke dark:border-strokedark">
+                                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Total Outstanding</p>
+                                <p className="text-2xl font-black text-primary">PKR {group.total_amount.toLocaleString()}</p>
                             </div>
                         </div>
                     ))}

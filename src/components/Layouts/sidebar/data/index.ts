@@ -440,6 +440,7 @@ export const NAV_DATA = [
         icon: Icons.BanknoteIcon,
         items: [
           { title: "Pending Collections", url: "/outlet/cash-in-hand" },
+          { title: "Pending Submissions", url: "/outlet/cash-in-hand/pending-submissions" },
           { title: "Collection History", url: "/outlet/cash-in-hand/history" },
         ],
       },

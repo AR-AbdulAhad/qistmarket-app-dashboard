@@ -59,6 +59,80 @@ export default function SelfPickupPage() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isCameraActive, setIsCameraActive] = useState(false);
+  
+  // Barcode Scanner Logic
+  const [scannerConnected, setScannerConnected] = useState(false);
+  const [scannerDeviceName, setScannerDeviceName] = useState('Hardware Barcode Scanner');
+  const barcodeBuffer = useRef('');
+  const lastKeyTime = useRef(Date.now());
+
+  const connectScanner = async () => {
+    try {
+      // Prompt user to select their barcode scanner
+      const devices = await (navigator as any).hid.requestDevice({ filters: [] });
+      if (devices && devices.length > 0) {
+        setScannerDeviceName(devices[0].productName || 'Hardware Barcode Scanner');
+        setScannerConnected(true);
+        toast.success(`Scanner Connected: ${devices[0].productName}`);
+      }
+    } catch (err) {
+      console.error('Error connecting scanner:', err);
+    }
+  };
+
+  useEffect(() => {
+    const checkExistingScanner = async () => {
+        try {
+            if ('hid' in navigator) {
+                const devices = await (navigator as any).hid.getDevices();
+                if (devices && devices.length > 0) {
+                    setScannerDeviceName(devices[0].productName || 'Hardware Barcode Scanner');
+                    setScannerConnected(true);
+                }
+            }
+        } catch (err) {
+            console.error("Failed to check existing scanner", err);
+        }
+    };
+    checkExistingScanner();
+  }, []);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      const isInputFocused = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA';
+      
+      const currentTime = Date.now();
+      if (currentTime - lastKeyTime.current > 50) {
+        barcodeBuffer.current = ''; 
+      }
+      
+      if (e.key === 'Enter') {
+        if (barcodeBuffer.current.length > 3) {
+          const scannedCode = barcodeBuffer.current;
+          setSearch(scannedCode);
+          if (!scannerConnected) setScannerConnected(true);
+          
+          // Execute side effect outside of any React state updater
+          setTimeout(() => {
+              toast.success(`Barcode Scanned: ${scannedCode}`);
+          }, 0);
+          
+          if (!isInputFocused) {
+            e.preventDefault();
+          }
+        }
+        barcodeBuffer.current = '';
+      } else if (e.key.length === 1) { 
+        barcodeBuffer.current += e.key;
+      }
+      
+      lastKeyTime.current = currentTime;
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [scannerConnected]);
 
   const getDevices = async () => {
     try {
@@ -578,6 +652,28 @@ export default function SelfPickupPage() {
                         <div className="absolute right-6 top-1/2 -translate-y-1/2 p-2 bg-white rounded-xl shadow-sm border border-gray-100 text-gray-400">
                             <QrCode className="w-6 h-6" />
                         </div>
+                    </div>
+
+                    {/* Barcode Scanner Status Indicator */}
+                    <div className="mt-4 flex items-center justify-between px-2">
+                        <div className="flex items-center gap-2">
+                            <div className={cn(
+                                "w-2.5 h-2.5 rounded-full animate-pulse",
+                                scannerConnected ? "bg-emerald-500" : "bg-amber-500"
+                            )}></div>
+                            <span className="text-sm font-bold text-gray-500">
+                                {scannerConnected ? `Connected: ${scannerDeviceName}` : "Waiting for Barcode Scanner..."}
+                            </span>
+                        </div>
+                        {!scannerConnected && (
+                            <button
+                                type="button"
+                                onClick={connectScanner}
+                                className="text-xs font-bold text-blue-500 hover:text-blue-700 bg-blue-50 px-3 py-1 rounded-lg transition-colors"
+                            >
+                                Connect Scanner
+                            </button>
+                        )}
                     </div>
 
                     <div className="mt-8 space-y-4 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
