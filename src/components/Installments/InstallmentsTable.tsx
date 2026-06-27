@@ -1,10 +1,15 @@
 "use client";
 
 import React, { useState } from "react";
+import Cookies from "js-cookie";
 import SmartPayQrModal from "./SmartPayQrModal";
 
 const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
 const pkr = (n: number) => `PKR ${Number(n || 0).toLocaleString()}`;
+const getAuthHeaders = () => {
+    const token = Cookies.get("auth_token");
+    return { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
+};
 
 type InstallmentRow = {
     monthNumber: number;
@@ -46,6 +51,7 @@ type OrderInstallment = {
     consumer_bill_status: string | null;
     recovery_officer: { id: number; name: string; phone: string } | null;
     tpsPayments?: any[];
+    paytrigger_status?: string | null;
 };
 
 type Props = {
@@ -99,6 +105,7 @@ export default function InstallmentsTable({ data, onPay, selectedIds = [], onSel
                             <th className="px-6 py-4">Next Due</th>
                             <th className="px-6 py-4">Installments</th>
                             <th className="px-6 py-4">Progress</th>
+                            <th className="px-6 py-4 text-center">PayTrigger</th>
                             <th className="px-6 py-4 text-center">Details</th>
                         </tr>
                     </thead>
@@ -189,6 +196,25 @@ export default function InstallmentsTable({ data, onPay, selectedIds = [], onSel
                                                 />
                                             </div>
                                             <p className="text-[10px] text-gray-500 mt-1">{Math.round(progress)}% done</p>
+                                        </td>
+                                        <td className="px-6 py-4 text-center">
+                                            {order.paytrigger_status ? (
+                                                <span className={`inline-flex items-center gap-1 text-[9px] font-black px-2 py-1 rounded-lg ${
+                                                    order.paytrigger_status === 'locked' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
+                                                    order.paytrigger_status === 'unlocked' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' :
+                                                    order.paytrigger_status === 'active_lock' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' :
+                                                    order.paytrigger_status === 'pre_enrolled' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' :
+                                                    'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400'
+                                                }`}>
+                                                    {order.paytrigger_status === 'locked' ? '🔒 LOCKED' :
+                                                     order.paytrigger_status === 'unlocked' ? '🔓 UNLOCKED' :
+                                                     order.paytrigger_status === 'active_lock' ? '⚠ ACTIVE LOCK' :
+                                                     order.paytrigger_status === 'pre_enrolled' ? '📱 PRE-ENROLLED' :
+                                                     order.paytrigger_status.toUpperCase()}
+                                                </span>
+                                            ) : (
+                                                <span className="text-[9px] text-gray-300">—</span>
+                                            )}
                                         </td>
                                         <td className="px-6 py-4 text-center">
                                             <button
@@ -631,6 +657,61 @@ export default function InstallmentsTable({ data, onPay, selectedIds = [], onSel
                                                             View Online Ledger →
                                                         </a>
                                                     )}
+                                                    {/* ── PayTrigger Actions ── */}
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mr-1">PT:</span>
+                                                        <button
+                                                            onClick={async () => {
+                                                                try {
+                                                                    const res = await fetch(`${API_BASE}/api/paytrigger/manual-lock`, {
+                                                                        method: 'POST',
+                                                                        headers: getAuthHeaders(),
+                                                                        body: JSON.stringify({ imei: order.imei_serial, order_ref: order.order_ref }),
+                                                                    });
+                                                                    const d = await res.json();
+                                                                    alert(d.message || (d.success ? 'Lock sent' : 'Failed'));
+                                                                } catch (e) { console.error(e); }
+                                                            }}
+                                                            className="text-[9px] font-black px-2.5 py-1.5 rounded-lg bg-red-500 text-white hover:bg-red-600 transition-colors disabled:opacity-40"
+                                                            disabled={!order.imei_serial}
+                                                        >
+                                                            Lock
+                                                        </button>
+                                                        <button
+                                                            onClick={async () => {
+                                                                try {
+                                                                    const res = await fetch(`${API_BASE}/api/paytrigger/manual-unlock`, {
+                                                                        method: 'POST',
+                                                                        headers: getAuthHeaders(),
+                                                                        body: JSON.stringify({ imei: order.imei_serial, order_ref: order.order_ref }),
+                                                                    });
+                                                                    const d = await res.json();
+                                                                    alert(d.message || (d.success ? 'Unlock sent' : 'Failed'));
+                                                                } catch (e) { console.error(e); }
+                                                            }}
+                                                            className="text-[9px] font-black px-2.5 py-1.5 rounded-lg bg-emerald-500 text-white hover:bg-emerald-600 transition-colors disabled:opacity-40"
+                                                            disabled={!order.imei_serial}
+                                                        >
+                                                            Unlock
+                                                        </button>
+                                                        <button
+                                                            onClick={async () => {
+                                                                try {
+                                                                    const res = await fetch(`${API_BASE}/api/paytrigger/promise-to-pay`, {
+                                                                        method: 'POST',
+                                                                        headers: getAuthHeaders(),
+                                                                        body: JSON.stringify({ imei: order.imei_serial, order_ref: order.order_ref, days: 7 }),
+                                                                    });
+                                                                    const d = await res.json();
+                                                                    alert(d.message || (d.success ? 'PTP sent' : 'Failed'));
+                                                                } catch (e) { console.error(e); }
+                                                            }}
+                                                            className="text-[9px] font-black px-2.5 py-1.5 rounded-lg bg-amber-500 text-white hover:bg-amber-600 transition-colors disabled:opacity-40"
+                                                            disabled={!order.imei_serial}
+                                                        >
+                                                            PTP
+                                                        </button>
+                                                    </div>
                                                 </div>
                                             </td>
                                         </tr>

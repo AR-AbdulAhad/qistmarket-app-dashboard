@@ -556,7 +556,14 @@ export default function TransferHistoryPage() {
                                                 <input type="checkbox" checked={selectedTransferredIds.has(rec.id)} onChange={() => toggleTransferred(rec.id)} className="w-4 h-4 text-indigo-600 bg-gray-100 border-gray-300 rounded focus:ring-indigo-600 dark:bg-meta-4 dark:border-strokedark cursor-pointer" />
                                             </div>
                                         )}
-                                        <span className="font-mono text-xs">{rec.inventory.imei_serial || "Generic"}</span>
+                                        <div className="flex items-center gap-2">
+                                            <span className="font-mono text-xs">{rec.inventory.imei_serial || "Generic"}</span>
+                                            {rec.inventory.status === "Used Stock" && (
+                                                <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-orange-100 text-orange-700 dark:bg-orange-900/20 dark:text-orange-400 uppercase tracking-wider border border-orange-200 dark:border-orange-800">
+                                                    Used Item
+                                                </span>
+                                            )}
+                                        </div>
                                     </div>
                                     <div className="col-span-2 text-center text-xs my-auto">{rec.inventory.color_variant || "—"}</div>
                                     <div className="col-span-1 text-center text-xs my-auto">{rec.quantity_transferred}</div>

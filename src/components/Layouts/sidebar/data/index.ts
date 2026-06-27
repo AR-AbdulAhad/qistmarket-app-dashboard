@@ -202,6 +202,12 @@ export const NAV_DATA = [
         url: "/reports",
         items: [],
       },
+      {
+        title: "PayTrigger",
+        icon: Icons.LockIcon,
+        url: "/admin/paytrigger",
+        items: [],
+      },
     ],
   },
   {

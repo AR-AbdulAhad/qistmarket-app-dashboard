@@ -698,9 +698,11 @@ export default function SelfPickupPage() {
                                         </div>
                                         <div className="space-y-1">
                                             <h4 className="font-black text-gray-900 text-lg">{item.product_name}</h4>
-                                            <div className="flex items-center gap-3">
+                                            <div className="flex items-center gap-3 flex-wrap">
                                                 <span className="text-xs font-black text-gray-400 bg-gray-100 px-2.5 py-1 rounded-lg uppercase tracking-tighter">IMEI: {item.imei_serial}</span>
                                                 <span className="text-xs font-black text-gray-400 bg-gray-100 px-2.5 py-1 rounded-lg uppercase tracking-tighter">Color: {item.color_variant}</span>
+                                                {item.category && <span className="text-xs font-black text-gray-400 bg-gray-100 px-2.5 py-1 rounded-lg uppercase tracking-tighter">{item.category}</span>}
+                                                {(() => { const m = item.product_name?.split(' ')[0]; return m ? <span className="text-xs font-black text-blue-500 bg-blue-50 px-2.5 py-1 rounded-lg uppercase tracking-tighter">{m}</span> : null; })()}
                                             </div>
                                         </div>
                                     </div>

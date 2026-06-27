@@ -43,6 +43,7 @@ type GroupedItem = {
 
 const STATUS_COLORS: Record<string, string> = {
     "In Stock": "bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400",
+    "Used Stock": "bg-primary/10 text-primary border border-primary/20 dark:bg-primary/5 dark:text-primary",
     "Sold": "bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400",
     "Out Of Stock": "bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-400",
 };
@@ -123,7 +124,7 @@ export default function OutletInventoryPage() {
             }
             const grp = map.get(key)!;
             grp.totalQty += item.quantity;
-            if (item.status === "In Stock") grp.inStockQty += item.quantity;
+            if (item.status === "In Stock" || item.status === "Used Stock") grp.inStockQty += item.quantity;
             grp.children.push(item);
         }
 
@@ -323,7 +324,7 @@ export default function OutletInventoryPage() {
 
     // Overall stats
     const totalItems = inventory.reduce((s, i) => s + i.quantity, 0);
-    const totalInStock = inventory.filter(i => i.status === "In Stock").reduce((s, i) => s + i.quantity, 0);
+    const totalInStock = inventory.filter(i => i.status === "In Stock" || i.status === "Used Stock").reduce((s, i) => s + i.quantity, 0);
     const totalSold = inventory.filter(i => i.status === "Sold").reduce((s, i) => s + i.quantity, 0);
 
     return (
@@ -551,7 +552,7 @@ export default function OutletInventoryPage() {
                                                         {/* In-Stock count (same as qty for child row) */}
                                                         <td className="px-4 py-3 text-center">
                                                             <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${STATUS_COLORS[item.status] || "bg-gray-100 text-gray-600"}`}>
-                                                                {item.status === "In Stock" ? item.quantity : 0}
+                                                                {item.status === "In Stock" || item.status === "Used Stock" ? item.quantity : 0}
                                                             </span>
                                                         </td>
 
@@ -573,8 +574,13 @@ export default function OutletInventoryPage() {
                                                         <td className="px-4 py-3 text-center">
                                                             <div className="flex flex-col items-center gap-1">
                                                                 <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${STATUS_COLORS[item.status] || "bg-gray-100 text-gray-600"}`}>
-                                                                    {item.status}
+                                                                    {item.status === "Used Stock" ? "In Stock" : item.status}
                                                                 </span>
+                                                                {item.status === "Used Stock" && (
+                                                                    <span className="px-1.5 py-0.5 rounded-full text-[8px] font-black bg-orange-100 text-orange-700 dark:bg-orange-900/20 dark:text-orange-400 uppercase tracking-wider border border-orange-200 dark:border-orange-800">
+                                                                        Used Item
+                                                                    </span>
+                                                                )}
                                                             </div>
                                                         </td>
                                                     </tr>
