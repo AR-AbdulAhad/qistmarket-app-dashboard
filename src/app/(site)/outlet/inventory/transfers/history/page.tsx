@@ -38,6 +38,7 @@ interface TransferRecord {
         imei_serial?: string;
         purchase_price: number;
         quantity: number;
+        status?: string;
     };
 }
 
