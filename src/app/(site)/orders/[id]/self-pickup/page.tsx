@@ -214,7 +214,7 @@ export default function SelfPickupPage() {
     const cat = category.toLowerCase().trim();
     let plans: any[] = [];
 
-    if (cat === 'mobiles' && price <= 50000) {
+    if (cat === 'mobiles' && price <= 60000) {
       plans = [
         { months: 3, profit: 0.20, advance: 0.35 },
         { months: 6, profit: 0.35, advance: 0.25 },
@@ -243,6 +243,7 @@ export default function SelfPickupPage() {
         { months: 6, profit: 0.38, advance: 0.35 },
         { months: 9, profit: 0.48, advance: 0.30 },
         { months: 12, profit: 0.60, advance: 0.25 },
+        { months: 24, profit: 0.85, advance: 0.25 },
       ];
     }
 

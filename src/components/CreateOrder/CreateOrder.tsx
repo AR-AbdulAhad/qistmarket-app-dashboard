@@ -204,7 +204,7 @@ const CreateOrders: React.FC = () => {
     const cat = category.toLowerCase().trim();
     let plans = [];
 
-    if (cat === 'mobiles' && price <= 50000) {
+    if (cat === 'mobiles' && price <= 60000) {
       plans = [
         { months: 3, profit: 0.20, advance: 0.35 },
         { months: 6, profit: 0.35, advance: 0.25 },

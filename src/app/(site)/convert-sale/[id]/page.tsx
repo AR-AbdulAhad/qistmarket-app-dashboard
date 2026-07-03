@@ -181,14 +181,14 @@ const ConvertSalePage = ({ params }: { params: Promise<{ id: string }> }) => {
   const calculateInstallments = (category: string, price: number) => {
     const cat = category.toLowerCase().trim();
     let plans = [];
-    if (cat === 'mobiles' && price <= 50000) {
+    if (cat === 'mobiles' && price <= 60000) {
       plans = [{ months: 3, profit: 0.20, advance: 0.35 }, { months: 6, profit: 0.35, advance: 0.25 }, { months: 9, profit: 0.45, advance: 0.20 }, { months: 12, profit: 0.55, advance: 0.15 }];
     } else if (price > 50000 && price <= 100000) {
       plans = [{ months: 3, profit: 0.20, advance: 0.40 }, { months: 6, profit: 0.35, advance: 0.35 }, { months: 9, profit: 0.45, advance: 0.30 }, { months: 12, profit: 0.55, advance: 0.25 }, { months: 24, profit: 0.85, advance: 0.25 }];
     } else if (price > 100000) {
       plans = [{ months: 3, profit: 0.20, advance: 0.40 }, { months: 6, profit: 0.35, advance: 0.35 }, { months: 9, profit: 0.45, advance: 0.30 }, { months: 12, profit: 0.55, advance: 0.25 }, { months: 24, profit: 0.85, advance: 0.25 }];
     } else {
-      plans = [{ months: 3, profit: 0.22, advance: 0.40 }, { months: 6, profit: 0.38, advance: 0.35 }, { months: 9, profit: 0.48, advance: 0.30 }, { months: 12, profit: 0.60, advance: 0.25 }];
+      plans = [{ months: 3, profit: 0.22, advance: 0.40 }, { months: 6, profit: 0.38, advance: 0.35 }, { months: 9, profit: 0.48, advance: 0.30 }, { months: 12, profit: 0.60, advance: 0.25 }, { months: 24, profit: 0.85, advance: 0.25 }];
     }
     return plans.map(p => {
       const adv = roundUp(price * p.advance);
