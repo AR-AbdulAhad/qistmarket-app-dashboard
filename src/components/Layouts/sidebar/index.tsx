@@ -65,6 +65,16 @@ export function Sidebar() {
       return false;
     }
 
+    // ACCOUNTS PORTAL: Accountant (exclusive) + Super Admin (full system access / audit visibility)
+    if (section.label === "ACCOUNTS PORTAL" && userRole !== "accountant" && userRole !== "super admin") {
+      return false;
+    }
+
+    // Accountant only sees ACCOUNTS PORTAL
+    if (section.label !== "ACCOUNTS PORTAL" && userRole === "accountant") {
+      return false;
+    }
+
     if (section.label === "MAIN MENU" && userRole === "branch user") {
       return false;
     }
