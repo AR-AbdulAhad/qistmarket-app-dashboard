@@ -37,7 +37,7 @@ export default function SigninWithOTP() {
     password: "",
   });
 
-  const [loginType, setLoginType] = useState<"web" | "outlet" | "hr">("web");
+  const [loginType, setLoginType] = useState<"web" | "outlet" | "hr" | "accountant">("web");
 
   const [step, setStep] = useState<"identifier" | "otp">("identifier");
   const [deviceId, setDeviceId] = useState<string>("");
@@ -225,6 +225,40 @@ export default function SigninWithOTP() {
     }
   };
 
+  const handleAccountantLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const { username, password } = data;
+    if (!username || !password) {
+      toast.error("Please enter username and password.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/accounts/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password }),
+      });
+
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.message || "Login failed.");
+
+      toast.success("Accountant login successful.");
+      Cookies.set("auth_token", result.token, {
+        expires: 30,
+        path: "/",
+      });
+      localStorage.setItem("user", JSON.stringify(result.user));
+      localStorage.setItem("token", result.token);
+      router.push("/accounts/dashboard");
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div>
       <div className="mb-8 flex border-b border-gray-100 dark:border-gray-800">
@@ -242,6 +276,11 @@ export default function SigninWithOTP() {
           active={loginType === "hr"}
           label="HR Login"
           onClick={() => setLoginType("hr")}
+        />
+        <TabButton
+          active={loginType === "accountant"}
+          label="Accountant Login"
+          onClick={() => setLoginType("accountant")}
         />
       </div>
 
@@ -349,6 +388,41 @@ export default function SigninWithOTP() {
             className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#ff3d3d] p-4 font-medium text-white transition hover:bg-opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {loading ? "Logging in..." : "Login to HR Dashboard"}
+            {loading && (
+              <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-solid border-white border-t-transparent" />
+            )}
+          </button>
+        </form>
+      ) : loginType === "accountant" ? (
+        <form onSubmit={handleAccountantLogin}>
+          <InputGroup
+            type="text"
+            label="Username"
+            className="mb-6 [&_input]:py-[15px] [&_input]:pr-12"
+            placeholder="Username"
+            name="username"
+            handleChange={handleChange}
+            value={data.username}
+            icon={<UserIcon />}
+          />
+
+          <InputGroup
+            type="password"
+            label="Password"
+            className="mb-6 [&_input]:py-[15px] [&_input]:pr-12"
+            placeholder="Password"
+            name="password"
+            handleChange={handleChange}
+            value={data.password}
+            icon={<KeyIcon className="h-5 w-5" />}
+          />
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#ff3d3d] p-4 font-medium text-white transition hover:bg-opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {loading ? "Logging in..." : "Login to Accounts Dashboard"}
             {loading && (
               <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-solid border-white border-t-transparent" />
             )}
