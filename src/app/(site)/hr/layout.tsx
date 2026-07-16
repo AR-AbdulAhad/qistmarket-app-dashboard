@@ -4,7 +4,7 @@ import { ReactNode, useEffect } from "react";
 import { useAuth } from "../../../../contexts/AuthContext";
 import { useRouter } from "next/navigation";
 
-const ALLOWED = ["hr"];
+const ALLOWED = ["hr", "admin", "super admin"];
 
 export default function HrLayout({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth();
