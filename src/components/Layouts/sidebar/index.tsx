@@ -6,6 +6,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { use, useEffect, useState } from "react";
 import { NAV_DATA } from "./data";
+import * as Icons from "./icons";
 import { ArrowLeftIcon, ChevronUp } from "./icons";
 import { MenuItem } from "./menu-item";
 import { useSidebarContext } from "./sidebar-context";
@@ -60,7 +61,7 @@ export function Sidebar() {
     }
 
     // HR PORTAL: HR (exclusive) + Admin/Super Admin (head-office oversight, matches backend requireHRAdmin)
-    if (section.label === "HR PORTAL" && userRole !== "hr" && userRole !== "admin" /* && userRole !== "super admin" */) {
+    if (section.label === "HR PORTAL" && userRole !== "hr" && userRole !== "admin" && userRole !== "super admin") {
       return false;
     }
 
@@ -95,14 +96,11 @@ export function Sidebar() {
       // Super Admin sees all three portals at once, so the three separate
       // "Dashboard" entries (MAIN MENU / HR PORTAL / ACCOUNTS PORTAL) are
       // dropped here and re-merged into one "Dashboard" dropdown below.
-      // (Modified: commented out since HR and Accounts are hidden and only Main Dashboard is shown)
-      /*
       if (userRole === "super admin") {
         if (section.label === "MAIN MENU" && item.title === "Main Dashboard") return false;
         if (section.label === "HR PORTAL" && item.title === "HR Dashboard") return false;
         if (section.label === "ACCOUNTS PORTAL" && item.title === "Accounts Dashboard") return false;
       }
-      */
 
       return true;
     });
@@ -112,8 +110,6 @@ export function Sidebar() {
 
   // Super Admin only: merge the three portal Dashboards into a single
   // dropdown at the top of MAIN MENU instead of three scattered entries.
-  // (Modified: commented out since HR and Accounts dashboards are hidden)
-  /*
   if (userRole === "super admin") {
     const mainMenu = filteredNavData.find((s) => s.label === "MAIN MENU");
     if (mainMenu) {
@@ -128,7 +124,6 @@ export function Sidebar() {
       } as any);
     }
   }
-  */
 
   return (
     <>
