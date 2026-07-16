@@ -66,7 +66,7 @@ export function Sidebar() {
     }
 
     // ACCOUNTS PORTAL: Accountant (exclusive) + Super Admin (full system access / audit visibility)
-    if (section.label === "ACCOUNTS PORTAL" && userRole !== "accountant" /* && userRole !== "super admin" */) {
+    if (section.label === "ACCOUNTS PORTAL" && userRole !== "accountant" && userRole !== "super admin") {
       return false;
     }
 
@@ -86,11 +86,11 @@ export function Sidebar() {
     const filteredItems = section.items.filter((item) => {
       // Logic for Form Analyzer "Orders for Approval"
       if (item.title === "Orders for Approval") {
-        // Form Analyzer can see it
-        if (userRole === "formanalyzer" || userRole === "form analyzer" || userRole === "form_analyzer" || userRole === "admin" || userRole === "super admin") {
-          return true;
-        }
-        return false;
+         // Form Analyzer can see it
+         if (userRole === "formanalyzer" || userRole === "form analyzer" || userRole === "form_analyzer" || userRole === "admin" || userRole === "super admin") {
+           return true;
+         }
+         return false;
       }
 
       // Super Admin sees all three portals at once, so the three separate
@@ -150,10 +150,10 @@ export function Sidebar() {
           <div className="relative pr-4.5">
             <Link
               href={
-                userRole === "sales officer"
-                  ? "/csr/dashboard"
-                  : userRole === "branch user"
-                    ? "/outlet/dashboard"
+                userRole === "sales officer" 
+                  ? "/csr/dashboard" 
+                  : userRole === "branch user" 
+                    ? "/outlet/dashboard" 
                     : userRole === "hr"
                       ? "/hr/dashboard"
                       : "/"
@@ -206,7 +206,7 @@ export function Sidebar() {
                                 className={cn(
                                   "ml-auto rotate-180 transition-transform duration-200",
                                   expandedItems.includes(item.title) &&
-                                  "rotate-0",
+                                    "rotate-0",
                                 )}
                                 aria-hidden="true"
                               />
@@ -237,7 +237,7 @@ export function Sidebar() {
                               "url" in item
                                 ? item.url + ""
                                 : "/" +
-                                item.title.toLowerCase().split(" ").join("-");
+                                  item.title.toLowerCase().split(" ").join("-");
 
                             return (
                               <MenuItem
