@@ -35,6 +35,7 @@ export default function SigninWithOTP() {
     outlet_code: "",
     username: "",
     password: "",
+    totp_code: "",
   });
 
   const [loginType, setLoginType] = useState<"web" | "outlet" | "hr" | "accountant">("web");
@@ -42,6 +43,8 @@ export default function SigninWithOTP() {
   const [step, setStep] = useState<"identifier" | "otp">("identifier");
   const [deviceId, setDeviceId] = useState<string>("");
   const [loading, setLoading] = useState(false);
+  const [web2FAPrompt, setWeb2FAPrompt] = useState(false);
+  const [accountant2FAPrompt, setAccountant2FAPrompt] = useState(false);
 
   useEffect(() => {
     const generateDeviceId = () => {
@@ -136,11 +139,18 @@ export default function SigninWithOTP() {
           identifier: data.identifier,
           otp: data.otp,
           "device-id": deviceId,
+          totp_code: data.totp_code || undefined,
         }),
       });
 
       const result = await res.json();
       if (!res.ok) throw new Error(result.error?.message || "Login failed.");
+
+      if (result.requires2FA) {
+        setWeb2FAPrompt(true);
+        toast(result.message || "Enter your 2FA code to continue.");
+        return;
+      }
 
       toast.success(result.message);
       Cookies.set("auth_token", result.token, {
@@ -238,11 +248,17 @@ export default function SigninWithOTP() {
       const res = await fetch(`${BACKEND_URL}/api/accounts/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ username, password, totp_code: data.totp_code || undefined }),
       });
 
       const result = await res.json();
       if (!res.ok) throw new Error(result.message || "Login failed.");
+
+      if (result.requires2FA) {
+        setAccountant2FAPrompt(true);
+        toast(result.message || "Enter your 2FA code to continue.");
+        return;
+      }
 
       toast.success("Accountant login successful.");
       Cookies.set("auth_token", result.token, {
@@ -325,6 +341,19 @@ export default function SigninWithOTP() {
               value={data.otp}
               icon={<KeyIcon className="h-5 w-5" />}
             />
+
+            {web2FAPrompt && (
+              <InputGroup
+                type="text"
+                label="2FA Code"
+                className="mb-6 [&_input]:py-[15px] [&_input]:pr-12"
+                placeholder="6-digit authenticator code"
+                name="totp_code"
+                handleChange={handleChange}
+                value={data.totp_code}
+                icon={<KeyIcon className="h-5 w-5" />}
+              />
+            )}
 
             <div className="mb-4.5 flex gap-4">
               <button
@@ -416,6 +445,19 @@ export default function SigninWithOTP() {
             value={data.password}
             icon={<KeyIcon className="h-5 w-5" />}
           />
+
+          {accountant2FAPrompt && (
+            <InputGroup
+              type="text"
+              label="2FA Code"
+              className="mb-6 [&_input]:py-[15px] [&_input]:pr-12"
+              placeholder="6-digit authenticator code"
+              name="totp_code"
+              handleChange={handleChange}
+              value={data.totp_code}
+              icon={<KeyIcon className="h-5 w-5" />}
+            />
+          )}
 
           <button
             type="submit"

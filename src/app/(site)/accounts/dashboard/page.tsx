@@ -48,6 +48,11 @@ const SEVERITY_STYLE: Record<string, string> = {
   critical: "bg-rose-50 text-rose-700 border-rose-100 dark:bg-rose-500/10 dark:border-rose-500/20",
 };
 
+const RANGES = ["Day", "Week", "Month", "Quarter", "Year"] as const;
+const RANGE_LABEL: Record<(typeof RANGES)[number], string> = {
+  Day: "today", Week: "this week", Month: "this month", Quarter: "this quarter", Year: "this year",
+};
+
 export default function AccountsDashboardPage() {
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [recovery, setRecovery] = useState<RecoveryAnalytics | null>(null);
@@ -56,6 +61,7 @@ export default function AccountsDashboardPage() {
   const [lockedDevices, setLockedDevices] = useState(0);
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [loading, setLoading] = useState(true);
+  const [range, setRange] = useState<(typeof RANGES)[number]>("Month");
 
   useEffect(() => {
     const token = Cookies.get("auth_token");
@@ -67,8 +73,8 @@ export default function AccountsDashboardPage() {
         const headers = { Authorization: `Bearer ${token}` };
         const [summaryRes, recoveryRes, flowRes, stockRes, deviceRes, alertsRes] = await Promise.all([
           fetch(`${BACKEND_URL}/api/accounts/dashboard-summary`, { headers }),
-          fetch(`${BACKEND_URL}/api/accounts/recovery-analytics?range=Month`, { headers }),
-          fetch(`${BACKEND_URL}/api/accounts/installment-flow?range=Month`, { headers }),
+          fetch(`${BACKEND_URL}/api/accounts/recovery-analytics?range=${range}`, { headers }),
+          fetch(`${BACKEND_URL}/api/accounts/installment-flow?range=${range}`, { headers }),
           fetch(`${BACKEND_URL}/api/outlet-reports/stock-summary?outletId=all`, { headers }),
           fetch(`${BACKEND_URL}/api/paytrigger/devices/summary`, { headers }),
           fetch(`${BACKEND_URL}/api/accounts/alerts`, { headers }),
@@ -90,7 +96,7 @@ export default function AccountsDashboardPage() {
     };
 
     fetchData();
-  }, []);
+  }, [range]);
 
   // Only entries with actual due activity this period — an all-zero chart
   // just renders invisible zero-width bars, which reads as "broken", not "empty".
@@ -129,6 +135,21 @@ export default function AccountsDashboardPage() {
         icon={LayoutDashboard}
         title="Accounts Dashboard"
         subtitle="Centralized financial snapshot across all outlets, updated in real time."
+        actions={
+          <div className="flex gap-1 rounded-xl bg-gray-100 p-1 dark:bg-dark-3">
+            {RANGES.map((r) => (
+              <button
+                key={r}
+                onClick={() => setRange(r)}
+                className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                  range === r ? "bg-white text-[#ff3d3d] shadow-sm dark:bg-boxdark" : "text-gray-500 hover:text-gray-700 dark:text-gray-400"
+                }`}
+              >
+                {r}
+              </button>
+            ))}
+          </div>
+        }
       />
 
       {/* Global Alerts & Notifications */}
@@ -154,7 +175,7 @@ export default function AccountsDashboardPage() {
             <StatCard icon={Wallet} label="Total Cash In Hand" value={PKR(summary?.totalCashInHand || 0)} accent="text-emerald-600" bg="bg-emerald-50 dark:bg-emerald-500/10" bar="bg-emerald-500" />
             <StatCard icon={Clock} label="Pending Cash In Hand" value={PKR(summary?.pendingCashInHand || 0)} accent="text-amber-600" bg="bg-amber-50 dark:bg-amber-500/10" bar="bg-amber-500" />
             <StatCard icon={Wifi} label="Online Payments Today" value={PKR(summary?.onlinePaymentsToday || 0)} accent="text-blue-600" bg="bg-blue-50 dark:bg-blue-500/10" bar="bg-blue-500" />
-            <StatCard icon={TrendingUp} label="Total Monthly Recovery" value={PKR(recovery?.totalRecovered || 0)} accent="text-emerald-600" bg="bg-emerald-50 dark:bg-emerald-500/10" bar="bg-emerald-500" />
+            <StatCard icon={TrendingUp} label={`Total Recovery (${range})`} value={PKR(recovery?.totalRecovered || 0)} accent="text-emerald-600" bg="bg-emerald-50 dark:bg-emerald-500/10" bar="bg-emerald-500" />
             <StatCard icon={Landmark} label="Bank Balance" value={PKR(summary?.bankBalance || 0)} accent="text-indigo-600" bg="bg-indigo-50 dark:bg-indigo-500/10" bar="bg-indigo-500" />
             <StatCard icon={Receipt} label="Today's Expense" value={PKR(summary?.todaysExpense || 0)} accent="text-rose-600" bg="bg-rose-50 dark:bg-rose-500/10" bar="bg-rose-500" />
             <StatCard icon={HandCoins} label="Vendor Payables" value={PKR(summary?.vendorPayables || 0)} accent="text-orange-600" bg="bg-orange-50 dark:bg-orange-500/10" bar="bg-orange-500" />
@@ -173,13 +194,13 @@ export default function AccountsDashboardPage() {
             <div className="flex size-9 items-center justify-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-500/10"><CalendarRange className="size-4" strokeWidth={2.25} /></div>
             <div>
               <h2 className="text-base font-bold text-dark dark:text-white">Installment Collection Trend</h2>
-              <p className="text-xs text-gray-500 dark:text-gray-400">Daily cash vs. online collections this month</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">Daily cash vs. online collections, {RANGE_LABEL[range]}</p>
             </div>
           </div>
           {trend.length > 0 ? (
             <Chart options={trendOptions} series={[{ name: "Cash", data: trend.map((t) => t.cash) }, { name: "Online", data: trend.map((t) => t.online) }]} type="area" height={280} />
           ) : (
-            <EmptyState icon={CalendarRange} title="No collections recorded yet this month" />
+            <EmptyState icon={CalendarRange} title={`No collections recorded ${RANGE_LABEL[range]}`} />
           )}
         </div>
       )}
@@ -201,7 +222,7 @@ export default function AccountsDashboardPage() {
             {activeOutlets.length > 0 ? (
               <Chart options={barOptions(activeOutlets.map((o) => o.outlet_name), "#1baf7a")} series={[{ name: "Recovery %", data: activeOutlets.map((o) => o.recoveryPercentage) }]} type="bar" height={Math.max(220, activeOutlets.length * 46)} />
             ) : (
-              <EmptyState icon={TrendingUp} title="No recovery data yet" description="Once installments are due this month, recovery trends will appear here." />
+              <EmptyState icon={TrendingUp} title="No recovery data yet" description={`Once installments are due ${RANGE_LABEL[range]}, recovery trends will appear here.`} />
             )}
           </div>
 

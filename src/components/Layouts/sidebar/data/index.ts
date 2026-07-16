@@ -91,11 +91,13 @@ export const NAV_DATA = [
       {
         title: "Approved Order List",
         icon: Icons.ArchiveIcon,
+        url: "/approved-order-list",
         items: [],
       },
       {
         title: "Recovery Orders",
         icon: Icons.RotateCcwIcon,
+        url: "/recovery-orders",
         items: [],
       },
       {
@@ -143,8 +145,10 @@ export const NAV_DATA = [
       {
         title: "Notifications",
         icon: Icons.BellIcon,
-        url: "/notifications",
-        items: [],
+        items: [
+          { title: "View Notifications", url: "/notifications" },
+          { title: "Broadcast", url: "/admin/notifications-broadcast" },
+        ],
       },
       {
         title: "User Management",
@@ -157,6 +161,10 @@ export const NAV_DATA = [
           {
             title: "User List",
             url: "/user-management/user-list",
+          },
+          {
+            title: "Deletion Requests",
+            url: "/admin/deletion-requests",
           },
         ],
       },
@@ -199,13 +207,102 @@ export const NAV_DATA = [
       {
         title: "Reports",
         icon: Icons.BarChartIcon,
-        url: "/reports",
-        items: [],
+        items: [
+          { title: "Reports Summary", url: "/reports" },
+          { title: "Reports Hub", url: "/admin/reports-hub" },
+        ],
       },
       {
         title: "PayTrigger",
         icon: Icons.LockIcon,
         url: "/admin/paytrigger",
+        items: [],
+      },
+      {
+        title: "Outlets Management",
+        icon: Icons.StoreIcon,
+        url: "/admin/outlets",
+        items: [],
+      },
+      {
+        title: "Inventory & Warehouse",
+        icon: Icons.PackageIcon,
+        url: "/admin/inventory",
+        items: [],
+      },
+      {
+        title: "Rankings & Leaderboards",
+        icon: Icons.BarChartIcon,
+        url: "/admin/rankings",
+        items: [],
+      },
+      {
+        title: "Alerts Center",
+        icon: Icons.AlertTriangleIcon,
+        url: "/admin/alerts",
+        items: [],
+      },
+      {
+        title: "Security",
+        icon: Icons.ActivityIcon,
+        items: [
+          { title: "Activity Logs", url: "/admin/activity-logs" },
+          { title: "Security Settings", url: "/admin/security-settings" },
+          { title: "Permissions", url: "/admin/permissions" },
+        ],
+      },
+      {
+        title: "Recovery Management",
+        icon: Icons.RotateCcwIcon,
+        url: "/admin/recovery-management",
+        items: [],
+      },
+      {
+        title: "Delivery Management",
+        icon: Icons.TruckIcon,
+        url: "/admin/delivery-management",
+        items: [],
+      },
+      {
+        title: "Installment Aging",
+        icon: Icons.ClockIcon,
+        url: "/admin/installment-aging",
+        items: [],
+      },
+      {
+        title: "EMI Calculator",
+        icon: Icons.CalculatorIcon,
+        url: "/admin/emi-calculator",
+        items: [],
+      },
+      {
+        title: "Sales Targets",
+        icon: Icons.DollarSignIcon,
+        url: "/admin/sales-targets",
+        items: [],
+      },
+      {
+        title: "Field Ops",
+        icon: Icons.MapPinIcon,
+        url: "/admin/field-ops",
+        items: [],
+      },
+      {
+        title: "Command Center",
+        icon: Icons.LayoutDashboardIcon,
+        url: "/admin/command-center",
+        items: [],
+      },
+      {
+        title: "Discount Requests",
+        icon: Icons.CreditCardIcon,
+        url: "/admin/discount-requests",
+        items: [],
+      },
+      {
+        title: "Customer Risk Score",
+        icon: Icons.ShieldCheckIcon,
+        url: "/admin/customer-risk",
         items: [],
       },
     ],
