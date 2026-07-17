@@ -128,7 +128,11 @@ export default function OutletInventoryPage() {
             grp.children.push(item);
         }
 
-        return Array.from(map.values()).sort((a, b) => b.totalQty - a.totalQty);
+        return Array.from(map.values()).sort((a, b) => {
+            if (b.inStockQty === 0 && a.inStockQty > 0) return -1;
+            if (a.inStockQty === 0 && b.inStockQty > 0) return 1;
+            return b.inStockQty - a.inStockQty;
+        });
     }, [inventory]);
 
     const toggleExpand = (key: string) => {
@@ -326,6 +330,7 @@ export default function OutletInventoryPage() {
     const totalItems = inventory.reduce((s, i) => s + i.quantity, 0);
     const totalInStock = inventory.filter(i => i.status === "In Stock" || i.status === "Used Stock").reduce((s, i) => s + i.quantity, 0);
     const totalSold = inventory.filter(i => i.status === "Sold").reduce((s, i) => s + i.quantity, 0);
+    const totalStockValue = inventory.filter(i => i.status === "In Stock" || i.status === "Used Stock").reduce((s, i) => s + (i.quantity * (i.purchase_price || 0)), 0);
 
     return (
         <div className="p-4 md:p-6 max-w-7xl mx-auto relative">
@@ -360,15 +365,16 @@ export default function OutletInventoryPage() {
             </div>
 
             {/* Stats Row */}
-            <div className="grid grid-cols-3 gap-4 mb-6">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
                 {[
                     { label: "Total Item", val: totalStats.totalStock, color: "text-primary" },
                     { label: "In Stock", val: totalStats.inStock, color: "text-green-600 dark:text-green-400" },
                     { label: "Sold", val: totalStats.sold, color: "text-blue-600 dark:text-blue-400" },
+                    { label: "Stock Value", val: `PKR ${totalStockValue.toLocaleString()}`, color: "text-amber-600 dark:text-amber-400" },
                 ].map(s => (
-                    <div key={s.label} className="bg-white dark:bg-boxdark border border-stroke dark:border-strokedark rounded-xl p-4 shadow-sm text-center">
-                        <div className={`text-2xl font-black ${s.color}`}>{s.val}</div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400 mt-1 font-medium uppercase tracking-wide">{s.label}</div>
+                    <div key={s.label} className="bg-white dark:bg-boxdark border border-stroke dark:border-strokedark rounded-xl p-4 shadow-sm text-center flex flex-col justify-center items-center">
+                        <div className={`text-2xl md:text-xl lg:text-2xl font-black ${s.color}`}>{s.val}</div>
+                        <div className="text-[10px] sm:text-xs text-gray-500 dark:text-gray-400 mt-1 font-medium uppercase tracking-wide">{s.label}</div>
                     </div>
                 ))}
             </div>
@@ -405,9 +411,9 @@ export default function OutletInventoryPage() {
                                     <th className="px-4 py-4">Product</th>
                                     <th className="px-4 py-4">Category</th>
                                     <th className="px-4 py-4">Variant / Color</th>
-                                    <th className="px-4 py-4 text-center">Total Qty</th>
-                                    <th className="px-4 py-4 text-center">In Stock</th>
+                                    <th className="px-4 py-4 text-center">Qty</th>
                                     <th className="px-4 py-4">Base Price</th>
+                                    <th className="px-4 py-4">Stock Value</th>
                                     <th className="px-4 py-4 text-center">Units</th>
                                 </tr>
                             </thead>
@@ -441,7 +447,10 @@ export default function OutletInventoryPage() {
                                                 </td>
 
                                                 <td className="px-4 py-4" onClick={() => toggleExpand(grp.key)}>
-                                                    <span className="font-bold text-black dark:text-white">{grp.product_name}</span>
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="font-bold text-black dark:text-white">{grp.product_name}</span>
+                                                        <span className="px-1.5 py-0.5 text-[10px] tracking-wider uppercase font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 border border-amber-200 dark:border-amber-800 rounded">Used</span>
+                                                    </div>
                                                 </td>
                                                 <td className="px-4 py-4 text-gray-500 dark:text-gray-400" onClick={() => toggleExpand(grp.key)}>
                                                     {grp.category || "—"}
@@ -453,18 +462,15 @@ export default function OutletInventoryPage() {
                                                     }
                                                 </td>
                                                 <td className="px-4 py-4 text-center font-black text-lg" onClick={() => toggleExpand(grp.key)}>
-                                                    {grp.totalQty}
-                                                </td>
-                                                <td className="px-4 py-4 text-center" onClick={() => toggleExpand(grp.key)}>
-                                                    <span className={`px-2 py-1 rounded-full text-xs font-bold ${grp.inStockQty > 0
-                                                            ? "bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400"
-                                                            : "bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-400"
-                                                        }`}>
+                                                    <span className={`${grp.inStockQty > 0 ? "text-green-600 dark:text-green-400" : "text-red-500"}`}>
                                                         {grp.inStockQty}
                                                     </span>
                                                 </td>
                                                 <td className="px-4 py-4" onClick={() => toggleExpand(grp.key)}>
-                                                    <span className="font-medium text-gray-700 dark:text-gray-200">PKR {grp.purchase_price?.toLocaleString()}</span>
+                                                    <span className="font-medium text-gray-700 dark:text-gray-200">PKR {grp.purchase_price?.toLocaleString() || 0}</span>
+                                                </td>
+                                                <td className="px-4 py-4" onClick={() => toggleExpand(grp.key)}>
+                                                    <span className="font-bold text-amber-600 dark:text-amber-400">PKR {(grp.inStockQty * (grp.purchase_price || 0)).toLocaleString()}</span>
                                                 </td>
                                                 <td className="px-4 py-4 text-center">
                                                     <div className="flex items-center justify-center gap-3">
