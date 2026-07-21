@@ -15,6 +15,7 @@ function getFiles(dir, filesList = []) {
     }
     return filesList;
 }
+   
 
 const allFiles = getFiles(path.join(__dirname, 'src'));
 
