@@ -6,7 +6,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { use, useEffect, useState } from "react";
 import { NAV_DATA } from "./data";
-import * as Icons from "./icons";
 import { ArrowLeftIcon, ChevronUp } from "./icons";
 import { MenuItem } from "./menu-item";
 import { useSidebarContext } from "./sidebar-context";
@@ -60,18 +59,8 @@ export function Sidebar() {
       return false;
     }
 
-    // HR PORTAL: HR (exclusive) + Admin/Super Admin (head-office oversight, matches backend requireHRAdmin)
-    if (section.label === "HR PORTAL" && userRole !== "hr" && userRole !== "admin" /* && userRole !== "super admin" */) {
-      return false;
-    }
-
-    // ACCOUNTS PORTAL: Accountant (exclusive) + Super Admin (full system access / audit visibility)
-    if (section.label === "ACCOUNTS PORTAL" && userRole !== "accountant" /* && userRole !== "super admin" */) {
-      return false;
-    }
-
-    // Accountant only sees ACCOUNTS PORTAL
-    if (section.label !== "ACCOUNTS PORTAL" && userRole === "accountant") {
+    // Hide HR PORTAL from non-HR roles
+    if (section.label === "HR PORTAL" && userRole !== "hr") {
       return false;
     }
 
@@ -86,50 +75,17 @@ export function Sidebar() {
     const filteredItems = section.items.filter((item) => {
       // Logic for Form Analyzer "Orders for Approval"
       if (item.title === "Orders for Approval") {
-        // Form Analyzer can see it
-        if (userRole === "formanalyzer" || userRole === "form analyzer" || userRole === "form_analyzer" || userRole === "admin" || userRole === "super admin") {
-          return true;
-        }
-        return false;
+         // Form Analyzer can see it
+         if (userRole === "formanalyzer" || userRole === "form analyzer" || userRole === "form_analyzer" || userRole === "admin" || userRole === "super admin") {
+           return true;
+         }
+         return false;
       }
-
-      // Super Admin sees all three portals at once, so the three separate
-      // "Dashboard" entries (MAIN MENU / HR PORTAL / ACCOUNTS PORTAL) are
-      // dropped here and re-merged into one "Dashboard" dropdown below.
-      // (Modified: commented out since HR and Accounts are hidden and only Main Dashboard is shown)
-      /*
-      if (userRole === "super admin") {
-        if (section.label === "MAIN MENU" && item.title === "Main Dashboard") return false;
-        if (section.label === "HR PORTAL" && item.title === "HR Dashboard") return false;
-        if (section.label === "ACCOUNTS PORTAL" && item.title === "Accounts Dashboard") return false;
-      }
-      */
-
       return true;
     });
 
     return { ...section, items: filteredItems };
   });
-
-  // Super Admin only: merge the three portal Dashboards into a single
-  // dropdown at the top of MAIN MENU instead of three scattered entries.
-  // (Modified: commented out since HR and Accounts dashboards are hidden)
-  /*
-  if (userRole === "super admin") {
-    const mainMenu = filteredNavData.find((s) => s.label === "MAIN MENU");
-    if (mainMenu) {
-      mainMenu.items.unshift({
-        title: "Dashboard",
-        icon: Icons.LayoutDashboardIcon,
-        items: [
-          { title: "Operations Dashboard", url: "/" },
-          { title: "HR Dashboard", url: "/hr/dashboard" },
-          { title: "Accounts Dashboard", url: "/accounts/dashboard" },
-        ],
-      } as any);
-    }
-  }
-  */
 
   return (
     <>
@@ -156,10 +112,10 @@ export function Sidebar() {
           <div className="relative pr-4.5">
             <Link
               href={
-                userRole === "sales officer"
-                  ? "/csr/dashboard"
-                  : userRole === "branch user"
-                    ? "/outlet/dashboard"
+                userRole === "sales officer" 
+                  ? "/csr/dashboard" 
+                  : userRole === "branch user" 
+                    ? "/outlet/dashboard" 
                     : userRole === "hr"
                       ? "/hr/dashboard"
                       : "/"
@@ -212,7 +168,7 @@ export function Sidebar() {
                                 className={cn(
                                   "ml-auto rotate-180 transition-transform duration-200",
                                   expandedItems.includes(item.title) &&
-                                  "rotate-0",
+                                    "rotate-0",
                                 )}
                                 aria-hidden="true"
                               />
@@ -243,7 +199,7 @@ export function Sidebar() {
                               "url" in item
                                 ? item.url + ""
                                 : "/" +
-                                item.title.toLowerCase().split(" ").join("-");
+                                  item.title.toLowerCase().split(" ").join("-");
 
                             return (
                               <MenuItem
