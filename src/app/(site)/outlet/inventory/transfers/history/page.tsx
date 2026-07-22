@@ -39,7 +39,6 @@ interface TransferRecord {
         purchase_price: number;
         quantity: number;
         status?: string;
-        is_used?: boolean;
     };
 }
 
@@ -335,7 +334,7 @@ export default function TransferHistoryPage() {
     };
 
     // ── Bulk Stock Back ────────────────────────────────────────────────────────
-    const allTransferredIds = useMemo(() => transfers.filter(t => t.status === 'transferred').map(t => t.id), [transfers]);
+    const allTransferredIds = useMemo(() => transfers.filter(t => t.status === 'transferred' || t.status === 'delivered').map(t => t.id), [transfers]);
     const allTransferredSelected = allTransferredIds.length > 0 && allTransferredIds.every(id => selectedTransferredIds.has(id));
     const someTransferredSelected = selectedTransferredIds.size > 0;
 
@@ -353,7 +352,7 @@ export default function TransferHistoryPage() {
         } else {
             setSelectedTransferredIds(new Set(allTransferredIds));
             const grpKeysWithTransferred = new Set<string>();
-            transfers.filter(t => t.status === 'transferred').forEach(t => {
+            transfers.filter(t => t.status === 'transferred' || t.status === 'delivered').forEach(t => {
                 const otherPartyId = direction === 'sent' ? t.to_id : t.from_id;
                 grpKeysWithTransferred.add(`${t.inventory.product_name}||${otherPartyId}`);
             });
@@ -553,14 +552,14 @@ export default function TransferHistoryPage() {
                                             </div>
                                         )}
                                         {/* Transferred select — both Sent & Received (for Stock Back) */}
-                                        {rec.status === 'transferred' && (
+                                        {(rec.status === 'transferred' || rec.status === 'delivered') && (
                                             <div className="mr-3" onClick={(e) => e.stopPropagation()}>
                                                 <input type="checkbox" checked={selectedTransferredIds.has(rec.id)} onChange={() => toggleTransferred(rec.id)} className="w-4 h-4 text-indigo-600 bg-gray-100 border-gray-300 rounded focus:ring-indigo-600 dark:bg-meta-4 dark:border-strokedark cursor-pointer" />
                                             </div>
                                         )}
                                         <div className="flex items-center gap-2">
                                             <span className="font-mono text-xs">{rec.inventory.imei_serial || "Generic"}</span>
-                                            {(rec.inventory.status === "Used Stock" || rec.inventory.is_used) && (
+                                            {rec.inventory.status === "Used Stock" && (
                                                 <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-orange-100 text-orange-700 dark:bg-orange-900/20 dark:text-orange-400 uppercase tracking-wider border border-orange-200 dark:border-orange-800">
                                                     Used Item
                                                 </span>
@@ -583,7 +582,7 @@ export default function TransferHistoryPage() {
                                                 <button onClick={() => handleCancel(rec.id)} className="p-1.5 bg-red-500 text-white rounded hover:bg-opacity-90" title="Cancel"><X size={12} /></button>
                                             </div>
                                         )}
-                                        {rec.status === 'transferred' && (
+                                        {(rec.status === 'transferred' || rec.status === 'delivered') && (
                                             <button onClick={() => handleInitiateStockBack(rec.id, rec.inventory.product_name, rec.inventory.imei_serial || "")} disabled={actionLoading} className="p-1.5 bg-indigo-500 text-white rounded hover:bg-opacity-90" title="Stock Back"><RotateCcw size={12} /></button>
                                         )}
                                     </div>

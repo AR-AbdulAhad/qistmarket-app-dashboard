@@ -97,6 +97,13 @@ const CreateUsers: React.FC = () => {
       platform: 'web',
       icon: Monitor,
       description: 'Manage employee records, attendance, leaves, payroll and announcements'
+    },
+    {
+      id: 11,
+      name: 'Accountant',
+      platform: 'web',
+      icon: Monitor,
+      description: 'Centralized financial control — cash in hand, expenses, vendor payables, customer receivables, recovery analytics, stock summary, and consolidated reporting across all outlets'
     }
   ];
 
