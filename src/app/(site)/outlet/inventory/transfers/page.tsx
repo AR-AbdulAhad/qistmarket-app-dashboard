@@ -23,6 +23,7 @@ interface InventoryItem {
     color_variant?: string;
     quantity: number;
     status: string;
+    is_used: boolean;
 }
 
 interface GroupedItem {
@@ -77,7 +78,7 @@ export default function TransfersPage() {
     const fetchData = async () => {
         try {
             const [invRes, offRes, outRes] = await Promise.all([
-                fetch(`${API_BASE}/api/outlet/inventory?page=${page}&limit=${limit}&search=${encodeURIComponent(search)}`, { headers: getAuthHeaders() }),
+                fetch(`${API_BASE}/api/outlet/inventory/get/transfer?page=${page}&limit=${limit}&search=${encodeURIComponent(search)}`, { headers: getAuthHeaders() }),
                 fetch(`${API_BASE}/api/orders/outlet/officers`, { headers: getAuthHeaders() }),
                 fetch(`${API_BASE}/api/outlets`, { headers: getAuthHeaders() }),
             ]);
@@ -120,7 +121,7 @@ export default function TransfersPage() {
         };
     }, [socket, user]);
 
-    const inStockItems = useMemo(() => inventory.filter(i => i.status === "In Stock" || i.status === "Used Stock"), [inventory]);
+    const inStockItems = useMemo(() => inventory.filter(i => i.status === "In Stock"), [inventory]);
 
     const grouped = useMemo<GroupedItem[]>(() => {
         const map = new Map<string, GroupedItem>();
@@ -385,7 +386,7 @@ export default function TransfersPage() {
                                                                 <span className="font-mono bg-gray-100 dark:bg-meta-4 px-2 py-0.5 rounded text-xs border border-gray-200 dark:border-strokedark text-gray-700 dark:text-gray-300">
                                                                     {item.imei_serial || "No IMEI"}
                                                                 </span>
-                                                                {item.status === "Used Stock" && (
+                                                                {item.is_used && (
                                                                     <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-orange-100 text-orange-700 dark:bg-orange-900/20 dark:text-orange-400 uppercase tracking-wider border border-orange-200 dark:border-orange-800">
                                                                         Used Item
                                                                     </span>
