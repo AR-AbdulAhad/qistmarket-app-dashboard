@@ -6,7 +6,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { use, useEffect, useState } from "react";
 import { NAV_DATA } from "./data";
-import * as Icons from "./icons";
 import { ArrowLeftIcon, ChevronUp } from "./icons";
 import { MenuItem } from "./menu-item";
 import { useSidebarContext } from "./sidebar-context";
@@ -60,6 +59,7 @@ export function Sidebar() {
       return false;
     }
 
+<<<<<<< HEAD
     // HR PORTAL: HR (exclusive) + Admin/Super Admin (head-office oversight, matches backend requireHRAdmin)
     if (section.label === "HR PORTAL" && userRole !== "hr" && userRole !== "admin" && userRole !== "super admin") {
       return false;
@@ -72,6 +72,10 @@ export function Sidebar() {
 
     // Accountant only sees ACCOUNTS PORTAL
     if (section.label !== "ACCOUNTS PORTAL" && userRole === "accountant") {
+=======
+    // Hide HR PORTAL from non-HR roles
+    if (section.label === "HR PORTAL" && userRole !== "hr") {
+>>>>>>> e756d65 (ahad add)
       return false;
     }
 
@@ -91,7 +95,13 @@ export function Sidebar() {
            return true;
          }
          return false;
+         // Form Analyzer can see it
+         if (userRole === "formanalyzer" || userRole === "form analyzer" || userRole === "form_analyzer" || userRole === "admin" || userRole === "super admin") {
+           return true;
+         }
+         return false;
       }
+<<<<<<< HEAD
 
       // Super Admin sees all three portals at once, so the three separate
       // "Dashboard" entries (MAIN MENU / HR PORTAL / ACCOUNTS PORTAL) are
@@ -102,12 +112,15 @@ export function Sidebar() {
         if (section.label === "ACCOUNTS PORTAL" && item.title === "Accounts Dashboard") return false;
       }
 
+=======
+>>>>>>> e756d65 (ahad add)
       return true;
     });
 
     return { ...section, items: filteredItems };
   });
 
+<<<<<<< HEAD
   // Super Admin only: merge the three portal Dashboards into a single
   // dropdown at the top of MAIN MENU instead of three scattered entries.
   if (userRole === "super admin") {
@@ -125,6 +138,8 @@ export function Sidebar() {
     }
   }
 
+=======
+>>>>>>> e756d65 (ahad add)
   return (
     <>
       {/* Mobile Overlay */}
@@ -150,10 +165,10 @@ export function Sidebar() {
           <div className="relative pr-4.5">
             <Link
               href={
-                userRole === "sales officer" 
-                  ? "/csr/dashboard" 
-                  : userRole === "branch user" 
-                    ? "/outlet/dashboard" 
+                userRole === "sales officer"  
+                  ? "/csr/dashboard"  
+                  : userRole === "branch user"  
+                    ? "/outlet/dashboard"  
                     : userRole === "hr"
                       ? "/hr/dashboard"
                       : "/"
@@ -206,7 +221,7 @@ export function Sidebar() {
                                 className={cn(
                                   "ml-auto rotate-180 transition-transform duration-200",
                                   expandedItems.includes(item.title) &&
-                                    "rotate-0",
+                                      "rotate-0",
                                 )}
                                 aria-hidden="true"
                               />
@@ -237,7 +252,7 @@ export function Sidebar() {
                               "url" in item
                                 ? item.url + ""
                                 : "/" +
-                                  item.title.toLowerCase().split(" ").join("-");
+                                    item.title.toLowerCase().split(" ").join("-");
 
                             return (
                               <MenuItem
