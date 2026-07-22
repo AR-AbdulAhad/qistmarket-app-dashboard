@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from 'react'
 import Cookies from 'js-cookie'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Store, Warehouse, Trophy, AlertTriangle, Activity, Users2, Landmark } from 'lucide-react'
 import { PaymentsOverviewChart } from '@/components/Charts/payments-overview/chart'
 import { useNotifications } from '../../../../contexts/NotificationContext'
 import { useAuth } from '../../../../contexts/AuthContext'
@@ -84,51 +83,8 @@ const initialStats: DashboardStats = {
   activeDeliveries: 0,
 }
 
-interface DailyTrendPoint {
-  date: string
-  count: number
-  totalAmount: number
-  advanceAmount: number
-}
-
-interface ReportSummary {
-  totalReceived: number
-  totalPending: number
-  dailyTrend: DailyTrendPoint[]
-}
-
-interface DashboardExtras {
-  activeEmployees: number
-  todaysExpense: number
-  vendorPayables: number
-  customerReceivables: number
-  cashRecovered: number
-  onlineRecovered: number
-}
-
-const initialExtras: DashboardExtras = {
-  activeEmployees: 0,
-  todaysExpense: 0,
-  vendorPayables: 0,
-  customerReceivables: 0,
-  cashRecovered: 0,
-  onlineRecovered: 0,
-}
-
-const QUICK_LINKS = [
-  { title: 'Outlets Management', href: '/admin/outlets', icon: Store },
-  { title: 'Inventory & Warehouse', href: '/admin/inventory', icon: Warehouse },
-  { title: 'Rankings & Leaderboards', href: '/admin/rankings', icon: Trophy },
-  { title: 'Alerts Center', href: '/admin/alerts', icon: AlertTriangle },
-  { title: 'Activity Logs', href: '/admin/activity-logs', icon: Activity },
-  { title: 'HR Portal', href: '/hr/dashboard', icon: Users2 },
-  { title: 'Accounts Portal', href: '/accounts/dashboard', icon: Landmark },
-]
-
 export default function Home() {
   const [stats, setStats] = useState<DashboardStats>(initialStats)
-  const [reportSummary, setReportSummary] = useState<ReportSummary | null>(null)
-  const [extras, setExtras] = useState<DashboardExtras>(initialExtras)
   const [recentOrders, setRecentOrders] = useState<OrderSummary[]>([])
   const [recentOrdersPagination, setRecentOrdersPagination] = useState<PaginationInfo | null>(null)
   const [deliveryStatus, setDeliveryStatus] = useState<DeliveryStatusItem[]>([])
@@ -183,10 +139,6 @@ export default function Home() {
         customersRes,
         recentOrdersRes,
         deliveryStatusRes,
-        reportSummaryRes,
-        accountsSummaryRes,
-        channelRecoveryRes,
-        employeesRes,
       ] = await Promise.all([
         fetchJson(`${BACKEND_URL}/api/orders?page=1&limit=1`),
         fetchJson(
@@ -209,10 +161,6 @@ export default function Home() {
           `${BACKEND_URL}/api/orders?page=1&limit=10&sortBy=updated_at&sortDir=desc`
         ),
         fetchJson(`${BACKEND_URL}/api/orders/delivery-status`),
-        fetchJson(`${BACKEND_URL}/api/reports/summary?dateRange=Month`),
-        fetchJson(`${BACKEND_URL}/api/accounts/dashboard-summary`),
-        fetchJson(`${BACKEND_URL}/api/accounts/recovery-analytics/channel-wise`),
-        fetchJson(`${BACKEND_URL}/api/hr/employees`),
       ])
 
       setStats({
@@ -231,28 +179,6 @@ export default function Home() {
       setRecentOrders(recentOrdersRes?.data?.orders ?? [])
       setRecentOrdersPagination(recentOrdersRes?.data?.pagination ?? null)
       setDeliveryStatus(Array.isArray(deliveryStatusRes?.data) ? deliveryStatusRes.data : [])
-
-      const overview = reportSummaryRes?.data?.overview
-      const dailyTrend = reportSummaryRes?.data?.breakdown?.dailyTrend
-      if (overview) {
-        setReportSummary({
-          totalReceived: overview.totalReceived ?? 0,
-          totalPending: overview.totalPending ?? 0,
-          dailyTrend: Array.isArray(dailyTrend) ? dailyTrend : [],
-        })
-      }
-
-      const accountsSummary = accountsSummaryRes?.data
-      const byChannel = channelRecoveryRes?.data?.byChannel ?? []
-      const employees = Array.isArray(employeesRes?.employees) ? employeesRes.employees : []
-      setExtras({
-        activeEmployees: employees.filter((e: any) => e.portal_active).length,
-        todaysExpense: accountsSummary?.todaysExpense ?? 0,
-        vendorPayables: accountsSummary?.vendorPayables ?? 0,
-        customerReceivables: accountsSummary?.customerReceivables ?? 0,
-        cashRecovered: byChannel.find((c: any) => c.channel === 'Cash')?.amount ?? 0,
-        onlineRecovered: byChannel.find((c: any) => c.channel === 'Online')?.amount ?? 0,
-      })
     } catch (err) {
       console.error(err)
       setError('Failed to load dashboard data')
@@ -273,22 +199,25 @@ export default function Home() {
   }, [token])
 
   const paymentsChartData = useMemo(() => {
-    const trend = reportSummary?.dailyTrend ?? []
-    if (trend.length === 0) {
-      return { received: [], due: [] }
-    }
+    const categories = ['New/Pending', 'In Progress', 'Delivered', 'Cancelled']
+    const baseSeries = [
+      stats.newPendingOrders,
+      stats.inProgressOrders,
+      stats.deliveredOrders,
+      stats.cancelledOrders,
+    ]
 
     return {
-      received: trend.map((d) => ({
-        x: new Date(d.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
-        y: d.advanceAmount,
+      received: categories.map((label, idx) => ({
+        x: label,
+        y: idx === 2 ? stats.deliveredOrders : baseSeries[idx] * 0.6,
       })),
-      due: trend.map((d) => ({
-        x: new Date(d.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
-        y: Math.max(0, d.totalAmount - d.advanceAmount),
+      due: categories.map((label, idx) => ({
+        x: label,
+        y: baseSeries[idx] * 0.4,
       })),
     }
-  }, [reportSummary])
+  }, [stats])
 
   return (
     <div className="space-y-8">
@@ -350,48 +279,6 @@ export default function Home() {
         />
       </div>
 
-      <div className="grid gap-5 md:grid-cols-2">
-        <DashboardCard
-          title="Total Collected (This Month)"
-          value={reportSummary?.totalReceived ?? 0}
-          subtitle="Advance + installment payments received"
-          tone="success"
-          isCurrency
-        />
-        <DashboardCard
-          title="Pending Receivables (This Month)"
-          value={reportSummary?.totalPending ?? 0}
-          subtitle="Outstanding amount across this month's orders"
-          tone="danger"
-          isCurrency
-        />
-      </div>
-
-      <div className="grid gap-5 grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
-        <DashboardCard title="Active Employees" value={extras.activeEmployees} subtitle="Portal-active staff" tone="info" />
-        <DashboardCard title="Cash Recovered (Month)" value={extras.cashRecovered} subtitle="Cash-channel installments" tone="success" isCurrency />
-        <DashboardCard title="Online Recovered (Month)" value={extras.onlineRecovered} subtitle="Online-channel installments" tone="info" isCurrency />
-        <DashboardCard title="Today's Expenses" value={extras.todaysExpense} subtitle="Head-office + outlet vouchers" tone="danger" isCurrency />
-        <DashboardCard title="Vendor Payables" value={extras.vendorPayables} subtitle="Outstanding vendor balance" tone="danger" isCurrency />
-        <DashboardCard title="Customer Receivables" value={extras.customerReceivables} subtitle="Outstanding customer balance" tone="primary" isCurrency />
-      </div>
-
-      <div className="rounded-[10px] border border-stroke bg-white p-5 shadow-1 dark:border-dark-3 dark:bg-gray-dark">
-        <h2 className="mb-4 text-base font-semibold text-dark dark:text-white">Quick Links</h2>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-7">
-          {QUICK_LINKS.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className="flex flex-col items-center gap-2 rounded-xl border border-stroke bg-gray-50 p-3 text-center transition hover:border-[#ff3d3d] hover:bg-[#ff3d3d]/5 dark:border-dark-3 dark:bg-dark-3 dark:hover:border-[#ff3d3d]"
-            >
-              <link.icon className="size-5 text-[#ff3d3d]" />
-              <span className="text-[11px] font-medium leading-tight text-dark dark:text-white">{link.title}</span>
-            </Link>
-          ))}
-        </div>
-      </div>
-
       <div className="grid gap-5 xl:grid-cols-3">
         <div className="space-y-5 xl:col-span-2">
           <div className="rounded-[10px] border border-stroke bg-white p-5 shadow-1 dark:border-dark-3 dark:bg-gray-dark">
@@ -401,17 +288,11 @@ export default function Home() {
                   Orders & Payments Overview
                 </h2>
                 <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  Daily advance collected vs remaining order value, this month.
+                  Synthetic received vs due curve based on current order pipeline.
                 </p>
               </div>
             </div>
-            {paymentsChartData.received.length === 0 ? (
-              <div className="flex h-[310px] items-center justify-center text-sm text-gray-400">
-                No collections recorded yet this month.
-              </div>
-            ) : (
-              <PaymentsOverviewChart data={paymentsChartData} />
-            )}
+            <PaymentsOverviewChart data={paymentsChartData} />
           </div>
 
           <div className="rounded-[10px] border border-stroke bg-white p-5 shadow-1 dark:border-dark-3 dark:bg-gray-dark">
@@ -706,10 +587,9 @@ interface DashboardCardProps {
   value: number
   subtitle: string
   tone?: 'primary' | 'success' | 'danger' | 'info'
-  isCurrency?: boolean
 }
 
-function DashboardCard({ title, value, subtitle, tone = 'primary', isCurrency = false }: DashboardCardProps) {
+function DashboardCard({ title, value, subtitle, tone = 'primary' }: DashboardCardProps) {
   const toneClasses: Record<
     NonNullable<DashboardCardProps['tone']>,
     { badge: string; value: string }
@@ -735,16 +615,18 @@ function DashboardCard({ title, value, subtitle, tone = 'primary', isCurrency = 
   const tones = toneClasses[tone]
 
   return (
-    <div className="relative overflow-hidden rounded-[10px] border border-stroke bg-white p-4 shadow-1 dark:border-dark-3 dark:bg-gray-dark">
-      <div>
-        <p className="pr-10 text-xs font-medium text-gray-500 dark:text-gray-400">{title}</p>
-        <p className={`mt-2 text-lg sm:text-xl lg:text-[22px] font-bold tracking-tight ${tones.value} break-all`}>
-          {isCurrency ? `PKR ${value.toLocaleString('en-PK')}` : value.toLocaleString()}
-        </p>
+    <div className="rounded-[10px] border border-stroke bg-white p-4 shadow-1 dark:border-dark-3 dark:bg-gray-dark">
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <p className="text-xs font-medium text-gray-500 dark:text-gray-400">{title}</p>
+          <p className={`mt-2 text-2xl font-semibold ${tones.value}`}>
+            {value.toLocaleString()}
+          </p>
+        </div>
+        <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${tones.badge}`}>
+          Live
+        </span>
       </div>
-      <span className={`absolute top-4 right-4 rounded-full px-2 py-0.5 text-[10px] font-semibold ${tones.badge}`}>
-        Live
-      </span>
       <p className="mt-2 text-[11px] text-gray-500 dark:text-gray-400">{subtitle}</p>
     </div>
   )
