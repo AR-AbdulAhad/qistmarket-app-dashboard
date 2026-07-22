@@ -504,6 +504,7 @@ export const NAV_DATA = [
         icon: Icons.PackageIcon,
         items: [
           { title: "Stock List", url: "/outlet/inventory" },
+          { title: "Used Stock", url: "/outlet/inventory/used" },
           { title: "Stock Transfers", url: "/outlet/inventory/transfers" },
           { title: "Transfer History", url: "/outlet/inventory/transfers/history" },
         ],
