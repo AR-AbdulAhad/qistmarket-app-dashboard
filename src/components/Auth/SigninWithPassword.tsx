@@ -38,7 +38,7 @@ export default function SigninWithOTP() {
     totp_code: "",
   });
 
-  const [loginType, setLoginType] = useState<"web" | "outlet" | "hr">("web");
+  const [loginType, setLoginType] = useState<"web" | "outlet" | "hr" | "accountant">("web");
 
   const [step, setStep] = useState<"identifier" | "otp">("identifier");
   const [deviceId, setDeviceId] = useState<string>("");
@@ -292,6 +292,11 @@ export default function SigninWithOTP() {
           active={loginType === "hr"}
           label="HR Login"
           onClick={() => setLoginType("hr")}
+        />
+        <TabButton
+          active={loginType === "accountant"}
+          label="Accountant Login"
+          onClick={() => setLoginType("accountant")}
         />
       </div>
 

@@ -504,7 +504,6 @@ export const NAV_DATA = [
         icon: Icons.PackageIcon,
         items: [
           { title: "Stock List", url: "/outlet/inventory" },
-          { title: "Used Stock", url: "/outlet/inventory/used" },
           { title: "Stock Transfers", url: "/outlet/inventory/transfers" },
           { title: "Transfer History", url: "/outlet/inventory/transfers/history" },
         ],
@@ -667,6 +666,69 @@ export const NAV_DATA = [
         icon: Icons.BellIcon,
         url: "/hr/announcements",
         items: [],
+      },
+    ],
+  },
+  {
+    label: "ACCOUNTS PORTAL",
+    items: [
+      {
+        title: "Accounts Dashboard",
+        icon: Icons.LayoutDashboardIcon,
+        url: "/accounts/dashboard",
+        items: [],
+      },
+      {
+        title: "Cash & Banking",
+        icon: Icons.BanknoteIcon,
+        items: [
+          { title: "Cash In Hand", url: "/accounts/cash-in-hand" },
+          { title: "Bank Accounts", url: "/accounts/bank-accounts" },
+        ],
+      },
+      {
+        title: "Expenses & Vendors",
+        icon: Icons.HandshakeIcon,
+        items: [
+          { title: "Expenses", url: "/accounts/expenses" },
+          { title: "Vendors & Payables", url: "/accounts/vendors" },
+        ],
+      },
+      {
+        title: "Receivables & Installments",
+        icon: Icons.UsersIcon,
+        items: [
+          { title: "Customer Receivables", url: "/accounts/receivables" },
+          { title: "Installment Receiving", url: "/accounts/installment-receiving" },
+          { title: "Installment Aging", url: "/accounts/aging" },
+          { title: "Monthly Installments", url: "/accounts/monthly-installments" },
+        ],
+      },
+      {
+        title: "Analytics & Reports",
+        icon: Icons.BarChartIcon,
+        items: [
+          { title: "Recovery Analytics", url: "/accounts/recovery-analytics" },
+          { title: "Installment Flow Analytics", url: "/accounts/installment-flow" },
+          { title: "Stock Summary", url: "/accounts/stock-summary" },
+          { title: "Reports & Export", url: "/accounts/reports" },
+        ],
+      },
+      {
+        title: "Compliance & Security",
+        icon: Icons.ShieldCheckIcon,
+        items: [
+          { title: "Blacklist / Whitelist", url: "/accounts/blacklist" },
+          { title: "Activity Log", url: "/accounts/activity-log" },
+        ],
+      },
+      {
+        title: "Devices & Payments",
+        icon: Icons.LockIcon,
+        items: [
+          { title: "PayTrigger", url: "/accounts/paytrigger" },
+          { title: "Online Payments", url: "/accounts/online-payments" },
+        ],
       },
     ],
   },
