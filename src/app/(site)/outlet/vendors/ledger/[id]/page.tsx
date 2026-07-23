@@ -26,6 +26,15 @@ export default function VendorLedgerPage() {
     const [ledger, setLedger] = useState<any[]>([]);
     const [searchTerm, setSearchTerm] = useState("");
 
+    // Payment Modal State
+    const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+    const [paymentForm, setPaymentForm] = useState({
+        type: "out", // 'in' or 'out'
+        amount: "",
+        notes: ""
+    });
+    const [submittingPayment, setSubmittingPayment] = useState(false);
+
     const fetchLedger = async () => {
         setLoading(true);
         try {
@@ -52,6 +61,31 @@ export default function VendorLedgerPage() {
 
     const handlePrint = () => {
         window.print();
+    };
+
+    const handlePaymentSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setSubmittingPayment(true);
+        try {
+            const res = await fetch(`${API_BASE}/api/outlet/vendors/${id}/transaction`, {
+                method: 'POST',
+                headers: getAuthHeaders(),
+                body: JSON.stringify(paymentForm)
+            });
+            const data = await res.json();
+            if (data.success) {
+                toast.success(data.message);
+                setIsPaymentModalOpen(false);
+                setPaymentForm({ type: "out", amount: "", notes: "" });
+                fetchLedger(); // Refresh ledger
+            } else {
+                toast.error(data.message || "Failed to record payment");
+            }
+        } catch (err) {
+            toast.error("Network error");
+        } finally {
+            setSubmittingPayment(false);
+        }
     };
 
     const filteredLedger = ledger.filter(entry => 
@@ -97,6 +131,12 @@ export default function VendorLedgerPage() {
                     </div>
                 </div>
                 <div className="flex items-center gap-3 print:hidden">
+                    <button 
+                        onClick={() => setIsPaymentModalOpen(true)}
+                        className="px-6 py-2.5 rounded-xl text-sm font-black bg-blue-600 text-white hover:bg-opacity-90 transition-all flex items-center gap-2 shadow-lg"
+                    >
+                        <Wallet size={18} /> Record Payment
+                    </button>
                     <button 
                         onClick={handlePrint}
                         className="px-6 py-2.5 rounded-xl text-sm font-black bg-white dark:bg-boxdark border border-stroke dark:border-strokedark hover:bg-gray-50 transition-all flex items-center gap-2"
@@ -219,6 +259,79 @@ export default function VendorLedgerPage() {
                     </div>
                 </div>
             </div>
+            
+            {/* Payment Modal */}
+            {isPaymentModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+                    <div className="bg-white dark:bg-boxdark w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden border border-stroke dark:border-strokedark animate-fade-in-up">
+                        <div className="p-6 border-b border-stroke dark:border-strokedark flex items-center justify-between bg-gray-50 dark:bg-meta-4/20">
+                            <div>
+                                <h3 className="text-xl font-black text-gray-800 dark:text-white flex items-center gap-2">
+                                    <Wallet size={20} className="text-primary" /> Record Payment
+                                </h3>
+                                <p className="text-xs text-gray-400 font-bold mt-1">Add a generic payment in/out transaction</p>
+                            </div>
+                            <button 
+                                onClick={() => setIsPaymentModalOpen(false)}
+                                className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-200 dark:bg-meta-4 text-gray-500 hover:text-red-500 transition-colors"
+                            >
+                                ✕
+                            </button>
+                        </div>
+                        
+                        <form onSubmit={handlePaymentSubmit} className="p-6 space-y-5">
+                            <div>
+                                <label className="block text-xs font-black uppercase tracking-widest text-gray-400 mb-2">Payment Type</label>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <label className={`cursor-pointer border-2 rounded-xl p-3 flex flex-col items-center gap-2 transition-all ${paymentForm.type === 'out' ? 'border-red-500 bg-red-50 dark:bg-red-500/10' : 'border-gray-200 dark:border-strokedark hover:border-gray-300'}`}>
+                                        <input type="radio" name="type" className="sr-only" checked={paymentForm.type === 'out'} onChange={() => setPaymentForm({...paymentForm, type: 'out'})} />
+                                        <TrendingDown size={24} className={paymentForm.type === 'out' ? 'text-red-500' : 'text-gray-400'} />
+                                        <span className={`text-sm font-bold ${paymentForm.type === 'out' ? 'text-red-600 dark:text-red-400' : 'text-gray-500'}`}>Payment Out (To Vendor)</span>
+                                    </label>
+                                    <label className={`cursor-pointer border-2 rounded-xl p-3 flex flex-col items-center gap-2 transition-all ${paymentForm.type === 'in' ? 'border-green-500 bg-green-50 dark:bg-green-500/10' : 'border-gray-200 dark:border-strokedark hover:border-gray-300'}`}>
+                                        <input type="radio" name="type" className="sr-only" checked={paymentForm.type === 'in'} onChange={() => setPaymentForm({...paymentForm, type: 'in'})} />
+                                        <TrendingUp size={24} className={paymentForm.type === 'in' ? 'text-green-500' : 'text-gray-400'} />
+                                        <span className={`text-sm font-bold ${paymentForm.type === 'in' ? 'text-green-600 dark:text-green-400' : 'text-gray-500'}`}>Payment In (From Vendor)</span>
+                                    </label>
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <label className="block text-xs font-black uppercase tracking-widest text-gray-400 mb-2">Amount (PKR)</label>
+                                <input 
+                                    type="number" 
+                                    required
+                                    min="1"
+                                    value={paymentForm.amount}
+                                    onChange={(e) => setPaymentForm({...paymentForm, amount: e.target.value})}
+                                    className="w-full bg-gray-50 dark:bg-meta-4 border-none text-gray-800 dark:text-white rounded-xl p-4 font-bold focus:ring-2 focus:ring-primary outline-none"
+                                    placeholder="e.g. 50000"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-black uppercase tracking-widest text-gray-400 mb-2">Description / Notes</label>
+                                <textarea 
+                                    rows={3}
+                                    value={paymentForm.notes}
+                                    onChange={(e) => setPaymentForm({...paymentForm, notes: e.target.value})}
+                                    className="w-full bg-gray-50 dark:bg-meta-4 border-none text-gray-800 dark:text-white rounded-xl p-4 text-sm font-bold focus:ring-2 focus:ring-primary outline-none resize-none"
+                                    placeholder="Reference # or reason for payment..."
+                                />
+                            </div>
+
+                            <button 
+                                type="submit" 
+                                disabled={submittingPayment}
+                                className="w-full py-4 rounded-xl bg-primary text-white font-black text-sm hover:bg-opacity-90 transition-all disabled:opacity-50 flex items-center justify-center gap-2 shadow-xl shadow-primary/20 mt-4"
+                            >
+                                {submittingPayment ? <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span> : 'Confirm Transaction'}
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            )}
+
             <style jsx global>{`
                 @media print {
                     .print\\:hidden, 

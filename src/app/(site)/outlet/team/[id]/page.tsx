@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import {
     X, Package, ShoppingBag, Banknote, Calendar,
     User, Phone, Hash, ChevronRight, ArrowUpRight,
-    RefreshCw, FileText, ArrowLeft
+    RefreshCw, FileText, ArrowLeft,
+    MapPin, ToggleLeft, ToggleRight, Map, Clock
 } from "lucide-react";
 import Cookies from "js-cookie";
 import { toast } from "react-hot-toast";
@@ -20,6 +21,12 @@ export default function OfficerDetailsPage({ params }: { params: Promise<{ id: s
     const [details, setDetails] = useState<any>(null);
     const [activeTab, setActiveTab] = useState<'inventory' | 'delivered' | 'cash' | 'verification' | 'assigned_orders'>('inventory');
     const [orderStatusFilter, setOrderStatusFilter] = useState<string>('Pending');
+
+    const [statusLoading, setStatusLoading] = useState(false);
+    const [traceModalOpen, setTraceModalOpen] = useState(false);
+    const [traceDate, setTraceDate] = useState(() => new Date().toISOString().split('T')[0]);
+    const [locationHistory, setLocationHistory] = useState<any[]>([]);
+    const [fetchingTrace, setFetchingTrace] = useState(false);
 
     const fetchDetails = async () => {
         if (!officerId) return;
@@ -54,6 +61,57 @@ export default function OfficerDetailsPage({ params }: { params: Promise<{ id: s
     useEffect(() => {
         fetchDetails();
     }, [officerId]);
+
+    const toggleStatus = async () => {
+        if (!details?.officer) return;
+        setStatusLoading(true);
+        try {
+            const currentStatus = details.officer.status;
+            const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
+            const res = await fetch(`${API_BASE}/api/users/${officerId}/status`, {
+                method: "PATCH",
+                headers: { 
+                    Authorization: `Bearer ${Cookies.get("auth_token")}`,
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({ status: newStatus })
+            });
+            const data = await res.json();
+            if (data.success) {
+                toast.success(`Officer ${details.officer.status === 'active' ? 'disabled' : 'enabled'} successfully`);
+                setDetails({ ...details, officer: { ...details.officer, status: details.officer.status === 'active' ? 'inactive' : 'active' } });
+            } else {
+                toast.error(data.message || "Failed to update status");
+            }
+        } catch (err) {
+            toast.error("Failed to update status");
+        } finally {
+            setStatusLoading(false);
+        }
+    };
+
+    const fetchTrace = async () => {
+        setFetchingTrace(true);
+        try {
+            const res = await fetch(`${API_BASE}/api/users/${officerId}/location-history?date=${traceDate}`, {
+                headers: { Authorization: `Bearer ${Cookies.get("auth_token")}` }
+            });
+            const data = await res.json();
+            if (data.success) {
+                setLocationHistory(data.data);
+            } else {
+                toast.error("Failed to load location history");
+            }
+        } catch (err) {
+            toast.error("Failed to load location history");
+        } finally {
+            setFetchingTrace(false);
+        }
+    };
+
+    useEffect(() => {
+        if (traceModalOpen) fetchTrace();
+    }, [traceModalOpen, traceDate]);
 
     const verificationTabs = ['Pending', 'In Progress', 'Completed', 'Approved', 'Delivered', 'Rejected', 'Expired', ];
 
@@ -123,8 +181,35 @@ export default function OfficerDetailsPage({ params }: { params: Promise<{ id: s
                                 <span className="flex items-center gap-1.5 text-xs font-black uppercase tracking-widest text-primary bg-primary/10 px-3 py-1 rounded-full">
                                     <Phone size={12} /> {details?.officer?.phone || "No Phone"}
                                 </span>
+                                <span className={`flex items-center gap-1.5 text-xs font-black uppercase tracking-widest px-3 py-1 rounded-full ${
+                                    details?.officer?.status === 'active' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'
+                                }`}>
+                                    Status: {details?.officer?.status}
+                                </span>
                             </div>
                         </div>
+                    </div>
+                    
+                    <div className="flex flex-col gap-3">
+                        <button 
+                            onClick={toggleStatus}
+                            disabled={statusLoading}
+                            className={`flex items-center justify-center gap-2 px-6 py-2.5 rounded-full text-sm font-bold shadow-sm transition-all ${
+                                details?.officer?.status === 'active' 
+                                    ? 'bg-red-50 text-red-600 hover:bg-red-100 border border-red-200' 
+                                    : 'bg-green-50 text-green-600 hover:bg-green-100 border border-green-200'
+                            }`}
+                        >
+                            {statusLoading ? <RefreshCw size={18} className="animate-spin" /> : details?.officer?.status === 'active' ? <ToggleLeft size={18} /> : <ToggleRight size={18} />}
+                            {details?.officer?.status === 'active' ? 'Disable Account' : 'Enable Account'}
+                        </button>
+                        <button 
+                            onClick={() => setTraceModalOpen(true)}
+                            className="flex items-center justify-center gap-2 px-6 py-2.5 rounded-full bg-primary/10 text-primary border border-primary/20 hover:bg-primary hover:text-white transition-all text-sm font-bold shadow-sm"
+                        >
+                            <MapPin size={18} />
+                            Trace Location
+                        </button>
                     </div>
                 </div>
 
@@ -288,8 +373,8 @@ export default function OfficerDetailsPage({ params }: { params: Promise<{ id: s
                                 <EmptyState icon={<Package size={48} />} title="No Stock in Hand" subtitle="This officer currently has no units transferred." />
                             ) : (
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                    {details?.inventory?.map((item: any) => (
-                                        <div key={item.id} className="p-6 bg-white dark:bg-boxdark rounded-[2rem] border border-stroke dark:border-strokedark flex items-start justify-between group hover:border-primary/30 hover:shadow-xl transition-all hover:-translate-y-1">
+                                {details?.inventory?.map((item: any, idx: number) => (
+                                        <div key={`inv-${item.id}-${idx}`} className="p-6 bg-white dark:bg-boxdark rounded-[2rem] border border-stroke dark:border-strokedark flex items-start justify-between group hover:border-primary/30 hover:shadow-xl transition-all hover:-translate-y-1">
                                             <div>
                                                 <h4 className="font-black text-gray-800 dark:text-white text-base group-hover:text-primary transition-colors">{item.product_name}</h4>
                                                 <p className="text-[11px] text-gray-400 font-bold mt-1 uppercase tracking-widest">{item.category} • {item.color_variant || 'Default'}</p>
@@ -322,7 +407,7 @@ export default function OfficerDetailsPage({ params }: { params: Promise<{ id: s
                                                 <th className="px-8 py-5 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Product / IMEI</th>
                                                 <th className="px-8 py-5 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Customer</th>
                                                 <th className="px-8 py-5 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] text-right">Delivery Date</th>
-                                            \)</tr>
+                                            </tr>
                                         </thead>
                                         <tbody className="divide-y divide-stroke dark:divide-strokedark">
                                             {details?.delivered_products?.map((item: any, idx: number) => (
@@ -505,8 +590,8 @@ export default function OfficerDetailsPage({ params }: { params: Promise<{ id: s
                                         </h4>
                                     </div>
                                     <div className="divide-y divide-stroke dark:divide-strokedark">
-                                        {details?.submission_history?.map((h: any) => (
-                                            <div key={h.id} className="flex items-center justify-between p-6 hover:bg-gray-50 dark:hover:bg-meta-4/20 transition-colors">
+                                        {details?.submission_history?.map((h: any, idx: number) => (
+                                            <div key={`sub-${h.id}-${idx}`} className="flex items-center justify-between p-6 hover:bg-gray-50 dark:hover:bg-meta-4/20 transition-colors">
                                                 <div className="flex items-center gap-4">
                                                     <div className="w-12 h-12 rounded-[1rem] bg-green-100 flex items-center justify-center text-green-600">
                                                         <Banknote size={24} />
@@ -526,6 +611,8 @@ export default function OfficerDetailsPage({ params }: { params: Promise<{ id: s
                                             </div>
                                         ))}
                                     </div>
+
+
                                 </div>
                             ) : (
                                 <EmptyState icon={<Banknote size={48} />} title="No Submissions" subtitle="There are no cash submissions to the outlet yet." />
@@ -534,6 +621,73 @@ export default function OfficerDetailsPage({ params }: { params: Promise<{ id: s
                     )}
                 </div>
             </div>
+
+            {/* Location Trace Modal */}
+            {traceModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
+                    <div className="bg-white dark:bg-boxdark rounded-[2.5rem] w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden border border-stroke dark:border-strokedark animate-slide-up">
+                        <div className="p-6 border-b border-stroke dark:border-strokedark flex items-center justify-between bg-gray-50 dark:bg-meta-4/20">
+                            <h3 className="text-xl font-black text-gray-800 dark:text-white flex items-center gap-3">
+                                <div className="p-2 bg-primary/10 rounded-xl text-primary"><MapPin size={24} /></div>
+                                Location Trace History
+                            </h3>
+                            <button onClick={() => setTraceModalOpen(false)} className="text-gray-400 hover:text-red-500 transition-colors p-2 bg-white dark:bg-meta-4 rounded-full shadow-sm"><X size={20} /></button>
+                        </div>
+                        
+                        <div className="p-6 border-b border-stroke dark:border-strokedark flex items-center gap-4 bg-white dark:bg-boxdark">
+                            <label className="text-sm font-bold text-gray-600 dark:text-gray-300">Select Date:</label>
+                            <input 
+                                type="date" 
+                                value={traceDate} 
+                                onChange={(e) => setTraceDate(e.target.value)}
+                                className="border border-stroke dark:border-strokedark rounded-xl px-4 py-2 bg-gray-50 dark:bg-meta-4 text-sm font-medium focus:border-primary outline-none"
+                            />
+                            <button onClick={fetchTrace} className="p-2 bg-primary/10 text-primary rounded-xl hover:bg-primary hover:text-white transition-colors">
+                                <RefreshCw size={18} className={fetchingTrace ? "animate-spin" : ""} />
+                            </button>
+                        </div>
+
+                        <div className="p-6 overflow-y-auto flex-1 bg-gray-50 dark:bg-meta-4/10">
+                            {fetchingTrace ? (
+                                <div className="py-20 flex justify-center"><RefreshCw size={30} className="animate-spin text-primary opacity-50" /></div>
+                            ) : locationHistory.length === 0 ? (
+                                <div className="py-20 text-center">
+                                    <Map size={48} className="mx-auto text-gray-300 mb-4" />
+                                    <p className="text-lg font-bold text-gray-500">No Location Data</p>
+                                    <p className="text-sm text-gray-400">No tracing logs were recorded for this date.</p>
+                                </div>
+                            ) : (
+                                <div className="relative border-l-2 border-primary/20 ml-4 space-y-6 pb-4">
+                                    {locationHistory.map((loc, idx) => (
+                                        <div key={loc.id} className="relative pl-6">
+                                            <div className="absolute -left-[9px] top-1 w-4 h-4 rounded-full bg-white dark:bg-boxdark border-4 border-primary"></div>
+                                            <div className="bg-white dark:bg-boxdark p-4 rounded-2xl border border-stroke dark:border-strokedark shadow-sm">
+                                                <div className="flex justify-between items-start mb-2">
+                                                    <p className="text-sm font-black text-gray-800 dark:text-white flex items-center gap-2">
+                                                        <Clock size={14} className="text-primary" /> {new Date(loc.timestamp).toLocaleTimeString()}
+                                                    </p>
+                                                </div>
+                                                <div className="flex gap-4 text-xs font-bold text-gray-500 bg-gray-50 dark:bg-meta-4 p-2 rounded-xl">
+                                                    <span>Lat: <span className="text-gray-800 dark:text-white">{loc.latitude.toFixed(6)}</span></span>
+                                                    <span>Lng: <span className="text-gray-800 dark:text-white">{loc.longitude.toFixed(6)}</span></span>
+                                                    <a 
+                                                        href={`https://www.google.com/maps?q=${loc.latitude},${loc.longitude}`} 
+                                                        target="_blank" 
+                                                        rel="noreferrer"
+                                                        className="ml-auto text-primary hover:underline flex items-center gap-1"
+                                                    >
+                                                        View Map <ArrowUpRight size={12} />
+                                                    </a>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

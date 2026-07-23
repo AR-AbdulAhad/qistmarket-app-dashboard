@@ -282,6 +282,7 @@ interface Order {
     verification_assigned_at?: string | null;
     recovery_visits?: any[];
     recovery_officer_id?: number | null;
+    installment_ledger?: { short_id?: string | null } | null;
     productHistories?: {
         id: number;
         previous_product: string;
@@ -359,6 +360,11 @@ export default function OrderDetailsPage() {
     const [selectedImei, setSelectedImei] = useState('');
     const [inventoryItems, setInventoryItems] = useState<any[]>([]);
     const [otpSent, setOtpSent] = useState(false);
+
+    // Send Ledger state
+    const [sendLedgerModalOpen, setSendLedgerModalOpen] = useState(false);
+    const [sendLedgerTarget, setSendLedgerTarget] = useState('primary');
+    const [isSendingLedger, setIsSendingLedger] = useState(false);
 
     // Timeline collapse states
     const [isAssignmentTimelineCollapsed, setIsAssignmentTimelineCollapsed] = useState(true);
@@ -573,6 +579,33 @@ export default function OrderDetailsPage() {
     };
 
 
+    const handleSendLedger = async () => {
+        if (!order?.installment_ledger?.short_id) return;
+        setIsSendingLedger(true);
+        try {
+            const token = Cookies.get('auth_token');
+            const res = await fetch(`${BACKEND_URL}/api/ledger/${order.installment_ledger.short_id}/send`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({ targetPhone: sendLedgerTarget }),
+            });
+            const json = await res.json();
+            if (json.success) {
+                toast.success('Ledger sent successfully');
+                setSendLedgerModalOpen(false);
+            } else {
+                toast.error(json.message || 'Failed to send ledger');
+            }
+        } catch (err) {
+            toast.error('Failed to send ledger');
+        } finally {
+            setIsSendingLedger(false);
+        }
+    };
+
     if (loading) return <Loader text="Loading order details..." />;
     if (error) return <div className="p-8 text-center text-red-500">Error: {error}</div>;
     if (!order) return <div className="p-8 text-center text-gray-500">Order not found.</div>;
@@ -619,6 +652,14 @@ export default function OrderDetailsPage() {
                 >
                     Cancel Order
                 </button>
+                )}
+                {order.installment_ledger && (
+                    <button
+                        onClick={() => setSendLedgerModalOpen(true)}
+                        className="rounded-md bg-green-600 px-6 py-2 text-white hover:bg-opacity-90 shadow-md transition-colors"
+                    >
+                        📤 Send Ledger
+                    </button>
                 )}
             </div>
 
@@ -1794,6 +1835,73 @@ export default function OrderDetailsPage() {
                             className="bg-red-600 text-white rounded px-8 py-2 hover:bg-opacity-90 disabled:opacity-50"
                         >
                             {isSubmitting ? 'Processing...' : 'Confirm Cancellation'}
+                        </button>
+                    </div>
+                </div>
+            </Modal>
+            
+            <Modal open={sendLedgerModalOpen} onClose={() => setSendLedgerModalOpen(false)}>
+                <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl dark:bg-gray-800">
+                    <h3 className="mb-4 text-xl font-bold text-gray-900 dark:text-white">Send Ledger via WhatsApp</h3>
+                    <div className="space-y-4">
+                        <label className="flex items-center space-x-3 cursor-pointer">
+                            <input 
+                                type="radio" 
+                                name="sendLedgerTarget" 
+                                value="primary" 
+                                checked={sendLedgerTarget === 'primary'}
+                                onChange={(e) => setSendLedgerTarget(e.target.value)}
+                                className="form-radio h-5 w-5 text-primary"
+                            />
+                            <span className="text-gray-900 dark:text-white">
+                                Primary Number ({order?.verification?.purchaser?.telephone_number || order?.whatsapp_number || 'N/A'})
+                            </span>
+                        </label>
+                        
+                        {order?.verification?.purchaser?.alternate_phone_number && (
+                            <label className="flex items-center space-x-3 cursor-pointer">
+                                <input 
+                                    type="radio" 
+                                    name="sendLedgerTarget" 
+                                    value="alternate" 
+                                    checked={sendLedgerTarget === 'alternate'}
+                                    onChange={(e) => setSendLedgerTarget(e.target.value)}
+                                    className="form-radio h-5 w-5 text-primary"
+                                />
+                                <span className="text-gray-900 dark:text-white">
+                                    Alternate Number ({order?.verification?.purchaser?.alternate_phone_number})
+                                </span>
+                            </label>
+                        )}
+
+                        {order?.verification?.purchaser?.alternate_phone_number && (
+                            <label className="flex items-center space-x-3 cursor-pointer">
+                                <input 
+                                    type="radio" 
+                                    name="sendLedgerTarget" 
+                                    value="both" 
+                                    checked={sendLedgerTarget === 'both'}
+                                    onChange={(e) => setSendLedgerTarget(e.target.value)}
+                                    className="form-radio h-5 w-5 text-primary"
+                                />
+                                <span className="text-gray-900 dark:text-white">Both Numbers</span>
+                            </label>
+                        )}
+                    </div>
+                    <div className="mt-6 flex justify-end gap-3">
+                        <button
+                            onClick={() => setSendLedgerModalOpen(false)}
+                            disabled={isSendingLedger}
+                            className="rounded-md border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            onClick={handleSendLedger}
+                            disabled={isSendingLedger}
+                            className="rounded-md bg-green-600 px-4 py-2 text-white hover:bg-opacity-90 disabled:opacity-50"
+                        >
+                            {isSendingLedger ? 'Sending...' : 'Send'}
                         </button>
                     </div>
                 </div>

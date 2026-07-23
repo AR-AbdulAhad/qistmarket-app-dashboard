@@ -38,6 +38,7 @@ export default function InstallmentPaymentModal({ open, onClose, onSuccess, orde
     const [isOtpSent, setIsOtpSent] = useState(false);
     const [otp, setOtp] = useState("");
     const [feedback, setFeedback] = useState("");
+    const [alternateNumber, setAlternateNumber] = useState("");
     const [paymentMethod, setPaymentMethod] = useState("Cash");
     const [fuelCharge, setFuelCharge] = useState(0);
     const [paymentAmount, setPaymentAmount] = useState<number>(0);
@@ -52,6 +53,7 @@ export default function InstallmentPaymentModal({ open, onClose, onSuccess, orde
             setIsOtpSent(!isRecoveryOfficer);
             setOtp("");
             setFeedback("");
+            setAlternateNumber("");
             setPaymentMethod("Cash");
             setFuelCharge(0);
             
@@ -173,6 +175,7 @@ export default function InstallmentPaymentModal({ open, onClose, onSuccess, orde
                         month_number: installment?.monthNumber,
                         amount: paymentAmount,
                         feedback,
+                        alternate_number: alternateNumber,
                         payment_method: paymentMethod,
                         fuelCharges: fuelCharge
                     }),
@@ -196,6 +199,7 @@ export default function InstallmentPaymentModal({ open, onClose, onSuccess, orde
                         month_number: installment?.monthNumber,
                         amount: paymentAmount,
                         feedback,
+                        alternate_number: alternateNumber,
                         payment_method: paymentMethod, // Cash or Online
                     }),
                 });
@@ -321,7 +325,9 @@ export default function InstallmentPaymentModal({ open, onClose, onSuccess, orde
                         </div>
 
                         <div>
-                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Customer Feedback</label>
+                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1 flex justify-between">
+                                <span>Customer Feedback</span>
+                            </label>
                             <textarea
                                 value={feedback}
                                 onChange={(e) => setFeedback(e.target.value)}
@@ -330,7 +336,19 @@ export default function InstallmentPaymentModal({ open, onClose, onSuccess, orde
                             />
                         </div>
 
-
+                        <div>
+                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1 flex justify-between">
+                                <span>Alternate Number (Optional)</span>
+                                <span className="text-gray-400 font-normal normal-case text-[10px]">For receiving SMS</span>
+                            </label>
+                            <input
+                                type="text"
+                                value={alternateNumber}
+                                onChange={(e) => setAlternateNumber(e.target.value)}
+                                className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 focus:ring-2 focus:ring-blue-500 outline-none transition-all dark:text-white"
+                                placeholder="e.g. 03001234567"
+                            />
+                        </div>
 
                         <div className="pt-4 flex gap-3">
                             <button

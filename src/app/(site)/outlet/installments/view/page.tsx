@@ -23,7 +23,9 @@ import {
   Minimize2
 } from "lucide-react";
 import SmartPayQrModal from "@/components/Installments/SmartPayQrModal";
-
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+import * as XLSX from "xlsx";
 const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
 
 const getAuthHeaders = () => {
@@ -57,7 +59,20 @@ function InstallmentsViewContent() {
 
   // Query state
   const [search, setSearch] = useState(initialSearch);
-  const [activeTab, setActiveTab] = useState<'fresh' | 'due' | 'completed'>('fresh');
+  const [category, setCategory] = useState<'all' | 'regular' | 'fresh' | 'overdue' | 'blacklist' | 'defaulter' | 'ptp'>('all');
+  const [showAdvFilters, setShowAdvFilters] = useState(false);
+  
+  // Advanced Global Filters
+  const [advFilters, setAdvFilters] = useState({
+    item: "",
+    ptp: "",
+    lock_status: "",
+    ro_id: "",
+    min_amount: "",
+    max_amount: "",
+    min_balance: "",
+    max_balance: ""
+  });
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [page, setPage] = useState(1);
@@ -84,7 +99,11 @@ function InstallmentsViewContent() {
     totalPaidThisMonth: 0,
     remainingThisMonth: 0,
     overallSystemRemaining: 0,
-    overallSystemPaid: 0
+    overallSystemPaid: 0,
+    monthsDue: 0,
+    monthsCollected: 0,
+    monthsRemainingAmount: 0,
+    customerCount: 0
   });
   const [pagination, setPagination] = useState({ total: 0, totalPages: 1 });
   const [loading, setLoading] = useState(true);
@@ -104,6 +123,10 @@ function InstallmentsViewContent() {
   const [qrMonthNumber, setQrMonthNumber] = useState<number | null>(null);
   const [qrDefaultAmount, setQrDefaultAmount] = useState<number | null>(null);
   const [qrCustomerName, setQrCustomerName] = useState("");
+
+  // Bulk Reminder Modal state
+  const [bulkReminderModalOpen, setBulkReminderModalOpen] = useState(false);
+  const [sendingBulk, setSendingBulk] = useState(false);
 
   // Sync search URL
   useEffect(() => {
@@ -130,31 +153,43 @@ function InstallmentsViewContent() {
         page: page.toString(),
         limit: limit.toString(),
         search,
-        tab: activeTab,
+        category,
         month: selectedMonth.toString(),
-        year: selectedYear.toString()
+        year: selectedYear.toString(),
+        ...(advFilters.item && { item: advFilters.item }),
+        ...(advFilters.ptp && { ptp: advFilters.ptp }),
+        ...(advFilters.lock_status && { lock_status: advFilters.lock_status }),
+        ...(advFilters.ro_id && { ro_id: advFilters.ro_id }),
+        ...(advFilters.min_amount && { min_amount: advFilters.min_amount }),
+        ...(advFilters.max_amount && { max_amount: advFilters.max_amount }),
+        ...(advFilters.min_balance && { min_balance: advFilters.min_balance }),
+        ...(advFilters.max_balance && { max_balance: advFilters.max_balance })
       });
 
       const res = await fetch(`${API_BASE}/api/outlet/installments/due-list?${queryParams.toString()}`, {
         headers: getAuthHeaders()
       });
 
-      const data = await res.json();
-      if (data.success) {
-        setInstallments(data.data.installments || []);
-        setStats(data.data.stats || {
+      const resData = await res.json();
+      if (resData.success) {
+        setInstallments(resData.data.installments || []);
+        setStats(resData.data.stats || {
           totalDueThisMonth: 0,
           totalPaidThisMonth: 0,
           remainingThisMonth: 0,
           overallSystemRemaining: 0,
-          overallSystemPaid: 0
+          overallSystemPaid: 0,
+          monthsDue: 0,
+          monthsCollected: 0,
+          monthsRemainingAmount: 0,
+          customerCount: 0
         });
         setPagination({
-          total: data.data.pagination.total,
-          totalPages: data.data.pagination.totalPages
+          total: resData.data.pagination.total,
+          totalPages: resData.data.pagination.totalPages
         });
       } else {
-        toast.error(data.message || "Failed to load installments");
+        toast.error(resData.message || "Failed to load installments");
       }
     } catch (err) {
       console.error(err);
@@ -162,15 +197,15 @@ function InstallmentsViewContent() {
     } finally {
       setLoading(false);
     }
-  }, [page, limit, search, activeTab, selectedMonth, selectedYear]);
+  }, [page, limit, search, category, selectedMonth, selectedYear, advFilters]);
 
   useEffect(() => {
     fetchInstallments();
   }, [fetchInstallments]);
 
   // Reset page when filters change
-  const handleTabChange = (tabName: 'fresh' | 'due' | 'completed') => {
-    setActiveTab(tabName);
+  const handleCategoryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setCategory(e.target.value as any);
     setPage(1);
     setSelectedRows([]);
   };
@@ -223,93 +258,110 @@ function InstallmentsViewContent() {
     }
   };
 
-  // Export CSV Helper
-  const downloadCSV = (rowsToExport: any[], filename: string) => {
-    const headers = [
-      "S.No",
-      "Order Ref",
-      "Customer Name",
-      "WhatsApp Number",
-      "Alternate Contact",
-      "Area/Location",
-      "Due Date",
-      "Date of Purchase",
-      "Guarantor 1 Name",
-      "Guarantor 1 Phone",
-      "Guarantor 2 Name",
-      "Guarantor 2 Phone",
-      "Product Name",
-      "IMEI/Serial",
-      "This Month's Due Amount",
-      "Remaining Outstandings",
-      "Partial Payment",
-      "Payment Date & Logs",
-      "Ledger Status",
-      "Installment Note"
-    ];
+  const getExportData = (rowsToExport: any[]) => {
+    return rowsToExport.map((row, idx) => {
+      const paymentHistoryStr = row.paymentHistory && row.paymentHistory.length > 0
+        ? row.paymentHistory.map((h: any) => `${new Date(h.date).toLocaleDateString("en-PK")}: Rs. ${h.amount} (${h.method})`).join(" | ")
+        : row.paidDate
+          ? new Date(row.paidDate).toLocaleDateString("en-PK")
+          : "-";
 
-    const csvRows = [
-      headers.join(","), // Header row
-      ...rowsToExport.map((row, idx) => {
-        const paymentHistoryStr = row.paymentHistory && row.paymentHistory.length > 0
-          ? row.paymentHistory.map((h: any) => `${new Date(h.date).toLocaleDateString("en-PK")}: Rs. ${h.amount} (${h.method})`).join(" | ")
-          : row.paidDate
-            ? new Date(row.paidDate).toLocaleDateString("en-PK")
-            : "-";
-
-        return [
-          idx + 1,
-          `"${row.order_ref || ''}"`,
-          `"${row.customer_name || ''}"`,
-          `"${row.whatsapp_number || ''}"`,
-          `"${row.alternate_number || ''}"`,
-          `"${row.area || ''}"`,
-          `"${row.dueDate ? new Date(row.dueDate).toLocaleDateString("en-PK") : ''}"`,
-          `"${row.purchaseDate ? new Date(row.purchaseDate).toLocaleDateString("en-PK") : ''}"`,
-          `"${row.grantor1Name || ''}"`,
-          `"${row.grantor1Phone || ''}"`,
-          `"${row.grantor2Name || ''}"`,
-          `"${row.grantor2Phone || ''}"`,
-          `"${row.product_name || ''}"`,
-          `"${row.imei_serial || ''}"`,
-          row.monthlyAmount || 0,
-          row.remainingAmount || 0,
-          row.partialPayment || "",
-          `"${paymentHistoryStr}"`,
-          `"${row.status || ''}"`,
-          `"${(row.note || '').replace(/"/g, '""')}"`
-        ].join(",");
-      })
-    ];
-
-    const csvContent = "data:text/csv;charset=utf-8," + csvRows.join("\n");
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", filename);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+      return [
+        idx + 1,
+        row.order_ref || '',
+        row.customer_name || '',
+        row.whatsapp_number || '',
+        row.alternate_number || '',
+        row.area || '',
+        row.dueDate ? new Date(row.dueDate).toLocaleDateString("en-PK") : '',
+        row.purchaseDate ? new Date(row.purchaseDate).toLocaleDateString("en-PK") : '',
+        row.grantor1Name || '',
+        row.grantor1Phone || '',
+        row.grantor2Name || '',
+        row.grantor2Phone || '',
+        row.product_name || '',
+        row.imei_serial || '',
+        row.monthlyAmount || 0,
+        row.remainingAmount || 0,
+        row.partialPayment || "-",
+        paymentHistoryStr,
+        row.status || '',
+        row.note || ''
+      ];
+    });
   };
 
-  const handleExportSelected = () => {
+  const getExportHeaders = () => [
+    "S.No", "Order Ref", "Customer Name", "WhatsApp", "Alt Contact", "Area",
+    "Due Date", "Purchase Date", "G1 Name", "G1 Phone", "G2 Name", "G2 Phone",
+    "Product", "IMEI", "Due Amount", "Remaining", "Partial", "Logs", "Status", "Note"
+  ];
+
+  const exportPDF = (rowsToExport: any[], filename: string) => {
+    const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
+    const headers = getExportHeaders();
+    const data = getExportData(rowsToExport);
+
+    doc.setFontSize(14);
+    doc.text(`Installments Report - ${filename}`, 40, 40);
+    
+    autoTable(doc, {
+      head: [headers],
+      body: data,
+      startY: 60,
+      styles: { fontSize: 6, cellPadding: 2, overflow: 'linebreak' },
+      headStyles: { fillColor: [227, 30, 36], textColor: 255, fontSize: 7 },
+      columnStyles: {
+        0: { cellWidth: 20 },
+        1: { cellWidth: 40 },
+        2: { cellWidth: 50 },
+        // other columns will auto-size
+      },
+      margin: { top: 60, left: 20, right: 20, bottom: 20 }
+    });
+
+    doc.save(`${filename}.pdf`);
+  };
+
+  const exportExcel = (rowsToExport: any[], filename: string) => {
+    const headers = getExportHeaders();
+    const data = getExportData(rowsToExport);
+    
+    // Unshift headers into data
+    const worksheetData = [headers, ...data];
+    const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Installments");
+    
+    XLSX.writeFile(workbook, `${filename}.xlsx`);
+  };
+
+  const handleExportSelected = (type: 'pdf' | 'excel') => {
     const selectedData = filteredInstallments.filter(inst => selectedRows.includes(getRowKey(inst)));
     if (selectedData.length === 0) {
       toast.error("Please select at least one row to export");
       return;
     }
     const currentMonthLabel = MONTHS_LIST.find(m => m.value === selectedMonth)?.label || "Month";
-    downloadCSV(selectedData, `installments_${currentMonthLabel}_${selectedYear}_selected.csv`);
+    const filename = `Installments_${currentMonthLabel}_${selectedYear}_Selected`;
+    
+    if (type === 'pdf') exportPDF(selectedData, filename);
+    else exportExcel(selectedData, filename);
+    
     toast.success(`Successfully exported ${selectedData.length} records`);
   };
 
-  const handleExportAll = () => {
+  const handleExportAll = (type: 'pdf' | 'excel') => {
     if (filteredInstallments.length === 0) {
       toast.error("No records found in the current view to export");
       return;
     }
     const currentMonthLabel = MONTHS_LIST.find(m => m.value === selectedMonth)?.label || "Month";
-    downloadCSV(filteredInstallments, `installments_${currentMonthLabel}_${selectedYear}_all.csv`);
+    const filename = `Installments_${currentMonthLabel}_${selectedYear}_All`;
+    
+    if (type === 'pdf') exportPDF(filteredInstallments, filename);
+    else exportExcel(filteredInstallments, filename);
+    
     toast.success(`Successfully exported all ${filteredInstallments.length} records`);
   };
 
@@ -410,18 +462,31 @@ function InstallmentsViewContent() {
               </option>
             ))}
           </select>
+          <span className="text-gray-200 dark:text-slate-700">|</span>
+          <select
+            value={category}
+            onChange={handleCategoryChange}
+            className="bg-transparent border-0 text-xs font-black uppercase text-[#E31E24] focus:ring-0 cursor-pointer py-1"
+          >
+            <option value="all">All Accounts</option>
+            <option value="regular">Regular Accounts</option>
+            <option value="fresh">Fresh Accounts</option>
+            <option value="overdue">Overdue Accounts</option>
+            <option value="blacklist">Blacklist Accounts</option>
+            <option value="defaulter">Defaulter Accounts</option>
+            <option value="ptp">PTP Accounts</option>
+          </select>
         </div>
       </div>
 
       {/* STATISTICS CARDS SECTION */}
-      <div className="mb-8 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-5">
+      <div className="mb-8 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-6">
 
-        {/* Total Due This Month */}
         <div className="relative overflow-hidden rounded-2xl border border-gray-100 bg-white p-6 shadow-xl shadow-gray-100/50 dark:bg-boxdark dark:border-strokedark">
           <div className="flex justify-between items-start">
             <div>
-              <p className="text-[9px] font-black uppercase tracking-widest text-gray-400">Month's Due</p>
-              <h3 className="mt-2 text-xl font-black text-slate-800 dark:text-white">Rs. {stats.totalDueThisMonth.toLocaleString()}</h3>
+              <p className="text-[9px] font-black uppercase tracking-widest text-gray-400">Months Due</p>
+              <h3 className="mt-2 text-xl font-black text-slate-800 dark:text-white">{stats.monthsDue}</h3>
             </div>
             <div className="rounded-xl bg-[#E31E24]/5 p-2.5 text-[#E31E24]">
               <Calendar className="h-5 w-5" />
@@ -430,12 +495,11 @@ function InstallmentsViewContent() {
           <div className="absolute bottom-0 left-0 h-1 w-full bg-[#E31E24]/20" />
         </div>
 
-        {/* Total Collected This Month */}
         <div className="relative overflow-hidden rounded-2xl border border-gray-100 bg-white p-6 shadow-xl shadow-gray-100/50 dark:bg-boxdark dark:border-strokedark">
           <div className="flex justify-between items-start">
             <div>
-              <p className="text-[9px] font-black uppercase tracking-widest text-gray-400">Month's Collected</p>
-              <h3 className="mt-2 text-xl font-black text-slate-800 dark:text-white">Rs. {stats.totalPaidThisMonth.toLocaleString()}</h3>
+              <p className="text-[9px] font-black uppercase tracking-widest text-gray-400">Months Collected</p>
+              <h3 className="mt-2 text-xl font-black text-slate-800 dark:text-white">{stats.monthsCollected}</h3>
             </div>
             <div className="rounded-xl bg-emerald-50 p-2.5 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400">
               <CheckCircle2 className="h-5 w-5" />
@@ -444,12 +508,11 @@ function InstallmentsViewContent() {
           <div className="absolute bottom-0 left-0 h-1 w-full bg-emerald-500/20" />
         </div>
 
-        {/* Total Unpaid This Month */}
         <div className="relative overflow-hidden rounded-2xl border border-gray-100 bg-white p-6 shadow-xl shadow-gray-100/50 dark:bg-boxdark dark:border-strokedark">
           <div className="flex justify-between items-start">
             <div>
-              <p className="text-[9px] font-black uppercase tracking-widest text-gray-400">Month's Remaining</p>
-              <h3 className="mt-2 text-xl font-black text-slate-800 dark:text-white">Rs. {stats.remainingThisMonth.toLocaleString()}</h3>
+              <p className="text-[9px] font-black uppercase tracking-widest text-gray-400">Months Remaining</p>
+              <h3 className="mt-2 text-xl font-black text-slate-800 dark:text-white">Rs. {stats.monthsRemainingAmount.toLocaleString()}</h3>
             </div>
             <div className="rounded-xl bg-[#E31E24]/5 p-2.5 text-[#E31E24]">
               <Clock className="h-5 w-5" />
@@ -458,11 +521,10 @@ function InstallmentsViewContent() {
           <div className="absolute bottom-0 left-0 h-1 w-full bg-[#E31E24]/20" />
         </div>
 
-        {/* Overall System Collected */}
         <div className="relative overflow-hidden rounded-2xl border border-gray-100 bg-white p-6 shadow-xl shadow-gray-100/50 dark:bg-boxdark dark:border-strokedark">
           <div className="flex justify-between items-start">
             <div>
-              <p className="text-[9px] font-black uppercase tracking-widest text-gray-400">System Collected</p>
+              <p className="text-[9px] font-black uppercase tracking-widest text-gray-400">Total System Paid</p>
               <h3 className="mt-2 text-xl font-black text-slate-800 dark:text-white">Rs. {stats.overallSystemPaid.toLocaleString()}</h3>
             </div>
             <div className="rounded-xl bg-purple-50 p-2.5 text-purple-600 dark:bg-purple-500/10 dark:text-purple-400">
@@ -472,7 +534,6 @@ function InstallmentsViewContent() {
           <div className="absolute bottom-0 left-0 h-1 w-full bg-purple-500/20" />
         </div>
 
-        {/* Overall System Unpaid */}
         <div className="relative overflow-hidden rounded-2xl border border-gray-100 bg-white p-6 shadow-xl shadow-gray-100/50 dark:bg-boxdark dark:border-strokedark">
           <div className="flex justify-between items-start">
             <div>
@@ -486,47 +547,28 @@ function InstallmentsViewContent() {
           <div className="absolute bottom-0 left-0 h-1 w-full bg-slate-500/20" />
         </div>
 
+        <div className="relative overflow-hidden rounded-2xl border border-gray-100 bg-white p-6 shadow-xl shadow-gray-100/50 dark:bg-boxdark dark:border-strokedark">
+          <div className="flex justify-between items-start">
+            <div>
+              <p className="text-[9px] font-black uppercase tracking-widest text-gray-400">Customer Count</p>
+              <h3 className="mt-2 text-xl font-black text-slate-800 dark:text-white">{stats.customerCount}</h3>
+            </div>
+            <div className="rounded-xl bg-teal-50 p-2.5 text-teal-600 dark:bg-meta-4 dark:text-teal-300">
+              <Database className="h-5 w-5" />
+            </div>
+          </div>
+          <div className="absolute bottom-0 left-0 h-1 w-full bg-teal-500/20" />
+        </div>
+
       </div>
 
       {/* FILTER TABS & CONTROL ACTIONS */}
       <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between bg-white dark:bg-boxdark px-4 py-2.5 rounded-3xl shadow-sm border border-gray-100 dark:border-strokedark">
 
-        {/* Navigation Tabs */}
-        <div className="flex flex-wrap gap-1 bg-transparent self-start border-b border-gray-50 w-full lg:w-auto">
-          <button
-            onClick={() => handleTabChange('fresh')}
-            className={`whitespace-nowrap px-6 py-4 text-[10px] font-black uppercase tracking-widest transition-all border-b-2 ${activeTab === 'fresh'
-                ? "border-[#E31E24] text-[#E31E24]"
-                : "border-transparent text-gray-400 hover:text-gray-600"
-              }`}
-          >
-            Fresh
-          </button>
 
-          <button
-            onClick={() => handleTabChange('due')}
-            className={`whitespace-nowrap px-6 py-4 text-[10px] font-black uppercase tracking-widest transition-all border-b-2 ${activeTab === 'due'
-                ? "border-[#E31E24] text-[#E31E24]"
-                : "border-transparent text-gray-400 hover:text-gray-600"
-              }`}
-          >
-            Due / Overdue
-          </button>
-
-          <button
-            onClick={() => handleTabChange('completed')}
-            className={`whitespace-nowrap px-6 py-4 text-[10px] font-black uppercase tracking-widest transition-all border-b-2 ${activeTab === 'completed'
-                ? "border-[#E31E24] text-[#E31E24]"
-                : "border-transparent text-gray-400 hover:text-gray-600"
-              }`}
-          >
-            Fully Paid
-          </button>
-        </div>
 
         {/* Global Search and CSV Exports */}
         <div className="flex flex-wrap items-center gap-2.5">
-
           <div className="relative min-w-[220px]">
             <Search className="absolute left-3.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
             <input
@@ -540,6 +582,13 @@ function InstallmentsViewContent() {
               className="w-full rounded-2xl border-gray-100 bg-gray-50/50 py-2 pl-9 pr-4 text-xs outline-none focus:border-[#E31E24] focus:bg-white dark:border-strokedark dark:bg-meta-4 dark:text-white"
             />
           </div>
+          
+          <button
+            onClick={() => setShowAdvFilters(!showAdvFilters)}
+            className={`flex items-center gap-1.5 rounded-2xl border px-4 py-2.5 text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${showAdvFilters ? 'bg-[#E31E24]/10 border-[#E31E24]/30 text-[#E31E24]' : 'border-gray-100 dark:border-strokedark bg-white dark:bg-boxdark hover:bg-gray-50 text-gray-600 dark:text-white'}`}
+          >
+            <Filter className={`h-4 w-4 ${showAdvFilters ? 'text-[#E31E24]' : 'text-gray-400'}`} /> Filters
+          </button>
 
           {/* TRUE FULL-WALL WINDOW OVERLAY TOGGLE */}
           <button
@@ -565,19 +614,46 @@ function InstallmentsViewContent() {
             )}
           </button>
 
-          <button
-            onClick={handleExportSelected}
-            disabled={selectedRows.length === 0}
-            className="flex items-center gap-1.5 rounded-2xl border border-gray-100 dark:border-strokedark bg-white dark:bg-boxdark hover:bg-gray-50 px-4 py-2.5 text-[10px] font-black uppercase tracking-wider text-gray-600 dark:text-white disabled:opacity-40 transition-all cursor-pointer"
-          >
-            <FileSpreadsheet className="h-4 w-4 text-[#E31E24]" /> Export Selected ({selectedRows.length})
-          </button>
+          <div className="flex gap-1.5 items-center">
+            <button
+              onClick={() => handleExportSelected('pdf')}
+              disabled={selectedRows.length === 0}
+              className="flex items-center gap-1.5 rounded-l-2xl border border-gray-100 dark:border-strokedark bg-white dark:bg-boxdark hover:bg-gray-50 px-3 py-2.5 text-[10px] font-black uppercase tracking-wider text-gray-600 dark:text-white disabled:opacity-40 transition-all cursor-pointer"
+              title="Export Selected to PDF"
+            >
+              <FileDown className="h-4 w-4 text-[#E31E24]" /> PDF ({selectedRows.length})
+            </button>
+            <button
+              onClick={() => handleExportSelected('excel')}
+              disabled={selectedRows.length === 0}
+              className="flex items-center gap-1.5 rounded-r-2xl border border-l-0 border-gray-100 dark:border-strokedark bg-white dark:bg-boxdark hover:bg-gray-50 px-3 py-2.5 text-[10px] font-black uppercase tracking-wider text-gray-600 dark:text-white disabled:opacity-40 transition-all cursor-pointer"
+              title="Export Selected to Excel"
+            >
+              <FileSpreadsheet className="h-4 w-4 text-emerald-600" /> Excel ({selectedRows.length})
+            </button>
+          </div>
+
+          <div className="flex gap-1.5 items-center">
+            <button
+              onClick={() => handleExportAll('pdf')}
+              className="flex items-center gap-1.5 rounded-l-2xl bg-[#E31E24] hover:bg-[#c7161c] px-3 py-2.5 text-[10px] font-black uppercase tracking-wider text-white shadow-sm hover:shadow-md transition-all cursor-pointer border-r border-[#c7161c]"
+            >
+              <FileDown className="h-4 w-4" /> All PDF
+            </button>
+            <button
+              onClick={() => handleExportAll('excel')}
+              className="flex items-center gap-1.5 rounded-r-2xl bg-[#E31E24] hover:bg-[#c7161c] px-3 py-2.5 text-[10px] font-black uppercase tracking-wider text-white shadow-sm hover:shadow-md transition-all cursor-pointer"
+            >
+              <FileSpreadsheet className="h-4 w-4" /> All Excel
+            </button>
+          </div>
 
           <button
-            onClick={handleExportAll}
-            className="flex items-center gap-1.5 rounded-2xl bg-[#E31E24] hover:bg-[#c7161c] px-4 py-2.5 text-[10px] font-black uppercase tracking-wider text-white shadow-sm hover:shadow-md transition-all cursor-pointer"
+            onClick={() => setBulkReminderModalOpen(true)}
+            className="flex items-center gap-1.5 rounded-2xl border border-[#E31E24] bg-white hover:bg-gray-50 px-3 py-2.5 text-[10px] font-black uppercase tracking-wider text-[#E31E24] transition-all cursor-pointer dark:bg-boxdark dark:hover:bg-meta-4"
+            title="Bulk Reminders"
           >
-            <FileDown className="h-4 w-4" /> Export All CSV
+            <Calendar className="h-4 w-4" /> Bulk Reminders
           </button>
 
           <button
@@ -589,6 +665,110 @@ function InstallmentsViewContent() {
           </button>
         </div>
       </div>
+
+      {/* ADVANCED FILTERS PANEL */}
+      {showAdvFilters && (
+        <div className="mb-6 bg-white dark:bg-boxdark p-4 rounded-3xl shadow-sm border border-gray-100 dark:border-strokedark animate-fade-in">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+            <div>
+              <label className="mb-1.5 block text-[10px] font-black uppercase tracking-widest text-gray-400">Item Name</label>
+              <input
+                type="text"
+                placeholder="Search Item..."
+                value={advFilters.item}
+                onChange={(e) => { setAdvFilters({ ...advFilters, item: e.target.value }); setPage(1); }}
+                className="w-full rounded-xl border border-gray-100 bg-gray-50 px-3 py-2 text-xs outline-none focus:border-[#E31E24] dark:border-strokedark dark:bg-meta-4 dark:text-white"
+              />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-[10px] font-black uppercase tracking-widest text-gray-400">PTP Status</label>
+              <select
+                value={advFilters.ptp}
+                onChange={(e) => { setAdvFilters({ ...advFilters, ptp: e.target.value }); setPage(1); }}
+                className="w-full rounded-xl border border-gray-100 bg-gray-50 px-3 py-2 text-xs outline-none focus:border-[#E31E24] dark:border-strokedark dark:bg-meta-4 dark:text-white"
+              >
+                <option value="">Any</option>
+                <option value="yes">Yes</option>
+                <option value="no">No</option>
+              </select>
+            </div>
+            <div>
+              <label className="mb-1.5 block text-[10px] font-black uppercase tracking-widest text-gray-400">Lock Status</label>
+              <select
+                value={advFilters.lock_status}
+                onChange={(e) => { setAdvFilters({ ...advFilters, lock_status: e.target.value }); setPage(1); }}
+                className="w-full rounded-xl border border-gray-100 bg-gray-50 px-3 py-2 text-xs outline-none focus:border-[#E31E24] dark:border-strokedark dark:bg-meta-4 dark:text-white"
+              >
+                <option value="">Any</option>
+                <option value="unlocked">Unlocked</option>
+                <option value="locked">Locked</option>
+              </select>
+            </div>
+            <div>
+              <label className="mb-1.5 block text-[10px] font-black uppercase tracking-widest text-gray-400">Recovery Officer ID</label>
+              <input
+                type="number"
+                placeholder="RO ID..."
+                value={advFilters.ro_id}
+                onChange={(e) => { setAdvFilters({ ...advFilters, ro_id: e.target.value }); setPage(1); }}
+                className="w-full rounded-xl border border-gray-100 bg-gray-50 px-3 py-2 text-xs outline-none focus:border-[#E31E24] dark:border-strokedark dark:bg-meta-4 dark:text-white"
+              />
+            </div>
+            <div className="col-span-2 grid grid-cols-2 gap-2">
+              <div>
+                <label className="mb-1.5 block text-[10px] font-black uppercase tracking-widest text-gray-400">Min Amount</label>
+                <input
+                  type="number"
+                  placeholder="Min amount"
+                  value={advFilters.min_amount}
+                  onChange={(e) => { setAdvFilters({ ...advFilters, min_amount: e.target.value }); setPage(1); }}
+                  className="w-full rounded-xl border border-gray-100 bg-gray-50 px-3 py-2 text-xs outline-none focus:border-[#E31E24] dark:border-strokedark dark:bg-meta-4 dark:text-white"
+                />
+              </div>
+              <div>
+                <label className="mb-1.5 block text-[10px] font-black uppercase tracking-widest text-gray-400">Max Amount</label>
+                <input
+                  type="number"
+                  placeholder="Max amount"
+                  value={advFilters.max_amount}
+                  onChange={(e) => { setAdvFilters({ ...advFilters, max_amount: e.target.value }); setPage(1); }}
+                  className="w-full rounded-xl border border-gray-100 bg-gray-50 px-3 py-2 text-xs outline-none focus:border-[#E31E24] dark:border-strokedark dark:bg-meta-4 dark:text-white"
+                />
+              </div>
+            </div>
+            <div className="col-span-2 grid grid-cols-2 gap-2">
+              <div>
+                <label className="mb-1.5 block text-[10px] font-black uppercase tracking-widest text-gray-400">Min Balance</label>
+                <input
+                  type="number"
+                  placeholder="Min balance"
+                  value={advFilters.min_balance}
+                  onChange={(e) => { setAdvFilters({ ...advFilters, min_balance: e.target.value }); setPage(1); }}
+                  className="w-full rounded-xl border border-gray-100 bg-gray-50 px-3 py-2 text-xs outline-none focus:border-[#E31E24] dark:border-strokedark dark:bg-meta-4 dark:text-white"
+                />
+              </div>
+              <div>
+                <label className="mb-1.5 block text-[10px] font-black uppercase tracking-widest text-gray-400">Max Balance</label>
+                <input
+                  type="number"
+                  placeholder="Max balance"
+                  value={advFilters.max_balance}
+                  onChange={(e) => { setAdvFilters({ ...advFilters, max_balance: e.target.value }); setPage(1); }}
+                  className="w-full rounded-xl border border-gray-100 bg-gray-50 px-3 py-2 text-xs outline-none focus:border-[#E31E24] dark:border-strokedark dark:bg-meta-4 dark:text-white"
+                />
+              </div>
+            </div>
+            <div className="col-span-4 flex items-end justify-end">
+              <button
+                onClick={() => { setAdvFilters({ item: "", ptp: "", lock_status: "", ro_id: "", min_amount: "", max_amount: "", min_balance: "", max_balance: "" }); setPage(1); }}
+                className="text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-[#E31E24] transition-all"
+              >
+                Clear Filters
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* EXCEL SHEET HIGH-FIDELITY GRID CONTAINER */}
       <div className="bg-white dark:bg-boxdark rounded-3xl shadow-xl shadow-gray-100/40 border border-gray-100 dark:border-strokedark overflow-hidden">
@@ -1040,6 +1220,84 @@ function InstallmentsViewContent() {
                   "Save Changes"
                 )}
               </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* BULK REMINDER MODAL */}
+      {bulkReminderModalOpen && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
+          <div className="w-full max-w-md bg-white dark:bg-boxdark rounded-3xl shadow-2xl overflow-hidden border border-gray-100 dark:border-strokedark flex flex-col max-h-[90vh]">
+            
+            {/* Modal Header */}
+            <div className="px-6 py-5 border-b border-gray-100 dark:border-strokedark flex justify-between items-center bg-gray-50/50 dark:bg-meta-4/20">
+              <div className="flex items-center gap-3">
+                <div className="rounded-xl bg-[#E31E24]/10 p-2 text-[#E31E24]">
+                  <Calendar className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-slate-800 dark:text-white uppercase tracking-wider">Bulk Reminders</h3>
+                  <p className="text-[10px] text-gray-400 font-bold tracking-widest mt-0.5">MANAGE CUSTOMER ALERTS</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setBulkReminderModalOpen(false)}
+                className="text-gray-400 hover:text-[#E31E24] hover:bg-[#E31E24]/10 p-2 rounded-xl transition-all cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 flex flex-col gap-6 overflow-y-auto">
+              
+              {/* Manual Send */}
+              <div className="p-5 border border-gray-100 dark:border-strokedark rounded-2xl bg-white dark:bg-boxdark hover:border-[#E31E24]/30 transition-all">
+                <div className="flex flex-col gap-2">
+                  <h4 className="text-sm font-black text-slate-800 dark:text-white">Manual Bulk Send</h4>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+                    Send a reminder message immediately to all <strong className="text-[#E31E24]">Overdue</strong> customers currently visible in your filtered list.
+                  </p>
+                  
+                  <button
+                    onClick={() => {
+                      toast.success("Sending bulk manual reminders to overdue accounts...");
+                      setBulkReminderModalOpen(false);
+                    }}
+                    disabled={sendingBulk}
+                    className="mt-3 flex items-center justify-center gap-2 rounded-xl bg-slate-800 hover:bg-slate-900 dark:bg-slate-700 dark:hover:bg-slate-600 px-4 py-3 text-xs font-black uppercase tracking-wider text-white shadow-sm transition-all cursor-pointer"
+                  >
+                    {sendingBulk ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
+                    Send Now
+                  </button>
+                </div>
+              </div>
+
+              {/* Auto Settings */}
+              <div className="p-5 border border-[#E31E24]/20 rounded-2xl bg-[#E31E24]/5">
+                <div className="flex flex-col gap-2">
+                  <div className="flex justify-between items-start">
+                    <h4 className="text-sm font-black text-[#E31E24]">Auto Bulk Reminders</h4>
+                    <span className="bg-[#E31E24] text-white text-[9px] px-2 py-0.5 rounded-full font-black uppercase">Active</span>
+                  </div>
+                  <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed">
+                    Automatically send WhatsApp/SMS reminders to all overdue customers every morning at <strong className="text-slate-800 dark:text-white">10:00 AM</strong>.
+                  </p>
+                  
+                  <div className="mt-3 flex items-center justify-between bg-white dark:bg-boxdark p-3 rounded-xl border border-[#E31E24]/10">
+                    <span className="text-[10px] font-black tracking-widest uppercase text-gray-500">Auto-Scheduler Status</span>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input type="checkbox" className="sr-only peer" defaultChecked onChange={(e) => {
+                        toast.success(e.target.checked ? "Auto Bulk Reminders Enabled!" : "Auto Bulk Reminders Disabled");
+                      }} />
+                      <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-gray-600 peer-checked:bg-[#E31E24]"></div>
+                    </label>
+                  </div>
+                </div>
+              </div>
+
             </div>
 
           </div>

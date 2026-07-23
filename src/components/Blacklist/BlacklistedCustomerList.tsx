@@ -85,7 +85,7 @@ const BlacklistedCustomerList = () => {
     },
     {
       id: 'whatsapp_number',
-      accessorFn: (row) => row.customer.telephone_number,
+      accessorFn: (row) => row.customer.whatsapp_number,
       header: 'WhatsApp',
     },
     {
@@ -130,7 +130,17 @@ const BlacklistedCustomerList = () => {
         <span className="inline-flex items-center gap-1 rounded-full bg-red-500 px-3 py-1 text-[10px] font-black uppercase text-white animate-pulse">
           <AlertTriangle size={12} /> High Risk
         </span>
-      )
+      ),
+    },
+    {
+      id: 'reason',
+      accessorFn: (row) => row.customer.blacklist_reason || 'Auto-flagged (90+ days delinquency)',
+      header: 'Reason',
+      cell: ({ getValue }) => (
+        <div className="text-xs text-gray-500 max-w-[200px] truncate" title={getValue() as string}>
+          {getValue() as string}
+        </div>
+      ),
     },
     {
       id: 'actions',

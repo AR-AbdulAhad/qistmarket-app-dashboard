@@ -358,10 +358,10 @@ function InstallmentsContent() {
     const [pagination, setPagination] = useState({ total: 0, page: 1, limit: 10, totalPages: 1 });
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState(initialSearch);
-    const [activeTab, setActiveTab] = useState<'fresh' | 'overdue' | 'completed'>('fresh');
+    const [activeTab, setActiveTab] = useState<'fresh' | 'overdue' | 'paid'>('fresh');
     const [startDate, setStartDate] = useState("");
     const [endDate, setEndDate] = useState("");
-    const [stats, setStats] = useState({ totalRecovery: 0, overdueCount: 0 });
+    const [stats, setStats] = useState<{ totalAmount: number; customerCount: number; summaries?: any }>({ totalAmount: 0, customerCount: 0 });
 
     // Selection state for export
     const [selectedIds, setSelectedIds] = useState<number[]>([]);
@@ -406,8 +406,9 @@ function InstallmentsContent() {
                 setData(result.data.installments);
                 setPagination(result.data.pagination);
                 setStats({
-                    totalRecovery: result.data.totalRecovery || 0,
-                    overdueCount: result.data.overdueCount || 0
+                    totalAmount: result.data.totalAmount || 0,
+                    customerCount: result.data.customerCount || 0,
+                    summaries: result.data.summaries || null
                 });
             }
         } catch (e) {
@@ -530,25 +531,36 @@ function InstallmentsContent() {
                 </div>
 
                 <div className="flex flex-wrap items-center gap-4">
-                    <div className="bg-white dark:bg-gray-800 p-4 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 flex items-center gap-4 px-6 min-w-[240px]">
-                        <div className="w-12 h-12 rounded-2xl bg-emerald-50 dark:bg-emerald-900/20 flex items-center justify-center text-emerald-600">
-                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                        </div>
-                        <div>
-                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Total Recovery</p>
-                            <p className="text-xl font-black text-gray-900 dark:text-white">PKR {stats.totalRecovery.toLocaleString()}</p>
-                        </div>
-                    </div>
+                    {stats.summaries && (
+                        <>
+                            <div className="bg-white dark:bg-gray-800 p-4 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col justify-center px-6 min-w-[200px]">
+                                <div className="flex items-center gap-2 mb-2">
+                                    <div className="w-2.5 h-2.5 rounded-full bg-blue-500"></div>
+                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Fresh Accounts</p>
+                                </div>
+                                <p className="text-lg font-black text-gray-900 dark:text-white">PKR {stats.summaries.fresh.amount.toLocaleString()}</p>
+                                <p className="text-xs font-bold text-gray-500 mt-0.5">{stats.summaries.fresh.count} Customers</p>
+                            </div>
+                            
+                            <div className="bg-white dark:bg-gray-800 p-4 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col justify-center px-6 min-w-[200px]">
+                                <div className="flex items-center gap-2 mb-2">
+                                    <div className="w-2.5 h-2.5 rounded-full bg-red-500"></div>
+                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Overdue Accounts</p>
+                                </div>
+                                <p className="text-lg font-black text-gray-900 dark:text-white">PKR {stats.summaries.overdue.amount.toLocaleString()}</p>
+                                <p className="text-xs font-bold text-gray-500 mt-0.5">{stats.summaries.overdue.count} Customers</p>
+                            </div>
 
-                    <div className="bg-white dark:bg-gray-800 p-4 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 flex items-center gap-4 px-6 min-w-[240px]">
-                        <div className="w-12 h-12 rounded-2xl bg-red-50 dark:bg-red-900/20 flex items-center justify-center text-red-600">
-                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                        </div>
-                        <div>
-                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Overdue Accounts</p>
-                            <p className="text-xl font-black text-gray-900 dark:text-white">{stats.overdueCount}</p>
-                        </div>
-                    </div>
+                            <div className="bg-white dark:bg-gray-800 p-4 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col justify-center px-6 min-w-[200px]">
+                                <div className="flex items-center gap-2 mb-2">
+                                    <div className="w-2.5 h-2.5 rounded-full bg-emerald-500"></div>
+                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Paid Accounts</p>
+                                </div>
+                                <p className="text-lg font-black text-gray-900 dark:text-white">PKR {stats.summaries.paid.amount.toLocaleString()}</p>
+                                <p className="text-xs font-bold text-gray-500 mt-0.5">{stats.summaries.paid.count} Customers</p>
+                            </div>
+                        </>
+                    )}
                 </div>
             </div>
 
@@ -569,10 +581,10 @@ function InstallmentsContent() {
                         Overdue
                     </button>
                     <button
-                        onClick={() => { setActiveTab('completed'); setPagination({ ...pagination, page: 1 }); }}
-                        className={`flex-none px-6 py-2.5 rounded-xl text-sm font-bold transition-all whitespace-nowrap ${activeTab === 'completed' ? 'bg-white dark:bg-gray-800 text-emerald-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                        onClick={() => { setActiveTab('paid'); setPagination({ ...pagination, page: 1 }); }}
+                        className={`flex-none px-6 py-2.5 rounded-xl text-sm font-bold transition-all whitespace-nowrap ${activeTab === 'paid' ? 'bg-white dark:bg-gray-800 text-emerald-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
                     >
-                        Fully Paid
+                        Paid
                     </button>
                 </div>
 

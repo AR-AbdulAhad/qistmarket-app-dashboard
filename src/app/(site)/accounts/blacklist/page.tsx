@@ -157,6 +157,11 @@ export default function BlacklistPage() {
   };
 
   const handleAction = async (cnic: string, action: "blacklist" | "whitelist") => {
+    if (action === "blacklist" && !reason.trim()) {
+      toast.error("Please enter a reason for blacklisting.");
+      return;
+    }
+
     setActioningCnic(cnic);
     try {
       const res = await fetch(`${BACKEND_URL}/api/accounts/blacklist/action`, {
@@ -220,7 +225,7 @@ export default function BlacklistPage() {
                     <th className="px-4 py-3 font-bold">Customer</th>
                     <th className="px-4 py-3 font-bold">CNIC</th>
                     <th className="px-4 py-3 font-bold">Phone</th>
-                    <th className="px-4 py-3 font-bold">City</th>
+                    <th className="px-4 py-3 font-bold">Reason</th>
                     <th className="px-4 py-3 text-right font-bold">Orders</th>
                     <th className="px-4 py-3 text-right font-bold">Outstanding</th>
                   </tr>
@@ -231,7 +236,7 @@ export default function BlacklistPage() {
                       <td className="px-4 py-3.5 font-semibold text-dark dark:text-white">{c.customer.name}</td>
                       <td className="px-4 py-3.5 text-gray-600 dark:text-gray-300">{c.customer.cnic_number || "—"}</td>
                       <td className="px-4 py-3.5 text-gray-600 dark:text-gray-300">{c.customer.whatsapp_number}</td>
-                      <td className="px-4 py-3.5 text-gray-600 dark:text-gray-300">{c.customer.city || "—"}</td>
+                      <td className="px-4 py-3.5 text-xs text-gray-500 max-w-[150px] truncate" title={(c.customer as any).blacklist_reason}>{(c.customer as any).blacklist_reason || 'Auto-flagged (90+ days)'}</td>
                       <td className="px-4 py-3.5 text-right tabular-nums text-gray-600 dark:text-gray-300">{c.ledgerSummary.totalOrders}</td>
                       <td className="px-4 py-3.5 text-right tabular-nums font-bold text-rose-600">{PKR(c.ledgerSummary.totalRemaining)}</td>
                     </tr>
@@ -262,7 +267,7 @@ export default function BlacklistPage() {
             <input
               value={reason}
               onChange={(e) => setReason(e.target.value)}
-              placeholder="Reason (optional, applied to next action)"
+              placeholder="Reason (required for blacklist)"
               className="w-64 rounded-xl border border-stroke bg-white px-4 py-2.5 text-sm outline-none transition focus:border-[#ff3d3d] dark:border-dark-3 dark:bg-gray-dark dark:text-white"
             />
             <button type="submit" disabled={searching} className="flex items-center gap-1.5 rounded-xl bg-[#ff3d3d] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-opacity-90 disabled:opacity-50">

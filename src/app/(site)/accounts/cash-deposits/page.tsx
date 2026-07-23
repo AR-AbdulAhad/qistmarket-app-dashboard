@@ -1,0 +1,186 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import Cookies from "js-cookie";
+import { toast } from "react-hot-toast";
+import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
+import { CheckCircle, XCircle, Clock, ExternalLink, Image as ImageIcon } from "lucide-react";
+
+const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
+const getAuthHeaders = () => ({
+    Authorization: `Bearer ${Cookies.get("auth_token")}`,
+    "Content-Type": "application/json",
+});
+
+type DepositRequest = {
+    id: number;
+    amount: number;
+    payment_method: string;
+    receipt_id: string;
+    receipt_photo_url: string;
+    description: string;
+    status: string;
+    created_at: string;
+    submitted_by: { full_name: string; username: string };
+    bank_account?: { bank_name: string; account_number: string };
+    outlet?: { name: string; code: string };
+};
+
+export default function AccountsCashDepositsPage() {
+    const [deposits, setDeposits] = useState<DepositRequest[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [selectedStatus, setSelectedStatus] = useState("pending");
+
+    useEffect(() => {
+        fetchDeposits();
+    }, [selectedStatus]);
+
+    const fetchDeposits = async () => {
+        setLoading(true);
+        try {
+            const url = new URL(`${API_BASE}/api/accounts/bank-deposits`);
+            if (selectedStatus !== "all") {
+                url.searchParams.append("status", selectedStatus);
+            }
+            const res = await fetch(url.toString(), { headers: getAuthHeaders() });
+            const data = await res.json();
+            if (data.success) {
+                setDeposits(data.data);
+            }
+        } catch (err) {
+            toast.error("Failed to fetch deposit requests.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleVerify = async (id: number, status: "verified" | "rejected") => {
+        const remarks = prompt(`Enter remarks for ${status === "verified" ? "verification" : "rejection"} (optional):`);
+        if (remarks === null) return; // cancelled
+
+        try {
+            const res = await fetch(`${API_BASE}/api/accounts/bank-deposits/${id}/verify`, {
+                method: "PATCH",
+                headers: getAuthHeaders(),
+                body: JSON.stringify({ status, remarks }),
+            });
+            const data = await res.json();
+            if (data.success) {
+                toast.success(`Deposit request ${status} successfully.`);
+                fetchDeposits();
+            } else {
+                toast.error(data.message || "Failed to process request.");
+            }
+        } catch (err) {
+            toast.error("An error occurred.");
+        }
+    };
+
+    return (
+        <>
+            <Breadcrumb pageName="Bank Deposit Requests" />
+            <div className="rounded-sm border border-stroke bg-white px-5 pt-6 pb-2.5 shadow-default dark:border-strokedark dark:bg-boxdark sm:px-7.5 xl:pb-1">
+                <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <h4 className="text-xl font-semibold text-black dark:text-white">Deposit Requests</h4>
+                    <div className="flex gap-3">
+                        <select
+                            value={selectedStatus}
+                            onChange={(e) => setSelectedStatus(e.target.value)}
+                            className="rounded border border-stroke bg-transparent py-2 px-4 outline-none dark:border-strokedark dark:bg-meta-4"
+                        >
+                            <option value="pending">Pending</option>
+                            <option value="verified">Verified</option>
+                            <option value="rejected">Rejected</option>
+                            <option value="all">All</option>
+                        </select>
+                        <button onClick={fetchDeposits} className="rounded bg-primary py-2 px-4 text-white hover:bg-opacity-90">
+                            Refresh
+                        </button>
+                    </div>
+                </div>
+
+                <div className="max-w-full overflow-x-auto">
+                    <table className="w-full table-auto">
+                        <thead>
+                            <tr className="bg-gray-2 text-left dark:bg-meta-4">
+                                <th className="min-w-[120px] py-4 px-4 font-medium text-black dark:text-white">Date</th>
+                                <th className="min-w-[150px] py-4 px-4 font-medium text-black dark:text-white">Outlet / User</th>
+                                <th className="min-w-[150px] py-4 px-4 font-medium text-black dark:text-white">Amount / Method</th>
+                                <th className="min-w-[150px] py-4 px-4 font-medium text-black dark:text-white">Destination Bank</th>
+                                <th className="min-w-[120px] py-4 px-4 font-medium text-black dark:text-white">Proof</th>
+                                <th className="min-w-[120px] py-4 px-4 font-medium text-black dark:text-white">Status</th>
+                                <th className="py-4 px-4 font-medium text-black dark:text-white text-center">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {loading ? (
+                                <tr><td colSpan={7} className="text-center py-4">Loading...</td></tr>
+                            ) : deposits.length === 0 ? (
+                                <tr><td colSpan={7} className="text-center py-4">No requests found.</td></tr>
+                            ) : (
+                                deposits.map((deposit) => (
+                                    <tr key={deposit.id}>
+                                        <td className="border-b border-[#eee] py-5 px-4 dark:border-strokedark">
+                                            <p className="text-black dark:text-white">{new Date(deposit.created_at).toLocaleDateString()}</p>
+                                            <p className="text-xs text-body-color">{new Date(deposit.created_at).toLocaleTimeString()}</p>
+                                        </td>
+                                        <td className="border-b border-[#eee] py-5 px-4 dark:border-strokedark">
+                                            <p className="text-black dark:text-white font-medium">{deposit.outlet?.name || "Accounts"}</p>
+                                            <p className="text-xs text-body-color">{deposit.submitted_by.full_name}</p>
+                                        </td>
+                                        <td className="border-b border-[#eee] py-5 px-4 dark:border-strokedark">
+                                            <p className="text-black dark:text-white font-semibold">PKR {deposit.amount.toLocaleString()}</p>
+                                            <p className="text-xs text-primary">{deposit.payment_method}</p>
+                                        </td>
+                                        <td className="border-b border-[#eee] py-5 px-4 dark:border-strokedark">
+                                            {deposit.bank_account ? (
+                                                <>
+                                                    <p className="text-black dark:text-white">{deposit.bank_account.bank_name}</p>
+                                                    <p className="text-xs text-body-color">{deposit.bank_account.account_number}</p>
+                                                </>
+                                            ) : (
+                                                <p className="text-body-color italic text-sm">Not specified</p>
+                                            )}
+                                        </td>
+                                        <td className="border-b border-[#eee] py-5 px-4 dark:border-strokedark">
+                                            {deposit.receipt_id && <p className="text-sm font-medium">Ref: {deposit.receipt_id}</p>}
+                                            {deposit.receipt_photo_url && (
+                                                <a href={`${API_BASE}${deposit.receipt_photo_url}`} target="_blank" rel="noreferrer" className="mt-1 flex items-center gap-1 text-xs text-primary hover:underline">
+                                                    <ImageIcon size={14} /> View Photo
+                                                </a>
+                                            )}
+                                        </td>
+                                        <td className="border-b border-[#eee] py-5 px-4 dark:border-strokedark">
+                                            <span className={`inline-flex rounded-full bg-opacity-10 py-1 px-3 text-sm font-medium ${
+                                                deposit.status === 'verified' ? 'bg-success text-success' :
+                                                deposit.status === 'rejected' ? 'bg-danger text-danger' :
+                                                'bg-warning text-warning'
+                                            }`}>
+                                                {deposit.status === 'verified' && <CheckCircle className="mr-1 h-4 w-4" />}
+                                                {deposit.status === 'rejected' && <XCircle className="mr-1 h-4 w-4" />}
+                                                {deposit.status === 'pending' && <Clock className="mr-1 h-4 w-4" />}
+                                                {deposit.status.charAt(0).toUpperCase() + deposit.status.slice(1)}
+                                            </span>
+                                        </td>
+                                        <td className="border-b border-[#eee] py-5 px-4 dark:border-strokedark text-center">
+                                            {deposit.status === 'pending' && (
+                                                <div className="flex items-center justify-center space-x-2">
+                                                    <button onClick={() => handleVerify(deposit.id, 'verified')} className="hover:text-success" title="Verify">
+                                                        <CheckCircle className="h-5 w-5" />
+                                                    </button>
+                                                    <button onClick={() => handleVerify(deposit.id, 'rejected')} className="hover:text-danger" title="Reject">
+                                                        <XCircle className="h-5 w-5" />
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </td>
+                                    </tr>
+                                ))
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </>
+    );
+}

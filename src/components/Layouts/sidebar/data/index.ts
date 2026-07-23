@@ -166,6 +166,10 @@ export const NAV_DATA = [
             title: "Deletion Requests",
             url: "/admin/deletion-requests",
           },
+          {
+            title: "Cash Limits",
+            url: "/admin/cash-limits",
+          },
         ],
       },
       {
@@ -233,8 +237,9 @@ export const NAV_DATA = [
       {
         title: "Rankings & Leaderboards",
         icon: Icons.BarChartIcon,
-        url: "/admin/rankings",
-        items: [],
+        items: [
+          { title: "Officer Rankings", url: "/admin/rankings" },
+        ],
       },
       {
         title: "Alerts Center",
@@ -525,6 +530,17 @@ export const NAV_DATA = [
           { title: "Delivery Agents", url: "/outlet/delivery" },
           { title: "Recovery Officers", url: "/outlet/recovery" },
           { title: "Verification Officers", url: "/outlet/verification" },
+          { title: "Officer Targets", url: "/outlet/officer-targets" },
+        ],
+      },
+      {
+        title: "Rankings & Leaderboards",
+        icon: Icons.BarChartIcon,
+        items: [
+          { title: "Outlet Rankings", url: "/outlet/rankings/outlets" },
+          { title: "Delivery Rankings", url: "/outlet/rankings/delivery" },
+          { title: "Recovery Rankings", url: "/outlet/rankings/recovery" },
+          { title: "Verification Rankings", url: "/outlet/rankings/verification" },
         ],
       },
       {
@@ -549,6 +565,12 @@ export const NAV_DATA = [
         ],
       },
       {
+        title: "Cash Deposit",
+        icon: Icons.BanknoteIcon,
+        url: "/outlet/cash-deposit",
+        items: [],
+      },
+      {
         title: "Returns",
         icon: Icons.UndoIcon,
         url: "/outlet/returns",
@@ -558,7 +580,7 @@ export const NAV_DATA = [
         title: "Installments",
         icon: Icons.HashIcon,
         items: [
-          { title: "Installment Ledgers", url: "/outlet/installments" },
+          { title: "Installment Receiving", url: "/outlet/installments" },
           { title: "Installments View", url: "/outlet/installments/view" }
         ],
       },
@@ -685,6 +707,7 @@ export const NAV_DATA = [
         items: [
           { title: "Cash In Hand", url: "/accounts/cash-in-hand" },
           { title: "Bank Accounts", url: "/accounts/bank-accounts" },
+          { title: "Deposit Requests", url: "/accounts/cash-deposits" },
         ],
       },
       {
