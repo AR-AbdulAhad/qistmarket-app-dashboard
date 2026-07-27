@@ -19,7 +19,7 @@ interface ApprovalOrder { id: number; order_ref: string; customer_name: string; 
 interface VerificationOrder { id: number; order_ref: string; customer_name: string; updated_at: string }
 interface OnlinePayment { channel: string; consumer_number: string; amount: number; status: string; created_at: string }
 interface RecoveryItem { order_ref: string; customer_name: string; amount: number; paid_at: string }
-interface AttendanceRow { outlet_id: number; outlet_name: string; totalStaff: number; present: number; absent: number; notMarked: number }
+interface AttendanceRow { outlet_id: number; outlet_name: string; totalStaff: number; present: number; absent: number; notMarked: number; unlinkedOfficers: number }
 
 export default function AdminCommandCenterPage() {
   const { notifications } = useNotifications();
