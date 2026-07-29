@@ -57,7 +57,7 @@ export default function OutletInventoryPage() {
     const [totalPages, setTotalPages] = useState(1);
     const [limit] = useState(20);
     const [totalItemsCount, setTotalItemsCount] = useState(0);
-    const [totalStats, setTotalStats] = useState({ totalStock: 0, inStock: 0, sold: 0 });
+    const [totalStats, setTotalStats] = useState({ totalStock: 0, inStock: 0, sold: 0, outOfStock: 0 });
 
     // Expanded group keys
     const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set());
@@ -409,11 +409,12 @@ export default function OutletInventoryPage() {
             </div>
 
             {/* Stats Row */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
                 {[
                     { label: "Total Item", val: totalStats.totalStock, color: "text-primary" },
                     { label: "In Stock", val: totalStats.inStock, color: "text-green-600 dark:text-green-400" },
                     { label: "Sold", val: totalStats.sold, color: "text-blue-600 dark:text-blue-400" },
+                    { label: "Out of Stock", val: totalStats.outOfStock || 0, color: "text-red-600 dark:text-red-400" },
                     { label: "Stock Value", val: `PKR ${totalStockValue.toLocaleString()}`, color: "text-amber-600 dark:text-amber-400" },
                 ].map(s => (
                     <div key={s.label} className="bg-white dark:bg-boxdark border border-stroke dark:border-strokedark rounded-xl p-4 shadow-sm text-center flex flex-col justify-center items-center">
@@ -592,7 +593,7 @@ export default function OutletInventoryPage() {
                                                                     className="w-16 text-center border rounded px-1 py-1 text-xs disabled:opacity-50 dark:bg-form-input dark:border-strokedark outline-none mx-auto"
                                                                 />
                                                             ) : (
-                                                                <span className="font-bold">{item.quantity}</span>
+                                                                <span className="font-bold"></span>
                                                             )}
                                                         </td>
 
