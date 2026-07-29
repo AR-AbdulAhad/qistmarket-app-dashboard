@@ -5,7 +5,7 @@ export default function DeliveredOrdersPage() {
     return (
         <div>
             <Breadcrumb pageName="Delivered Orders" />
-            <OrderList forcedStatus="delivered" hideActions hideSelection />
+            <OrderList forcedStatus="delivered" apiEndpoint="/api/orders/delivered-list" hideActions hideSelection />
         </div>
     );
 };

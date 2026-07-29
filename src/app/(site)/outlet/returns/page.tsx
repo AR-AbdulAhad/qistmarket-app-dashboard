@@ -9,6 +9,7 @@ import {
   Clock, AlertCircle, Phone, X, ChevronRight, History
 } from "lucide-react";
 import Loader from "@/components/common/Loader";
+import { formatExactDate } from "@/utils/dateUtils";
 
 const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
 const getHeaders = () => ({ Authorization: `Bearer ${Cookies.get("auth_token")}` });
@@ -30,10 +31,7 @@ export default function OutletReturnsPage() {
 
   // Confirmation popup
   const [confirmData, setConfirmData] = useState<any | null>(null);
-  const [otp, setOtp] = useState(["", "", "", ""]);
-  const [verifying, setVerifying] = useState(false);
-  const [otpError, setOtpError] = useState("");
-  const [resending, setResending] = useState(false);
+  const [blacklistCustomer, setBlacklistCustomer] = useState(false);
 
   const token = useMemo(() => Cookies.get("auth_token"), []);
 
@@ -91,73 +89,27 @@ export default function OutletReturnsPage() {
           is_cash_refund: isCash,
           refund_amount: isCash ? parseFloat(refundAmt) : 0,
           customer_phone: customerPhone || undefined,
+          blacklist_customer: blacklistCustomer,
         }),
       });
       const d = await res.json();
       if (!d.success) throw new Error(d.error || "Failed");
-      const recId = d.data.record_id;
-      // Open confirmation popup
-      setConfirmData({
-        record_id: recId,
-        order_ref: selectedOrder.order_ref,
-        customer_name: selectedOrder.customer_name,
-        product_name: selectedOrder.delivered_product_name,
-        imei: selectedOrder.delivered_imei,
-        advance: selectedOrder.delivered_advance,
-        is_cash_refund: isCash,
-        refund_amount: isCash ? parseFloat(refundAmt) : 0,
-        phone: customerPhone || selectedOrder.whatsapp_number,
-      });
+      
+      toast.success("Return processed successfully");
+      
       setSelectedOrder(null);
       setOrderQuery("");
       setIsCash(false);
       setRefundAmt("");
       setCustomerPhone("");
-      setOtp(["", "", "", ""]);
-      setOtpError("");
+      setBlacklistCustomer(false);
+      fetchRecords();
     } catch (e: any) {
       toast.error(e.message || "Failed to initiate return");
     } finally { setSubmitting(false); }
   };
 
-  const handleVerifyOtp = async () => {
-    const code = otp.join("");
-    if (code.length !== 4) { setOtpError("Enter complete 4-digit OTP"); return; }
-    setVerifying(true);
-    setOtpError("");
-    try {
-      const res = await fetch(`${API_BASE}/api/outlet/verify-return-otp`, {
-        method: "POST",
-        headers: { ...getHeaders(), "Content-Type": "application/json" },
-        body: JSON.stringify({ record_id: confirmData.record_id, otp: code }),
-      });
-      const d = await res.json();
-      if (!d.success) throw new Error(d.error || "Invalid OTP");
-      setConfirmData(null);
-      setOtp(["", "", "", ""]);
-      fetchRecords();
-    } catch (e: any) {
-      setOtpError(e.message || "Verification failed");
-    } finally { setVerifying(false); }
-  };
 
-  const handleResendOtp = async () => {
-    if (!confirmData) return;
-    setResending(true);
-    try {
-      const phone = customerPhone || confirmData.phone || undefined;
-      const res = await fetch(`${API_BASE}/api/outlet/resend-return-otp`, {
-        method: "POST",
-        headers: { ...getHeaders(), "Content-Type": "application/json" },
-        body: JSON.stringify({ record_id: confirmData.record_id, customer_phone: phone }),
-      });
-      const d = await res.json();
-      if (!d.success) throw new Error(d.error || "Failed to resend");
-      setOtpError("");
-    } catch (e: any) {
-      setOtpError(e.message || "Failed to resend OTP");
-    } finally { setResending(false); }
-  };
 
   const handleClearSelection = () => {
     setSelectedOrder(null);
@@ -166,6 +118,7 @@ export default function OutletReturnsPage() {
     setIsCash(false);
     setRefundAmt("");
     setCustomerPhone("");
+    setBlacklistCustomer(false);
   };
 
   const filteredRecords = records.filter(r =>
@@ -307,113 +260,31 @@ export default function OutletReturnsPage() {
                 className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border-2 border-stroke dark:border-strokedark rounded-2xl focus:border-primary outline-none font-bold text-gray-800 dark:text-white transition-all" />
             </div>
 
+            {/* Blacklist Toggle */}
+            <div className="flex items-center justify-between bg-gray-50 dark:bg-gray-900 border border-stroke dark:border-strokedark p-4 rounded-xl">
+              <div>
+                <h4 className="text-sm font-black text-gray-800 dark:text-white uppercase tracking-tight">Blacklist Customer</h4>
+                <p className="text-[10px] text-gray-500 uppercase font-bold mt-1">If enabled, the customer & order will be blacklisted.</p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" className="sr-only peer" checked={blacklistCustomer} onChange={() => setBlacklistCustomer(!blacklistCustomer)} />
+                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-red-600"></div>
+              </label>
+            </div>
+
             <button onClick={handleInitiateReturn} disabled={submitting || (isCash && !refundAmt)}
               className="w-full py-5 bg-primary hover:bg-opacity-90 disabled:opacity-50 text-white rounded-2xl text-sm font-black uppercase tracking-widest shadow-2xl shadow-primary/30 transition-all active:scale-[0.98] flex items-center justify-center gap-3">
               {submitting ? (
                 <><div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div><span>Processing...</span></>
               ) : (
-                <><CheckCircle2 size={18} /><span>Send OTP &amp; Process Return</span></>
+                <><CheckCircle2 size={18} /><span>Process Return</span></>
               )}
             </button>
           </div>
         )}
       </div>
 
-      {/* ── CONFIRMATION POPUP ── */}
-      {confirmData && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white dark:bg-boxdark rounded-3xl p-8 max-w-md w-full mx-auto shadow-2xl border border-stroke dark:border-strokedark animate-in zoom-in-95 duration-200">
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-2xl bg-red-100 dark:bg-red-900/20 flex items-center justify-center text-red-600">
-                  <PackageX size={24} />
-                </div>
-                <div>
-                  <h3 className="font-black text-gray-800 dark:text-white">Confirm Return</h3>
-                  <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">OTP Verification</p>
-                </div>
-              </div>
-              <button onClick={() => { setConfirmData(null); setOtp(["", "", "", ""]); setOtpError(""); }}
-                className="bg-gray-100 dark:bg-meta-4 text-gray-500 p-2 rounded-full hover:bg-gray-200 transition-all">
-                <X size={18} />
-              </button>
-            </div>
-
-            <div className="bg-gray-50 dark:bg-gray-900 rounded-2xl p-4 mb-6 space-y-2 border border-stroke dark:border-strokedark">
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-400 font-bold">Product</span>
-                <span className="font-black text-gray-800 dark:text-white text-right">{confirmData.product_name}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-400 font-bold">IMEI</span>
-                <span className="font-mono text-primary font-bold text-xs">{confirmData.imei}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-400 font-bold">Order</span>
-                <span className="font-black text-gray-800 dark:text-white">#{confirmData.order_ref}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-400 font-bold">Customer</span>
-                <span className="font-black text-gray-800 dark:text-white">{confirmData.customer_name}</span>
-              </div>
-              {confirmData.is_cash_refund && (
-                <div className="flex justify-between text-sm pt-2 border-t border-stroke dark:border-strokedark">
-                  <span className="text-red-500 font-black text-xs uppercase tracking-wider">Cash Refund</span>
-                  <span className="font-black text-red-600 text-lg">Rs. {confirmData.refund_amount?.toLocaleString()}</span>
-                </div>
-              )}
-            </div>
-
-            <div className="mb-4">
-              <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-1">Phone (OTP sent here)</label>
-              <input type="text" value={customerPhone || confirmData.phone || ""} onChange={e => setCustomerPhone(e.target.value)}
-                className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-900 border border-stroke dark:border-strokedark rounded-xl focus:border-primary outline-none font-bold text-sm text-gray-800 dark:text-white" />
-            </div>
-
-            <div className="flex justify-center gap-3 mb-6">
-              {otp.map((d, i) => (
-                <input key={i} type="text" maxLength={1} value={d} autoFocus={i === 0}
-                  onChange={e => {
-                    const val = e.target.value.replace(/\D/g, "");
-                    const newOtp = [...otp];
-                    newOtp[i] = val;
-                    setOtp(newOtp);
-                    if (val && i < 3) {
-                      const next = document.getElementById(`otp-${i + 1}`);
-                      next?.focus();
-                    }
-                  }}
-                  onKeyDown={e => {
-                    if (e.key === "Backspace" && !otp[i] && i > 0) {
-                      const prev = document.getElementById(`otp-${i - 1}`);
-                      prev?.focus();
-                    }
-                  }}
-                  id={`otp-${i}`}
-                  className="w-14 h-14 text-center text-2xl font-black bg-gray-50 dark:bg-gray-900 border-2 border-stroke dark:border-strokedark rounded-2xl focus:border-primary outline-none transition-all text-gray-800 dark:text-white" />
-              ))}
-            </div>
-
-            {otpError && (
-              <p className="text-xs font-black text-red-500 text-center mb-4 bg-red-50 dark:bg-red-900/10 py-2 rounded-xl">{otpError}</p>
-            )}
-
-            <div className="flex gap-3">
-              <button onClick={handleVerifyOtp} disabled={verifying || otp.join("").length !== 4}
-                className="flex-1 py-4 bg-primary hover:bg-opacity-90 disabled:opacity-50 text-white rounded-2xl text-sm font-black uppercase tracking-widest shadow-lg shadow-primary/30 transition-all active:scale-[0.98] flex items-center justify-center gap-2">
-                {verifying ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : <CheckCircle2 size={18} />}
-                {verifying ? "Verifying..." : "Verify & Confirm Return"}
-              </button>
-            </div>
-
-            <button onClick={handleResendOtp} disabled={resending}
-              className="w-full mt-3 py-3 bg-gray-100 dark:bg-meta-4 hover:bg-gray-200 dark:hover:bg-meta-3 text-gray-500 rounded-2xl text-xs font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2">
-              {resending ? <div className="w-4 h-4 border-2 border-gray-400/30 border-t-gray-400 rounded-full animate-spin"></div> : <RefreshCw size={14} />}
-              Resend OTP
-            </button>
-          </div>
-        </div>
-      )}
+      {/* ── CONFIRMATION POPUP (Removed as OTP is bypassed) ── */}
 
       {/* ── PENDING RETURNS ── */}
       <div className="mb-10">
@@ -459,31 +330,27 @@ export default function OutletReturnsPage() {
                   {r.imei_returned && <p className="text-[9px] font-mono text-primary/70 bg-primary/5 px-2 py-0.5 rounded inline-block">IMEI: {r.imei_returned}</p>}
                 </div>
                 <button onClick={async () => {
-                  setConfirmData({
-                    record_id: r.id,
-                    order_ref: r.order?.order_ref,
-                    customer_name: r.order?.customer_name,
-                    product_name: r.product_name || r.order?.product_name,
-                    imei: r.imei_returned,
-                    advance: r.delivered_advance_amount,
-                    is_cash_refund: r.is_cash_refund,
-                    refund_amount: r.refund_amount,
-                    phone: r.order?.whatsapp_number,
-                  });
-                  setOtp(["", "", "", ""]);
-                  setOtpError("");
-                  // Auto-send OTP when popup opens
                   try {
-                    const phone = r.order?.whatsapp_number || undefined;
-                    await fetch(`${API_BASE}/api/outlet/resend-return-otp`, {
-                      method: "POST",
-                      headers: { ...getHeaders(), "Content-Type": "application/json" },
-                      body: JSON.stringify({ record_id: r.id, customer_phone: phone }),
-                    });
-                  } catch (_) {}
+                    const res = await fetch(`${API_BASE}/api/outlet/initiate-direct-return`, {
+                        method: "POST",
+                        headers: { ...getHeaders(), "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          order_id: r.order_id,
+                          is_cash_refund: r.is_cash_refund,
+                          refund_amount: r.refund_amount,
+                          blacklist_customer: false,
+                        }),
+                      });
+                      const d = await res.json();
+                      if (!d.success) throw new Error(d.error || "Failed");
+                      toast.success("Pending return verified successfully");
+                      fetchRecords();
+                  } catch (e: any) {
+                      toast.error(e.message || "Failed to process return");
+                  }
                 }}
                   className="w-full py-4 bg-amber-500 hover:bg-amber-600 text-white rounded-2xl text-[11px] font-black uppercase tracking-widest shadow-xl shadow-amber-500/20 transition-all active:scale-95 flex items-center justify-center gap-2">
-                  <CheckCircle2 size={14} /> Verify OTP
+                  <CheckCircle2 size={14} /> Process Pending Return
                 </button>
               </div>
             ))}
@@ -562,12 +429,9 @@ export default function OutletReturnsPage() {
                       <div className="flex items-center gap-2">
                         <div className="w-1.5 h-1.5 rounded-full bg-success"></div>
                         <p className="text-xs font-black text-gray-700 dark:text-gray-200">
-                          {r.verified_at ? new Date(r.verified_at).toLocaleDateString([], { month: "short", day: "2-digit", year: "numeric" }) : ""}
+                          {r.verified_at ? formatExactDate(r.verified_at) : ""}
                         </p>
                       </div>
-                      <p className="text-[10px] font-bold text-gray-400 pl-3.5 mt-0.5">
-                        {r.verified_at ? new Date(r.verified_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : ""}
-                      </p>
                     </td>
                   </tr>
                 ))}

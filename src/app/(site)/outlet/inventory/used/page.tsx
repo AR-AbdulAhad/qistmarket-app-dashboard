@@ -5,7 +5,7 @@ import Link from "next/link";
 import Cookies from "js-cookie";
 import {
     Edit, Trash2, Search, CheckSquare, Square, Package,
-    AlertCircle, RefreshCw, ChevronDown, ChevronRight, Save, X, Plus
+    AlertCircle, RefreshCw, ChevronDown, ChevronRight, Save, X, Plus, RotateCcw
 } from "lucide-react";
 import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
 
@@ -25,6 +25,7 @@ type InventoryItem = {
     purchase_price: number;
     installment_price: number;
     status: string;
+    is_used?: boolean;
 };
 
 // A "group" is formed by unique (product_name + color_variant).
@@ -185,6 +186,26 @@ export default function OutletInventoryPage() {
             purchase_price: item.purchase_price,
             status: item.status,
         });
+    };
+
+    const reverseUsedStatus = async (item: InventoryItem) => {
+        if (!confirm(`Reverse used status for ${item.product_name}?`)) return;
+        try {
+            const res = await fetch(`${API_BASE}/api/outlet/inventory/${item.id}`, {
+                method: "PATCH",
+                headers: getAuthHeaders(),
+                body: JSON.stringify({ is_used: false, status: "Sold" }),
+            });
+            const data = await res.json();
+            if (data.success) {
+                setInventory(prev => prev.filter(i => i.id !== item.id));
+                showAlert("success", `${item.product_name} reversed to available stock.`);
+            } else {
+                showAlert("error", data.message || "Could not reverse item.");
+            }
+        } catch {
+            showAlert("error", "Network error while reversing item.");
+        }
     };
 
     const saveEdit = async (id: number) => {
@@ -358,6 +379,9 @@ export default function OutletInventoryPage() {
                     </p>
                 </div>
                 <div className="flex items-center gap-3">
+                    <Link href="/outlet/inventory/used/history" className="bg-white dark:bg-boxdark border border-stroke dark:border-strokedark text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-meta-4 px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 shadow-sm transition-colors">
+                        <RotateCcw size={16} /> View Reversal History
+                    </Link>
                     <button onClick={fetchInventory} className="bg-white dark:bg-boxdark border border-stroke dark:border-strokedark text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-meta-4 px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 shadow-sm transition-colors">
                         <RefreshCw size={16} /> Sync Stock
                     </button>
@@ -365,11 +389,12 @@ export default function OutletInventoryPage() {
             </div>
 
             {/* Stats Row */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            {/* <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
                 {[
                     { label: "Total Item", val: totalStats.totalStock, color: "text-primary" },
                     { label: "In Stock", val: totalStats.inStock, color: "text-green-600 dark:text-green-400" },
                     { label: "Sold", val: totalStats.sold, color: "text-blue-600 dark:text-blue-400" },
+                    { label: "Out of Stock", val: totalStats.outOfStock || 0, color: "text-red-600 dark:text-red-400" },
                     { label: "Stock Value", val: `PKR ${totalStockValue.toLocaleString()}`, color: "text-amber-600 dark:text-amber-400" },
                 ].map(s => (
                     <div key={s.label} className="bg-white dark:bg-boxdark border border-stroke dark:border-strokedark rounded-xl p-4 shadow-sm text-center flex flex-col justify-center items-center">
@@ -377,7 +402,7 @@ export default function OutletInventoryPage() {
                         <div className="text-[10px] sm:text-xs text-gray-500 dark:text-gray-400 mt-1 font-medium uppercase tracking-wide">{s.label}</div>
                     </div>
                 ))}
-            </div>
+            </div> */}
 
             {/* Toolbar */}
             <div className="bg-white dark:bg-boxdark rounded-xl shadow-sm border border-stroke dark:border-strokedark p-4 mb-4 flex flex-col lg:flex-row gap-4 justify-between items-center">
@@ -551,7 +576,7 @@ export default function OutletInventoryPage() {
                                                                     className="w-16 text-center border rounded px-1 py-1 text-xs disabled:opacity-50 dark:bg-form-input dark:border-strokedark outline-none mx-auto"
                                                                 />
                                                             ) : (
-                                                                <span className="font-bold">{item.quantity}</span>
+                                                                <span className="font-bold"></span>
                                                             )}
                                                         </td>
 
@@ -587,6 +612,12 @@ export default function OutletInventoryPage() {
                                                                         Used Item
                                                                     </span>
                                                                 )}
+                                                                <button
+                                                                    onClick={(e) => { e.stopPropagation(); reverseUsedStatus(item); }}
+                                                                    className="mt-1 px-2 py-1 rounded-full text-[10px] font-bold bg-success/10 text-success border border-success/20 hover:bg-success/20 transition-colors"
+                                                                >
+                                                                    Reverse
+                                                                </button>
                                                             </div>
                                                         </td>
                                                     </tr>

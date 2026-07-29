@@ -73,6 +73,8 @@ interface Order {
   street: string | null;
   house_no: string | null;
   product_name: string
+  delivered_product_name?: string
+  delivered_imei?: string
   advance_amount: number
   monthly_amount: number
   months: number
@@ -99,6 +101,7 @@ interface Order {
 interface OrderListProps {
   forcedStatus?: string
   forcedChannel?: string
+  apiEndpoint?: string
   hideActions?: boolean
   hideSelection?: boolean
   showAllStatuses?: boolean
@@ -124,7 +127,7 @@ interface PaginationInfo {
 // ─────────────────────────────────────────────────────────────────────────────
 // Main Component
 // ─────────────────────────────────────────────────────────────────────────────
-const OrderListContent = ({ forcedStatus, forcedChannel, hideActions, hideSelection, showAllStatuses, onRowSelectionChange, customTopBarActions }: OrderListProps) => {
+const OrderListContent = ({ forcedStatus, forcedChannel, apiEndpoint, hideActions, hideSelection, showAllStatuses, onRowSelectionChange, customTopBarActions }: OrderListProps) => {
   const router = useRouter()
   const [orders, setOrders] = useState<Order[]>([])
   const [pagination, setPagination] = useState<PaginationInfo>({
@@ -156,6 +159,8 @@ const OrderListContent = ({ forcedStatus, forcedChannel, hideActions, hideSelect
   const { user } = useAuth()
   const userRole = user?.role?.toLowerCase() || ''
   const isSalesOfficer = userRole === 'sales officer'
+  const isSuperAdmin = userRole === 'super admin'
+  const isOutletBranchUser = user?.role_id === 5
 
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
   const [selectedVerifierId, setSelectedVerifierId] = useState<number | null>(null)
@@ -238,7 +243,8 @@ const OrderListContent = ({ forcedStatus, forcedChannel, hideActions, hideSelect
         if (f.id && f.value) params.append(f.id, String(f.value))
       })
 
-      const res = await fetch(`${BACKEND_URL}/api/orders?${params}`, {
+      const apiPath = apiEndpoint || '/api/orders'
+      const res = await fetch(`${BACKEND_URL}${apiPath}?${params}`, {
         headers: { Authorization: `Bearer ${token}` },
       })
 
@@ -247,7 +253,10 @@ const OrderListContent = ({ forcedStatus, forcedChannel, hideActions, hideSelect
 
       if (json.success && json.data?.orders) {
         setOrders(json.data.orders)
-        setPagination(json.data.pagination)
+        setPagination(prev => ({
+          ...prev,
+          ...json.data.pagination,
+        }))
       }
     } catch (err) {
       console.error(err)
@@ -366,16 +375,13 @@ const OrderListContent = ({ forcedStatus, forcedChannel, hideActions, hideSelect
   }
 
   const confirmAssign = async () => {
-    const isDelivery = selectedOrder?.status === 'approved' || selectedOrder?.status === 'picked'
-    const targetUserId = isDelivery ? selectedDeliveryOfficerId : selectedVerifierId
-    
-    if (!selectedOrder || !targetUserId) return
-    setIsSubmitting(true)
-    try {
-      const token = Cookies.get('auth_token')
-      const endpoint = isDelivery 
-        ? `${BACKEND_URL}/api/orders/${selectedOrder.id}/assign-delivery`
-        : `${BACKEND_URL}/api/orders/${selectedOrder.id}/assign`
+const targetUserId = selectedDeliveryOfficerId
+      
+      if (!selectedOrder || !targetUserId) return
+      setIsSubmitting(true)
+      try {
+        const token = Cookies.get('auth_token')
+        const endpoint = `${BACKEND_URL}/api/orders/${selectedOrder.id}/assign-delivery`
 
       const res = await fetch(endpoint, {
         method: 'PATCH',
@@ -404,15 +410,11 @@ const OrderListContent = ({ forcedStatus, forcedChannel, hideActions, hideSelect
   }
 
   const confirmSingleUnassign = async () => {
-    const isDelivery = selectedOrder?.status === 'approved' || selectedOrder?.status === 'picked'
-    
     if (!selectedOrder) return
     setIsSubmitting(true)
     try {
       const token = Cookies.get('auth_token')
-      const endpoint = isDelivery
-        ? `${BACKEND_URL}/api/orders/${selectedOrder.id}/assign-delivery`
-        : `${BACKEND_URL}/api/orders/${selectedOrder.id}/assign`
+      const endpoint = `${BACKEND_URL}/api/orders/${selectedOrder.id}/assign-delivery`
 
       const res = await fetch(endpoint, {
         method: 'PATCH',
@@ -451,18 +453,15 @@ const OrderListContent = ({ forcedStatus, forcedChannel, hideActions, hideSelect
   }
 
   const confirmBulkAssign = async () => {
-    const isDeliveryBulk = forcedStatus === 'approved' || forcedStatus === 'picked'
-    const targetUserId = isDeliveryBulk ? selectedDeliveryOfficerId : selectedVerifierId
-    
-    if (!targetUserId) return
-    const ids = table.getSelectedRowModel().rows.map((r) => r.original.id)
-    setIsSubmitting(true)
+const targetUserId = selectedDeliveryOfficerId
+      
+      if (!targetUserId) return
+      const ids = table.getSelectedRowModel().rows.map((r) => r.original.id)
+      setIsSubmitting(true)
 
-    try {
-      const token = Cookies.get('auth_token')
-      const endpoint = isDeliveryBulk 
-        ? `${BACKEND_URL}/api/orders/assign-bulk-delivery`
-        : `${BACKEND_URL}/api/orders/assign-bulk`
+      try {
+        const token = Cookies.get('auth_token')
+        const endpoint = `${BACKEND_URL}/api/orders/assign-bulk-delivery`
 
       const res = await fetch(endpoint, {
         method: 'POST',
@@ -727,15 +726,12 @@ const OrderListContent = ({ forcedStatus, forcedChannel, hideActions, hideSelect
   }
 
   const confirmBulkUnassign = async () => {
-    const isDeliveryBulk = forcedStatus === 'approved' || forcedStatus === 'picked'
-    const ids = table.getSelectedRowModel().rows.map((r) => r.original.id)
-    setIsSubmitting(true)
+const ids = table.getSelectedRowModel().rows.map((r) => r.original.id)
+      setIsSubmitting(true)
 
-    try {
-      const token = Cookies.get('auth_token')
-      const endpoint = isDeliveryBulk
-        ? `${BACKEND_URL}/api/orders/assign-bulk-delivery`
-        : `${BACKEND_URL}/api/orders/assign-bulk`
+      try {
+        const token = Cookies.get('auth_token')
+        const endpoint = `${BACKEND_URL}/api/orders/assign-bulk-delivery`
 
       const res = await fetch(endpoint, {
         method: 'POST',
@@ -762,8 +758,8 @@ const OrderListContent = ({ forcedStatus, forcedChannel, hideActions, hideSelect
   }
 
   // Column visibility flags based on page status
-  const hideAssignedTo = ['rejected', 'expired', 'cancelled'].includes(forcedStatus || '')
-  const showDeliveryOfficer = ['completed', 'delivered', 'picked', 'approved'].includes(forcedStatus || '')
+  const hideAssignedTo = ['rejected', 'expired', 'cancelled', 'returned'].includes(forcedStatus || '')
+  const showDeliveryOfficer = ['completed', 'delivered', 'picked', 'approved', 'returned'].includes(forcedStatus || '')
   const showRecoveryOfficer = ['delivered'].includes(forcedStatus || '')
 
   // ── Columns ────────────────────────────────────────────────────────────────
@@ -814,7 +810,15 @@ const OrderListContent = ({ forcedStatus, forcedChannel, hideActions, hideSelect
     { accessorKey: 'whatsapp_number', header: 'WhatsApp', enableColumnFilter: true },
     { accessorKey: 'city', header: 'City', enableColumnFilter: true },
     { accessorKey: 'area', header: 'Area', enableColumnFilter: true },
-    { accessorKey: 'product_name', header: 'Suggested Product', enableColumnFilter: true },
+    {
+      id: 'product',
+      header: (['delivered', 'returned', 'recovery'].includes(forcedStatus || '') ? 'Delivered Product' : 'Suggested Product'),
+      accessorFn: (row: Order) => {
+        if (['delivered', 'returned', 'recovery'].includes(forcedStatus || '')) return row.delivered_product_name || row.product_name
+        return row.product_name
+      },
+      enableColumnFilter: true,
+    },
     {
       accessorKey: 'status',
       header: 'Status',
@@ -891,6 +895,11 @@ const OrderListContent = ({ forcedStatus, forcedChannel, hideActions, hideSelect
           case 'approved':
             label = 'Approved';
             className += ' bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300';
+            break;
+
+          case 'returned':
+            label = 'Returned';
+            className += ' bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300';
             break;
 
           case 'picked':
@@ -1167,68 +1176,38 @@ const OrderListContent = ({ forcedStatus, forcedChannel, hideActions, hideSelect
                       )
                     ) : (
                       <>
-                        {order.status === 'approved' || (order.status === 'picked' && [1, 2, 5].includes(user?.role_id ?? -1)) ? (
-                          order.delivery_officer ? (
-                            <li>
-                              <button
-                                onClick={() => {
-                                  handleUnassignClick(order)
-                                  setIsOpen(false)
-                                }}
-                                className="block w-full px-4 py-2.5 text-left hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/30 dark:hover:text-red-400"
-                              >
-                                Unassign Delivery
-                              </button>
-                            </li>
-                          ) : (
-                            <li>
-                              <button
-                                onClick={() => {
-                                  handleAssignClick(order)
-                                  setIsOpen(false)
-                                }}
-                                className="block w-full px-4 py-2.5 text-left hover:bg-[#F5F7FD] hover:text-[#ff3d3d] dark:hover:bg-dark-3"
-                              >
-                                Assign Delivery
-                              </button>
-                            </li>
-                          )
-                        ) : (
-                          order.status !== 'picked' && (
-                            order.assigned_to ? (
-                              <li>
-                                <button
-                                  onClick={() => {
-                                    handleUnassignClick(order)
-                                    setIsOpen(false)
-                                  }}
-                                  className="block w-full px-4 py-2.5 text-left hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/30 dark:hover:text-red-400"
-                                >
-                                  Unassign Verification
-                                </button>
-                              </li>
-                            ) : (
-                              <li>
-                                <button
-                                  onClick={() => {
-                                    handleAssignClick(order)
-                                    setIsOpen(false)
-                                  }}
-                                  className="block w-full px-4 py-2.5 text-left hover:bg-[#F5F7FD] hover:text-[#ff3d3d] dark:hover:bg-dark-3"
-                                >
-                                  Assign Verification
-                                </button>
-                              </li>
-                            )
-                          )
-                        )}
+                        {order.delivery_officer ? (
+                        <li>
+                          <button
+                            onClick={() => {
+                              handleUnassignClick(order)
+                              setIsOpen(false)
+                            }}
+                            className="block w-full px-4 py-2.5 text-left hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/30 dark:hover:text-red-400"
+                          >
+                            Unassign Delivery
+                          </button>
+                        </li>
+                      ) : (
+                        <li>
+                          <button
+                            onClick={() => {
+                              handleAssignClick(order)
+                              setIsOpen(false)
+                            }}
+                            className="block w-full px-4 py-2.5 text-left hover:bg-[#F5F7FD] hover:text-[#ff3d3d] dark:hover:bg-dark-3"
+                          >
+                            Assign Delivery
+                          </button>
+                        </li>
+                      )}
                       </>
                     )}
                   </>
                 )}
 
                 {/* Self Pickup (for outlet users when approved) */}
-                {user?.role_id === 5 && order.status === 'approved' && !order.delivery_officer && !order.verification?.home_location_required && (
+                {isOutletBranchUser && !isSuperAdmin && order.status === 'approved' && !order.delivery_officer && !order.verification?.home_location_required && (
                   <li>
                     <button
                       onClick={() => {
@@ -1351,7 +1330,7 @@ const OrderListContent = ({ forcedStatus, forcedChannel, hideActions, hideSelect
                 }}
                 className="rounded-lg border border-stroke bg-transparent px-3 py-1.5 outline-none focus:border-[#ff3d3d] dark:border-dark-3"
               >
-                {["All", "new", "pending", "in_progress", "cancelled", "rejected", "delivered", "completed", "expired", "approved", "picked"].map((s) => (
+                {["All", "new", "pending", "in_progress", "cancelled", "rejected", "returned", "delivered", "completed", "expired", "approved", "picked"].map((s) => (
                   <option key={s} value={s} className="dark:bg-dark-2">
                     {s === "All" ? "All Statuses" : s.replace(/_/g, " ").charAt(0).toUpperCase() + s.replace(/_/g, " ").slice(1)}
                   </option>
@@ -1703,38 +1682,23 @@ const OrderListContent = ({ forcedStatus, forcedChannel, hideActions, hideSelect
         className="max-w-md rounded-2xl bg-white p-8 shadow-xl dark:bg-gray-800"
       >
         <h2 className="mb-4 text-xl font-semibold text-dark dark:text-white">
-          {['approved', 'picked'].includes(selectedOrder?.status || '') ? 'Assign Delivery Officer' : 'Assign Verification Officer'}
+          Assign Delivery Officer
         </h2>
         <p className="mb-6 text-gray-600 dark:text-gray-300">
-          Select {['approved', 'picked'].includes(selectedOrder?.status || '') ? 'a delivery officer' : 'a verification officer'}:
+          Select a delivery officer:
         </p>
-        {['approved', 'picked'].includes(selectedOrder?.status || '') ? (
-          <select
-            value={selectedDeliveryOfficerId ?? ''}
-            onChange={(e) => setSelectedDeliveryOfficerId(Number(e.target.value))}
-            className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2.5 outline-none focus:border-[#ff3d3d] dark:border-dark-3 dark:bg-dark-2"
-          >
-            <option value="">Select Officer</option>
-            {deliveryOfficers.map((u) => (
-              <option key={u.id} value={u.id}>
-                {u.full_name} ({u.username})
-              </option>
-            ))}
-          </select>
-        ) : (
-          <select
-            value={selectedVerifierId ?? ''}
-            onChange={(e) => setSelectedVerifierId(Number(e.target.value))}
-            className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2.5 outline-none focus:border-[#ff3d3d] dark:border-dark-3 dark:bg-dark-2"
-          >
-            <option value="">Select Officer</option>
-            {verifiers.map((u) => (
-              <option key={u.id} value={u.id}>
-                {u.full_name} ({u.username})
-              </option>
-            ))}
-          </select>
-        )}
+        <select
+          value={selectedDeliveryOfficerId ?? ''}
+          onChange={(e) => setSelectedDeliveryOfficerId(Number(e.target.value))}
+          className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2.5 outline-none focus:border-[#ff3d3d] dark:border-dark-3 dark:bg-dark-2"
+        >
+          <option value="">Select Officer</option>
+          {deliveryOfficers.map((u) => (
+            <option key={u.id} value={u.id}>
+              {u.full_name} ({u.username})
+            </option>
+          ))}
+        </select>
         <div className="mt-6 flex justify-end gap-4">
           <button
             onClick={() => {
@@ -1749,7 +1713,7 @@ const OrderListContent = ({ forcedStatus, forcedChannel, hideActions, hideSelect
           </button>
           <button
             onClick={confirmAssign}
-            disabled={(!selectedVerifierId && !selectedDeliveryOfficerId) || isSubmitting}
+            disabled={!selectedDeliveryOfficerId || isSubmitting}
             className="rounded bg-[#ff3d3d] px-6 py-2.5 text-white hover:bg-[#ff3d3d]/90 disabled:opacity-50"
           >
             {isSubmitting ? 'Assigning...' : 'Assign'}
@@ -1764,10 +1728,10 @@ const OrderListContent = ({ forcedStatus, forcedChannel, hideActions, hideSelect
         className="max-w-md rounded-2xl bg-white p-8 shadow-xl dark:bg-gray-800"
       >
         <h2 className="mb-4 text-xl font-semibold text-dark dark:text-white">
-          {['approved', 'picked'].includes(selectedOrder?.status || '') ? 'Unassign Delivery Officer' : 'Unassign Verification Officer'}
+          Unassign Delivery Officer
         </h2>
         <p className="mb-6 text-gray-600 dark:text-gray-300">
-          Are you sure you want to unassign {['approved', 'picked'].includes(selectedOrder?.status || '') ? 'Delivery' : 'Verification'} Officer from order <strong>{selectedOrder?.order_ref}</strong>?
+          Are you sure you want to unassign Delivery Officer from order <strong>{selectedOrder?.order_ref}</strong>?
         </p>
         <div className="mt-6 flex justify-end gap-4">
           <button
@@ -1798,38 +1762,23 @@ const OrderListContent = ({ forcedStatus, forcedChannel, hideActions, hideSelect
         className="max-w-md rounded-2xl bg-white p-8 shadow-xl dark:bg-gray-800"
       >
         <h2 className="mb-4 text-xl font-semibold text-dark dark:text-white">
-          {['approved', 'picked'].includes(forcedStatus || '') ? 'Bulk Assign Delivery Officers' : 'Bulk Assign Verification Officers'}
+          Bulk Assign Delivery Officers
         </h2>
         <p className="mb-6 text-gray-600 dark:text-gray-300">
-          Select {['approved', 'picked'].includes(forcedStatus || '') ? 'a delivery officer' : 'a verification officer'} for {selectedCount} selected orders:
+          Select a delivery officer for {selectedCount} selected orders:
         </p>
-        {['approved', 'picked'].includes(forcedStatus || '') ? (
-          <select
-            value={selectedDeliveryOfficerId ?? ''}
-            onChange={(e) => setSelectedDeliveryOfficerId(Number(e.target.value))}
-            className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2.5 outline-none focus:border-[#ff3d3d] dark:border-dark-3 dark:bg-dark-2"
-          >
-            <option value="">Select Officer</option>
-            {deliveryOfficers.map((u) => (
-              <option key={u.id} value={u.id}>
-                {u.full_name} ({u.username})
-              </option>
-            ))}
-          </select>
-        ) : (
-          <select
-            value={selectedVerifierId ?? ''}
-            onChange={(e) => setSelectedVerifierId(Number(e.target.value))}
-            className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2.5 outline-none focus:border-[#ff3d3d] dark:border-dark-3 dark:bg-dark-2"
-          >
-            <option value="">Select Officer</option>
-            {verifiers.map((u) => (
-              <option key={u.id} value={u.id}>
-                {u.full_name} ({u.username})
-              </option>
-            ))}
-          </select>
-        )}
+        <select
+          value={selectedDeliveryOfficerId ?? ''}
+          onChange={(e) => setSelectedDeliveryOfficerId(Number(e.target.value))}
+          className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2.5 outline-none focus:border-[#ff3d3d] dark:border-dark-3 dark:bg-dark-2"
+        >
+          <option value="">Select Officer</option>
+          {deliveryOfficers.map((u) => (
+            <option key={u.id} value={u.id}>
+              {u.full_name} ({u.username})
+            </option>
+          ))}
+        </select>
         <div className="mt-6 flex justify-end gap-4">
           <button
             onClick={() => {
@@ -1844,7 +1793,7 @@ const OrderListContent = ({ forcedStatus, forcedChannel, hideActions, hideSelect
           </button>
           <button
             onClick={confirmBulkAssign}
-            disabled={(!selectedVerifierId && !selectedDeliveryOfficerId) || isSubmitting}
+            disabled={!selectedDeliveryOfficerId || isSubmitting}
             className="rounded bg-[#ff3d3d] px-6 py-2.5 text-white hover:bg-[#ff3d3d]/90 disabled:opacity-50"
           >
             {isSubmitting ? 'Assigning All...' : 'Assign All'}
@@ -1859,10 +1808,10 @@ const OrderListContent = ({ forcedStatus, forcedChannel, hideActions, hideSelect
         className="max-w-md rounded-2xl bg-white p-8 shadow-xl dark:bg-gray-800"
       >
         <h2 className="mb-4 text-xl font-semibold text-dark dark:text-white">
-          {['approved', 'picked'].includes(forcedStatus || '') ? 'Bulk Unassign Delivery Officers' : 'Bulk Unassign Verification Officers'}
+          Bulk Unassign Delivery Officers
         </h2>
         <p className="mb-6 text-gray-600 dark:text-gray-300">
-          Are you sure you want to unassign {['approved', 'picked'].includes(forcedStatus || '') ? 'Delivery' : 'Verification'} Officers from <strong>{selectedCount}</strong> selected orders?
+          Are you sure you want to unassign Delivery Officers from <strong>{selectedCount}</strong> selected orders?
         </p>
         <div className="mt-6 flex justify-end gap-4">
           <button

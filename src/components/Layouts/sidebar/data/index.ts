@@ -47,6 +47,10 @@ export const NAV_DATA = [
             url: "/delivered-orders",
           },
           {
+            title: "Returned Orders",
+            url: "/returned-orders",
+          },
+          {
             title: "Expired Orders",
             url: "/expired-orders",
           },
@@ -358,6 +362,10 @@ export const NAV_DATA = [
             url: "/delivered-orders",
           },
           {
+            title: "Returned Orders",
+            url: "/returned-orders",
+          },
+          {
             title: "Expired Orders",
             url: "/expired-orders",
           },
@@ -471,6 +479,10 @@ export const NAV_DATA = [
             url: "/delivered-orders",
           },
           {
+            title: "Returned Orders",
+            url: "/returned-orders",
+          },
+          {
             title: "Expired Orders",
             url: "/expired-orders",
           },
@@ -510,6 +522,7 @@ export const NAV_DATA = [
         items: [
           { title: "Stock List", url: "/outlet/inventory" },
           { title: "Used Stock", url: "/outlet/inventory/used" },
+          { title: "Used Stock History", url: "/outlet/inventory/used/history" },
           { title: "Stock Transfers", url: "/outlet/inventory/transfers" },
           { title: "Transfer History", url: "/outlet/inventory/transfers/history" },
         ],
@@ -531,6 +544,7 @@ export const NAV_DATA = [
           { title: "Recovery Officers", url: "/outlet/recovery" },
           { title: "Verification Officers", url: "/outlet/verification" },
           { title: "Officer Targets", url: "/outlet/officer-targets" },
+          { title: "Cash Limits", url: "/outlet/cash-limits" },
         ],
       },
       {

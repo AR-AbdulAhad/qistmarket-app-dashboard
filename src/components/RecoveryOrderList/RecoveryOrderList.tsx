@@ -38,6 +38,8 @@ interface Order {
     area: string;
     zone: string | null;
     product_name: string
+    delivered_product_name?: string
+    delivered_imei?: string
     total_amount: number
     advance_amount: number
     monthly_amount: number
@@ -316,7 +318,12 @@ const RecoveryOrderList = () => {
         { accessorKey: 'whatsapp_number', header: 'WhatsApp', enableColumnFilter: true },
             { accessorKey: 'city', header: 'City', enableColumnFilter: true },
         { accessorKey: 'area', header: 'Area', enableColumnFilter: true },
-        { accessorKey: 'product_name', header: 'Suggested Product', enableColumnFilter: true },
+                {
+                id: 'product',
+                header: 'Delivered Product',
+                accessorFn: (row: Order) => row.delivered_product_name || row.product_name,
+                enableColumnFilter: true,
+            },
         {
             accessorKey: 'status',
             header: 'Status',

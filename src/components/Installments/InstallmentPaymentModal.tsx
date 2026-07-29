@@ -300,7 +300,7 @@ export default function InstallmentPaymentModal({ open, onClose, onSuccess, orde
                         )}
 
                         <div className="grid grid-cols-2 gap-4">
-                            <div>
+                            <div className="hidden">
                                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Payment Method</label>
                                 <select
                                     value={paymentMethod}
