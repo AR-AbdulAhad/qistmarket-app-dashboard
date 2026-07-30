@@ -8,6 +8,8 @@ import { CameraIcon } from "./_components/icons";
 import Cookies from "js-cookie";
 import { useAuth } from "../../../../contexts/AuthContext";
 import { jwtDecode } from "jwt-decode";
+import { getMyDeletionRequest, requestAccountDeletion } from "@/services/account-deletion.service";
+import { AccountDeletionRequest } from "@/types/account-deletion";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
 
@@ -40,6 +42,11 @@ export default function ProfilePage() {
   const [fileCover, setFileCover] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
 
+  const [deletionRequest, setDeletionRequest] = useState<AccountDeletionRequest | null>(null);
+  const [deletionReason, setDeletionReason] = useState("");
+  const [showDeletionForm, setShowDeletionForm] = useState(false);
+  const [requestingDeletion, setRequestingDeletion] = useState(false);
+
   useEffect(() => {
     if (user) {
       setData({
@@ -49,6 +56,28 @@ export default function ProfilePage() {
       });
     }
   }, [user]);
+
+  useEffect(() => {
+    getMyDeletionRequest()
+      .then((res) => setDeletionRequest(res.request))
+      .catch(() => {});
+  }, []);
+
+  const handleRequestDeletion = async () => {
+    setRequestingDeletion(true);
+    try {
+      await requestAccountDeletion(deletionReason);
+      toast.success("Deletion request submitted. An admin will review it.");
+      setShowDeletionForm(false);
+      setDeletionReason("");
+      const res = await getMyDeletionRequest();
+      setDeletionRequest(res.request);
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || "Failed to submit deletion request.");
+    } finally {
+      setRequestingDeletion(false);
+    }
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, files } = e.target;
@@ -191,6 +220,52 @@ export default function ProfilePage() {
           </button>
         </div>
       </form>
+
+      <div className="mt-6 rounded-[10px] border border-rose-200 bg-rose-50/50 p-6 dark:border-rose-500/20 dark:bg-rose-500/5">
+        <h4 className="font-medium text-rose-700 dark:text-rose-400">Danger Zone</h4>
+
+        {deletionRequest && deletionRequest.status === "pending" ? (
+          <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
+            Your account deletion request is <strong>pending review</strong>. Submitted {new Date(deletionRequest.requestedAt).toLocaleDateString()}.
+          </p>
+        ) : deletionRequest && deletionRequest.status === "rejected" ? (
+          <div className="mt-2 text-sm text-gray-600 dark:text-gray-300">
+            <p>Your previous deletion request was <strong>rejected</strong>{deletionRequest.reviewRemarks ? `: "${deletionRequest.reviewRemarks}"` : "."}</p>
+            <button onClick={() => setShowDeletionForm(true)} className="mt-2 text-sm font-medium text-rose-600 hover:underline">Request again</button>
+          </div>
+        ) : deletionRequest && deletionRequest.status === "approved" ? (
+          <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">Your account deletion request was approved and your account has been deactivated.</p>
+        ) : !showDeletionForm ? (
+          <div className="mt-2">
+            <p className="text-sm text-gray-600 dark:text-gray-300">Request permanent deletion of your account. An admin will review this before anything happens.</p>
+            <button onClick={() => setShowDeletionForm(true)} className="mt-3 rounded-lg border border-rose-300 px-4 py-2 text-sm font-medium text-rose-600 hover:bg-rose-100 dark:hover:bg-rose-500/10">
+              Request Account Deletion
+            </button>
+          </div>
+        ) : (
+          <div className="mt-3 space-y-3">
+            <textarea
+              value={deletionReason}
+              onChange={(e) => setDeletionReason(e.target.value)}
+              placeholder="Reason (optional)..."
+              rows={3}
+              className="w-full rounded-lg border border-stroke bg-white px-4 py-2.5 text-sm outline-none focus:border-rose-400 dark:border-dark-3 dark:bg-dark-2 dark:text-white"
+            />
+            <div className="flex gap-2">
+              <button
+                onClick={handleRequestDeletion}
+                disabled={requestingDeletion}
+                className="rounded-lg bg-rose-600 px-4 py-2 text-sm font-medium text-white hover:bg-opacity-90 disabled:opacity-50"
+              >
+                {requestingDeletion ? "Submitting..." : "Confirm Request"}
+              </button>
+              <button onClick={() => setShowDeletionForm(false)} className="rounded-lg border border-stroke px-4 py-2 text-sm font-medium text-gray-600 dark:border-dark-3 dark:text-gray-300">
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

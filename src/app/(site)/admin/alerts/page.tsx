@@ -38,9 +38,10 @@ export default function AdminAlertsPage() {
       fetch(`${BACKEND_URL}/api/accounts/audit/fraud-alerts`, { headers: authHeaders() }).then((r) => r.json()),
       fetch(`${BACKEND_URL}/api/accounts/audit/duplicate-cnic`, { headers: authHeaders() }).then((r) => r.json()),
       fetch(`${BACKEND_URL}/api/accounts/audit/low-recovery`, { headers: authHeaders() }).then((r) => r.json()),
+      fetch(`${BACKEND_URL}/api/accounts/audit/unassigned-recovery`, { headers: authHeaders() }).then((r) => r.json()),
       fetch(`${BACKEND_URL}/api/accounts/cash/limits`, { headers: authHeaders() }).then((r) => r.json()),
     ])
-      .then(([globalJson, fraudJson, cnicJson, lowRecoveryJson, cashLimitsJson]) => {
+      .then(([globalJson, fraudJson, cnicJson, lowRecoveryJson, unassignedRecoveryJson, cashLimitsJson]) => {
         const cashLimitAlerts: Alert[] = cashLimitsJson.success
           ? (cashLimitsJson.data || [])
               .filter((l: any) => l.is_over_limit)
@@ -57,6 +58,7 @@ export default function AdminAlertsPage() {
           ...(fraudJson.success ? fraudJson.data.alerts : []),
           ...(cnicJson.success ? cnicJson.data.alerts : []),
           ...(lowRecoveryJson.success ? lowRecoveryJson.data.alerts : []),
+          ...(unassignedRecoveryJson.success ? unassignedRecoveryJson.data.alerts : []),
           ...cashLimitAlerts,
         ];
         combined.sort((a, b) => (SEVERITY_RANK[a.severity] ?? 9) - (SEVERITY_RANK[b.severity] ?? 9));

@@ -29,8 +29,8 @@ interface Performance {
   pendingCash: number;
 }
 
-interface AttendanceRow { outlet_id: number; outlet_name: string; totalStaff: number; present: number; absent: number; notMarked: number }
-interface StaffMember { id: number; full_name: string; username: string; phone: string | null; status: string; is_online: boolean; role: string }
+interface AttendanceRow { outlet_id: number; outlet_name: string; totalStaff: number; present: number; absent: number; notMarked: number; unlinkedOfficers: number }
+interface StaffMember { id: number; full_name: string; username: string; phone: string | null; status: string; is_online: boolean; role: string; has_employee_record: boolean }
 
 export default function AdminOutletsPage() {
   const [outlets, setOutlets] = useState<Outlet[]>([]);
@@ -226,6 +226,7 @@ export default function AdminOutletsPage() {
                     <td className="px-4 py-3.5 text-right tabular-nums font-bold text-orange-600">{PKR(p?.pendingCash || 0)}</td>
                     <td className="px-4 py-3.5 text-xs text-gray-500">
                       {a ? <span><span className="font-semibold text-emerald-600">{a.present}</span>/{a.totalStaff} present</span> : "—"}
+                      {a && a.unlinkedOfficers > 0 && <p className="mt-0.5 text-[10px] font-bold text-amber-600">+{a.unlinkedOfficers} officer(s) not in HR</p>}
                     </td>
                     <td className="px-4 py-3.5 text-right">
                       <div className="flex justify-end gap-3">
@@ -263,6 +264,7 @@ export default function AdminOutletsPage() {
                     <div>
                       <p className="font-semibold text-dark dark:text-white">{s.full_name}</p>
                       <p className="text-xs text-gray-400">@{s.username} · {s.role}{s.phone ? ` · ${s.phone}` : ""}</p>
+                      {!s.has_employee_record && <p className="mt-0.5 text-[10px] font-bold text-amber-600">⚠ No HR employee record — missing from Attendance</p>}
                     </div>
                     <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${s.is_online ? "bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10" : "bg-gray-100 text-gray-500 dark:bg-white/10"}`}>{s.is_online ? "Online" : "Offline"}</span>
                   </div>
