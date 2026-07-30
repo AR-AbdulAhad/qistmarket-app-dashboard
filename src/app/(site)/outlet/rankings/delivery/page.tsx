@@ -3,17 +3,11 @@
 import { useEffect, useState } from "react";
 import Cookies from "js-cookie";
 import toast from "react-hot-toast";
-import { Truck, TrendingUp, TrendingDown, Minus, RefreshCw, Store, Filter } from "lucide-react";
+import { Truck, Minus, RefreshCw, Store, Filter } from "lucide-react";
 import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
 const authHeaders = () => ({ Authorization: `Bearer ${Cookies.get("auth_token")}`, "Content-Type": "application/json" });
-
-function TrendIcon({ trend }: { trend: number }) {
-    if (trend > 0) return <TrendingUp size={14} className="text-green-500" />;
-    if (trend < 0) return <TrendingDown size={14} className="text-red-500" />;
-    return <Minus size={14} className="text-gray-400" />;
-}
 
 const tierBadge: Record<string, string> = {
     Gold: "bg-yellow-100 text-yellow-700 border border-yellow-200",
@@ -136,7 +130,6 @@ export default function DeliveryOfficerRankingsPage() {
                                             {officer.tier && (
                                                 <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full flex-shrink-0 ${tierBadge[officer.tier] || ''}`}>{officer.tier}</span>
                                             )}
-                                            <span className="flex items-center gap-1"><TrendIcon trend={officer.trend ?? 0} /></span>
                                         </div>
                                         <div className="flex items-center gap-3 text-xs font-bold text-gray-400">
                                             <span className="flex items-center gap-1"><Store size={12} />{officer.outlet_name}</span>
@@ -160,12 +153,6 @@ export default function DeliveryOfficerRankingsPage() {
                                             <div className="text-center">
                                                 <p className="text-[9px] font-black uppercase tracking-widest text-red-500 mb-0.5">Failed</p>
                                                 <p className="text-base font-black text-red-500">{officer.failed_deliveries}</p>
-                                            </div>
-                                        )}
-                                        {officer.avg_delivery_minutes != null && (
-                                            <div className="text-center">
-                                                <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-0.5">Avg Time</p>
-                                                <p className="text-base font-black text-gray-800 dark:text-white">{officer.avg_delivery_minutes}m</p>
                                             </div>
                                         )}
                                     </div>
