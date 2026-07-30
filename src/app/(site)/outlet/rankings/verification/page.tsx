@@ -148,7 +148,7 @@ export default function VerificationOfficerRankingsPage() {
                                         )}
                                         {officer.approved_verifications != null && (
                                             <div className="text-center">
-                                                <p className="text-[9px] font-black uppercase tracking-widest text-green-500 mb-0.5">Approved</p>
+                                                <p className="text-[9px] font-black uppercase tracking-widest text-green-500 mb-0.5">Completed</p>
                                                 <p className="text-base font-black text-green-600">{officer.approved_verifications}</p>
                                             </div>
                                         )}
