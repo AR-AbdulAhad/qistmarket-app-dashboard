@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import Cookies from "js-cookie";
 import toast from "react-hot-toast";
 import {
   Banknote, ShieldCheck, Plus, Trash2, RefreshCw, AlertTriangle,
-  Building2, User, ChevronDown, AlertCircle, CheckCircle2
+  User, ChevronDown, AlertCircle, CheckCircle2, Pencil, X
 } from "lucide-react";
 import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
 
@@ -17,19 +17,28 @@ export default function CashLimitsPage() {
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
 
-  // Form state
+  // Add form state
   const [scopeType, setScopeType] = useState<"delivery" | "recovery">("delivery");
   const [scopeId, setScopeId] = useState("");
   const [dailyLimit, setDailyLimit] = useState("");
+  const [selectedEntity, setSelectedEntity] = useState<any>(null);
 
   const [deliveryOptions, setDeliveryOptions] = useState<any[]>([]);
   const [recoveryOptions, setRecoveryOptions] = useState<any[]>([]);
-  const [selectedEntity, setSelectedEntity] = useState<any>(null);
+
+  // Edit modal state
+  const [editTarget, setEditTarget] = useState<any | null>(null);
+  const [editLimit, setEditLimit] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  // Delete modal state
+  const [limitToDelete, setLimitToDelete] = useState<number | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const fetchLimits = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${BACKEND_URL}/api/accounts/cash/limits`, { headers: authHeaders() });
+      const res = await fetch(`${BACKEND_URL}/api/outlet/cash/limits`, { headers: authHeaders() });
       const data = await res.json();
       if (data.success) setLimits(data.data);
       else toast.error(data.message || "Failed to load limits");
@@ -40,12 +49,13 @@ export default function CashLimitsPage() {
     }
   };
 
+  // Use outlet-scoped endpoint instead of admin-panel
   const fetchOfficerOptions = async (roleId: number, setter: React.Dispatch<React.SetStateAction<any[]>>) => {
     try {
-      const res = await fetch(`${BACKEND_URL}/api/admin-panel/users?role_id=${roleId}&limit=100`, { headers: authHeaders() });
+      const res = await fetch(`${BACKEND_URL}/api/outlet/team/list?role_id=${roleId}`, { headers: authHeaders() });
       const data = await res.json();
       if (data.success) {
-        setter(data.data?.users || data.users || []);
+        setter(data.data || data.officers || []);
       }
     } catch {
       // ignore
@@ -58,17 +68,12 @@ export default function CashLimitsPage() {
     fetchOfficerOptions(3, setRecoveryOptions);
   }, []);
 
-  const selectEntity = (entity: any) => {
-    setSelectedEntity(entity);
-    setScopeId(String(entity.id));
-  };
-
   const handleAddLimit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!scopeId) return toast.error("Please select a target");
+    if (!scopeId) return toast.error("Please select an officer");
     setAdding(true);
     try {
-      const res = await fetch(`${BACKEND_URL}/api/accounts/cash/limits`, {
+      const res = await fetch(`${BACKEND_URL}/api/outlet/cash/limits`, {
         method: "POST",
         headers: authHeaders(),
         body: JSON.stringify({ scope_type: "officer", scope_id: parseInt(scopeId), daily_limit: parseFloat(dailyLimit) })
@@ -88,15 +93,52 @@ export default function CashLimitsPage() {
     }
   };
 
-  const handleDelete = async (id: number) => {
-    if (!confirm("Are you sure you want to remove this cash limit?")) return;
+  const openEditModal = (l: any) => {
+    setEditTarget(l);
+    setEditLimit(String(l.daily_limit));
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editTarget || !editLimit) return;
+    setSaving(true);
     try {
-      const res = await fetch(`${BACKEND_URL}/api/accounts/cash/limits/${id}`, { method: "DELETE", headers: authHeaders() });
+      const res = await fetch(`${BACKEND_URL}/api/outlet/cash/limits`, {
+        method: "POST",
+        headers: authHeaders(),
+        body: JSON.stringify({ scope_type: "officer", scope_id: editTarget.scope_id, daily_limit: parseFloat(editLimit) })
+      });
       const data = await res.json();
-      if (data.success) { toast.success("Cash limit removed"); setLimits(limits.filter(l => l.id !== id)); }
-      else toast.error(data.message || "Failed to remove limit");
+      if (data.success) {
+        toast.success("Cash limit updated successfully");
+        setEditTarget(null);
+        fetchLimits();
+      } else {
+        toast.error(data.message || "Failed to update limit");
+      }
+    } catch {
+      toast.error("Failed to update limit");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const confirmDelete = async () => {
+    if (!limitToDelete) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/outlet/cash/limits/${limitToDelete}`, { method: "DELETE", headers: authHeaders() });
+      const data = await res.json();
+      if (data.success) {
+        toast.success("Cash limit removed");
+        setLimits(limits.filter(l => l.id !== limitToDelete));
+      } else {
+        toast.error(data.message || "Failed to remove limit");
+      }
     } catch {
       toast.error("Failed to remove limit");
+    } finally {
+      setDeleting(false);
+      setLimitToDelete(null);
     }
   };
 
@@ -157,7 +199,7 @@ export default function CashLimitsPage() {
                 <h3 className="text-xl font-black text-gray-900 dark:text-white mb-2 flex items-center gap-2">
                   <ShieldCheck size={20} className="text-primary" /> Set Cash Limit
                 </h3>
-                <p className="text-sm text-gray-500 dark:text-gray-400">Quickly assign daily cash limits for delivery or recovery officers. Select an officer, enter the amount, and save.</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">Assign daily cash limits for delivery or recovery officers in your branch.</p>
               </div>
               <form onSubmit={handleAddLimit} className="space-y-5">
                 {/* Scope Type Toggle */}
@@ -168,7 +210,7 @@ export default function CashLimitsPage() {
                       <button key={type} type="button" onClick={() => { setScopeType(type); setScopeId(""); setSelectedEntity(null); }}
                         className={`flex-1 py-2 text-sm font-bold rounded-lg flex items-center justify-center gap-2 transition-all ${scopeType === type ? "bg-white dark:bg-boxdark shadow-sm text-primary" : "text-gray-500 hover:text-gray-700"}`}>
                         <User size={16} />
-                        {type === "delivery" ? "Delivery Officer" : "Recovery Officer"}
+                        {type === "delivery" ? "Delivery" : "Recovery"}
                       </button>
                     ))}
                   </div>
@@ -190,10 +232,10 @@ export default function CashLimitsPage() {
                       }}
                       className="w-full pl-4 pr-10 py-3 bg-gray-50 dark:bg-meta-4 border border-stroke dark:border-strokedark rounded-xl text-sm font-bold focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all"
                     >
-                      <option value="">Select {scopeType === "delivery" ? "Delivery Officer" : "Recovery Officer"}</option>
+                      <option value="">Select officer...</option>
                       {(scopeType === "delivery" ? deliveryOptions : recoveryOptions).map((item: any) => (
                         <option key={item.id} value={item.id}>
-                          {item.full_name || item.username}{item.role ? ` (${item.role.name || item.role})` : ""}
+                          {item.full_name || item.username}
                         </option>
                       ))}
                     </select>
@@ -202,7 +244,7 @@ export default function CashLimitsPage() {
                   {selectedEntity && (
                     <div className="mt-2 flex items-center gap-2 bg-primary/5 border border-primary/20 rounded-xl px-3 py-2">
                       <CheckCircle2 size={14} className="text-primary" />
-                      <span className="text-sm font-bold text-primary">{selectedEntity.full_name || selectedEntity.username} (ID: {selectedEntity.id})</span>
+                      <span className="text-sm font-bold text-primary">{selectedEntity.full_name || selectedEntity.username}</span>
                     </div>
                   )}
                 </div>
@@ -232,7 +274,7 @@ export default function CashLimitsPage() {
               <div className="space-y-4">
                 {[1, 2, 3, 4].map(i => <div key={i} className="h-28 bg-gray-100 dark:bg-meta-4 rounded-3xl animate-pulse" />)}
               </div>
-            ) : limits.length === 0 ? (
+            ) : officerLimits.length === 0 ? (
               <div className="py-24 text-center bg-white dark:bg-boxdark rounded-[2.5rem] border border-stroke dark:border-strokedark">
                 <Banknote size={48} className="mx-auto text-gray-300 mb-4" />
                 <p className="text-xl font-bold text-gray-500">No Cash Limits Configured</p>
@@ -240,69 +282,144 @@ export default function CashLimitsPage() {
               </div>
             ) : (
               officerLimits.map((l) => {
-              const utilization = l.daily_limit > 0 ? Math.min(100, Math.round(((l.current_pending || 0) / l.daily_limit) * 100)) : 0;
-              const isOver = l.is_over_limit;
+                const utilization = l.daily_limit > 0 ? Math.min(100, Math.round(((l.current_pending || 0) / l.daily_limit) * 100)) : 0;
+                const isOver = l.is_over_limit;
 
-              return (
-                <div key={l.id} className={`bg-white dark:bg-boxdark rounded-3xl border p-6 flex flex-col gap-5 transition-all hover:shadow-lg ${isOver ? "border-red-300 dark:border-red-700/50" : "border-stroke dark:border-strokedark"}`}>
-                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                    <div className="flex items-center gap-4">
-                      <div className="w-14 h-14 rounded-[1.25rem] flex items-center justify-center bg-purple-50 text-purple-600 shadow-sm">
-                        <User size={24} />
-                      </div>
-                      <div>
-                        <h4 className="text-lg font-black text-gray-900 dark:text-white">{l.name || l.full_name || "Officer"}</h4>
-                        <div className="mt-2 flex flex-wrap items-center gap-2 text-[10px] font-black uppercase tracking-widest text-gray-500">
-                          <span className="bg-gray-100 dark:bg-meta-4 text-gray-600 dark:text-gray-300 px-2 py-1 rounded-full border border-gray-200 dark:border-strokedark">Officer · ID {l.scope_id}</span>
-                          <span className={`px-2 py-1 rounded-full border text-xs font-bold ${isOver ? "bg-red-100 border-red-200 text-red-600" : "bg-emerald-100 border-emerald-200 text-emerald-700"}`}>
-                            {isOver ? "Over Limit" : "Within Limit"}
-                          </span>
+                return (
+                  <div key={l.id} className={`bg-white dark:bg-boxdark rounded-3xl border p-6 flex flex-col gap-5 transition-all hover:shadow-lg ${isOver ? "border-red-300 dark:border-red-700/50" : "border-stroke dark:border-strokedark"}`}>
+                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                      <div className="flex items-center gap-4">
+                        <div className="w-14 h-14 rounded-[1.25rem] flex items-center justify-center bg-purple-50 text-purple-600 shadow-sm">
+                          <User size={24} />
+                        </div>
+                        <div>
+                          <h4 className="text-lg font-black text-gray-900 dark:text-white">{l.name || l.full_name || "Officer"}</h4>
+                          <div className="mt-2 flex flex-wrap items-center gap-2 text-[10px] font-black uppercase tracking-widest text-gray-500">
+                            <span className="bg-gray-100 dark:bg-meta-4 text-gray-600 dark:text-gray-300 px-2 py-1 rounded-full border border-gray-200 dark:border-strokedark">Officer · ID {l.scope_id}</span>
+                            <span className={`px-2 py-1 rounded-full border text-xs font-bold ${isOver ? "bg-red-100 border-red-200 text-red-600" : "bg-emerald-100 border-emerald-200 text-emerald-700"}`}>
+                              {isOver ? "⚠ Over Limit" : "✓ Within Limit"}
+                            </span>
+                          </div>
                         </div>
                       </div>
                     </div>
-                    <div className="inline-flex items-center rounded-2xl bg-slate-50 dark:bg-meta-4 px-4 py-2 text-sm font-bold uppercase tracking-[0.25em] text-slate-500">
-                      {l.scope_type === "officer" ? (l.role?.name || (l.type || "Officer")) : "Officer"}
-                    </div>
-                  </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-gray-50 dark:bg-meta-4 rounded-3xl p-4">
-                    <div className="space-y-2">
-                      <p className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-400">Set limit</p>
-                      <p className="text-xl font-black text-gray-900 dark:text-white">PKR {(l.daily_limit || 0).toLocaleString()}</p>
-                    </div>
-                    <div className="space-y-2">
-                      <p className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-400">Pending now</p>
-                      <p className={`text-xl font-black flex items-center gap-2 ${isOver ? "text-red-500" : "text-emerald-600"}`}>
-                        {isOver && <AlertTriangle size={14} />}
-                        PKR {(l.current_pending || 0).toLocaleString()}
-                      </p>
-                    </div>
-                    <div className="space-y-2">
-                      <p className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-400">Utilization</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-gray-50 dark:bg-meta-4 rounded-3xl p-4">
                       <div className="space-y-2">
-                        <div className="w-full h-2 rounded-full bg-gray-200 dark:bg-meta-3 overflow-hidden">
-                          <div className={`h-full rounded-full transition-all ${isOver ? "bg-red-500" : "bg-emerald-500"}`} style={{ width: `${utilization}%` }} />
+                        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-400">Set limit</p>
+                        <p className="text-xl font-black text-gray-900 dark:text-white">PKR {(l.daily_limit || 0).toLocaleString()}</p>
+                      </div>
+                      <div className="space-y-2">
+                        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-400">Pending now</p>
+                        <p className={`text-xl font-black flex items-center gap-2 ${isOver ? "text-red-500" : "text-emerald-600"}`}>
+                          {isOver && <AlertTriangle size={14} />}
+                          PKR {(l.current_pending || 0).toLocaleString()}
+                        </p>
+                      </div>
+                      <div className="space-y-2">
+                        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-400">Utilization</p>
+                        <div className="space-y-2">
+                          <div className="w-full h-2 rounded-full bg-gray-200 dark:bg-meta-3 overflow-hidden">
+                            <div className={`h-full rounded-full transition-all ${isOver ? "bg-red-500" : "bg-emerald-500"}`} style={{ width: `${utilization}%` }} />
+                          </div>
+                          <p className={`text-xs font-black ${isOver ? "text-red-500" : "text-emerald-600"}`}>{utilization}%</p>
                         </div>
-                        <p className={`text-xs font-black ${isOver ? "text-red-500" : "text-emerald-600"}`}>{utilization}%</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="text-sm text-gray-500 dark:text-gray-400">Live data from officer activity.</div>
+                      <div className="flex gap-2">
+                        <button onClick={() => openEditModal(l)}
+                          className="flex items-center gap-2 px-4 py-2.5 text-blue-600 hover:text-white hover:bg-blue-500 bg-blue-50 dark:bg-blue-500/10 rounded-2xl transition-all text-sm font-bold">
+                          <Pencil size={16} /> Edit
+                        </button>
+                        <button onClick={() => setLimitToDelete(l.id)}
+                          className="flex items-center gap-2 px-4 py-2.5 text-red-500 hover:text-white hover:bg-red-500 bg-red-50 dark:bg-red-500/10 rounded-2xl transition-all text-sm font-bold">
+                          <Trash2 size={16} /> Delete
+                        </button>
                       </div>
                     </div>
                   </div>
-
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="text-sm text-gray-500 dark:text-gray-400">Updated from backend rules and officer activity.</div>
-                    <button onClick={() => handleDelete(l.id)}
-                      className="w-12 h-12 flex items-center justify-center text-red-500 hover:text-white hover:bg-red-500 bg-red-50 dark:bg-red-500/10 rounded-2xl transition-all">
-                      <Trash2 size={18} />
-                    </button>
-                  </div>
-                </div>
-              );
-            })
+                );
+              })
             )}
           </div>
         </div>
       </div>
+
+      {/* Edit Modal */}
+      {editTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white dark:bg-boxdark rounded-3xl p-7 max-w-md w-full shadow-2xl">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-blue-50 dark:bg-blue-500/10 flex items-center justify-center">
+                  <Pencil size={20} className="text-blue-500" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-black text-gray-900 dark:text-white">Edit Cash Limit</h2>
+                  <p className="text-xs text-gray-500">{editTarget.name || editTarget.full_name || "Officer"}</p>
+                </div>
+              </div>
+              <button onClick={() => setEditTarget(null)} className="w-9 h-9 flex items-center justify-center rounded-xl hover:bg-gray-100 dark:hover:bg-meta-4 transition">
+                <X size={18} className="text-gray-500" />
+              </button>
+            </div>
+
+            <div className="bg-gray-50 dark:bg-meta-4 rounded-2xl p-4 mb-5 flex justify-between text-sm">
+              <span className="text-gray-500 font-bold">Current Limit</span>
+              <span className="font-black text-gray-900 dark:text-white">PKR {(editTarget.daily_limit || 0).toLocaleString()}</span>
+            </div>
+
+            <div className="mb-6">
+              <label className="text-xs font-black uppercase tracking-widest text-gray-500 mb-2 block">New Daily Cash Limit (PKR)</label>
+              <input
+                type="number"
+                value={editLimit}
+                onChange={(e) => setEditLimit(e.target.value)}
+                placeholder="e.g. 50000"
+                autoFocus
+                className="w-full bg-gray-50 dark:bg-meta-4 border border-stroke dark:border-strokedark rounded-xl px-4 py-3 text-sm font-bold focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all"
+              />
+            </div>
+
+            <div className="flex gap-3">
+              <button onClick={() => setEditTarget(null)} className="flex-1 px-4 py-3 rounded-2xl bg-gray-100 dark:bg-meta-4 text-gray-700 dark:text-white hover:bg-gray-200 font-bold transition">
+                Cancel
+              </button>
+              <button onClick={handleSaveEdit} disabled={saving || !editLimit}
+                className="flex-1 px-4 py-3 rounded-2xl bg-primary text-white hover:bg-primary/90 font-bold transition flex items-center justify-center gap-2 disabled:opacity-50">
+                {saving ? <RefreshCw size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
+                Save Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {limitToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white dark:bg-boxdark rounded-3xl p-6 max-w-sm w-full shadow-2xl">
+            <div className="flex flex-col items-center text-center">
+              <div className="w-16 h-16 rounded-full bg-red-50 dark:bg-red-500/10 flex items-center justify-center mb-4">
+                <Trash2 size={28} className="text-red-500" />
+              </div>
+              <h2 className="text-xl font-bold mb-2 text-gray-900 dark:text-white">Remove Limit?</h2>
+              <p className="text-gray-500 dark:text-gray-400 text-sm mb-6">Are you sure you want to remove this cash limit? The officer will no longer have a restriction.</p>
+              <div className="flex w-full gap-3">
+                <button onClick={() => setLimitToDelete(null)} disabled={deleting} className="flex-1 px-4 py-3 rounded-2xl bg-gray-100 dark:bg-meta-4 text-gray-700 dark:text-white hover:bg-gray-200 font-bold transition">Cancel</button>
+                <button onClick={confirmDelete} disabled={deleting}
+                  className="flex-1 px-4 py-3 rounded-2xl bg-red-500 text-white hover:bg-red-600 font-bold transition flex items-center justify-center gap-2 disabled:opacity-50">
+                  {deleting ? <RefreshCw size={16} className="animate-spin" /> : <Trash2 size={16} />}
+                  Remove
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
-

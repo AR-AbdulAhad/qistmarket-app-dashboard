@@ -6,6 +6,7 @@ import { Clock, RefreshCw, Smartphone, DollarSign, ArrowLeft, X, CheckCircle } f
 import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
 import Link from "next/link";
 import { toast } from "react-hot-toast";
+import { formatExactDate } from "@/utils/dateUtils";
 
 const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
 const getAuthHeaders = () => ({
@@ -46,19 +47,10 @@ function OtpVerifyPopup({
         if (otp.length < 4) return;
         setLoading(true);
         try {
-            const userStr = localStorage.getItem("user");
-            const user = userStr ? JSON.parse(userStr) : null;
-            const outletId = user?.outlet_id;
-
-            if (!outletId) {
-                toast.error("Outlet ID not found in session");
-                return;
-            }
-
             const res = await fetch(`${API_BASE}/api/outlet/verify-cash-otp`, {
                 method: "POST",
                 headers: getAuthHeaders(),
-                body: JSON.stringify({ otp, outlet_id: outletId }),
+                body: JSON.stringify({ otp }),
             });
             const data = await res.json();
             if (data.success) {
@@ -349,7 +341,7 @@ export default function PendingSubmissionsPage() {
                                     <div className="flex justify-between items-center text-sm">
                                         <span className="text-gray-500 dark:text-gray-400 font-medium">Time:</span>
                                         <span className="font-bold text-gray-700 dark:text-gray-300">
-                                            {new Date(sub.submitted_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                                            {formatExactDate(sub.submitted_at,)}
                                         </span>
                                     </div>
                                 </div>
