@@ -1768,7 +1768,7 @@ const OrderListContent = ({ forcedStatus, forcedChannel, apiEndpoint, hideAction
           </button>
           <button
             onClick={confirmAssign}
-            disabled={!selectedDeliveryOfficerId || isSubmitting}
+            disabled={!(selectedOrder?.status === 'new' || selectedOrder?.status === 'pending' ? selectedVerifierId : selectedDeliveryOfficerId) || isSubmitting}
             className="rounded bg-[#ff3d3d] px-6 py-2.5 text-white hover:bg-[#ff3d3d]/90 disabled:opacity-50"
           >
             {isSubmitting ? 'Assigning...' : 'Assign'}
