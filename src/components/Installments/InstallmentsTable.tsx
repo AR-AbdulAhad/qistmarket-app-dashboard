@@ -168,9 +168,9 @@ export default function InstallmentsTable({ data, onPay, selectedIds = [], onSel
                     <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
                         {data.map((order) => {
                             const isExpanded = expandedRows.includes(order.order_id);
-                            const nextPending = order.installmentLedger.find(r => r.status === 'pending');
-                            const { paidInstallments, totalInstallments, totalRemaining, advanceAmount,
-                                totalInstallmentDue, totalInstallmentPaid } = order.ledgerSummaries;
+                            const nextPending = order.installmentLedger?.find(r => r.status === 'pending');
+                            const { paidInstallments = 0, totalInstallments = 0, totalRemaining = 0, advanceAmount = 0,
+                                totalInstallmentDue = 0, totalInstallmentPaid = 0 } = order.ledgerSummaries || {};
                             const progress = totalInstallments > 0 ? (paidInstallments / totalInstallments) * 100 : 0;
                             const allPaid = totalInstallments > 0 && paidInstallments === totalInstallments;
 
@@ -438,10 +438,10 @@ export default function InstallmentsTable({ data, onPay, selectedIds = [], onSel
                                                                 <span className="text-right">Remaining</span>
                                                                 <span className="text-center">Action</span>
                                                             </div>
-                                                            {order.installmentLedger.map((inst, idx) => {
+                                                            {(order.installmentLedger || []).map((inst, idx) => {
                                                                 const isPaid = inst.status === 'paid';
                                                                 const isPartial = inst.status === 'partial' || (!isPaid && (inst.paidAmount || 0) > 0);
-                                                                const isNext = !isPaid && !isPartial && order.installmentLedger
+                                                                const isNext = !isPaid && !isPartial && (order.installmentLedger || [])
                                                                     .filter(r => r.monthNumber < inst.monthNumber)
                                                                     .every(r => r.status === 'paid');
                                                                 const instDueDate = inst.dueDate ? new Date(inst.dueDate) : null;
@@ -670,7 +670,7 @@ export default function InstallmentsTable({ data, onPay, selectedIds = [], onSel
                                                                                         </tr>
                                                                                     </thead>
                                                                                     <tbody>
-                                                                                        ${order.installmentLedger.map(inst => `
+                                                                                        ${(order.installmentLedger || []).map(inst => `
                                                                                             <tr>
                                                                                                 <td>${inst.label || `Month ${inst.monthNumber}`}</td>
                                                                                                 <td style="font-weight:bold;">${pkr(inst.dueAmount)} ${inst.arrears ? ` <div style="color:#ef4444; font-size:10px;">(+ ${pkr(inst.arrears)} arr)</div>` : ''}</td>
