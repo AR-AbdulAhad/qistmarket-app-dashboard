@@ -26,9 +26,12 @@ export default function OfficerTargetsPage() {
     // Assignment form state
     const [selectedOfficer, setSelectedOfficer] = useState("");
     const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7)); // YYYY-MM
-    const [targetType, setTargetType] = useState<"amount" | "customers">("amount");
-    const [targetValue, setTargetValue] = useState("");
+    const [targetAmount, setTargetAmount] = useState("");
+    const [targetCustomers, setTargetCustomers] = useState("");
     const [submitting, setSubmitting] = useState(false);
+    
+    // Table filter state
+    const [filterMonth, setFilterMonth] = useState(new Date().toISOString().slice(0, 7));
 
     const getAuthHeaders = () => ({
         Authorization: `Bearer ${Cookies.get("auth_token")}`,
@@ -49,7 +52,7 @@ export default function OfficerTargetsPage() {
             });
             const data = await res.json();
             if (data.success) {
-                setOfficers(data.data || []);
+                setOfficers(data.officers || []);
             }
         } catch (err) {
             console.error("Failed to fetch officers", err);
@@ -58,7 +61,7 @@ export default function OfficerTargetsPage() {
 
     const fetchTargets = async () => {
         try {
-            const res = await fetch(`${API_BASE}/api/targets/officer?month=${selectedMonth}`, {
+            const res = await fetch(`${API_BASE}/api/targets/officer?month=${filterMonth}`, {
                 headers: getAuthHeaders()
             });
             const data = await res.json();
@@ -81,13 +84,13 @@ export default function OfficerTargetsPage() {
             setLoading(false);
         };
         loadInitial();
-    }, [selectedMonth]);
+    }, [filterMonth]);
 
     const handleAssignTarget = async (e: React.FormEvent) => {
         e.preventDefault();
         
-        if (!selectedOfficer || !targetValue) {
-            toast.error("Please select an officer and enter a target value.");
+        if (!selectedOfficer || !targetAmount || !targetCustomers) {
+            toast.error("Please select an officer and enter target values.");
             return;
         }
 
@@ -99,15 +102,16 @@ export default function OfficerTargetsPage() {
                 body: JSON.stringify({
                     officer_id: selectedOfficer,
                     month: selectedMonth,
-                    target_type: targetType,
-                    target_value: targetValue
+                    target_amount: targetAmount,
+                    target_customers: targetCustomers
                 })
             });
             const data = await res.json();
             if (data.success) {
                 toast.success(data.message);
                 fetchTargets();
-                setTargetValue("");
+                setTargetAmount("");
+                setTargetCustomers("");
             } else {
                 toast.error(data.message || "Failed to assign target");
             }
@@ -156,7 +160,6 @@ export default function OfficerTargetsPage() {
                                 >
                                     <option value="recovery">Recovery Officers</option>
                                     <option value="delivery">Delivery Officers</option>
-                                    <option value="verification">Verification Officers</option>
                                 </select>
                             </div>
 
@@ -175,29 +178,28 @@ export default function OfficerTargetsPage() {
                             </div>
 
                             <div>
-                                <label className="block text-xs font-black uppercase tracking-widest text-gray-400 mb-2">Target Type</label>
-                                <div className="grid grid-cols-2 gap-3">
-                                    <label className={`cursor-pointer border-2 rounded-xl p-3 flex flex-col items-center gap-2 transition-all ${targetType === 'amount' ? 'border-primary bg-primary/10' : 'border-gray-200 dark:border-strokedark hover:border-gray-300'}`}>
-                                        <input type="radio" name="targetType" className="sr-only" checked={targetType === 'amount'} onChange={() => setTargetType('amount')} />
-                                        <span className={`text-sm font-bold ${targetType === 'amount' ? 'text-primary' : 'text-gray-500'}`}>Amount (PKR)</span>
-                                    </label>
-                                    <label className={`cursor-pointer border-2 rounded-xl p-3 flex flex-col items-center gap-2 transition-all ${targetType === 'customers' ? 'border-primary bg-primary/10' : 'border-gray-200 dark:border-strokedark hover:border-gray-300'}`}>
-                                        <input type="radio" name="targetType" className="sr-only" checked={targetType === 'customers'} onChange={() => setTargetType('customers')} />
-                                        <span className={`text-sm font-bold ${targetType === 'customers' ? 'text-primary' : 'text-gray-500'}`}>Customers (Qty)</span>
-                                    </label>
-                                </div>
-                            </div>
-
-                            <div>
-                                <label className="block text-xs font-black uppercase tracking-widest text-gray-400 mb-2">Target Value</label>
+                                <label className="block text-xs font-black uppercase tracking-widest text-gray-400 mb-2">Target Amount (PKR)</label>
                                 <input 
                                     type="number" 
                                     required
                                     min="1"
-                                    value={targetValue}
-                                    onChange={(e) => setTargetValue(e.target.value)}
+                                    value={targetAmount}
+                                    onChange={(e) => setTargetAmount(e.target.value)}
                                     className="w-full bg-gray-50 dark:bg-meta-4 border border-stroke dark:border-strokedark text-gray-800 dark:text-white rounded-xl p-3 text-sm focus:ring-2 focus:ring-primary outline-none"
-                                    placeholder={targetType === 'amount' ? "e.g. 500000" : "e.g. 50"}
+                                    placeholder="e.g. 500000"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-black uppercase tracking-widest text-gray-400 mb-2">Target Customers (Qty)</label>
+                                <input 
+                                    type="number" 
+                                    required
+                                    min="1"
+                                    value={targetCustomers}
+                                    onChange={(e) => setTargetCustomers(e.target.value)}
+                                    className="w-full bg-gray-50 dark:bg-meta-4 border border-stroke dark:border-strokedark text-gray-800 dark:text-white rounded-xl p-3 text-sm focus:ring-2 focus:ring-primary outline-none"
+                                    placeholder="e.g. 50"
                                 />
                             </div>
 
@@ -207,7 +209,7 @@ export default function OfficerTargetsPage() {
                                     disabled={submitting}
                                     className="w-full py-3 rounded-xl bg-primary text-white font-black text-sm hover:bg-opacity-90 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
                                 >
-                                    {submitting ? 'Assigning...' : 'Lock In Target'}
+                                    {submitting ? 'Assigning...' : 'Lock In Targets'}
                                 </button>
                                 <p className="text-center text-[10px] text-gray-400 mt-3 flex items-center justify-center gap-1">
                                     <CheckCircle2 size={12} className="text-green-500" /> Targets cannot be modified once set.
@@ -220,10 +222,19 @@ export default function OfficerTargetsPage() {
                 {/* Right Column: Target List */}
                 <div className="lg:col-span-2">
                     <div className="bg-white dark:bg-boxdark rounded-2xl shadow-sm border border-stroke dark:border-strokedark overflow-hidden">
-                        <div className="p-6 border-b border-stroke dark:border-strokedark flex items-center justify-between">
+                        <div className="p-6 border-b border-stroke dark:border-strokedark flex items-center justify-between flex-wrap gap-4">
                             <h2 className="text-lg font-black text-gray-800 dark:text-white flex items-center gap-2">
-                                <Users size={20} className="text-blue-500" /> Assigned Targets ({selectedMonth})
+                                <Users size={20} className="text-blue-500" /> Assigned Targets
                             </h2>
+                            <div className="flex items-center gap-2">
+                                <Filter size={16} className="text-gray-400" />
+                                <input 
+                                    type="month" 
+                                    value={filterMonth}
+                                    onChange={(e) => setFilterMonth(e.target.value)}
+                                    className="bg-gray-50 dark:bg-meta-4 border border-stroke dark:border-strokedark text-gray-800 dark:text-white rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-primary outline-none"
+                                />
+                            </div>
                         </div>
                         <div className="overflow-x-auto">
                             <table className="w-full text-left">
@@ -231,8 +242,8 @@ export default function OfficerTargetsPage() {
                                     <tr>
                                         <th className="p-4">Officer Name</th>
                                         <th className="p-4">Role</th>
-                                        <th className="p-4">Target Type</th>
-                                        <th className="p-4 text-right">Target Value</th>
+                                        <th className="p-4 text-right">Target Amount</th>
+                                        <th className="p-4 text-right">Target Customers</th>
                                         <th className="p-4 text-right">Assigned By</th>
                                     </tr>
                                 </thead>
@@ -252,11 +263,11 @@ export default function OfficerTargetsPage() {
                                                         {t.officer?.role?.name || 'Officer'}
                                                     </span>
                                                 </td>
-                                                <td className="p-4 text-sm text-gray-500 capitalize">{t.target_type}</td>
                                                 <td className="p-4 text-right font-black text-primary">
-                                                    {t.target_type === 'amount' 
-                                                        ? `PKR ${t.target_value.toLocaleString()}` 
-                                                        : `${t.target_value} Customers`}
+                                                    PKR {t.target_amount?.toLocaleString() || 0}
+                                                </td>
+                                                <td className="p-4 text-right font-black text-blue-500">
+                                                    {t.target_customers || 0}
                                                 </td>
                                                 <td className="p-4 text-right text-xs text-gray-400 font-bold">
                                                     {t.created_by?.full_name || t.created_by?.username}
