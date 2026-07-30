@@ -595,7 +595,8 @@ export const NAV_DATA = [
         icon: Icons.HashIcon,
         items: [
           { title: "Installment Receiving", url: "/outlet/installments" },
-          { title: "Installments View", url: "/outlet/installments/view" }
+          { title: "Installments View", url: "/outlet/installments/view" },
+          { title: "Advanced Analytics", url: "/outlet/analytics/installments" }
         ],
       },
       {

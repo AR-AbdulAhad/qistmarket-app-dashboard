@@ -57,9 +57,7 @@ export default function RecoveryOfficerRankingsPage() {
 
     useEffect(() => { fetchRankings(); }, []);
 
-    const filtered = selectedOutlet === "all"
-        ? officers
-        : officers.filter((o) => String(o.outlet_id) === selectedOutlet);
+    const filtered = officers;
 
     return (
         <>
@@ -75,19 +73,7 @@ export default function RecoveryOfficerRankingsPage() {
                         <p className="text-sm text-gray-400 mt-2 font-bold">Global and per-outlet recovery officer performance — current month</p>
                     </div>
                     <div className="flex items-center gap-3">
-                        <div className="flex items-center gap-2 bg-white dark:bg-boxdark border border-stroke dark:border-strokedark rounded-2xl px-4 py-2.5">
-                            <Filter size={16} className="text-gray-400" />
-                            <select
-                                value={selectedOutlet}
-                                onChange={(e) => setSelectedOutlet(e.target.value)}
-                                className="text-sm font-bold bg-transparent outline-none text-gray-700 dark:text-gray-200"
-                            >
-                                <option value="all">All Outlets</option>
-                                {outlets.map((o: any) => (
-                                    <option key={o.id} value={String(o.id)}>{o.name}</option>
-                                ))}
-                            </select>
-                        </div>
+
                         <button onClick={fetchRankings} className="flex items-center gap-2 bg-white dark:bg-boxdark border border-stroke dark:border-strokedark px-5 py-2.5 rounded-2xl text-sm font-bold hover:bg-gray-50 transition-all">
                             <RefreshCw size={16} className={loading ? "animate-spin" : ""} /> Refresh
                         </button>

@@ -13,7 +13,7 @@ import { Toaster } from 'react-hot-toast';
 export const metadata: Metadata = {
   title: "Qist Market Management System",
   description:
-    "Next.js admin dashboard toolkit with 200+ templates, UI components, and integrations for fast dashboard development.",
+    "Qist Market Management System is a comprehensive platform designed to streamline and optimize the operations of market management. It offers a range of features and tools to facilitate efficient management of market activities, including inventory tracking, sales analysis, customer relationship management, and more. With its user-friendly interface and robust functionality, Qist Market Management System empowers market managers to make informed decisions, enhance productivity, and drive business growth.",
 };
 
 export default function RootLayout({ children }: PropsWithChildren) {

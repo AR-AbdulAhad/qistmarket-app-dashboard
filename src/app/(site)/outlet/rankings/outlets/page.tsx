@@ -116,14 +116,14 @@ export default function OutletRankingsPage() {
                                             <p className="text-lg font-black text-green-600">{outlet.recoveryPercentage?.toFixed(1)}%</p>
                                         </div>
                                         <div className="bg-white/70 dark:bg-boxdark/60 rounded-2xl p-4 text-center">
-                                            <p className="text-[9px] font-black uppercase tracking-widest text-blue-500 mb-1">On-Time %</p>
-                                            <p className="text-lg font-black text-blue-600">{outlet.onTimePercentage?.toFixed(1)}%</p>
+                                            <p className="text-[9px] font-black uppercase tracking-widest text-blue-500 mb-1">Delivered Orders</p>
+                                            <p className="text-lg font-black text-blue-600">{outlet.customerCount?.toLocaleString() || 0}</p>
                                         </div>
                                     </div>
 
                                     <div className="pt-4 border-t border-stroke/30 dark:border-strokedark/30 flex justify-between text-xs font-bold text-gray-400">
                                         <span>Recovered: PKR {outlet.recoveredAmount?.toLocaleString()}</span>
-                                        <span>{outlet.onTimeCount} on-time / {outlet.lateCount} late</span>
+                                        <span>Total Sales: PKR {outlet.totalSales?.toLocaleString()}</span>
                                     </div>
                                 </div>
                             );

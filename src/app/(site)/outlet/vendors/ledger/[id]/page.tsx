@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import Loader from "@/components/common/Loader";
 import toast from "react-hot-toast";
+import { formatExactDate } from "@/utils/dateUtils";
 
 const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
 const getAuthHeaders = () => ({
@@ -214,23 +215,26 @@ export default function VendorLedgerPage() {
                                 filteredLedger.map((entry, idx) => (
                                     <tr key={idx} className="hover:bg-gray-50 dark:hover:bg-meta-4/20 transition-all group">
                                         <td className="p-5 font-bold text-gray-500 whitespace-nowrap">
-                                            {new Date(entry.date).toLocaleDateString()}
-                                            <div className="text-[10px] font-medium opacity-40">{new Date(entry.date).toLocaleTimeString()}</div>
+                                            {formatExactDate(entry.date, 'MMM DD, YYYY')}
                                         </td>
                                         <td className="p-5">
                                             <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
-                                                entry.type === 'Purchase' 
+                                                (entry.type === 'Purchase' || entry.type === 'Payment In')
                                                     ? 'bg-red-100/50 text-red-600' 
                                                     : 'bg-green-100/50 text-green-600'
                                             }`}>
-                                                {entry.type === 'Purchase' ? <><ArrowUpRight size={10} className="inline mr-1" /> Procurement</> : <><ArrowDownLeft size={10} className="inline mr-1" /> Settlement</>}
+                                                {entry.type === 'Purchase' && <><ArrowUpRight size={10} className="inline mr-1" /> Procurement</>}
+                                                {entry.type === 'Payment In' && <><TrendingUp size={10} className="inline mr-1" /> Payment In</>}
+                                                {entry.type === 'Payment Out' && <><TrendingDown size={10} className="inline mr-1" /> Payment Out</>}
+                                                {entry.type === 'Payment' && <><ArrowDownLeft size={10} className="inline mr-1" /> Settlement</>}
+                                                {entry.type === 'Return' && <><ArrowDownLeft size={10} className="inline mr-1" /> Return</>}
                                             </span>
                                         </td>
                                         <td className="p-5 font-mono font-black text-gray-400">{entry.reference}</td>
                                         <td className="p-5">
                                             {entry.due_date ? (
                                                 <div className={`text-xs font-bold ${new Date(entry.due_date) < new Date() && entry.running_balance > 0 ? 'text-red-500 animate-pulse' : 'text-gray-400'}`}>
-                                                    {new Date(entry.due_date).toLocaleDateString()}
+                                                    {formatExactDate(entry.due_date, 'MMM DD, YYYY')}
                                                 </div>
                                             ) : '-'}
                                         </td>
