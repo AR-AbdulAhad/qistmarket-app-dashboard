@@ -81,6 +81,7 @@ interface Order {
   channel: string
   status: string
   created_at: string
+  updated_at?: string
   created_by: { username: string } | null
   assigned_to: { username: string } | null
   delivery_officer: { username: string; full_name: string } | null
@@ -231,17 +232,17 @@ const OrderListContent = ({ forcedStatus, forcedChannel, apiEndpoint, hideAction
         params.append('channel', forcedChannel)
       }
 
-      if (dateRange !== 'All') {
+      columnFilters.forEach((f) => {
+        if (f.id && f.value) params.append(f.id, String(f.value))
+      })
+
+      if (dateRange && dateRange !== 'All') {
         params.append('dateRange', dateRange)
         if (dateRange === 'Custom Range' && startDate && endDate) {
           params.append('startDate', startDate)
           params.append('endDate', endDate)
         }
       }
-
-      columnFilters.forEach((f) => {
-        if (f.id && f.value) params.append(f.id, String(f.value))
-      })
 
       const apiPath = apiEndpoint || '/api/orders'
       const res = await fetch(`${BACKEND_URL}${apiPath}?${params}`, {
@@ -252,7 +253,9 @@ const OrderListContent = ({ forcedStatus, forcedChannel, apiEndpoint, hideAction
       const json = await res.json()
 
       if (json.success && json.data?.orders) {
-        setOrders(json.data.orders)
+        let fetchedOrders = json.data.orders;
+
+        setOrders(fetchedOrders)
         setPagination(prev => ({
           ...prev,
           ...json.data.pagination,
