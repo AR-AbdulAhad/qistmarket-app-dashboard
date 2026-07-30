@@ -375,13 +375,16 @@ const OrderListContent = ({ forcedStatus, forcedChannel, apiEndpoint, hideAction
   }
 
   const confirmAssign = async () => {
-const targetUserId = selectedDeliveryOfficerId
+      const isVerification = selectedOrder?.status === 'new' || selectedOrder?.status === 'pending';
+      const targetUserId = isVerification ? selectedVerifierId : selectedDeliveryOfficerId;
       
       if (!selectedOrder || !targetUserId) return
       setIsSubmitting(true)
       try {
         const token = Cookies.get('auth_token')
-        const endpoint = `${BACKEND_URL}/api/orders/${selectedOrder.id}/assign-delivery`
+        const endpoint = isVerification
+            ? `${BACKEND_URL}/api/orders/${selectedOrder.id}/assign`
+            : `${BACKEND_URL}/api/orders/${selectedOrder.id}/assign-delivery`
 
       const res = await fetch(endpoint, {
         method: 'PATCH',
@@ -413,8 +416,11 @@ const targetUserId = selectedDeliveryOfficerId
     if (!selectedOrder) return
     setIsSubmitting(true)
     try {
+      const isVerification = selectedOrder?.status === 'new' || selectedOrder?.status === 'pending';
       const token = Cookies.get('auth_token')
-      const endpoint = `${BACKEND_URL}/api/orders/${selectedOrder.id}/assign-delivery`
+      const endpoint = isVerification
+        ? `${BACKEND_URL}/api/orders/${selectedOrder.id}/assign`
+        : `${BACKEND_URL}/api/orders/${selectedOrder.id}/assign-delivery`
 
       const res = await fetch(endpoint, {
         method: 'PATCH',
@@ -453,7 +459,8 @@ const targetUserId = selectedDeliveryOfficerId
   }
 
   const confirmBulkAssign = async () => {
-const targetUserId = selectedDeliveryOfficerId
+      const isVerification = forcedStatus === 'new' || forcedStatus === 'pending';
+      const targetUserId = isVerification ? selectedVerifierId : selectedDeliveryOfficerId;
       
       if (!targetUserId) return
       const ids = table.getSelectedRowModel().rows.map((r) => r.original.id)
@@ -461,7 +468,9 @@ const targetUserId = selectedDeliveryOfficerId
 
       try {
         const token = Cookies.get('auth_token')
-        const endpoint = `${BACKEND_URL}/api/orders/assign-bulk-delivery`
+        const endpoint = isVerification
+          ? `${BACKEND_URL}/api/orders/assign-bulk`
+          : `${BACKEND_URL}/api/orders/assign-bulk-delivery`
 
       const res = await fetch(endpoint, {
         method: 'POST',
@@ -726,12 +735,15 @@ const targetUserId = selectedDeliveryOfficerId
   }
 
   const confirmBulkUnassign = async () => {
-const ids = table.getSelectedRowModel().rows.map((r) => r.original.id)
+      const isVerification = forcedStatus === 'new' || forcedStatus === 'pending';
+      const ids = table.getSelectedRowModel().rows.map((r) => r.original.id)
       setIsSubmitting(true)
 
       try {
         const token = Cookies.get('auth_token')
-        const endpoint = `${BACKEND_URL}/api/orders/assign-bulk-delivery`
+        const endpoint = isVerification
+          ? `${BACKEND_URL}/api/orders/assign-bulk`
+          : `${BACKEND_URL}/api/orders/assign-bulk-delivery`
 
       const res = await fetch(endpoint, {
         method: 'POST',
@@ -1176,31 +1188,59 @@ const ids = table.getSelectedRowModel().rows.map((r) => r.original.id)
                       )
                     ) : (
                       <>
-                        {order.delivery_officer ? (
-                        <li>
-                          <button
-                            onClick={() => {
-                              handleUnassignClick(order)
-                              setIsOpen(false)
-                            }}
-                            className="block w-full px-4 py-2.5 text-left hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/30 dark:hover:text-red-400"
-                          >
-                            Unassign Delivery
-                          </button>
-                        </li>
-                      ) : (
-                        <li>
-                          <button
-                            onClick={() => {
-                              handleAssignClick(order)
-                              setIsOpen(false)
-                            }}
-                            className="block w-full px-4 py-2.5 text-left hover:bg-[#F5F7FD] hover:text-[#ff3d3d] dark:hover:bg-dark-3"
-                          >
-                            Assign Delivery
-                          </button>
-                        </li>
-                      )}
+                        {(order.status === 'new' || order.status === 'pending') ? (
+                          order.assigned_to ? (
+                            <li>
+                              <button
+                                onClick={() => {
+                                  handleUnassignClick(order)
+                                  setIsOpen(false)
+                                }}
+                                className="block w-full px-4 py-2.5 text-left hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/30 dark:hover:text-red-400"
+                              >
+                                Unassign Verification
+                              </button>
+                            </li>
+                          ) : (
+                            <li>
+                              <button
+                                onClick={() => {
+                                  handleAssignClick(order)
+                                  setIsOpen(false)
+                                }}
+                                className="block w-full px-4 py-2.5 text-left hover:bg-[#F5F7FD] hover:text-[#ff3d3d] dark:hover:bg-dark-3"
+                              >
+                                Assign Verification
+                              </button>
+                            </li>
+                          )
+                        ) : (
+                          order.delivery_officer ? (
+                            <li>
+                              <button
+                                onClick={() => {
+                                  handleUnassignClick(order)
+                                  setIsOpen(false)
+                                }}
+                                className="block w-full px-4 py-2.5 text-left hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/30 dark:hover:text-red-400"
+                              >
+                                Unassign Delivery
+                              </button>
+                            </li>
+                          ) : (
+                            <li>
+                              <button
+                                onClick={() => {
+                                  handleAssignClick(order)
+                                  setIsOpen(false)
+                                }}
+                                className="block w-full px-4 py-2.5 text-left hover:bg-[#F5F7FD] hover:text-[#ff3d3d] dark:hover:bg-dark-3"
+                              >
+                                Assign Delivery
+                              </button>
+                            </li>
+                          )
+                        )}
                       </>
                     )}
                   </>
@@ -1682,23 +1722,38 @@ const ids = table.getSelectedRowModel().rows.map((r) => r.original.id)
         className="max-w-md rounded-2xl bg-white p-8 shadow-xl dark:bg-gray-800"
       >
         <h2 className="mb-4 text-xl font-semibold text-dark dark:text-white">
-          Assign Delivery Officer
+          {selectedOrder?.status === 'new' || selectedOrder?.status === 'pending' ? 'Assign Verification Officer' : 'Assign Delivery Officer'}
         </h2>
         <p className="mb-6 text-gray-600 dark:text-gray-300">
-          Select a delivery officer:
+          Select {selectedOrder?.status === 'new' || selectedOrder?.status === 'pending' ? 'a verification officer' : 'a delivery officer'}:
         </p>
-        <select
-          value={selectedDeliveryOfficerId ?? ''}
-          onChange={(e) => setSelectedDeliveryOfficerId(Number(e.target.value))}
-          className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2.5 outline-none focus:border-[#ff3d3d] dark:border-dark-3 dark:bg-dark-2"
-        >
-          <option value="">Select Officer</option>
-          {deliveryOfficers.map((u) => (
-            <option key={u.id} value={u.id}>
-              {u.full_name} ({u.username})
-            </option>
-          ))}
-        </select>
+        {selectedOrder?.status === 'new' || selectedOrder?.status === 'pending' ? (
+          <select
+            value={selectedVerifierId ?? ''}
+            onChange={(e) => setSelectedVerifierId(Number(e.target.value))}
+            className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2.5 outline-none focus:border-[#ff3d3d] dark:border-dark-3 dark:bg-dark-2"
+          >
+            <option value="">Select Officer</option>
+            {verifiers.map((u) => (
+              <option key={u.id} value={u.id}>
+                {u.full_name} ({u.username})
+              </option>
+            ))}
+          </select>
+        ) : (
+          <select
+            value={selectedDeliveryOfficerId ?? ''}
+            onChange={(e) => setSelectedDeliveryOfficerId(Number(e.target.value))}
+            className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2.5 outline-none focus:border-[#ff3d3d] dark:border-dark-3 dark:bg-dark-2"
+          >
+            <option value="">Select Officer</option>
+            {deliveryOfficers.map((u) => (
+              <option key={u.id} value={u.id}>
+                {u.full_name} ({u.username})
+              </option>
+            ))}
+          </select>
+        )}
         <div className="mt-6 flex justify-end gap-4">
           <button
             onClick={() => {
@@ -1728,10 +1783,10 @@ const ids = table.getSelectedRowModel().rows.map((r) => r.original.id)
         className="max-w-md rounded-2xl bg-white p-8 shadow-xl dark:bg-gray-800"
       >
         <h2 className="mb-4 text-xl font-semibold text-dark dark:text-white">
-          Unassign Delivery Officer
+          {selectedOrder?.status === 'new' || selectedOrder?.status === 'pending' ? 'Unassign Verification Officer' : 'Unassign Delivery Officer'}
         </h2>
         <p className="mb-6 text-gray-600 dark:text-gray-300">
-          Are you sure you want to unassign Delivery Officer from order <strong>{selectedOrder?.order_ref}</strong>?
+          Are you sure you want to unassign {selectedOrder?.status === 'new' || selectedOrder?.status === 'pending' ? 'Verification Officer' : 'Delivery Officer'} from order <strong>{selectedOrder?.order_ref}</strong>?
         </p>
         <div className="mt-6 flex justify-end gap-4">
           <button
@@ -1762,23 +1817,38 @@ const ids = table.getSelectedRowModel().rows.map((r) => r.original.id)
         className="max-w-md rounded-2xl bg-white p-8 shadow-xl dark:bg-gray-800"
       >
         <h2 className="mb-4 text-xl font-semibold text-dark dark:text-white">
-          Bulk Assign Delivery Officers
+          {forcedStatus === 'new' || forcedStatus === 'pending' ? 'Bulk Assign Verification Officers' : 'Bulk Assign Delivery Officers'}
         </h2>
         <p className="mb-6 text-gray-600 dark:text-gray-300">
-          Select a delivery officer for {selectedCount} selected orders:
+          Select {forcedStatus === 'new' || forcedStatus === 'pending' ? 'a verification officer' : 'a delivery officer'} for {selectedCount} selected orders:
         </p>
-        <select
-          value={selectedDeliveryOfficerId ?? ''}
-          onChange={(e) => setSelectedDeliveryOfficerId(Number(e.target.value))}
-          className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2.5 outline-none focus:border-[#ff3d3d] dark:border-dark-3 dark:bg-dark-2"
-        >
-          <option value="">Select Officer</option>
-          {deliveryOfficers.map((u) => (
-            <option key={u.id} value={u.id}>
-              {u.full_name} ({u.username})
-            </option>
-          ))}
-        </select>
+        {forcedStatus === 'new' || forcedStatus === 'pending' ? (
+          <select
+            value={selectedVerifierId ?? ''}
+            onChange={(e) => setSelectedVerifierId(Number(e.target.value))}
+            className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2.5 outline-none focus:border-[#ff3d3d] dark:border-dark-3 dark:bg-dark-2"
+          >
+            <option value="">Select Officer</option>
+            {verifiers.map((u) => (
+              <option key={u.id} value={u.id}>
+                {u.full_name} ({u.username})
+              </option>
+            ))}
+          </select>
+        ) : (
+          <select
+            value={selectedDeliveryOfficerId ?? ''}
+            onChange={(e) => setSelectedDeliveryOfficerId(Number(e.target.value))}
+            className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2.5 outline-none focus:border-[#ff3d3d] dark:border-dark-3 dark:bg-dark-2"
+          >
+            <option value="">Select Officer</option>
+            {deliveryOfficers.map((u) => (
+              <option key={u.id} value={u.id}>
+                {u.full_name} ({u.username})
+              </option>
+            ))}
+          </select>
+        )}
         <div className="mt-6 flex justify-end gap-4">
           <button
             onClick={() => {
@@ -1793,7 +1863,7 @@ const ids = table.getSelectedRowModel().rows.map((r) => r.original.id)
           </button>
           <button
             onClick={confirmBulkAssign}
-            disabled={!selectedDeliveryOfficerId || isSubmitting}
+            disabled={!(forcedStatus === 'new' || forcedStatus === 'pending' ? selectedVerifierId : selectedDeliveryOfficerId) || isSubmitting}
             className="rounded bg-[#ff3d3d] px-6 py-2.5 text-white hover:bg-[#ff3d3d]/90 disabled:opacity-50"
           >
             {isSubmitting ? 'Assigning All...' : 'Assign All'}
@@ -1808,10 +1878,10 @@ const ids = table.getSelectedRowModel().rows.map((r) => r.original.id)
         className="max-w-md rounded-2xl bg-white p-8 shadow-xl dark:bg-gray-800"
       >
         <h2 className="mb-4 text-xl font-semibold text-dark dark:text-white">
-          Bulk Unassign Delivery Officers
+          {forcedStatus === 'new' || forcedStatus === 'pending' ? 'Bulk Unassign Verification Officers' : 'Bulk Unassign Delivery Officers'}
         </h2>
         <p className="mb-6 text-gray-600 dark:text-gray-300">
-          Are you sure you want to unassign Delivery Officers from <strong>{selectedCount}</strong> selected orders?
+          Are you sure you want to unassign {forcedStatus === 'new' || forcedStatus === 'pending' ? 'Verification Officers' : 'Delivery Officers'} from <strong>{selectedCount}</strong> selected orders?
         </p>
         <div className="mt-6 flex justify-end gap-4">
           <button

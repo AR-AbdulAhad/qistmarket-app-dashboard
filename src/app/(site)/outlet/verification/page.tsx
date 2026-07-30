@@ -153,7 +153,7 @@ function VOCard({ officer, onClick }: { officer: any; onClick: () => void }) {
           {[
             { label: "Pending", value: orders.pending ?? 0, color: "text-yellow-600" },
             { label: "In Progress", value: orders.in_progress ?? 0, color: "text-blue-600" },
-            { label: "Approved", value: orders.approved ?? 0, color: "text-teal-600" },
+            { label: "Completed", value: orders.completed ?? 0, color: "text-teal-600" },
             { label: "Rejected", value: orders.rejected ?? 0, color: "text-red-500" },
             { label: "Delivered", value: orders.delivered ?? 0, color: "text-purple-600" },
             { label: "Expired", value: orders.expired ?? 0, color: "text-gray-400" },

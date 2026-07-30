@@ -6,6 +6,8 @@ import Cookies from "js-cookie";
 import InstallmentsTable from "@/components/Installments/InstallmentsTable";
 import InstallmentPaymentModal from "@/components/Installments/InstallmentPaymentModal";
 import SmartPayQrModal from "@/components/Installments/SmartPayQrModal";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
 
@@ -358,10 +360,22 @@ function InstallmentsContent() {
     const [pagination, setPagination] = useState({ total: 0, page: 1, limit: 10, totalPages: 1 });
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState(initialSearch);
-    const [activeTab, setActiveTab] = useState<'fresh' | 'overdue' | 'paid'>('fresh');
+    const [activeTab, setActiveTab] = useState<'all' | 'regular' | 'fresh' | 'overdue' | 'blacklist' | 'defaulter' | 'ptp' | 'paid'>('all');
     const [startDate, setStartDate] = useState("");
     const [endDate, setEndDate] = useState("");
-    const [stats, setStats] = useState<{ totalAmount: number; customerCount: number; summaries?: any }>({ totalAmount: 0, customerCount: 0 });
+    const [stats, setStats] = useState<any>({});
+    const [categoriesSummary, setCategoriesSummary] = useState<any>({});
+
+    // Advanced Filters State
+    const [item, setItem] = useState("");
+    const [ptpStatus, setPtpStatus] = useState("");
+    const [lockStatus, setLockStatus] = useState("");
+    const [roId, setRoId] = useState("");
+    const [minAmount, setMinAmount] = useState("");
+    const [maxAmount, setMaxAmount] = useState("");
+    const [minBalance, setMinBalance] = useState("");
+    const [maxBalance, setMaxBalance] = useState("");
+    const [showFilters, setShowFilters] = useState(false);
 
     // Selection state for export
     const [selectedIds, setSelectedIds] = useState<number[]>([]);
@@ -385,7 +399,7 @@ function InstallmentsContent() {
 
     useEffect(() => {
         fetchInstallments();
-    }, [pagination.page, search, activeTab, startDate, endDate]);
+    }, [pagination.page, search, activeTab, startDate, endDate, item, ptpStatus, lockStatus, roId, minAmount, maxAmount, minBalance, maxBalance]);
 
     const fetchInstallments = async () => {
         setLoading(true);
@@ -393,23 +407,28 @@ function InstallmentsContent() {
             const query = new URLSearchParams({
                 page: pagination.page.toString(),
                 search,
-                tab: activeTab,
-                ...(startDate && { startDate }),
-                ...(endDate && { endDate }),
+                category: activeTab,
+                ...(startDate && { start_date: startDate }),
+                ...(endDate && { end_date: endDate }),
+                ...(item && { item }),
+                ...(ptpStatus && { ptp: ptpStatus }),
+                ...(lockStatus && { lock_status: lockStatus }),
+                ...(roId && { ro_id: roId }),
+                ...(minAmount && { min_amount: minAmount }),
+                ...(maxAmount && { max_amount: maxAmount }),
+                ...(minBalance && { min_balance: minBalance }),
+                ...(maxBalance && { max_balance: maxBalance }),
             }).toString();
 
-            const res = await fetch(`${API_BASE}/api/outlet/installments?${query}`, {
+            const res = await fetch(`${API_BASE}/api/outlet/installments/due-list?${query}`, {
                 headers: getAuthHeaders(),
             });
             const result = await res.json();
             if (result.success) {
                 setData(result.data.installments);
                 setPagination(result.data.pagination);
-                setStats({
-                    totalAmount: result.data.totalAmount || 0,
-                    customerCount: result.data.customerCount || 0,
-                    summaries: result.data.summaries || null
-                });
+                setCategoriesSummary(result.data.categories_summary || {});
+                setStats(result.data.stats || {});
             }
         } catch (e) {
             console.error(e);
@@ -519,119 +538,256 @@ function InstallmentsContent() {
         document.body.removeChild(link);
     };
 
+    const exportToPDF = () => {
+        const rowsToExport = selectedIds.length > 0
+            ? data.filter(item => selectedIds.includes(item.order_id))
+            : data;
+
+        if (rowsToExport.length === 0) return;
+
+        const doc = new jsPDF('landscape');
+        
+        doc.setFontSize(16);
+        doc.text(`Installments Report - ${activeTab.toUpperCase()}`, 14, 15);
+        doc.setFontSize(10);
+        doc.text(`Generated on: ${new Date().toLocaleDateString('en-PK')}`, 14, 22);
+
+        const tableColumn = ["Ref", "Customer", "Phone", "Product", "IMEI", "Total Due", "Total Paid", "Remaining", "PTP Status"];
+        const tableRows: any[] = [];
+
+        rowsToExport.forEach(item => {
+            const hasPtp = item.installmentLedger?.some((l: any) => l.ptp_date);
+            const ptpStatus = hasPtp ? "Has PTP" : "No PTP";
+            const rowData = [
+                item.order_ref,
+                item.customer_name,
+                item.whatsapp_number,
+                item.product_name,
+                item.imei_serial || 'N/A',
+                item.ledgerSummaries.totalInstallmentDue || 0,
+                item.ledgerSummaries.totalInstallmentPaid || 0,
+                item.ledgerSummaries.totalRemaining || 0,
+                ptpStatus
+            ];
+            tableRows.push(rowData);
+        });
+
+        autoTable(doc, {
+            head: [tableColumn],
+            body: tableRows,
+            startY: 28,
+            styles: { fontSize: 8 },
+            headStyles: { fillColor: [41, 128, 185] }
+        });
+
+        doc.save(`installments_export_${activeTab}_${new Date().toISOString().split('T')[0]}.pdf`);
+    };
+
+    const handleSendBulkReminders = async () => {
+        if (selectedIds.length === 0) {
+            alert("Please select at least one account to send reminders.");
+            return;
+        }
+
+        const confirmed = window.confirm(`Are you sure you want to send reminders to ${selectedIds.length} selected customers?`);
+        if (!confirmed) return;
+
+        try {
+            const res = await fetch(`${API_BASE}/api/outlet/installments/reminders`, {
+                method: 'POST',
+                headers: getAuthHeaders(),
+                body: JSON.stringify({ order_ids: selectedIds })
+            });
+            const resultData = await res.json();
+            if (resultData.success) {
+                alert(`Successfully queued ${selectedIds.length} reminders!`);
+                setSelectedIds([]);
+            } else {
+                alert(`Error: ${resultData.message}`);
+            }
+        } catch (e) {
+            console.error(e);
+            alert("An error occurred while sending reminders.");
+        }
+    };
+
     return (
         <div className="p-6 max-w-[1600px] mx-auto min-h-screen">
             <GlobalInstallmentSearch onPay={handlePayClick} onGenerateQR={handleGenerateQR} />
 
             {/* Header & Stats */}
-            <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 mb-8">
+            <div className="flex flex-col mb-8 gap-6">
                 <div className="flex-1">
-                    <h1 className="text-4xl font-black text-gray-900 dark:text-white tracking-tight">Installments Summary</h1>
-                    <p className="text-gray-500 dark:text-gray-400 mt-2 font-medium">Tracking {activeTab} installments and collections.</p>
+                    <h1 className="text-4xl font-black text-gray-900 dark:text-white tracking-tight">Installment Receiving</h1>
+                    <p className="text-gray-500 dark:text-gray-400 mt-2 font-medium">Tracking and recovering accounts across all categories.</p>
+                </div>
+                
+                {/* Global Metrics Row */}
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                    <div className="bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 hover:shadow-md transition-shadow">
+                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Months Due</p>
+                        <p className="text-xl font-black text-gray-900 dark:text-white">{pkr(stats.months_due || 0)}</p>
+                    </div>
+                    <div className="bg-blue-50/50 dark:bg-blue-900/10 p-4 rounded-2xl shadow-sm border border-blue-100 dark:border-blue-800 hover:shadow-md transition-shadow">
+                        <p className="text-[10px] font-bold text-blue-500 uppercase tracking-widest mb-1.5">Months Collected</p>
+                        <p className="text-xl font-black text-blue-600 dark:text-blue-400">{pkr(stats.months_collected || 0)}</p>
+                    </div>
+                    <div className="bg-red-50/50 dark:bg-red-900/10 p-4 rounded-2xl shadow-sm border border-red-100 dark:border-red-800 hover:shadow-md transition-shadow">
+                        <p className="text-[10px] font-bold text-red-500 uppercase tracking-widest mb-1.5">Months Remaining</p>
+                        <p className="text-xl font-black text-red-600 dark:text-red-400">{pkr(stats.months_remaining || 0)}</p>
+                    </div>
+                    <div className="bg-emerald-50/50 dark:bg-emerald-900/10 p-4 rounded-2xl shadow-sm border border-emerald-100 dark:border-emerald-800 hover:shadow-md transition-shadow">
+                        <p className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest mb-1.5">System Collected</p>
+                        <p className="text-xl font-black text-emerald-600 dark:text-emerald-400">{pkr(stats.system_collected || 0)}</p>
+                    </div>
+                    <div className="bg-orange-50/50 dark:bg-orange-900/10 p-4 rounded-2xl shadow-sm border border-orange-100 dark:border-orange-800 hover:shadow-md transition-shadow">
+                        <p className="text-[10px] font-bold text-orange-500 uppercase tracking-widest mb-1.5">System Outstanding</p>
+                        <p className="text-xl font-black text-orange-600 dark:text-orange-400">{pkr(stats.system_outstanding || 0)}</p>
+                    </div>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-4">
-                    {stats.summaries && (
-                        <>
-                            <div className="bg-white dark:bg-gray-800 p-4 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col justify-center px-6 min-w-[200px]">
-                                <div className="flex items-center gap-2 mb-2">
-                                    <div className="w-2.5 h-2.5 rounded-full bg-blue-500"></div>
-                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Fresh Accounts</p>
+                {/* Categories Tabs as Cards */}
+                <div className="flex gap-4 overflow-x-auto pb-6 pt-2 px-1 snap-x hide-scrollbar">
+                    {[
+                        { id: 'all', label: 'All Accounts', bg: 'bg-gray-100 dark:bg-gray-800', text: 'text-gray-800 dark:text-gray-100', activeRing: 'ring-gray-400', dot: 'bg-gray-500' },
+                        { id: 'regular', label: 'Regular', bg: 'bg-blue-50 dark:bg-blue-900/40', text: 'text-blue-800 dark:text-blue-300', activeRing: 'ring-blue-500', dot: 'bg-blue-500' },
+                        { id: 'fresh', label: 'Fresh', bg: 'bg-cyan-50 dark:bg-cyan-900/40', text: 'text-cyan-800 dark:text-cyan-300', activeRing: 'ring-cyan-500', dot: 'bg-cyan-500' },
+                        { id: 'overdue', label: 'Overdue', bg: 'bg-orange-50 dark:bg-orange-900/40', text: 'text-orange-800 dark:text-orange-300', activeRing: 'ring-orange-500', dot: 'bg-orange-500' },
+                        { id: 'blacklist', label: 'Blacklist', bg: 'bg-red-50 dark:bg-red-900/40', text: 'text-red-800 dark:text-red-300', activeRing: 'ring-red-500', dot: 'bg-red-500' },
+                        { id: 'defaulter', label: 'Defaulter', bg: 'bg-rose-50 dark:bg-rose-900/40', text: 'text-rose-800 dark:text-rose-300', activeRing: 'ring-rose-500', dot: 'bg-rose-600' },
+                        { id: 'ptp', label: 'PTP (Pending)', bg: 'bg-purple-50 dark:bg-purple-900/40', text: 'text-purple-800 dark:text-purple-300', activeRing: 'ring-purple-500', dot: 'bg-purple-500' },
+                        { id: 'paid', label: 'Paid', bg: 'bg-emerald-50 dark:bg-emerald-900/40', text: 'text-emerald-800 dark:text-emerald-300', activeRing: 'ring-emerald-500', dot: 'bg-emerald-500' }
+                    ].map(cat => {
+                        const sum = categoriesSummary[cat.id] || { amount: 0, customers: 0 };
+                        const isActive = activeTab === cat.id;
+                        return (
+                            <button
+                                key={cat.id}
+                                onClick={() => { setActiveTab(cat.id as any); setPagination({ ...pagination, page: 1 }); }}
+                                className={`flex-none snap-start p-4 rounded-[20px] text-left min-w-[160px] transition-all duration-300 border border-transparent 
+                                    ${isActive 
+                                        ? `shadow-lg scale-[1.05] ring-2 ring-offset-4 ring-offset-white dark:ring-offset-[#1a222c] ${cat.activeRing} ${cat.bg} ${cat.text}` 
+                                        : `hover:bg-opacity-80 opacity-75 grayscale-[0.3] hover:grayscale-0 hover:opacity-100 ${cat.bg} ${cat.text}`
+                                    }`}
+                            >
+                                <div className="flex items-center gap-2 mb-3">
+                                    <div className={`w-2 h-2 rounded-full shadow-sm ${cat.dot} ${isActive ? 'animate-pulse' : ''}`}></div>
+                                    <p className="text-[10px] font-black uppercase tracking-widest opacity-90">{cat.label}</p>
                                 </div>
-                                <p className="text-lg font-black text-gray-900 dark:text-white">PKR {stats.summaries.fresh.amount.toLocaleString()}</p>
-                                <p className="text-xs font-bold text-gray-500 mt-0.5">{stats.summaries.fresh.count} Customers</p>
-                            </div>
-                            
-                            <div className="bg-white dark:bg-gray-800 p-4 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col justify-center px-6 min-w-[200px]">
-                                <div className="flex items-center gap-2 mb-2">
-                                    <div className="w-2.5 h-2.5 rounded-full bg-red-500"></div>
-                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Overdue Accounts</p>
-                                </div>
-                                <p className="text-lg font-black text-gray-900 dark:text-white">PKR {stats.summaries.overdue.amount.toLocaleString()}</p>
-                                <p className="text-xs font-bold text-gray-500 mt-0.5">{stats.summaries.overdue.count} Customers</p>
-                            </div>
-
-                            <div className="bg-white dark:bg-gray-800 p-4 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col justify-center px-6 min-w-[200px]">
-                                <div className="flex items-center gap-2 mb-2">
-                                    <div className="w-2.5 h-2.5 rounded-full bg-emerald-500"></div>
-                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Paid Accounts</p>
-                                </div>
-                                <p className="text-lg font-black text-gray-900 dark:text-white">PKR {stats.summaries.paid.amount.toLocaleString()}</p>
-                                <p className="text-xs font-bold text-gray-500 mt-0.5">{stats.summaries.paid.count} Customers</p>
-                            </div>
-                        </>
-                    )}
+                                <p className="text-xl font-black tracking-tight">{pkr(sum.amount)}</p>
+                                <p className="text-[11px] font-bold opacity-60 mt-1">{sum.customers} {sum.customers === 1 ? 'Customer' : 'Customers'}</p>
+                            </button>
+                        );
+                    })}
                 </div>
             </div>
 
             {/* Controls Bar */}
-            <div className="bg-white dark:bg-gray-800 p-3 rounded-[32px] shadow-sm border border-gray-100 dark:border-gray-700 mb-6 flex flex-col md:flex-row items-center gap-4">
-                {/* Tabs */}
-                <div className="flex p-1 bg-gray-50 dark:bg-gray-900 rounded-2xl w-full md:w-auto overflow-x-auto">
-                    <button
-                        onClick={() => { setActiveTab('fresh'); setPagination({ ...pagination, page: 1 }); }}
-                        className={`flex-none px-6 py-2.5 rounded-xl text-sm font-bold transition-all whitespace-nowrap ${activeTab === 'fresh' ? 'bg-white dark:bg-gray-800 text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-                    >
-                        Fresh
-                    </button>
-                    <button
-                        onClick={() => { setActiveTab('overdue'); setPagination({ ...pagination, page: 1 }); }}
-                        className={`flex-none px-6 py-2.5 rounded-xl text-sm font-bold transition-all whitespace-nowrap ${activeTab === 'overdue' ? 'bg-white dark:bg-gray-800 text-red-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-                    >
-                        Overdue
-                    </button>
-                    <button
-                        onClick={() => { setActiveTab('paid'); setPagination({ ...pagination, page: 1 }); }}
-                        className={`flex-none px-6 py-2.5 rounded-xl text-sm font-bold transition-all whitespace-nowrap ${activeTab === 'paid' ? 'bg-white dark:bg-gray-800 text-emerald-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-                    >
-                        Paid
-                    </button>
-                </div>
-
-                <div className="h-8 w-[1px] bg-gray-100 dark:bg-gray-700 hidden md:block"></div>
-
+            <div className="bg-white dark:bg-gray-800 p-4 rounded-[32px] shadow-sm border border-gray-100 dark:border-gray-700 mb-6 flex flex-col lg:flex-row items-center gap-4">
+                
                 {/* Search */}
                 <div className="relative flex-1 w-full">
                     <input
                         type="text"
                         placeholder="Search customer, ref or IMEI..."
-                        className="w-full pl-11 pr-4 py-3 rounded-2xl bg-transparent border-none focus:ring-0 outline-none text-sm font-medium dark:text-white"
+                        className="w-full pl-12 pr-4 py-3.5 rounded-2xl bg-gray-50 dark:bg-gray-900 border-none focus:ring-2 focus:ring-blue-500 outline-none text-sm font-semibold dark:text-white"
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
                     />
-                    <svg className="absolute left-4 top-3.5 w-4.5 h-4.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                    <svg className="absolute left-4 top-4 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
                 </div>
 
-                <div className="h-8 w-[1px] bg-gray-100 dark:bg-gray-700 hidden md:block"></div>
+                <div className="h-8 w-[1px] bg-gray-100 dark:bg-gray-700 hidden lg:block"></div>
 
-                {/* Date Filters */}
-                <div className="flex items-center gap-2 w-full md:w-auto">
-                    <input
-                        type="date"
-                        className="bg-gray-50 dark:bg-gray-900 px-4 py-2.5 rounded-xl text-xs font-bold border-none outline-none focus:ring-1 focus:ring-blue-500"
-                        value={startDate}
-                        onChange={(e) => setStartDate(e.target.value)}
-                    />
-                    <span className="text-gray-400 text-xs font-bold">to</span>
-                    <input
-                        type="date"
-                        className="bg-gray-50 dark:bg-gray-900 px-4 py-2.5 rounded-xl text-xs font-bold border-none outline-none focus:ring-1 focus:ring-blue-500"
-                        value={endDate}
-                        onChange={(e) => setEndDate(e.target.value)}
-                    />
-                </div>
-
-                <div className="h-8 w-[1px] bg-gray-100 dark:bg-gray-700 hidden md:block"></div>
-
-                {/* Export */}
+                {/* Advanced Filters Toggle */}
                 <button
-                    onClick={exportToCSV}
-                    className="w-full md:w-auto px-6 py-2.5 rounded-xl bg-gray-900 dark:bg-white dark:text-gray-900 text-white text-xs font-black uppercase tracking-widest hover:opacity-90 transition-all flex items-center justify-center gap-2"
+                    onClick={() => setShowFilters(!showFilters)}
+                    className={`w-full lg:w-auto px-6 py-3.5 rounded-2xl text-sm font-bold flex items-center justify-center gap-2 transition-all ${showFilters ? 'bg-blue-600 text-white' : 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'}`}
                 >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-                    {selectedIds.length > 0 ? `Export (${selectedIds.length})` : 'Export All'}
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
+                    Filters
                 </button>
+
+                {/* Bulk Reminders */}
+                <button
+                    onClick={handleSendBulkReminders}
+                    disabled={selectedIds.length === 0}
+                    className="w-full lg:w-auto px-6 py-3.5 rounded-2xl text-sm font-bold flex items-center justify-center gap-2 transition-all bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-purple-100 dark:hover:bg-purple-900/50"
+                >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
+                    Send Reminders {selectedIds.length > 0 ? `(${selectedIds.length})` : ''}
+                </button>
+
+                <div className="h-8 w-[1px] bg-gray-100 dark:bg-gray-700 hidden lg:block"></div>
+
+                {/* Export Options */}
+                <div className="flex w-full lg:w-auto gap-2">
+                    <button
+                        onClick={exportToCSV}
+                        className="flex-1 lg:flex-none px-6 py-3.5 rounded-2xl bg-gray-900 dark:bg-white dark:text-gray-900 text-white text-[10px] font-black uppercase tracking-widest hover:opacity-90 transition-all flex items-center justify-center gap-1.5 shadow-sm"
+                    >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                        CSV {selectedIds.length > 0 ? `(${selectedIds.length})` : ''}
+                    </button>
+                    <button
+                        onClick={exportToPDF}
+                        className="flex-1 lg:flex-none px-6 py-3.5 rounded-2xl bg-red-600 dark:bg-red-600 text-white text-[10px] font-black uppercase tracking-widest hover:opacity-90 transition-all flex items-center justify-center gap-1.5 shadow-sm"
+                    >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
+                        PDF {selectedIds.length > 0 ? `(${selectedIds.length})` : ''}
+                    </button>
+                </div>
             </div>
+
+            {/* Advanced Filters Drawer */}
+            {showFilters && (
+                <div className="bg-gray-50 dark:bg-gray-800/50 p-6 rounded-[32px] border border-gray-100 dark:border-gray-700 mb-6 grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4 animate-fade-in-down">
+                    <div className="flex flex-col gap-1.5">
+                        <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest ml-1">Installment Date</label>
+                        <div className="flex items-center gap-2 bg-white dark:bg-gray-900 p-1.5 rounded-xl border border-gray-200 dark:border-gray-700">
+                            <input type="date" className="w-full bg-transparent border-none text-xs font-bold focus:ring-0 outline-none" value={startDate} onChange={e => setStartDate(e.target.value)} />
+                            <span className="text-gray-400 font-bold text-[10px]">TO</span>
+                            <input type="date" className="w-full bg-transparent border-none text-xs font-bold focus:ring-0 outline-none" value={endDate} onChange={e => setEndDate(e.target.value)} />
+                        </div>
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                        <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest ml-1">Item / Product</label>
+                        <input type="text" placeholder="e.g. iPhone 13" className="px-4 py-2.5 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-sm font-semibold outline-none focus:border-blue-500" value={item} onChange={e => setItem(e.target.value)} />
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                        <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest ml-1">PTP Status</label>
+                        <select className="px-4 py-2.5 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-sm font-semibold outline-none focus:border-blue-500" value={ptpStatus} onChange={e => setPtpStatus(e.target.value)}>
+                            <option value="">All</option>
+                            <option value="yes">Has PTP</option>
+                            <option value="no">No PTP</option>
+                        </select>
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                        <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest ml-1">Lock Status</label>
+                        <select className="px-4 py-2.5 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-sm font-semibold outline-none focus:border-blue-500" value={lockStatus} onChange={e => setLockStatus(e.target.value)}>
+                            <option value="">All</option>
+                            <option value="unlocked">Unlocked</option>
+                            <option value="locked">Locked</option>
+                        </select>
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                        <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest ml-1">Inst. Amount Range</label>
+                        <div className="flex items-center gap-2 bg-white dark:bg-gray-900 p-1.5 rounded-xl border border-gray-200 dark:border-gray-700">
+                            <input type="number" placeholder="Min" className="w-full bg-transparent border-none text-xs font-bold focus:ring-0 outline-none" value={minAmount} onChange={e => setMinAmount(e.target.value)} />
+                            <span className="text-gray-400 font-bold text-[10px]">TO</span>
+                            <input type="number" placeholder="Max" className="w-full bg-transparent border-none text-xs font-bold focus:ring-0 outline-none" value={maxAmount} onChange={e => setMaxAmount(e.target.value)} />
+                        </div>
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                        <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest ml-1">Balance Range</label>
+                        <div className="flex items-center gap-2 bg-white dark:bg-gray-900 p-1.5 rounded-xl border border-gray-200 dark:border-gray-700">
+                            <input type="number" placeholder="Min" className="w-full bg-transparent border-none text-xs font-bold focus:ring-0 outline-none" value={minBalance} onChange={e => setMinBalance(e.target.value)} />
+                            <span className="text-gray-400 font-bold text-[10px]">TO</span>
+                            <input type="number" placeholder="Max" className="w-full bg-transparent border-none text-xs font-bold focus:ring-0 outline-none" value={maxBalance} onChange={e => setMaxBalance(e.target.value)} />
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {loading && data.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-32 bg-white dark:bg-gray-800 rounded-[32px] border border-gray-100 dark:border-gray-700">

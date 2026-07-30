@@ -442,13 +442,24 @@ export default function OfficerDetailsPage({ params }: { params: Promise<{ id: s
                                     {(() => {
                                         const filtered = details?.verifications?.filter((v: any) => {
                                             const orderStatus = (v.status || "").toLowerCase();
-                                            const filterStr = orderStatusFilter.toLowerCase().replace("_", " ");
                                             
                                             if (orderStatusFilter === 'Delivered') {
-                                                return v.is_delivered === true;
+                                                return v.is_delivered === true || orderStatus === 'delivered';
+                                            } else if (orderStatusFilter === 'Pending') {
+                                                return ['pending verification', 'pending', 'new'].includes(orderStatus);
+                                            } else if (orderStatusFilter === 'In Progress') {
+                                                return ['verification in progress', 'in_progress', 'in progress'].includes(orderStatus);
+                                            } else if (orderStatusFilter === 'Completed') {
+                                                return orderStatus === 'completed';
+                                            } else if (orderStatusFilter === 'Approved') {
+                                                return ['approved', 'verified', 'ready for delivery'].includes(orderStatus);
+                                            } else if (orderStatusFilter === 'Rejected') {
+                                                return orderStatus === 'rejected';
+                                            } else if (orderStatusFilter === 'Expired') {
+                                                return orderStatus === 'expired';
                                             }
                                             
-                                            return orderStatus === filterStr;
+                                            return false;
                                         }) || [];
                                         
                                         return filtered.length === 0 ? (
