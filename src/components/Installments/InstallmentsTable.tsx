@@ -6,6 +6,11 @@ import SmartPayQrModal from "./SmartPayQrModal";
 
 const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
 const pkr = (n: number) => `PKR ${Number(n || 0).toLocaleString()}`;
+const getImageUrl = (path: string | undefined | null) => {
+    if (!path) return '';
+    if (path.startsWith('http')) return path;
+    return `${API_BASE.replace(/\/$/, '')}/${path.replace(/^\//, '')}`;
+};
 const getAuthHeaders = () => {
     const token = Cookies.get("auth_token");
     return { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
@@ -193,7 +198,7 @@ export default function InstallmentsTable({ data, onPay, selectedIds = [], onSel
                                             <div className="flex items-center gap-3">
                                                 {order.purchaser?.profile_photo ? (
                                                     <img
-                                                        src={order.purchaser.profile_photo}
+                                                        src={getImageUrl(order.purchaser.profile_photo)}
                                                         alt={order.customer_name}
                                                         className="w-8 h-8 rounded-full object-cover border border-gray-200"
                                                     />
@@ -308,7 +313,7 @@ export default function InstallmentsTable({ data, onPay, selectedIds = [], onSel
                                                             <div className="bg-white dark:bg-gray-800 rounded-2xl p-4 border border-gray-100 dark:border-gray-700 shadow-sm flex items-center gap-4">
                                                                 <div className="w-16 h-16 rounded-2xl bg-gray-100 dark:bg-gray-700 overflow-hidden flex-shrink-0">
                                                                     {order.purchaser?.profile_photo ? (
-                                                                        <img src={order.purchaser.profile_photo} className="w-full h-full object-cover" alt="" />
+                                                                        <img src={getImageUrl(order.purchaser.profile_photo)} className="w-full h-full object-cover" alt="" />
                                                                     ) : (
                                                                         <div className="w-full h-full flex items-center justify-center text-gray-400">
                                                                             <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
@@ -334,7 +339,7 @@ export default function InstallmentsTable({ data, onPay, selectedIds = [], onSel
                                                                     <div key={gi} className="bg-white dark:bg-gray-800 rounded-2xl p-3 border border-gray-100 dark:border-gray-700 shadow-sm flex items-center gap-3">
                                                                         <div className="w-10 h-10 rounded-xl bg-gray-50 dark:bg-gray-700 overflow-hidden flex-shrink-0">
                                                                             {g.profile_photo ? (
-                                                                                <img src={g.profile_photo} className="w-full h-full object-cover" alt="" />
+                                                                                <img src={getImageUrl(g.profile_photo)} className="w-full h-full object-cover" alt="" />
                                                                             ) : (
                                                                                 <div className="w-full h-full flex items-center justify-center text-gray-400">
                                                                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
