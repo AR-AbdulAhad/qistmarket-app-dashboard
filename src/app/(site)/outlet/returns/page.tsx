@@ -127,7 +127,7 @@ export default function OutletReturnsPage() {
     r.imei_returned?.toLowerCase().includes(search.toLowerCase())
   );
 
-  const pendingRecords = filteredRecords.filter(r => r.status === "pending");
+
   const completedRecords = filteredRecords.filter(r => r.status === "verified");
 
   if (loading && records.length === 0) return <Loader text="Loading Returns..." />;
@@ -158,14 +158,10 @@ export default function OutletReturnsPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
         <div className="bg-white dark:bg-boxdark p-4 rounded-2xl border border-stroke dark:border-strokedark shadow-sm">
           <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1">Total Returns</p>
           <p className="text-2xl font-black text-gray-800 dark:text-white">{records.length}</p>
-        </div>
-        <div className="bg-white dark:bg-boxdark p-4 rounded-2xl border border-stroke dark:border-strokedark shadow-sm border-l-4 border-l-warning">
-          <p className="text-[10px] font-black uppercase tracking-widest text-warning mb-1">Pending Verification</p>
-          <p className="text-2xl font-black text-gray-800 dark:text-white">{pendingRecords.length}</p>
         </div>
         <div className="bg-white dark:bg-boxdark p-4 rounded-2xl border border-stroke dark:border-strokedark shadow-sm border-l-4 border-l-success">
           <p className="text-[10px] font-black uppercase tracking-widest text-success mb-1">Completed</p>
@@ -286,77 +282,7 @@ export default function OutletReturnsPage() {
 
       {/* ── CONFIRMATION POPUP (Removed as OTP is bypassed) ── */}
 
-      {/* ── PENDING RETURNS ── */}
-      <div className="mb-10">
-        <h2 className="text-sm font-black uppercase tracking-widest text-warning flex items-center gap-2 mb-4 ml-1">
-          <Clock size={16} /> Pending Verification ({pendingRecords.length})
-        </h2>
-        {pendingRecords.length === 0 ? (
-          <div className="bg-white dark:bg-boxdark rounded-2xl border border-stroke dark:border-strokedark p-10 text-center text-gray-400">
-            <PackageX size={48} className="mx-auto mb-4 opacity-50" />
-            <p className="font-bold text-sm uppercase tracking-widest">No pending returns</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {pendingRecords.map(r => (
-              <div key={r.id} className="bg-white dark:bg-boxdark rounded-2xl p-5 border border-warning/30 border-l-4 border-l-warning shadow-sm">
-                <div className="flex justify-between items-start mb-3">
-                  <span className="text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-md bg-red-100 text-red-600">Return Request</span>
-                  <span className="text-[10px] font-bold text-gray-400 bg-gray-50 dark:bg-meta-4 px-2 py-1 rounded italic">{new Date(r.created_at).toLocaleDateString()}</span>
-                </div>
-                <div className="mb-4">
-                  <h3 className="text-lg font-bold text-gray-800 dark:text-white leading-tight flex items-center gap-2">
-                    <User size={16} className="text-gray-400" /> {r.order?.customer_name || "N/A"}
-                  </h3>
-                  <p className="text-[10px] text-primary font-black uppercase tracking-widest mt-1">Ref: #{r.order?.order_ref || r.order_id}</p>
-                </div>
-                {r.is_cash_refund && (
-                  <div className="mb-4 bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-900/30 p-3 rounded-xl flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-full bg-red-500 text-white flex items-center justify-center"><DollarSign size={14} /></div>
-                      <div>
-                        <p className="text-[9px] font-black text-red-500 uppercase tracking-widest">Cash Refund</p>
-                        <p className="text-sm font-black text-red-700 dark:text-red-400">Rs. {r.refund_amount?.toLocaleString()}</p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-                <div className="bg-gray-50 dark:bg-meta-4/20 p-3 rounded-xl border border-stroke dark:border-strokedark mb-4">
-                  <div className="flex justify-between items-start mb-1">
-                    <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Product</p>
-                    <Tag size={10} className="text-gray-400" />
-                  </div>
-                  <p className="font-bold text-gray-700 dark:text-gray-200 text-xs leading-none mb-1">{r.product_name || r.order?.product_name || "N/A"}</p>
-                  {r.imei_returned && <p className="text-[9px] font-mono text-primary/70 bg-primary/5 px-2 py-0.5 rounded inline-block">IMEI: {r.imei_returned}</p>}
-                </div>
-                <button onClick={async () => {
-                  try {
-                    const res = await fetch(`${API_BASE}/api/outlet/initiate-direct-return`, {
-                        method: "POST",
-                        headers: { ...getHeaders(), "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                          order_id: r.order_id,
-                          is_cash_refund: r.is_cash_refund,
-                          refund_amount: r.refund_amount,
-                          blacklist_customer: false,
-                        }),
-                      });
-                      const d = await res.json();
-                      if (!d.success) throw new Error(d.error || "Failed");
-                      toast.success("Pending return verified successfully");
-                      fetchRecords();
-                  } catch (e: any) {
-                      toast.error(e.message || "Failed to process return");
-                  }
-                }}
-                  className="w-full py-4 bg-amber-500 hover:bg-amber-600 text-white rounded-2xl text-[11px] font-black uppercase tracking-widest shadow-xl shadow-amber-500/20 transition-all active:scale-95 flex items-center justify-center gap-2">
-                  <CheckCircle2 size={14} /> Process Pending Return
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+
 
       {/* ── COMPLETED RETURNS TABLE ── */}
       <div>
