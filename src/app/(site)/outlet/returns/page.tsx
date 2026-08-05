@@ -32,6 +32,7 @@ export default function OutletReturnsPage() {
   // Confirmation popup
   const [confirmData, setConfirmData] = useState<any | null>(null);
   const [blacklistCustomer, setBlacklistCustomer] = useState(false);
+  const [keepEnrolled, setKeepEnrolled] = useState(true);
 
   const token = useMemo(() => Cookies.get("auth_token"), []);
 
@@ -90,6 +91,7 @@ export default function OutletReturnsPage() {
           refund_amount: isCash ? parseFloat(refundAmt) : 0,
           customer_phone: customerPhone || undefined,
           blacklist_customer: blacklistCustomer,
+          keep_enrolled: keepEnrolled,
         }),
       });
       const d = await res.json();
@@ -119,6 +121,7 @@ export default function OutletReturnsPage() {
     setRefundAmt("");
     setCustomerPhone("");
     setBlacklistCustomer(false);
+    setKeepEnrolled(true);
   };
 
   const filteredRecords = records.filter(r =>
@@ -218,6 +221,23 @@ export default function OutletReturnsPage() {
               </div>
               <button onClick={handleClearSelection} className="text-[10px] font-black text-gray-400 hover:text-red-500 uppercase tracking-widest">Change</button>
             </div>
+
+            {selectedOrder.is_enrolled && (
+              <div className="bg-primary/5 border border-primary/20 p-4 rounded-xl flex items-center justify-between">
+                <div>
+                  <h4 className="text-sm font-black text-primary uppercase tracking-tight flex items-center gap-2">
+                    <CheckCircle2 size={16} /> Enrolled in PayTrigger
+                  </h4>
+                  <p className="text-[10px] text-primary/70 uppercase font-bold mt-1">
+                    Keep this ON to just remove expiration date without unenrolling.
+                  </p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" className="sr-only peer" checked={keepEnrolled} onChange={() => setKeepEnrolled(!keepEnrolled)} />
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary"></div>
+                </label>
+              </div>
+            )}
 
             {/* Cash Refund? */}
             <div>
