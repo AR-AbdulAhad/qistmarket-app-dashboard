@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Fragment } from "react";
 import Cookies from "js-cookie";
 import { toast } from "react-hot-toast";
+import io from "socket.io-client";
 import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
 import { CheckCircle, XCircle, Clock, ExternalLink, Image as ImageIcon } from "lucide-react";
 
@@ -24,16 +25,43 @@ type DepositRequest = {
     submitted_by: { full_name: string; username: string };
     bank_account?: { bank_name: string; account_number: string };
     outlet?: { name: string; code: string };
+    accountant?: { id: number; full_name: string } | null;
+    consumer_number?: string | null;
+    qr_image_base64?: string | null;
+    expires_at?: string | null;
+};
+
+const isExpired = (expiresAt?: string | null) => {
+    if (!expiresAt) return false;
+    return new Date(expiresAt).getTime() < Date.now();
 };
 
 export default function AccountsCashDepositsPage() {
     const [deposits, setDeposits] = useState<DepositRequest[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedStatus, setSelectedStatus] = useState("pending");
+    const [expandedId, setExpandedId] = useState<number | null>(null);
 
     useEffect(() => {
         fetchDeposits();
     }, [selectedStatus]);
+
+    // Live updates: refetch the moment a 1Bill/QR deposit is auto-verified by the webhook.
+    // Re-attached whenever selectedStatus changes so the refetch always uses the current filter.
+    useEffect(() => {
+        const token = Cookies.get("auth_token");
+        if (!token) return;
+        const socket = io(API_BASE, { auth: { token }, reconnection: true });
+        socket.on("bank_deposit_updated", () => {
+            fetchDeposits();
+        });
+        return () => { socket.disconnect(); };
+    }, [selectedStatus]);
+
+    const copyText = (text: string) => {
+        navigator.clipboard.writeText(text);
+        toast.success("Copied!");
+    };
 
     const fetchDeposits = async () => {
         setLoading(true);
@@ -110,16 +138,21 @@ export default function AccountsCashDepositsPage() {
                                 <th className="min-w-[120px] py-4 px-4 font-medium text-black dark:text-white">Proof</th>
                                 <th className="min-w-[120px] py-4 px-4 font-medium text-black dark:text-white">Status</th>
                                 <th className="py-4 px-4 font-medium text-black dark:text-white text-center">Actions</th>
+                                <th className="py-4 px-4 font-medium text-black dark:text-white"></th>
                             </tr>
                         </thead>
                         <tbody>
                             {loading ? (
-                                <tr><td colSpan={7} className="text-center py-4">Loading...</td></tr>
+                                <tr><td colSpan={8} className="text-center py-4">Loading...</td></tr>
                             ) : deposits.length === 0 ? (
-                                <tr><td colSpan={7} className="text-center py-4">No requests found.</td></tr>
+                                <tr><td colSpan={8} className="text-center py-4">No requests found.</td></tr>
                             ) : (
-                                deposits.map((deposit) => (
-                                    <tr key={deposit.id}>
+                                deposits.map((deposit) => {
+                                    const hasExtra = deposit.payment_method === '1bill' || deposit.payment_method === 'qr_payment';
+                                    const expired = isExpired(deposit.expires_at);
+                                    return (
+                                    <Fragment key={deposit.id}>
+                                    <tr>
                                         <td className="border-b border-[#eee] py-5 px-4 dark:border-strokedark">
                                             <p className="text-black dark:text-white">{new Date(deposit.created_at).toLocaleDateString()}</p>
                                             <p className="text-xs text-body-color">{new Date(deposit.created_at).toLocaleTimeString()}</p>
@@ -131,6 +164,9 @@ export default function AccountsCashDepositsPage() {
                                         <td className="border-b border-[#eee] py-5 px-4 dark:border-strokedark">
                                             <p className="text-black dark:text-white font-semibold">PKR {deposit.amount.toLocaleString()}</p>
                                             <p className="text-xs text-primary">{deposit.payment_method}</p>
+                                            {hasExtra && expired && deposit.status === 'pending' && (
+                                                <span className="mt-1 inline-flex rounded-full bg-danger bg-opacity-10 py-0.5 px-2 text-xs font-medium text-danger">Expired</span>
+                                            )}
                                         </td>
                                         <td className="border-b border-[#eee] py-5 px-4 dark:border-strokedark">
                                             {deposit.bank_account ? (
@@ -174,8 +210,41 @@ export default function AccountsCashDepositsPage() {
                                                 </div>
                                             )}
                                         </td>
+                                        <td className="border-b border-[#eee] py-5 px-4 dark:border-strokedark text-center">
+                                            {hasExtra && (
+                                                <button onClick={() => setExpandedId(expandedId === deposit.id ? null : deposit.id)} className="text-primary hover:underline text-xs">
+                                                    {expandedId === deposit.id ? 'Hide' : 'Details'}
+                                                </button>
+                                            )}
+                                        </td>
                                     </tr>
-                                ))
+                                    {hasExtra && expandedId === deposit.id && (
+                                        <tr>
+                                            <td colSpan={8} className="border-b border-[#eee] bg-gray-50 py-4 px-4 dark:border-strokedark dark:bg-meta-4">
+                                                <div className="flex flex-col gap-2 text-sm">
+                                                    <p><span className="text-body-color">Accountant:</span> {deposit.accountant?.full_name || '—'}</p>
+                                                    {deposit.consumer_number && (
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-body-color">Consumer Number:</span>
+                                                            <span className="font-mono font-medium">{deposit.consumer_number}</span>
+                                                            <button onClick={() => copyText(deposit.consumer_number!)} className="text-xs text-primary hover:underline">Copy</button>
+                                                        </div>
+                                                    )}
+                                                    {deposit.qr_image_base64 && (
+                                                        <img src={deposit.qr_image_base64} alt="QR" className="h-40 w-40" />
+                                                    )}
+                                                    {deposit.expires_at && (
+                                                        <p className={expired ? "text-danger" : "text-body-color"}>
+                                                            {expired ? 'Expired at' : 'Valid until'} {new Date(deposit.expires_at).toLocaleString()}
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    )}
+                                    </Fragment>
+                                    );
+                                })
                             )}
                         </tbody>
                     </table>
