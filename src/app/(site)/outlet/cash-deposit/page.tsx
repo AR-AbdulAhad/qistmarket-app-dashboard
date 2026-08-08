@@ -52,6 +52,7 @@ type BankDeposit = {
     consumer_number?: string | null;
     qr_image_base64?: string | null;
     expires_at?: string | null;
+    transaction_id?: string | null;
 };
 
 type Accountant = {
@@ -82,7 +83,6 @@ export default function CashDepositPage() {
     const [banks, setBanks] = useState<BankAccount[]>([]);
     const [accountants, setAccountants] = useState<Accountant[]>([]);
     const [accountantId, setAccountantId] = useState("");
-    const [lastResult, setLastResult] = useState<BankDeposit | null>(null);
     const [expandedId, setExpandedId] = useState<number | null>(null);
     const [, setTick] = useState(0); // periodic re-render so expiry badges stay current
 
@@ -172,8 +172,24 @@ export default function CashDepositPage() {
 
     const isRoutedMethod = paymentMethod === "1bill" || paymentMethod === "qr_payment";
 
+    // No accountant-picker UI — auto-assign silently (prefers one that isn't
+    // already busy for the currently selected method).
+    useEffect(() => {
+        if (accountants.length === 0) {
+            setAccountantId("");
+            return;
+        }
+        const busyKey = paymentMethod === '1bill' ? 'bill_busy' : 'qr_busy';
+        const free = accountants.find((a) => !a[busyKey]);
+        setAccountantId(String((free || accountants[0]).id));
+    }, [accountants, paymentMethod]);
+
     const handleDepositSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (isRoutedMethod && !accountantId) {
+            toast.error("No accountant available to route this deposit to.");
+            return;
+        }
         setLoading(true);
         const formData = new FormData();
         formData.append("amount", amount);
@@ -193,17 +209,28 @@ export default function CashDepositPage() {
             });
             const data = await res.json();
             if (data.success) {
-                toast.success("Deposit request submitted successfully!");
+                toast.success(isRoutedMethod ? "Generated — check history below." : "Deposit request submitted successfully!");
                 setAmount(""); setBankAccountId(""); setReceiptId(""); setDescription(""); setFile(null);
-                if (isRoutedMethod) {
-                    setLastResult(data.deposit);
-                    setAccountantId("");
-                    fetchAccountants();
-                }
+                if (isRoutedMethod) fetchAccountants();
                 fetchDepositHistory();
             } else { toast.error(data.message || "Failed to submit request."); }
         } catch (err) { toast.error("An error occurred. Please try again."); }
         finally { setLoading(false); }
+    };
+
+    const handleCancel = async (id: number) => {
+        if (!confirm("Cancel this pending deposit request?")) return;
+        try {
+            const res = await fetch(`${API_BASE}/api/outlet/bank-deposits/${id}/cancel`, {
+                method: "PATCH", headers: getAuthHeaders(),
+            });
+            const data = await res.json();
+            if (data.success) {
+                toast.success("Request cancelled.");
+                fetchDepositHistory();
+                fetchAccountants();
+            } else { toast.error(data.message || "Failed to cancel request."); }
+        } catch (err) { toast.error("An error occurred. Please try again."); }
     };
 
     const copyText = (text: string) => {
@@ -302,43 +329,7 @@ export default function CashDepositPage() {
                                     </select>
                                 </div>
                             </div>
-                            {isRoutedMethod ? (
-                                <div className="mb-6">
-                                    <label className="mb-2.5 block text-black dark:text-white">Select Accountant <span className="text-meta-1">*</span></label>
-                                    <select required value={accountantId} onChange={(e) => setAccountantId(e.target.value)} className="w-full rounded border-[1.5px] border-stroke bg-transparent py-3 px-5 font-medium outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:focus:border-primary">
-                                        <option value="">Select an accountant</option>
-                                        {accountants.map(a => {
-                                            const busy = paymentMethod === '1bill' ? a.bill_busy : a.qr_busy;
-                                            return (
-                                                <option key={a.id} value={a.id} disabled={busy}>
-                                                    {a.full_name}{busy ? ' (busy — pending elsewhere)' : ''}
-                                                </option>
-                                            );
-                                        })}
-                                    </select>
-
-                                    {lastResult && lastResult.payment_method === paymentMethod && (
-                                        <div className={`mt-4 rounded border p-4 ${isExpired(lastResult.expires_at) ? 'border-danger bg-danger bg-opacity-5' : 'border-success bg-success bg-opacity-5'}`}>
-                                            {isExpired(lastResult.expires_at) ? (
-                                                <p className="text-danger text-sm font-medium">Expired — enter the amount again and submit to generate a new one.</p>
-                                            ) : (
-                                                <>
-                                                    <p className="mb-2 text-xs text-body-color">Valid until {formatExactDate(lastResult.expires_at!)}</p>
-                                                    {paymentMethod === '1bill' && lastResult.consumer_number && (
-                                                        <div className="flex items-center gap-3">
-                                                            <span className="font-mono text-lg font-bold text-black dark:text-white">{lastResult.consumer_number}</span>
-                                                            <button type="button" onClick={() => copyText(lastResult.consumer_number!)} className="text-sm text-primary hover:underline">Copy</button>
-                                                        </div>
-                                                    )}
-                                                    {paymentMethod === 'qr_payment' && lastResult.qr_image_base64 && (
-                                                        <img src={lastResult.qr_image_base64} alt="SmartPay QR" className="h-48 w-48" />
-                                                    )}
-                                                </>
-                                            )}
-                                        </div>
-                                    )}
-                                </div>
-                            ) : (
+                            {isRoutedMethod ? null : (
                                 <>
                                     <div className="mb-4.5">
                                         <label className="mb-2.5 block text-black dark:text-white">Select Bank Account</label>
@@ -380,9 +371,9 @@ export default function CashDepositPage() {
                             {depositHistory.length === 0 ? (
                                 <p className="text-gray-500 text-sm text-center py-4">No deposit history yet.</p>
                             ) : (
-                                <div className="overflow-x-auto">
+                                <div className="max-h-[520px] overflow-y-auto overflow-x-auto">
                                     <table className="w-full table-auto">
-                                        <thead>
+                                        <thead className="sticky top-0 z-10">
                                             <tr className="bg-gray-2 text-left dark:bg-meta-4">
                                                 <th className="py-3 px-4 font-medium text-black dark:text-white text-sm">Date</th>
                                                 <th className="py-3 px-4 font-medium text-black dark:text-white text-sm">Amount</th>
@@ -425,16 +416,30 @@ export default function CashDepositPage() {
                                                         </span>
                                                     </td>
                                                     <td className="border-b border-[#eee] py-3 px-4 dark:border-strokedark text-sm">
-                                                        {dep.receipt_photo_url ? (
+                                                        {dep.transaction_id && (
+                                                            <div className="flex items-center gap-1">
+                                                                <span className="font-mono text-xs">TxID: {dep.transaction_id}</span>
+                                                                <button onClick={() => copyText(dep.transaction_id!)} className="text-xs text-primary hover:underline">Copy</button>
+                                                            </div>
+                                                        )}
+                                                        {dep.receipt_photo_url && (
                                                             <a href={`${API_BASE}${dep.receipt_photo_url}`} target="_blank" rel="noreferrer" className="text-primary hover:underline text-xs">View</a>
-                                                        ) : '—'}
+                                                        )}
+                                                        {!dep.transaction_id && !dep.receipt_photo_url && '—'}
                                                     </td>
                                                     <td className="border-b border-[#eee] py-3 px-4 dark:border-strokedark text-sm text-center">
-                                                        {hasExtra && (
-                                                            <button onClick={() => setExpandedId(expandedId === dep.id ? null : dep.id)} className="text-primary hover:underline text-xs">
-                                                                {expandedId === dep.id ? 'Hide' : 'Details'}
-                                                            </button>
-                                                        )}
+                                                        <div className="flex items-center justify-center gap-3">
+                                                            {hasExtra && (
+                                                                <button onClick={() => setExpandedId(expandedId === dep.id ? null : dep.id)} className="text-primary hover:underline text-xs">
+                                                                    {expandedId === dep.id ? 'Hide' : 'Details'}
+                                                                </button>
+                                                            )}
+                                                            {dep.status === 'pending' && (
+                                                                <button onClick={() => handleCancel(dep.id)} className="text-danger hover:underline text-xs">
+                                                                    Cancel
+                                                                </button>
+                                                            )}
+                                                        </div>
                                                     </td>
                                                 </tr>
                                                 {hasExtra && expandedId === dep.id && (
@@ -442,17 +447,17 @@ export default function CashDepositPage() {
                                                         <td colSpan={7} className="border-b border-[#eee] bg-gray-50 py-3 px-4 dark:border-strokedark dark:bg-meta-4">
                                                             <div className="flex flex-col gap-2 text-sm">
                                                                 <p><span className="text-body-color">Accountant:</span> {dep.accountant?.full_name || '—'}</p>
-                                                                {dep.consumer_number && (
+                                                                {dep.payment_method === '1bill' && dep.consumer_number && (
                                                                     <div className="flex items-center gap-2">
                                                                         <span className="text-body-color">Consumer Number:</span>
                                                                         <span className="font-mono font-medium">{dep.consumer_number}</span>
                                                                         <button onClick={() => copyText(dep.consumer_number!)} className="text-xs text-primary hover:underline">Copy</button>
                                                                     </div>
                                                                 )}
-                                                                {dep.qr_image_base64 && (
+                                                                {dep.payment_method === 'qr_payment' && dep.qr_image_base64 && (
                                                                     <img src={dep.qr_image_base64} alt="QR" className="h-40 w-40" />
                                                                 )}
-                                                                {dep.expires_at && (
+                                                                {dep.status === 'pending' && dep.expires_at && (
                                                                     <p className={expired ? "text-danger" : "text-body-color"}>
                                                                         {expired ? 'Expired at' : 'Valid until'} {formatExactDate(dep.expires_at)}
                                                                     </p>
