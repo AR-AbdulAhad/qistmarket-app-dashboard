@@ -29,6 +29,7 @@ type DepositRequest = {
     consumer_number?: string | null;
     qr_image_base64?: string | null;
     expires_at?: string | null;
+    transaction_id?: string | null;
 };
 
 const isExpired = (expiresAt?: string | null) => {
@@ -40,7 +41,20 @@ export default function AccountsCashDepositsPage() {
     const [deposits, setDeposits] = useState<DepositRequest[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedStatus, setSelectedStatus] = useState("pending");
+    const [selectedMethod, setSelectedMethod] = useState("all");
     const [expandedId, setExpandedId] = useState<number | null>(null);
+
+    const methodTabs: { key: string; label: string }[] = [
+        { key: "all", label: "All Methods" },
+        { key: "manual_deposit", label: "Manual" },
+        { key: "1bill", label: "1Bill" },
+        { key: "qr_payment", label: "QR Payment" },
+    ];
+    const visibleDeposits = selectedMethod === "all"
+        ? deposits
+        : deposits.filter((d) => d.payment_method === selectedMethod);
+    const methodCount = (key: string) =>
+        key === "all" ? deposits.length : deposits.filter((d) => d.payment_method === key).length;
 
     useEffect(() => {
         fetchDeposits();
@@ -127,6 +141,22 @@ export default function AccountsCashDepositsPage() {
                     </div>
                 </div>
 
+                <div className="mb-4 flex flex-wrap gap-2">
+                    {methodTabs.map((tab) => (
+                        <button
+                            key={tab.key}
+                            onClick={() => setSelectedMethod(tab.key)}
+                            className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
+                                selectedMethod === tab.key
+                                    ? 'bg-primary text-white'
+                                    : 'bg-gray-2 text-body-color hover:bg-gray-3 dark:bg-meta-4 dark:hover:bg-meta-3'
+                            }`}
+                        >
+                            {tab.label} ({methodCount(tab.key)})
+                        </button>
+                    ))}
+                </div>
+
                 <div className="max-w-full overflow-x-auto">
                     <table className="w-full table-auto">
                         <thead>
@@ -144,10 +174,10 @@ export default function AccountsCashDepositsPage() {
                         <tbody>
                             {loading ? (
                                 <tr><td colSpan={8} className="text-center py-4">Loading...</td></tr>
-                            ) : deposits.length === 0 ? (
+                            ) : visibleDeposits.length === 0 ? (
                                 <tr><td colSpan={8} className="text-center py-4">No requests found.</td></tr>
                             ) : (
-                                deposits.map((deposit) => {
+                                visibleDeposits.map((deposit) => {
                                     const hasExtra = deposit.payment_method === '1bill' || deposit.payment_method === 'qr_payment';
                                     const expired = isExpired(deposit.expires_at);
                                     return (
@@ -179,12 +209,19 @@ export default function AccountsCashDepositsPage() {
                                             )}
                                         </td>
                                         <td className="border-b border-[#eee] py-5 px-4 dark:border-strokedark">
+                                            {deposit.transaction_id && (
+                                                <div className="flex items-center gap-1">
+                                                    <span className="font-mono text-xs">TxID: {deposit.transaction_id}</span>
+                                                    <button onClick={() => copyText(deposit.transaction_id!)} className="text-xs text-primary hover:underline">Copy</button>
+                                                </div>
+                                            )}
                                             {deposit.receipt_id && <p className="text-sm font-medium">Ref: {deposit.receipt_id}</p>}
                                             {deposit.receipt_photo_url && (
                                                 <a href={`${API_BASE}${deposit.receipt_photo_url}`} target="_blank" rel="noreferrer" className="mt-1 flex items-center gap-1 text-xs text-primary hover:underline">
                                                     <ImageIcon size={14} /> View Photo
                                                 </a>
                                             )}
+                                            {!deposit.transaction_id && !deposit.receipt_id && !deposit.receipt_photo_url && '—'}
                                         </td>
                                         <td className="border-b border-[#eee] py-5 px-4 dark:border-strokedark">
                                             <span className={`inline-flex rounded-full bg-opacity-10 py-1 px-3 text-sm font-medium ${
@@ -199,7 +236,7 @@ export default function AccountsCashDepositsPage() {
                                             </span>
                                         </td>
                                         <td className="border-b border-[#eee] py-5 px-4 dark:border-strokedark text-center">
-                                            {deposit.status === 'pending' && (
+                                            {deposit.status === 'pending' && deposit.payment_method === 'manual_deposit' && (
                                                 <div className="flex items-center justify-center space-x-2">
                                                     <button onClick={() => handleVerify(deposit.id, 'verified')} className="hover:text-success" title="Verify">
                                                         <CheckCircle className="h-5 w-5" />
@@ -223,17 +260,7 @@ export default function AccountsCashDepositsPage() {
                                             <td colSpan={8} className="border-b border-[#eee] bg-gray-50 py-4 px-4 dark:border-strokedark dark:bg-meta-4">
                                                 <div className="flex flex-col gap-2 text-sm">
                                                     <p><span className="text-body-color">Accountant:</span> {deposit.accountant?.full_name || '—'}</p>
-                                                    {deposit.consumer_number && (
-                                                        <div className="flex items-center gap-2">
-                                                            <span className="text-body-color">Consumer Number:</span>
-                                                            <span className="font-mono font-medium">{deposit.consumer_number}</span>
-                                                            <button onClick={() => copyText(deposit.consumer_number!)} className="text-xs text-primary hover:underline">Copy</button>
-                                                        </div>
-                                                    )}
-                                                    {deposit.qr_image_base64 && (
-                                                        <img src={deposit.qr_image_base64} alt="QR" className="h-40 w-40" />
-                                                    )}
-                                                    {deposit.expires_at && (
+                                                    {deposit.status === 'pending' && deposit.expires_at && (
                                                         <p className={expired ? "text-danger" : "text-body-color"}>
                                                             {expired ? 'Expired at' : 'Valid until'} {new Date(deposit.expires_at).toLocaleString()}
                                                         </p>
