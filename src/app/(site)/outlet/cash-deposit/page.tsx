@@ -1,9 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Fragment } from "react";
 import Cookies from "js-cookie";
 import { toast } from "react-hot-toast";
+import io from "socket.io-client";
 import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
+import { formatExactDate } from "@/utils/dateUtils";
 import { DollarSign, Building, FileText, CheckCircle, XCircle, ArrowRightLeft, ArrowDownLeft, ArrowUpRight } from "lucide-react";
 
 const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
@@ -46,6 +48,24 @@ type BankDeposit = {
     description: string | null;
     created_at: string;
     bank_account?: { bank_name: string; account_number: string } | null;
+    accountant?: { id: number; full_name: string } | null;
+    consumer_number?: string | null;
+    qr_image_base64?: string | null;
+    expires_at?: string | null;
+};
+
+type Accountant = {
+    id: number;
+    full_name: string;
+    bill_consumer_number: string | null;
+    smart_pay_consumer_number: string | null;
+    bill_busy: boolean;
+    qr_busy: boolean;
+};
+
+const isExpired = (expiresAt?: string | null) => {
+    if (!expiresAt) return false;
+    return new Date(expiresAt).getTime() < Date.now();
 };
 
 export default function CashDepositPage() {
@@ -60,6 +80,11 @@ export default function CashDepositPage() {
     const [file, setFile] = useState<File | null>(null);
     const [loading, setLoading] = useState(false);
     const [banks, setBanks] = useState<BankAccount[]>([]);
+    const [accountants, setAccountants] = useState<Accountant[]>([]);
+    const [accountantId, setAccountantId] = useState("");
+    const [lastResult, setLastResult] = useState<BankDeposit | null>(null);
+    const [expandedId, setExpandedId] = useState<number | null>(null);
+    const [, setTick] = useState(0); // periodic re-render so expiry badges stay current
 
     // Transfer State
     const [transferAmount, setTransferAmount] = useState("");
@@ -97,6 +122,14 @@ export default function CashDepositPage() {
         } catch (err) { console.error(err); }
     };
 
+    const fetchAccountants = async () => {
+        try {
+            const res = await fetch(`${API_BASE}/api/outlet/accountants`, { headers: getAuthHeaders() });
+            const data = await res.json();
+            if (data.success) setAccountants(data.data || []);
+        } catch (err) { console.error(err); }
+    };
+
     const fetchTransfers = async () => {
         try {
             const [inRes, outRes] = await Promise.all([
@@ -115,7 +148,29 @@ export default function CashDepositPage() {
         fetchOutlets();
         fetchTransfers();
         fetchDepositHistory();
+        fetchAccountants();
     }, []);
+
+    // Periodic tick so "expired" badges update without needing a manual refresh.
+    useEffect(() => {
+        const interval = setInterval(() => setTick((t) => t + 1), 30000);
+        return () => clearInterval(interval);
+    }, []);
+
+    // Live updates: the moment 1Bill/QR payment is confirmed by the webhook,
+    // refresh history + accountant busy-state without a manual refresh.
+    useEffect(() => {
+        const token = Cookies.get("auth_token");
+        if (!token) return;
+        const socket = io(API_BASE, { auth: { token }, reconnection: true });
+        socket.on("bank_deposit_updated", () => {
+            fetchDepositHistory();
+            fetchAccountants();
+        });
+        return () => { socket.disconnect(); };
+    }, []);
+
+    const isRoutedMethod = paymentMethod === "1bill" || paymentMethod === "qr_payment";
 
     const handleDepositSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -123,10 +178,14 @@ export default function CashDepositPage() {
         const formData = new FormData();
         formData.append("amount", amount);
         formData.append("payment_method", paymentMethod);
-        if (bankAccountId) formData.append("bank_account_id", bankAccountId);
-        if (receiptId) formData.append("receipt_id", receiptId);
-        if (description) formData.append("description", description);
-        if (file) formData.append("receipt_photo", file);
+        if (isRoutedMethod) {
+            formData.append("accountant_id", accountantId);
+        } else {
+            if (bankAccountId) formData.append("bank_account_id", bankAccountId);
+            if (receiptId) formData.append("receipt_id", receiptId);
+            if (description) formData.append("description", description);
+            if (file) formData.append("receipt_photo", file);
+        }
 
         try {
             const res = await fetch(`${API_BASE}/api/outlet/bank-deposits`, {
@@ -136,10 +195,20 @@ export default function CashDepositPage() {
             if (data.success) {
                 toast.success("Deposit request submitted successfully!");
                 setAmount(""); setBankAccountId(""); setReceiptId(""); setDescription(""); setFile(null);
+                if (isRoutedMethod) {
+                    setLastResult(data.deposit);
+                    setAccountantId("");
+                    fetchAccountants();
+                }
                 fetchDepositHistory();
             } else { toast.error(data.message || "Failed to submit request."); }
-        } catch (err) { toast.error("An error occurred. Please try again."); } 
+        } catch (err) { toast.error("An error occurred. Please try again."); }
         finally { setLoading(false); }
+    };
+
+    const copyText = (text: string) => {
+        navigator.clipboard.writeText(text);
+        toast.success("Copied!");
     };
 
     const handleTransferSubmit = async (e: React.FormEvent) => {
@@ -233,27 +302,67 @@ export default function CashDepositPage() {
                                     </select>
                                 </div>
                             </div>
-                            <div className="mb-4.5">
-                                <label className="mb-2.5 block text-black dark:text-white">Select Bank Account</label>
-                                <select value={bankAccountId} onChange={(e) => setBankAccountId(e.target.value)} className="w-full rounded border-[1.5px] border-stroke bg-transparent py-3 px-5 font-medium outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:focus:border-primary">
-                                    <option value="">Select a bank (Optional)</option>
-                                    {banks.map(b => (
-                                        <option key={b.id} value={b.id}>{b.bank_name} - {b.account_title} ({b.account_number})</option>
-                                    ))}
-                                </select>
-                            </div>
-                            <div className="mb-4.5">
-                                <label className="mb-2.5 block text-black dark:text-white">Receipt ID / Reference No.</label>
-                                <input type="text" value={receiptId} onChange={(e) => setReceiptId(e.target.value)} placeholder="Enter receipt ID" className="w-full rounded border-[1.5px] border-stroke bg-transparent py-3 px-5 font-medium outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:focus:border-primary" />
-                            </div>
-                            <div className="mb-6">
-                                <label className="mb-2.5 block text-black dark:text-white">Receipt Photo</label>
-                                <input type="file" onChange={(e) => setFile(e.target.files?.[0] || null)} className="w-full cursor-pointer rounded-lg border-[1.5px] border-stroke bg-transparent outline-none transition file:mr-5 file:border-collapse file:cursor-pointer file:border-0 file:border-r file:border-solid file:border-stroke file:bg-whiter file:py-3 file:px-5 file:hover:bg-primary file:hover:bg-opacity-10 focus:border-primary active:border-primary disabled:cursor-default disabled:bg-whiter dark:border-form-strokedark dark:bg-form-input dark:file:border-form-strokedark dark:file:bg-white/30 dark:file:text-white dark:focus:border-primary" />
-                            </div>
-                            <div className="mb-6">
-                                <label className="mb-2.5 block text-black dark:text-white">Description (Optional)</label>
-                                <textarea rows={3} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Add any extra notes..." className="w-full rounded border-[1.5px] border-stroke bg-transparent py-3 px-5 font-medium outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:focus:border-primary" />
-                            </div>
+                            {isRoutedMethod ? (
+                                <div className="mb-6">
+                                    <label className="mb-2.5 block text-black dark:text-white">Select Accountant <span className="text-meta-1">*</span></label>
+                                    <select required value={accountantId} onChange={(e) => setAccountantId(e.target.value)} className="w-full rounded border-[1.5px] border-stroke bg-transparent py-3 px-5 font-medium outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:focus:border-primary">
+                                        <option value="">Select an accountant</option>
+                                        {accountants.map(a => {
+                                            const busy = paymentMethod === '1bill' ? a.bill_busy : a.qr_busy;
+                                            return (
+                                                <option key={a.id} value={a.id} disabled={busy}>
+                                                    {a.full_name}{busy ? ' (busy — pending elsewhere)' : ''}
+                                                </option>
+                                            );
+                                        })}
+                                    </select>
+
+                                    {lastResult && lastResult.payment_method === paymentMethod && (
+                                        <div className={`mt-4 rounded border p-4 ${isExpired(lastResult.expires_at) ? 'border-danger bg-danger bg-opacity-5' : 'border-success bg-success bg-opacity-5'}`}>
+                                            {isExpired(lastResult.expires_at) ? (
+                                                <p className="text-danger text-sm font-medium">Expired — enter the amount again and submit to generate a new one.</p>
+                                            ) : (
+                                                <>
+                                                    <p className="mb-2 text-xs text-body-color">Valid until {formatExactDate(lastResult.expires_at!)}</p>
+                                                    {paymentMethod === '1bill' && lastResult.consumer_number && (
+                                                        <div className="flex items-center gap-3">
+                                                            <span className="font-mono text-lg font-bold text-black dark:text-white">{lastResult.consumer_number}</span>
+                                                            <button type="button" onClick={() => copyText(lastResult.consumer_number!)} className="text-sm text-primary hover:underline">Copy</button>
+                                                        </div>
+                                                    )}
+                                                    {paymentMethod === 'qr_payment' && lastResult.qr_image_base64 && (
+                                                        <img src={lastResult.qr_image_base64} alt="SmartPay QR" className="h-48 w-48" />
+                                                    )}
+                                                </>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            ) : (
+                                <>
+                                    <div className="mb-4.5">
+                                        <label className="mb-2.5 block text-black dark:text-white">Select Bank Account</label>
+                                        <select value={bankAccountId} onChange={(e) => setBankAccountId(e.target.value)} className="w-full rounded border-[1.5px] border-stroke bg-transparent py-3 px-5 font-medium outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:focus:border-primary">
+                                            <option value="">Select a bank (Optional)</option>
+                                            {banks.map(b => (
+                                                <option key={b.id} value={b.id}>{b.bank_name} - {b.account_title} ({b.account_number})</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div className="mb-4.5">
+                                        <label className="mb-2.5 block text-black dark:text-white">Receipt ID / Reference No.</label>
+                                        <input type="text" value={receiptId} onChange={(e) => setReceiptId(e.target.value)} placeholder="Enter receipt ID" className="w-full rounded border-[1.5px] border-stroke bg-transparent py-3 px-5 font-medium outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:focus:border-primary" />
+                                    </div>
+                                    <div className="mb-6">
+                                        <label className="mb-2.5 block text-black dark:text-white">Receipt Photo</label>
+                                        <input type="file" onChange={(e) => setFile(e.target.files?.[0] || null)} className="w-full cursor-pointer rounded-lg border-[1.5px] border-stroke bg-transparent outline-none transition file:mr-5 file:border-collapse file:cursor-pointer file:border-0 file:border-r file:border-solid file:border-stroke file:bg-whiter file:py-3 file:px-5 file:hover:bg-primary file:hover:bg-opacity-10 focus:border-primary active:border-primary disabled:cursor-default disabled:bg-whiter dark:border-form-strokedark dark:bg-form-input dark:file:border-form-strokedark dark:file:bg-white/30 dark:file:text-white dark:focus:border-primary" />
+                                    </div>
+                                    <div className="mb-6">
+                                        <label className="mb-2.5 block text-black dark:text-white">Description (Optional)</label>
+                                        <textarea rows={3} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Add any extra notes..." className="w-full rounded border-[1.5px] border-stroke bg-transparent py-3 px-5 font-medium outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:focus:border-primary" />
+                                    </div>
+                                </>
+                            )}
                             <button disabled={loading} type="submit" className="flex w-full justify-center rounded bg-primary p-3 font-medium text-gray hover:bg-opacity-90 disabled:opacity-50">
                                 {loading ? "Submitting..." : "Submit Bank Deposit"}
                             </button>
@@ -281,19 +390,27 @@ export default function CashDepositPage() {
                                                 <th className="py-3 px-4 font-medium text-black dark:text-white text-sm">Receipt ID</th>
                                                 <th className="py-3 px-4 font-medium text-black dark:text-white text-sm">Status</th>
                                                 <th className="py-3 px-4 font-medium text-black dark:text-white text-sm">Receipt</th>
+                                                <th className="py-3 px-4 font-medium text-black dark:text-white text-sm"></th>
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {depositHistory.map(dep => (
-                                                <tr key={dep.id}>
+                                            {depositHistory.map(dep => {
+                                                const hasExtra = dep.payment_method === '1bill' || dep.payment_method === 'qr_payment';
+                                                const expired = isExpired(dep.expires_at);
+                                                return (
+                                                <Fragment key={dep.id}>
+                                                <tr>
                                                     <td className="border-b border-[#eee] py-3 px-4 dark:border-strokedark text-sm">
-                                                        {new Date(dep.created_at).toLocaleString()}
+                                                        {formatExactDate(dep.created_at)}
                                                     </td>
                                                     <td className="border-b border-[#eee] py-3 px-4 dark:border-strokedark text-sm font-bold text-primary">
                                                         Rs {dep.amount.toLocaleString()}
                                                     </td>
                                                     <td className="border-b border-[#eee] py-3 px-4 dark:border-strokedark text-sm capitalize">
                                                         {dep.payment_method?.replace(/_/g, ' ')}
+                                                        {hasExtra && expired && dep.status === 'pending' && (
+                                                            <span className="ml-2 inline-flex rounded-full bg-danger bg-opacity-10 py-0.5 px-2 text-xs font-medium text-danger normal-case">Expired</span>
+                                                        )}
                                                     </td>
                                                     <td className="border-b border-[#eee] py-3 px-4 dark:border-strokedark text-sm text-gray-500">
                                                         {dep.receipt_id || '—'}
@@ -312,8 +429,41 @@ export default function CashDepositPage() {
                                                             <a href={`${API_BASE}${dep.receipt_photo_url}`} target="_blank" rel="noreferrer" className="text-primary hover:underline text-xs">View</a>
                                                         ) : '—'}
                                                     </td>
+                                                    <td className="border-b border-[#eee] py-3 px-4 dark:border-strokedark text-sm text-center">
+                                                        {hasExtra && (
+                                                            <button onClick={() => setExpandedId(expandedId === dep.id ? null : dep.id)} className="text-primary hover:underline text-xs">
+                                                                {expandedId === dep.id ? 'Hide' : 'Details'}
+                                                            </button>
+                                                        )}
+                                                    </td>
                                                 </tr>
-                                            ))}
+                                                {hasExtra && expandedId === dep.id && (
+                                                    <tr>
+                                                        <td colSpan={7} className="border-b border-[#eee] bg-gray-50 py-3 px-4 dark:border-strokedark dark:bg-meta-4">
+                                                            <div className="flex flex-col gap-2 text-sm">
+                                                                <p><span className="text-body-color">Accountant:</span> {dep.accountant?.full_name || '—'}</p>
+                                                                {dep.consumer_number && (
+                                                                    <div className="flex items-center gap-2">
+                                                                        <span className="text-body-color">Consumer Number:</span>
+                                                                        <span className="font-mono font-medium">{dep.consumer_number}</span>
+                                                                        <button onClick={() => copyText(dep.consumer_number!)} className="text-xs text-primary hover:underline">Copy</button>
+                                                                    </div>
+                                                                )}
+                                                                {dep.qr_image_base64 && (
+                                                                    <img src={dep.qr_image_base64} alt="QR" className="h-40 w-40" />
+                                                                )}
+                                                                {dep.expires_at && (
+                                                                    <p className={expired ? "text-danger" : "text-body-color"}>
+                                                                        {expired ? 'Expired at' : 'Valid until'} {formatExactDate(dep.expires_at)}
+                                                                    </p>
+                                                                )}
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                )}
+                                                </Fragment>
+                                                );
+                                            })}
                                         </tbody>
                                     </table>
                                 </div>
