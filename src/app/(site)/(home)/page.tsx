@@ -432,7 +432,7 @@ export default function Home() {
               </Link>
             </div>
 
-            <div className="max-h-[360px] overflow-y-auto">
+            <div className="max-h-[360px] overflow-x-auto overflow-y-auto">
               <table className="min-w-full text-left text-xs">
                 <thead className="sticky top-0 bg-gray-50 text-[11px] uppercase tracking-wide text-gray-500 dark:bg-dark-3 dark:text-gray-400">
                   <tr>

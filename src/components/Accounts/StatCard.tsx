@@ -33,7 +33,7 @@ export default function StatCard({ icon: Icon, label, value, accent, bg, bar, gl
             {label}
           </p>
         </div>
-        <p className="break-words text-[22px] font-black leading-none tracking-tight text-slate-800 dark:text-white">
+        <p className="break-all sm:break-words text-base sm:text-lg lg:text-[22px] font-black leading-none tracking-tight text-slate-800 dark:text-white">
           {value}
         </p>
       </div>

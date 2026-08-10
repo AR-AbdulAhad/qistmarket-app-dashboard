@@ -172,19 +172,40 @@ const OrderListContent = ({ forcedStatus, forcedChannel, apiEndpoint, hideAction
 
   const searchParams = useSearchParams()
   const urlStatus = searchParams.get('status')
+  const urlDateRange = searchParams.get('dateRange')
+  const urlStartDate = searchParams.get('startDate')
+  const urlEndDate = searchParams.get('endDate')
+
+  const parseDateRange = (raw: string | null) => {
+    if (!raw) return 'All'
+    const lower = raw.toLowerCase()
+    if (lower === 'day' || lower === 'today') return 'Day'
+    if (lower === 'month') return 'Month'
+    if (lower === 'week') return 'Week'
+    if (lower === 'quarter') return 'Quarter'
+    if (lower === 'year') return 'Year'
+    if (lower === 'custom range' || lower === 'custom') return 'Custom Range'
+    return raw
+  }
   
   // Filtration
-  const [dateRange, setDateRange] = useState('All')
-  const [startDate, setStartDate] = useState('')
-  const [endDate, setEndDate] = useState('')
+  const [dateRange, setDateRange] = useState(() => parseDateRange(urlDateRange))
+  const [startDate, setStartDate] = useState(() => urlStartDate || '')
+  const [endDate, setEndDate] = useState(() => urlEndDate || '')
   const [statusFilter, setStatusFilter] = useState(urlStatus ? urlStatus : 'All')
 
-  // Sync statusFilter if URL param changes
+  // Sync statusFilter & dateRange if URL params change
   useEffect(() => {
     if (urlStatus && urlStatus !== statusFilter) {
       setStatusFilter(urlStatus)
     }
-  }, [urlStatus])
+    if (urlDateRange) {
+      const parsed = parseDateRange(urlDateRange)
+      setDateRange(parsed)
+      if (urlStartDate) setStartDate(urlStartDate)
+      if (urlEndDate) setEndDate(urlEndDate)
+    }
+  }, [urlStatus, urlDateRange, urlStartDate, urlEndDate])
 
   // Action Modals
   const [editModalOpen, setEditModalOpen] = useState(false)
@@ -803,8 +824,11 @@ const OrderListContent = ({ forcedStatus, forcedChannel, apiEndpoint, hideAction
       accessorKey: 'updated_at',
       header: 'Activity Date',
       cell: ({ row, getValue }) => {
-        const val = getValue() as string
-        const createdAt = row.original.created_at
+        const orig = row.original as any
+        const isDelivered = (orig.status || '').toLowerCase() === 'delivered' || Boolean(orig.is_delivered)
+        const rawVal = getValue() as string
+        const val = isDelivered ? (orig.delivered_at || rawVal) : rawVal
+        const createdAt = orig.created_at
         return (
           <div className="flex flex-col">
             <span className="font-bold text-dark dark:text-white">

@@ -15,7 +15,7 @@ import {
   RowSelectionState,
 } from '@tanstack/react-table'
 import Cookies from 'js-cookie'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { ChevronLeft, ChevronRight, SearchIcon, PointerUp, ChevronUpIcon } from '@/assets/icons'
 import ColumnFilter from '../DataTables/ColumnFilter'
 import { Modal } from '../Modal/Modal'
@@ -121,9 +121,35 @@ const ApprovedOrderList = () => {
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
   const [loading, setLoading] = useState(false)
 
-  const [dateRange, setDateRange] = useState('All')
-  const [startDate, setStartDate] = useState('')
-  const [endDate, setEndDate] = useState('')
+  const searchParams = useSearchParams()
+  const urlDateRange = searchParams.get('dateRange')
+  const urlStartDate = searchParams.get('startDate')
+  const urlEndDate = searchParams.get('endDate')
+
+  const parseDateRange = (raw: string | null) => {
+    if (!raw) return 'All'
+    const lower = raw.toLowerCase()
+    if (lower === 'day' || lower === 'today') return 'Day'
+    if (lower === 'month') return 'Month'
+    if (lower === 'week') return 'Week'
+    if (lower === 'quarter') return 'Quarter'
+    if (lower === 'year') return 'Year'
+    if (lower === 'custom range' || lower === 'custom') return 'Custom Range'
+    return raw
+  }
+
+  const [dateRange, setDateRange] = useState(() => parseDateRange(urlDateRange))
+  const [startDate, setStartDate] = useState(() => urlStartDate || '')
+  const [endDate, setEndDate] = useState(() => urlEndDate || '')
+
+  useEffect(() => {
+    if (urlDateRange) {
+      const parsed = parseDateRange(urlDateRange)
+      setDateRange(parsed)
+      if (urlStartDate) setStartDate(urlStartDate)
+      if (urlEndDate) setEndDate(urlEndDate)
+    }
+  }, [urlDateRange, urlStartDate, urlEndDate])
 
   const router = useRouter()
 
@@ -423,8 +449,11 @@ const ApprovedOrderList = () => {
       accessorKey: 'updated_at',
       header: 'Activity Date',
       cell: ({ row, getValue }) => {
-        const val = getValue() as string
-        const createdAt = row.original.created_at
+        const orig = row.original as any
+        const isDelivered = (orig.status || '').toLowerCase() === 'delivered' || Boolean(orig.is_delivered)
+        const rawVal = getValue() as string
+        const val = isDelivered ? (orig.delivered_at || rawVal) : rawVal
+        const createdAt = orig.created_at
         return (
           <div className="flex flex-col">
             <span className="font-bold text-dark dark:text-white">

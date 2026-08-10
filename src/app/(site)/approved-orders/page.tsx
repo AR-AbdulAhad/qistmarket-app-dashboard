@@ -1,11 +1,14 @@
+import { Suspense } from "react";
 import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
 import OrderList from "@/components/OrderList/OrderList";
 
-export default function CancelledOrdersPage() {
+export default function ApprovedOrdersPage() {
     return (
         <div>
             <Breadcrumb pageName="Approved Orders" />
-            <OrderList forcedStatus="approved" />
+            <Suspense fallback={<div>Loading approved orders...</div>}>
+                <OrderList forcedStatus="approved" />
+            </Suspense>
         </div>
     );
 };
