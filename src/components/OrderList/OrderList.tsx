@@ -803,8 +803,11 @@ const OrderListContent = ({ forcedStatus, forcedChannel, apiEndpoint, hideAction
       accessorKey: 'updated_at',
       header: 'Activity Date',
       cell: ({ row, getValue }) => {
-        const val = getValue() as string
-        const createdAt = row.original.created_at
+        const orig = row.original as any
+        const isDelivered = (orig.status || '').toLowerCase() === 'delivered' || Boolean(orig.is_delivered)
+        const rawVal = getValue() as string
+        const val = isDelivered ? (orig.delivered_at || rawVal) : rawVal
+        const createdAt = orig.created_at
         return (
           <div className="flex flex-col">
             <span className="font-bold text-dark dark:text-white">

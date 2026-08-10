@@ -196,7 +196,9 @@ const AssignedVerifications = () => {
       accessorKey: 'updated_at',
       header: 'Activity Date',
       cell: ({ row, getValue }) => {
-        const val = getValue() as string
+        const isDelivered = (row.original.status || '').toLowerCase() === 'delivered' || (row.original as any).is_delivered
+        const rawVal = getValue() as string
+        const val = isDelivered ? ((row.original as any).delivered_at || rawVal) : rawVal
         const createdAt = row.original.created_at
         return (
           <div className="flex flex-col">

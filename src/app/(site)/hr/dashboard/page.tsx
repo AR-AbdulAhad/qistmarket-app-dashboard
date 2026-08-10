@@ -69,18 +69,18 @@ export default function HrDashboard() {
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+        <div className="grid grid-cols-2 gap-3 sm:gap-5 sm:grid-cols-3 xl:grid-cols-5">
           {statCards.map((card) => {
             const Icon = card.icon;
             return (
-              <Link key={card.label} href={card.href} className="group rounded-xl border border-stroke bg-white p-5 shadow-sm transition-all hover:shadow-lg dark:border-stroke-dark dark:bg-dark-2">
+              <Link key={card.label} href={card.href} className="group rounded-xl border border-stroke bg-white p-4 sm:p-5 shadow-sm transition-all hover:shadow-lg dark:border-stroke-dark dark:bg-dark-2">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400">{card.label}</p>
-                    <p className="mt-1 text-3xl font-bold text-dark dark:text-white">{card.value}</p>
+                    <p className="text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400">{card.label}</p>
+                    <p className="mt-1 text-xl sm:text-3xl font-bold text-dark dark:text-white break-all">{card.value}</p>
                   </div>
-                  <div className={`flex h-12 w-12 items-center justify-center rounded-xl ${card.color} transition-transform group-hover:scale-110`}>
-                    <Icon className="h-6 w-6 text-white" />
+                  <div className={`flex h-10 w-10 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-xl ${card.color} transition-transform group-hover:scale-110`}>
+                    <Icon className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
                   </div>
                 </div>
               </Link>
@@ -92,11 +92,11 @@ export default function HrDashboard() {
       {/* Quick Actions + Recent Activity */}
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Quick Actions */}
-        <div className="rounded-xl border border-stroke bg-white p-6 dark:border-stroke-dark dark:bg-dark-2">
+        <div className="rounded-xl border border-stroke bg-white p-4 sm:p-6 dark:border-stroke-dark dark:bg-dark-2">
           <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-dark dark:text-white">
             <Activity className="h-5 w-5 text-primary" /> Quick Actions
           </h2>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {quickLinks.map((link) => {
               const Icon = link.icon;
               return (

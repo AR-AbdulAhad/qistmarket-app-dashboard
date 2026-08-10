@@ -204,20 +204,20 @@ export default function CsrDashboardPage() {
     ];
 
     return (
-      <div className="flex flex-wrap gap-4 mb-8 w-full">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-12 gap-3 mb-8 w-full">
         {cards.map((card, i) => (
           <div 
             key={card.label} 
             onClick={() => card.href ? router.push(card.href) : null}
-            className={`min-w-[160px] flex-1 shrink-0 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition-all duration-300 animate-in fade-in slide-in-from-top-${(i+1)*2} ${card.href ? 'cursor-pointer hover:shadow-lg hover:border-gray-200 hover:-translate-y-0.5' : ''}`}
+            className={`flex flex-col justify-between rounded-2xl border border-gray-100 bg-white p-4 sm:p-5 shadow-sm transition-all duration-300 animate-in fade-in slide-in-from-top-${(i+1)*2} ${card.href ? 'cursor-pointer hover:shadow-lg hover:border-gray-200 hover:-translate-y-0.5' : ''}`}
           >
-            <div className="flex items-center gap-2 mb-3">
-                <div className={`p-2 rounded-xl ${card.bg} ${card.color}`}>{card.icon}</div>
+            <div className="flex items-center gap-2 mb-2">
+                <div className={`p-1.5 sm:p-2 rounded-xl ${card.bg} ${card.color}`}>{card.icon}</div>
                 <h4 className="text-[8px] font-black uppercase tracking-wider text-gray-400 truncate">{card.label}</h4>
             </div>
             <div className="flex flex-col gap-1">
-                <h2 className="text-sm font-black text-gray-800">{card.value}</h2>
-                <div className={`flex items-center gap-1 text-[10px] font-black ${card.inc >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                <h2 className="text-xs sm:text-sm font-black text-gray-800 break-all">{card.value}</h2>
+                <div className={`flex items-center gap-1 text-[9px] sm:text-[10px] font-black ${card.inc >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
                     {card.inc >= 0 ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
                     {Math.abs(card.inc)}%
                 </div>

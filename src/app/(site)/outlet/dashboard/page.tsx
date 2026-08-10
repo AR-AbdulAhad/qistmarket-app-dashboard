@@ -115,7 +115,7 @@ const StatCard = ({
         </div>
 
         {/* Value */}
-        <p className="text-[28px] font-black text-slate-800 dark:text-white leading-none tracking-tight">{value}</p>
+        <p className="text-base sm:text-xl lg:text-2xl font-black text-slate-800 dark:text-white leading-none tracking-tight break-all sm:break-normal">{value}</p>
 
         {/* Increment badge */}
         <div className={`inline-flex items-center gap-1 self-start rounded-full px-2 py-0.5 text-[9px] font-black ${
@@ -302,18 +302,18 @@ export default function OutletDashboardPage() {
           <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.4em] mt-3 ml-1">Live Outlet Performance</p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-4 bg-white p-2 rounded-2xl border border-slate-100 shadow-xl shadow-slate-200/20">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-4 bg-white p-2 rounded-2xl border border-slate-100 shadow-xl shadow-slate-200/20 max-w-full">
           {["today", "month", "custom"].map((type) => (
             <button
               key={type}
               onClick={() => setFilterType(type as any)}
-              className={`px-8 py-3 rounded-xl text-[10px] font-black uppercase transition-all ${filterType === type ? "bg-[#E31E24] text-white shadow-xl shadow-red-200 scale-105" : "text-slate-400 hover:text-slate-600 hover:bg-slate-50"}`}
+              className={`px-4 sm:px-8 py-2 sm:py-3 rounded-xl text-[10px] font-black uppercase transition-all ${filterType === type ? "bg-[#E31E24] text-white shadow-xl shadow-red-200 scale-105" : "text-slate-400 hover:text-slate-600 hover:bg-slate-50"}`}
             >
               {type}
             </button>
           ))}
           {filterType === "custom" && (
-            <div className="flex items-center gap-3 pl-4 border-l border-slate-100 ml-2">
+            <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 sm:gap-3 pl-2 sm:pl-4 border-l border-slate-100 ml-1 sm:ml-2">
               <input
                 type="date"
                 value={startDate}
@@ -341,7 +341,7 @@ export default function OutletDashboardPage() {
       {/* Quick Links / Access Menu */}
       <section className="mb-8">
         <h2 className="mb-4 text-xs font-black uppercase tracking-widest text-slate-400">Quick Access Portal</h2>
-        <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-12">
+        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 xl:grid-cols-12 gap-3 max-w-full overflow-x-auto pb-2 custom-scrollbar">
           {quickLinks.map((ql) => (
             <QuickLink key={ql.label} {...ql} />
           ))}
@@ -352,7 +352,7 @@ export default function OutletDashboardPage() {
       {stats && (
         <section className="mb-8">
           <h2 className="mb-4 text-xs font-black uppercase tracking-widest text-slate-400">Real-Time Indicators</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-9 gap-4 w-full">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-9 gap-3 sm:gap-4 w-full">
             <StatCard
               icon={<ShoppingBag size={18} />}
               label="Total Orders"
