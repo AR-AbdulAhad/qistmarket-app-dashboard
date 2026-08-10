@@ -142,6 +142,18 @@ export default function CsrDashboardPage() {
   const [startDate, setStartDate] = useState(() => new Date().toISOString().split("T")[0]);
   const [endDate, setEndDate] = useState(() => new Date().toISOString().split("T")[0]);
 
+  const getFilterQueryParams = () => {
+    if (filterType === "today") return "?dateRange=Day";
+    if (filterType === "month") return "?dateRange=Month";
+    if (filterType === "custom") {
+      let q = "?dateRange=Custom Range";
+      if (startDate) q += `&startDate=${startDate}`;
+      if (endDate) q += `&endDate=${endDate}`;
+      return q;
+    }
+    return "";
+  };
+
   useEffect(() => {
     if (!authLoading && user) {
       const userRole = user.role?.toLowerCase();
@@ -208,7 +220,7 @@ export default function CsrDashboardPage() {
         {cards.map((card, i) => (
           <div 
             key={card.label} 
-            onClick={() => card.href ? router.push(card.href) : null}
+            onClick={() => card.href ? router.push(`${card.href}${getFilterQueryParams()}`) : null}
             className={`flex flex-col justify-between rounded-2xl border border-gray-100 bg-white p-4 sm:p-5 shadow-sm transition-all duration-300 animate-in fade-in slide-in-from-top-${(i+1)*2} ${card.href ? 'cursor-pointer hover:shadow-lg hover:border-gray-200 hover:-translate-y-0.5' : ''}`}
           >
             <div className="flex items-center gap-2 mb-2">

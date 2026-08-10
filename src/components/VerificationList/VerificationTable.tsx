@@ -16,7 +16,7 @@ import { SearchIcon, PointerUp, ChevronUpIcon, ChevronLeft, ChevronRight } from 
 import ColumnFilter from '../DataTables/ColumnFilter'
 import { Modal } from '../Modal/Modal'
 import { cn } from '@/lib/utils'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createPortal } from 'react-dom'
 import { useRef } from 'react'
 import Pagination from '../common/Pagination'
@@ -95,11 +95,37 @@ const AssignedVerifications = () => {
     hasPrev: false,
   })
 
+  const searchParams = useSearchParams()
+  const urlDateRange = searchParams.get('dateRange')
+  const urlStartDate = searchParams.get('startDate')
+  const urlEndDate = searchParams.get('endDate')
+
+  const parseDateRange = (raw: string | null) => {
+    if (!raw) return 'All'
+    const lower = raw.toLowerCase()
+    if (lower === 'day' || lower === 'today') return 'Day'
+    if (lower === 'month') return 'Month'
+    if (lower === 'week') return 'Week'
+    if (lower === 'quarter') return 'Quarter'
+    if (lower === 'year') return 'Year'
+    if (lower === 'custom range' || lower === 'custom') return 'Custom Range'
+    return raw
+  }
+
   // Filtration
-  const [dateRange, setDateRange] = useState('All')
-  const [startDate, setStartDate] = useState('')
-  const [endDate, setEndDate] = useState('')
+  const [dateRange, setDateRange] = useState(() => parseDateRange(urlDateRange))
+  const [startDate, setStartDate] = useState(() => urlStartDate || '')
+  const [endDate, setEndDate] = useState(() => urlEndDate || '')
   const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    if (urlDateRange) {
+      const parsed = parseDateRange(urlDateRange)
+      setDateRange(parsed)
+      if (urlStartDate) setStartDate(urlStartDate)
+      if (urlEndDate) setEndDate(urlEndDate)
+    }
+  }, [urlDateRange, urlStartDate, urlEndDate])
 
   // Modals (remarks only, view modal removed)
   const [remarksModalOpen, setRemarksModalOpen] = useState(false)

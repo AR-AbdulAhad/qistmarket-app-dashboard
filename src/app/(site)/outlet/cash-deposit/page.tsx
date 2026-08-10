@@ -49,19 +49,12 @@ type BankDeposit = {
     created_at: string;
     bank_account?: { bank_name: string; account_number: string } | null;
     accountant?: { id: number; full_name: string } | null;
+    submitted_by?: { id: number; full_name: string } | null;
+    outlet?: { id: number; name: string } | null;
     consumer_number?: string | null;
     qr_image_base64?: string | null;
     expires_at?: string | null;
     transaction_id?: string | null;
-};
-
-type Accountant = {
-    id: number;
-    full_name: string;
-    bill_consumer_number: string | null;
-    smart_pay_consumer_number: string | null;
-    bill_busy: boolean;
-    qr_busy: boolean;
 };
 
 const isExpired = (expiresAt?: string | null) => {
@@ -81,8 +74,6 @@ export default function CashDepositPage() {
     const [file, setFile] = useState<File | null>(null);
     const [loading, setLoading] = useState(false);
     const [banks, setBanks] = useState<BankAccount[]>([]);
-    const [accountants, setAccountants] = useState<Accountant[]>([]);
-    const [accountantId, setAccountantId] = useState("");
     const [expandedId, setExpandedId] = useState<number | null>(null);
     const [, setTick] = useState(0); // periodic re-render so expiry badges stay current
 
@@ -122,14 +113,6 @@ export default function CashDepositPage() {
         } catch (err) { console.error(err); }
     };
 
-    const fetchAccountants = async () => {
-        try {
-            const res = await fetch(`${API_BASE}/api/outlet/accountants`, { headers: getAuthHeaders() });
-            const data = await res.json();
-            if (data.success) setAccountants(data.data || []);
-        } catch (err) { console.error(err); }
-    };
-
     const fetchTransfers = async () => {
         try {
             const [inRes, outRes] = await Promise.all([
@@ -148,7 +131,6 @@ export default function CashDepositPage() {
         fetchOutlets();
         fetchTransfers();
         fetchDepositHistory();
-        fetchAccountants();
     }, []);
 
     // Periodic tick so "expired" badges update without needing a manual refresh.
@@ -165,38 +147,19 @@ export default function CashDepositPage() {
         const socket = io(API_BASE, { auth: { token }, reconnection: true });
         socket.on("bank_deposit_updated", () => {
             fetchDepositHistory();
-            fetchAccountants();
         });
         return () => { socket.disconnect(); };
     }, []);
 
     const isRoutedMethod = paymentMethod === "1bill" || paymentMethod === "qr_payment";
 
-    // No accountant-picker UI — auto-assign silently (prefers one that isn't
-    // already busy for the currently selected method).
-    useEffect(() => {
-        if (accountants.length === 0) {
-            setAccountantId("");
-            return;
-        }
-        const busyKey = paymentMethod === '1bill' ? 'bill_busy' : 'qr_busy';
-        const free = accountants.find((a) => !a[busyKey]);
-        setAccountantId(String((free || accountants[0]).id));
-    }, [accountants, paymentMethod]);
-
     const handleDepositSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (isRoutedMethod && !accountantId) {
-            toast.error("No accountant available to route this deposit to.");
-            return;
-        }
         setLoading(true);
         const formData = new FormData();
         formData.append("amount", amount);
         formData.append("payment_method", paymentMethod);
-        if (isRoutedMethod) {
-            formData.append("accountant_id", accountantId);
-        } else {
+        if (!isRoutedMethod) {
             if (bankAccountId) formData.append("bank_account_id", bankAccountId);
             if (receiptId) formData.append("receipt_id", receiptId);
             if (description) formData.append("description", description);
@@ -211,7 +174,6 @@ export default function CashDepositPage() {
             if (data.success) {
                 toast.success(isRoutedMethod ? "Generated — check history below." : "Deposit request submitted successfully!");
                 setAmount(""); setBankAccountId(""); setReceiptId(""); setDescription(""); setFile(null);
-                if (isRoutedMethod) fetchAccountants();
                 fetchDepositHistory();
             } else { toast.error(data.message || "Failed to submit request."); }
         } catch (err) { toast.error("An error occurred. Please try again."); }
@@ -228,7 +190,6 @@ export default function CashDepositPage() {
             if (data.success) {
                 toast.success("Request cancelled.");
                 fetchDepositHistory();
-                fetchAccountants();
             } else { toast.error(data.message || "Failed to cancel request."); }
         } catch (err) { toast.error("An error occurred. Please try again."); }
     };
@@ -446,7 +407,7 @@ export default function CashDepositPage() {
                                                     <tr>
                                                         <td colSpan={7} className="border-b border-[#eee] bg-gray-50 py-3 px-4 dark:border-strokedark dark:bg-meta-4">
                                                             <div className="flex flex-col gap-2 text-sm">
-                                                                <p><span className="text-body-color">Accountant:</span> {dep.accountant?.full_name || '—'}</p>
+                                                                <p><span className="text-body-color">Outlet / Submitted By:</span> {dep.outlet?.name || dep.submitted_by?.full_name || '—'}</p>
                                                                 {dep.payment_method === '1bill' && dep.consumer_number && (
                                                                     <div className="flex items-center gap-2">
                                                                         <span className="text-body-color">Consumer Number:</span>

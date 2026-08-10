@@ -129,11 +129,11 @@ const StatCard = ({
   );
 };
 
-const QuickLink = ({ icon: Icon, label, href, color }: { icon: any; label: string; href: string; color: string }) => {
+const QuickLink = ({ icon: Icon, label, href, color, filterQuery = "" }: { icon: any; label: string; href: string; color: string; filterQuery?: string }) => {
   const router = useRouter();
   return (
     <button
-      onClick={() => router.push(href)}
+      onClick={() => router.push(`${href}${filterQuery}`)}
       className="group flex flex-col items-center gap-1.5 transition-all duration-300 hover:-translate-y-1"
     >
       <div className={`flex size-14 items-center justify-center rounded-2xl ${color} shadow-sm group-hover:scale-105 group-hover:shadow-md transition-all duration-300`}>
@@ -155,6 +155,18 @@ export default function OutletDashboardPage() {
   const [filterType, setFilterType] = useState<"today" | "month" | "custom">("today");
   const [startDate, setStartDate] = useState(() => new Date().toISOString().split("T")[0]);
   const [endDate, setEndDate] = useState(() => new Date().toISOString().split("T")[0]);
+
+  const getFilterQueryParams = () => {
+    if (filterType === "today") return "?dateRange=Day";
+    if (filterType === "month") return "?dateRange=Month";
+    if (filterType === "custom") {
+      let q = "?dateRange=Custom Range";
+      if (startDate) q += `&startDate=${startDate}`;
+      if (endDate) q += `&endDate=${endDate}`;
+      return q;
+    }
+    return "";
+  };
 
   useEffect(() => {
     if (!authLoading && user) {
@@ -258,7 +270,7 @@ export default function OutletDashboardPage() {
 
   const quickLinks = [
     { icon: Package, label: "Orders", href: "/orders-list", color: "bg-red-500" },
-    { icon: CheckCircle2, label: "Approved Orders", href: "/approved-order-list", color: "bg-indigo-500" },
+    { icon: CheckCircle2, label: "Approved Orders", href: "/approved-orders", color: "bg-indigo-500" },
     { icon: BoxIcon, label: "Inventory", href: "/outlet/inventory", color: "bg-violet-500" },
     { icon: CreditCard, label: "Installments", href: "/outlet/installments", color: "bg-emerald-500" },
     { icon: Activity, label: "Recovery", href: "/outlet/recovery", color: "bg-orange-500" },
@@ -343,7 +355,7 @@ export default function OutletDashboardPage() {
         <h2 className="mb-4 text-xs font-black uppercase tracking-widest text-slate-400">Quick Access Portal</h2>
         <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 xl:grid-cols-12 gap-3 max-w-full overflow-x-auto pb-2 custom-scrollbar">
           {quickLinks.map((ql) => (
-            <QuickLink key={ql.label} {...ql} />
+            <QuickLink key={ql.label} {...ql} filterQuery={getFilterQueryParams()} />
           ))}
         </div>
       </section>
@@ -361,7 +373,7 @@ export default function OutletDashboardPage() {
               accent="text-blue-600"
               bg="bg-blue-50"
               bar="bg-blue-400"
-              onClick={() => router.push("/orders-list")}
+              onClick={() => router.push(`/orders-list${getFilterQueryParams()}`)}
             />
             <StatCard
               icon={<Clock size={18} />}
@@ -371,7 +383,7 @@ export default function OutletDashboardPage() {
               accent="text-amber-600"
               bg="bg-amber-50"
               bar="bg-amber-400"
-              onClick={() => router.push("/in-progress-orders")}
+              onClick={() => router.push(`/in-progress-orders${getFilterQueryParams()}`)}
             />
             <StatCard
               icon={<CheckCircle2 size={18} />}
@@ -381,7 +393,7 @@ export default function OutletDashboardPage() {
               accent="text-indigo-600"
               bg="bg-indigo-50"
               bar="bg-indigo-400"
-              onClick={() => router.push("/approved-order-list")}
+              onClick={() => router.push(`/approved-orders${getFilterQueryParams()}`)}
             />
             <StatCard
               icon={<Truck size={18} />}
@@ -391,7 +403,7 @@ export default function OutletDashboardPage() {
               accent="text-purple-600"
               bg="bg-purple-50"
               bar="bg-purple-400"
-              onClick={() => router.push("/picked-orders")}
+              onClick={() => router.push(`/picked-orders${getFilterQueryParams()}`)}
             />
             <StatCard
               icon={<Award size={18} />}
@@ -401,7 +413,7 @@ export default function OutletDashboardPage() {
               accent="text-emerald-600"
               bg="bg-emerald-50"
               bar="bg-emerald-400"
-              onClick={() => router.push("/delivered-orders")}
+              onClick={() => router.push(`/delivered-orders${getFilterQueryParams()}`)}
             />
             <StatCard
               icon={<XCircle size={18} />}
@@ -411,7 +423,7 @@ export default function OutletDashboardPage() {
               accent="text-rose-600"
               bg="bg-rose-50"
               bar="bg-rose-400"
-              onClick={() => router.push("/cancelled-orders")}
+              onClick={() => router.push(`/cancelled-orders${getFilterQueryParams()}`)}
             />
             <StatCard
               icon={<AlertTriangle size={18} />}
@@ -421,7 +433,7 @@ export default function OutletDashboardPage() {
               accent="text-red-600"
               bg="bg-red-50"
               bar="bg-red-400"
-              onClick={() => router.push("/rejected-orders")}
+              onClick={() => router.push(`/rejected-orders${getFilterQueryParams()}`)}
             />
             <StatCard
               icon={<Clock size={18} />}
@@ -431,7 +443,7 @@ export default function OutletDashboardPage() {
               accent="text-orange-600"
               bg="bg-orange-50"
               bar="bg-orange-400"
-              onClick={() => router.push("/expired-orders")}
+              onClick={() => router.push(`/expired-orders${getFilterQueryParams()}`)}
             />
             <StatCard
               icon={<Wallet size={18} />}

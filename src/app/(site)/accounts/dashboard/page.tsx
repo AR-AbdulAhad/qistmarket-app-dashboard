@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Cookies from "js-cookie";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import type { ApexOptions } from "apexcharts";
 import {
@@ -54,6 +55,7 @@ const RANGE_LABEL: Record<(typeof RANGES)[number], string> = {
 };
 
 export default function AccountsDashboardPage() {
+  const router = useRouter();
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [recovery, setRecovery] = useState<RecoveryAnalytics | null>(null);
   const [trend, setTrend] = useState<FlowTrend[]>([]);
@@ -62,6 +64,11 @@ export default function AccountsDashboardPage() {
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [loading, setLoading] = useState(true);
   const [range, setRange] = useState<(typeof RANGES)[number]>("Month");
+
+  const getFilterQueryParams = () => {
+    if (range) return `?dateRange=${range}`;
+    return "";
+  };
 
   useEffect(() => {
     const token = Cookies.get("auth_token");
@@ -172,16 +179,16 @@ export default function AccountsDashboardPage() {
           Array.from({ length: 10 }).map((_, i) => <StatCardSkeleton key={i} />)
         ) : (
           <>
-            <StatCard icon={Wallet} label="Total Cash In Hand" value={PKR(summary?.totalCashInHand || 0)} accent="text-emerald-600" bg="bg-emerald-50 dark:bg-emerald-500/10" bar="bg-emerald-500" />
-            <StatCard icon={Clock} label="Pending Cash In Hand" value={PKR(summary?.pendingCashInHand || 0)} accent="text-amber-600" bg="bg-amber-50 dark:bg-amber-500/10" bar="bg-amber-500" />
-            <StatCard icon={Wifi} label="Online Payments Today" value={PKR(summary?.onlinePaymentsToday || 0)} accent="text-blue-600" bg="bg-blue-50 dark:bg-blue-500/10" bar="bg-blue-500" />
-            <StatCard icon={TrendingUp} label={`Total Recovery (${range})`} value={PKR(recovery?.totalRecovered || 0)} accent="text-emerald-600" bg="bg-emerald-50 dark:bg-emerald-500/10" bar="bg-emerald-500" />
-            <StatCard icon={Landmark} label="Bank Balance" value={PKR(summary?.bankBalance || 0)} accent="text-indigo-600" bg="bg-indigo-50 dark:bg-indigo-500/10" bar="bg-indigo-500" />
-            <StatCard icon={Receipt} label="Today's Expense" value={PKR(summary?.todaysExpense || 0)} accent="text-rose-600" bg="bg-rose-50 dark:bg-rose-500/10" bar="bg-rose-500" />
-            <StatCard icon={HandCoins} label="Vendor Payables" value={PKR(summary?.vendorPayables || 0)} accent="text-orange-600" bg="bg-orange-50 dark:bg-orange-500/10" bar="bg-orange-500" />
-            <StatCard icon={Users} label="Customer Receivables" value={PKR(summary?.customerReceivables || 0)} accent="text-purple-600" bg="bg-purple-50 dark:bg-purple-500/10" bar="bg-purple-500" />
-            <StatCard icon={Package} label="Stock Valuation" value={PKR(stockValuation)} accent="text-teal-600" bg="bg-teal-50 dark:bg-teal-500/10" bar="bg-teal-500" />
-            <StatCard icon={Lock} label="Locked Devices" value={lockedDevices} accent="text-rose-600" bg="bg-rose-50 dark:bg-rose-500/10" bar="bg-rose-500" />
+            <StatCard icon={Wallet} label="Total Cash In Hand" value={PKR(summary?.totalCashInHand || 0)} accent="text-emerald-600" bg="bg-emerald-50 dark:bg-emerald-500/10" bar="bg-emerald-500" onClick={() => router.push(`/accounts/cash-in-hand${getFilterQueryParams()}`)} />
+            <StatCard icon={Clock} label="Pending Cash In Hand" value={PKR(summary?.pendingCashInHand || 0)} accent="text-amber-600" bg="bg-amber-50 dark:bg-amber-500/10" bar="bg-amber-500" onClick={() => router.push(`/accounts/cash-in-hand${getFilterQueryParams()}`)} />
+            <StatCard icon={Wifi} label="Online Payments Today" value={PKR(summary?.onlinePaymentsToday || 0)} accent="text-blue-600" bg="bg-blue-50 dark:bg-blue-500/10" bar="bg-blue-500" onClick={() => router.push(`/accounts/online-payments${getFilterQueryParams()}`)} />
+            <StatCard icon={TrendingUp} label={`Total Recovery (${range})`} value={PKR(recovery?.totalRecovered || 0)} accent="text-emerald-600" bg="bg-emerald-50 dark:bg-emerald-500/10" bar="bg-emerald-500" onClick={() => router.push(`/accounts/recovery-analytics${getFilterQueryParams()}`)} />
+            <StatCard icon={Landmark} label="Bank Balance" value={PKR(summary?.bankBalance || 0)} accent="text-indigo-600" bg="bg-indigo-50 dark:bg-indigo-500/10" bar="bg-indigo-500" onClick={() => router.push("/accounts/bank-accounts")} />
+            <StatCard icon={Receipt} label="Today's Expense" value={PKR(summary?.todaysExpense || 0)} accent="text-rose-600" bg="bg-rose-50 dark:bg-rose-500/10" bar="bg-rose-500" onClick={() => router.push(`/accounts/expenses${getFilterQueryParams()}`)} />
+            <StatCard icon={HandCoins} label="Vendor Payables" value={PKR(summary?.vendorPayables || 0)} accent="text-orange-600" bg="bg-orange-50 dark:bg-orange-500/10" bar="bg-orange-500" onClick={() => router.push("/accounts/vendors")} />
+            <StatCard icon={Users} label="Customer Receivables" value={PKR(summary?.customerReceivables || 0)} accent="text-purple-600" bg="bg-purple-50 dark:bg-purple-500/10" bar="bg-purple-500" onClick={() => router.push(`/accounts/receivables${getFilterQueryParams()}`)} />
+            <StatCard icon={Package} label="Stock Valuation" value={PKR(stockValuation)} accent="text-teal-600" bg="bg-teal-50 dark:bg-teal-500/10" bar="bg-teal-500" onClick={() => router.push("/accounts/stock-summary")} />
+            <StatCard icon={Lock} label="Locked Devices" value={lockedDevices} accent="text-rose-600" bg="bg-rose-50 dark:bg-rose-500/10" bar="bg-rose-500" onClick={() => router.push("/accounts/paytrigger")} />
           </>
         )}
       </div>

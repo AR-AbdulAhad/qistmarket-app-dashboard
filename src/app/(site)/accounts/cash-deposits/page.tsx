@@ -259,7 +259,7 @@ export default function AccountsCashDepositsPage() {
                                         <tr>
                                             <td colSpan={8} className="border-b border-[#eee] bg-gray-50 py-4 px-4 dark:border-strokedark dark:bg-meta-4">
                                                 <div className="flex flex-col gap-2 text-sm">
-                                                    <p><span className="text-body-color">Accountant:</span> {deposit.accountant?.full_name || '—'}</p>
+                                                    <p><span className="text-body-color">Outlet / Submitted By:</span> {deposit.outlet?.name || deposit.submitted_by?.full_name || '—'}</p>
                                                     {deposit.status === 'pending' && deposit.expires_at && (
                                                         <p className={expired ? "text-danger" : "text-body-color"}>
                                                             {expired ? 'Expired at' : 'Valid until'} {new Date(deposit.expires_at).toLocaleString()}
