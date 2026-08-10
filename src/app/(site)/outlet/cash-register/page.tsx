@@ -466,10 +466,10 @@ export default function CashRegisterPage() {
                                     <span className="text-xs font-black uppercase">Settlement Voucher</span>
                                     <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-600 text-white">Closed</span>
                                 </div>
-                                <div className="text-lg font-black">{todayRegister.settlement_number}</div>
+                                <div className="text-lg font-black">{todayRegister?.settlement_number}</div>
                                 <div className="text-[11px] font-medium flex items-center gap-4">
-                                    <span>Status: <strong>{todayRegister.settlement_status || "Pending"}</strong></span>
-                                    <span>Locked At: <strong>{todayRegister.approved_at ? new Date(todayRegister.approved_at).toLocaleTimeString() : '10:00 PM'}</strong></span>
+                                    <span>Status: <strong>{todayRegister?.settlement_status || "Pending"}</strong></span>
+                                    <span>Locked At: <strong>{todayRegister?.approved_at ? new Date(todayRegister!.approved_at as string).toLocaleTimeString() : '10:00 PM'}</strong></span>
                                 </div>
                             </div>
                         ) : (
