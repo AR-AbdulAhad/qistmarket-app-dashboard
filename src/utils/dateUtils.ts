@@ -1,32 +1,41 @@
+// Re-interprets a real instant's Asia/Karachi wall-clock time as if it were the
+// browser's local time, so plain (non-UTC) Date getters below read out PKT values —
+// this stays correct no matter what timezone the server or the viewer's browser is in.
+const toPKTWallClock = (date: Date): Date => {
+    const pktString = date.toLocaleString('en-US', { timeZone: 'Asia/Karachi' });
+    return new Date(pktString);
+};
+
 export const formatExactDate = (dateInput: string | Date | null | undefined, formatStr: string = 'MMM DD, YYYY hh:mm A') => {
     if (!dateInput) return 'N/A';
-    
+
     if (typeof dateInput === 'string' && dateInput.trim() === '') return 'N/A';
 
-    const date = new Date(dateInput);
-    if (isNaN(date.getTime())) return typeof dateInput === 'string' ? dateInput : 'N/A';
+    const rawDate = new Date(dateInput);
+    if (isNaN(rawDate.getTime())) return typeof dateInput === 'string' ? dateInput : 'N/A';
+    const date = toPKTWallClock(rawDate);
 
     const monthsShort = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     const monthsFull = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
     const daysFull = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     const daysShort = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-    const monthShortStr = monthsShort[date.getUTCMonth()];
-    const monthFullStr = monthsFull[date.getUTCMonth()];
-    const monthNum = String(date.getUTCMonth() + 1).padStart(2, '0');
-    
-    const dayOfWeekFull = daysFull[date.getUTCDay()];
-    const dayOfWeekShort = daysShort[date.getUTCDay()];
-    
-    const d = date.getUTCDate();
+    const monthShortStr = monthsShort[date.getMonth()];
+    const monthFullStr = monthsFull[date.getMonth()];
+    const monthNum = String(date.getMonth() + 1).padStart(2, '0');
+
+    const dayOfWeekFull = daysFull[date.getDay()];
+    const dayOfWeekShort = daysShort[date.getDay()];
+
+    const d = date.getDate();
     const day = String(d).padStart(2, '0');
     const dayUnpadded = String(d);
-    
-    const year = date.getUTCFullYear();
-    
-    let hours = date.getUTCHours();
-    const minutes = String(date.getUTCMinutes()).padStart(2, '0');
-    const seconds = String(date.getUTCSeconds()).padStart(2, '0');
+
+    const year = date.getFullYear();
+
+    let hours = date.getHours();
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    const seconds = String(date.getSeconds()).padStart(2, '0');
     const ampm = hours >= 12 ? 'PM' : 'AM';
     const ampmLower = hours >= 12 ? 'pm' : 'am';
     
@@ -65,18 +74,9 @@ export const timeAgo = (dateInput: string | Date | null | undefined) => {
     const date = new Date(dateInput);
     if (isNaN(date.getTime())) return typeof dateInput === 'string' ? dateInput : 'N/A';
 
-    const exactLocalTime = new Date(
-        date.getUTCFullYear(),
-        date.getUTCMonth(),
-        date.getUTCDate(),
-        date.getUTCHours(),
-        date.getUTCMinutes(),
-        date.getUTCSeconds()
-    );
+    // A duration between two real instants doesn't depend on timezone — no conversion needed.
+    const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
 
-    const now = new Date();
-    const seconds = Math.floor((now.getTime() - exactLocalTime.getTime()) / 1000);
-    
     if (seconds < 0) return "just now";
 
     let interval = seconds / 31536000;
@@ -94,13 +94,15 @@ export const timeAgo = (dateInput: string | Date | null | undefined) => {
 
 export const isExactToday = (dateInput: string | Date | null | undefined) => {
     if (!dateInput) return false;
-    const date = new Date(dateInput);
-    if (isNaN(date.getTime())) return false;
-    
-    const now = new Date();
-    return date.getUTCFullYear() === now.getFullYear() && 
-           date.getUTCMonth() === now.getMonth() && 
-           date.getUTCDate() === now.getDate();
+    const rawDate = new Date(dateInput);
+    if (isNaN(rawDate.getTime())) return false;
+
+    // Compare calendar days in Asia/Karachi, regardless of the viewer's own browser timezone.
+    const date = toPKTWallClock(rawDate);
+    const now = toPKTWallClock(new Date());
+    return date.getFullYear() === now.getFullYear() &&
+           date.getMonth() === now.getMonth() &&
+           date.getDate() === now.getDate();
 };
 
 export const addMonths = (dateInput: Date | string, months: number): Date => {

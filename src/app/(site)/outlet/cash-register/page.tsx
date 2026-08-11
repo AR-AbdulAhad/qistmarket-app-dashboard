@@ -24,6 +24,7 @@ type Metrics = {
     cash_from_delivery: number;
     expenses: number;
     vendor_payments: number;
+    vendor_receipts: number;
     cash_transferred_in: number;
     cash_transferred_out: number;
     closing_cash: number;
@@ -42,6 +43,7 @@ type Register = {
     cash_from_delivery: number;
     expenses: number;
     vendor_payments: number;
+    vendor_receipts: number;
     closing_cash: number;
     expected_cash: number;
     physical_cash: number | null;
@@ -212,6 +214,7 @@ export default function CashRegisterPage() {
         { key: "cash_from_delivery", label: "Cash from Delivery" },
         { key: "expenses", label: "Expenses (–)" },
         { key: "vendor_payments", label: "Vendor Payments (–)" },
+        { key: "vendor_receipts", label: "Cash from Vendor" },
         { key: "closing_cash", label: "Closing / Expected Cash" },
     ];
 
@@ -219,7 +222,7 @@ export default function CashRegisterPage() {
 
     const currentMetrics = metrics || {
         opening_cash: 0, down_payments: 0, installments_received: 0, cash_from_recovery: 0,
-        cash_from_delivery: 0, expenses: 0, vendor_payments: 0, cash_transferred_in: 0,
+        cash_from_delivery: 0, expenses: 0, vendor_payments: 0, vendor_receipts: 0, cash_transferred_in: 0,
         cash_transferred_out: 0, closing_cash: 0, expected_cash: 0, digital_bank_total: 0, digital_1bill_total: 0
     };
 
@@ -307,7 +310,7 @@ export default function CashRegisterPage() {
                 <AlertCircle className="shrink-0 mt-0.5" size={18} />
                 <div className="leading-relaxed">
                     <strong className="font-black uppercase tracking-widest text-[10px] block mb-1">Standard Physical Cash Accounting Formula:</strong>
-                    <span>Opening Cash + (Down Payments + Installments + Recovery Cash + Delivery Cash) – (Expenses + Vendor Payments + Refunds) = Expected Physical Cash</span>
+                    <span>Opening Cash + (Down Payments + Installments + Recovery Cash + Delivery Cash + Cash from Vendor) – (Expenses + Vendor Payments + Refunds) = Expected Physical Cash</span>
                     <div className="mt-1 text-[11px] text-gray-500 dark:text-gray-400">
                         * Note: Digital Bank Transfers (PKR {currentMetrics.digital_bank_total.toLocaleString()}) and 1Bill Payments (PKR {currentMetrics.digital_1bill_total.toLocaleString()}) are tracked separately and do NOT increase physical drawer cash.
                     </div>
