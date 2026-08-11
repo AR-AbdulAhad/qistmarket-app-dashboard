@@ -6,7 +6,7 @@ import { toast } from "react-hot-toast";
 import io from "socket.io-client";
 import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
 import { formatExactDate } from "@/utils/dateUtils";
-import { DollarSign, Building, FileText, CheckCircle, XCircle, ArrowRightLeft, ArrowDownLeft, ArrowUpRight } from "lucide-react";
+import { DollarSign, Building, FileText, CheckCircle, XCircle, ArrowRightLeft, ArrowDownLeft, ArrowUpRight, Search } from "lucide-react";
 
 const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
 const getAuthHeaders = () => ({
@@ -76,6 +76,7 @@ export default function CashDepositPage() {
     const [banks, setBanks] = useState<BankAccount[]>([]);
     const [expandedId, setExpandedId] = useState<number | null>(null);
     const [, setTick] = useState(0); // periodic re-render so expiry badges stay current
+    const [depositSearch, setDepositSearch] = useState("");
 
     // Transfer State
     const [transferAmount, setTransferAmount] = useState("");
@@ -88,6 +89,7 @@ export default function CashDepositPage() {
     const [incomingTransfers, setIncomingTransfers] = useState<TransferRequest[]>([]);
     const [outgoingTransfers, setOutgoingTransfers] = useState<TransferRequest[]>([]);
     const [depositHistory, setDepositHistory] = useState<BankDeposit[]>([]);
+    const [cashInHand, setCashInHand] = useState<number | null>(null);
 
     const fetchBanks = async () => {
         try {
@@ -113,6 +115,14 @@ export default function CashDepositPage() {
         } catch (err) { console.error(err); }
     };
 
+    const fetchCashInHand = async () => {
+        try {
+            const res = await fetch(`${API_BASE}/api/outlet/cash-register?filter=today`, { headers: getAuthHeaders() });
+            const data = await res.json();
+            if (data.success) setCashInHand(data.metrics?.closing_cash ?? 0);
+        } catch (err) { console.error(err); }
+    };
+
     const fetchTransfers = async () => {
         try {
             const [inRes, outRes] = await Promise.all([
@@ -131,6 +141,7 @@ export default function CashDepositPage() {
         fetchOutlets();
         fetchTransfers();
         fetchDepositHistory();
+        fetchCashInHand();
     }, []);
 
     // Periodic tick so "expired" badges update without needing a manual refresh.
@@ -175,6 +186,7 @@ export default function CashDepositPage() {
                 toast.success(isRoutedMethod ? "Generated — check history below." : "Deposit request submitted successfully!");
                 setAmount(""); setBankAccountId(""); setReceiptId(""); setDescription(""); setFile(null);
                 fetchDepositHistory();
+                fetchCashInHand();
             } else { toast.error(data.message || "Failed to submit request."); }
         } catch (err) { toast.error("An error occurred. Please try again."); }
         finally { setLoading(false); }
@@ -190,6 +202,7 @@ export default function CashDepositPage() {
             if (data.success) {
                 toast.success("Request cancelled.");
                 fetchDepositHistory();
+                fetchCashInHand();
             } else { toast.error(data.message || "Failed to cancel request."); }
         } catch (err) { toast.error("An error occurred. Please try again."); }
     };
@@ -237,6 +250,19 @@ export default function CashDepositPage() {
         } catch (err) { toast.error("An error occurred. Please try again."); }
     };
 
+    const filteredDepositHistory = depositHistory.filter((dep) => {
+        const q = depositSearch.trim().toLowerCase();
+        if (!q) return true;
+        return (
+            (dep.receipt_id || "").toLowerCase().includes(q) ||
+            (dep.transaction_id || "").toLowerCase().includes(q) ||
+            (dep.payment_method || "").replace(/_/g, " ").toLowerCase().includes(q) ||
+            (dep.status || "").toLowerCase().includes(q) ||
+            (dep.description || "").toLowerCase().includes(q) ||
+            String(dep.amount).includes(q)
+        );
+    });
+
     return (
         <>
             <Breadcrumb pageName="Cash Deposit & Transfers" />
@@ -267,10 +293,17 @@ export default function CashDepositPage() {
                 {activeTab === 'deposit' && (
                     <div className="flex flex-col gap-6">
                     <div className="rounded-sm border border-stroke bg-white shadow-default dark:border-strokedark dark:bg-boxdark">
-                        <div className="border-b border-stroke py-4 px-6.5 dark:border-strokedark">
+                        <div className="border-b border-stroke py-4 px-6.5 dark:border-strokedark flex flex-wrap items-center justify-between gap-3">
                             <h3 className="font-medium text-black dark:text-white flex items-center gap-2">
                                 <Building className="h-5 w-5" /> Submit Bank Deposit
                             </h3>
+                            <div className="flex items-center gap-2 rounded-lg bg-primary/5 border border-primary/10 px-4 py-2">
+                                <DollarSign className="h-4 w-4 text-primary" />
+                                <span className="text-xs font-medium text-body-color">Cash in Hand:</span>
+                                <span className="text-sm font-bold text-primary">
+                                    {cashInHand === null ? "Loading..." : `Rs ${cashInHand.toLocaleString()}`}
+                                </span>
+                            </div>
                         </div>
                         <form onSubmit={handleDepositSubmit} className="p-6.5">
                             <div className="mb-4.5 flex flex-col gap-6 xl:flex-row">
@@ -280,6 +313,15 @@ export default function CashDepositPage() {
                                         <span className="absolute left-4.5 top-4"><DollarSign size={20} /></span>
                                         <input type="number" required value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="Enter amount" className="w-full rounded border-[1.5px] border-stroke bg-transparent py-3 pl-12 pr-5 font-medium outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:focus:border-primary" />
                                     </div>
+                                    {cashInHand !== null && cashInHand > 0 && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setAmount(String(cashInHand))}
+                                            className="mt-1.5 text-xs font-medium text-primary hover:underline"
+                                        >
+                                            Use full amount (Rs {cashInHand.toLocaleString()})
+                                        </button>
+                                    )}
                                 </div>
                                 <div className="w-full xl:w-1/2">
                                     <label className="mb-2.5 block text-black dark:text-white">Payment Method <span className="text-meta-1">*</span></label>
@@ -328,9 +370,23 @@ export default function CashDepositPage() {
                                 <FileText className="h-5 w-5 text-primary" /> Bank Deposit History
                             </h3>
                         </div>
+                        <div className="px-4 pt-4">
+                            <div className="relative">
+                                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400"><Search size={16} /></span>
+                                <input
+                                    type="text"
+                                    value={depositSearch}
+                                    onChange={(e) => setDepositSearch(e.target.value)}
+                                    placeholder="Search by receipt ID, TxID, method, status, or amount..."
+                                    className="w-full rounded border-[1.5px] border-stroke bg-transparent py-2.5 pl-10 pr-4 text-sm font-medium outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:focus:border-primary"
+                                />
+                            </div>
+                        </div>
                         <div className="p-4">
                             {depositHistory.length === 0 ? (
                                 <p className="text-gray-500 text-sm text-center py-4">No deposit history yet.</p>
+                            ) : filteredDepositHistory.length === 0 ? (
+                                <p className="text-gray-500 text-sm text-center py-4">No deposits match your search.</p>
                             ) : (
                                 <div className="max-h-[520px] overflow-y-auto overflow-x-auto">
                                     <table className="w-full table-auto">
@@ -346,7 +402,7 @@ export default function CashDepositPage() {
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {depositHistory.map(dep => {
+                                            {filteredDepositHistory.map(dep => {
                                                 const hasExtra = dep.payment_method === '1bill' || dep.payment_method === 'qr_payment';
                                                 const expired = isExpired(dep.expires_at);
                                                 return (

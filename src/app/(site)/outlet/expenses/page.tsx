@@ -9,7 +9,7 @@ import {
     ChevronDown, ChevronRight, Wallet,
     CreditCard, AlertCircle, CheckCircle2,
     Calendar, Trash2, PieChart, TrendingUp,
-    Receipt
+    Receipt, Pencil
 } from "lucide-react";
 import Loader from "@/components/common/Loader";
 
@@ -34,7 +34,11 @@ interface ExpenseVoucher {
     date: string;
     notes?: string;
     items: ExpenseItem[];
+    created_at: string;
 }
+
+const EDIT_WINDOW_MS = 3 * 24 * 60 * 60 * 1000;
+const isWithinEditWindow = (createdAt: string) => (Date.now() - new Date(createdAt).getTime()) <= EDIT_WINDOW_MS;
 
 interface ExpenseSummary {
     today: number;
@@ -256,13 +260,23 @@ export default function ExpensesPage() {
                                             </td>
                                             <td className="p-5 text-right" onClick={(e) => e.stopPropagation()}>
                                                 <div className="flex items-center justify-end gap-2">
-                                                    <button
-                                                        onClick={() => handleDelete(v.id)}
-                                                        disabled={deletingId === v.id}
-                                                        className="p-2.5 hover:bg-red-50 text-red-500 rounded-xl transition-all active:scale-95 disabled:opacity-50 border border-transparent hover:border-red-100"
-                                                    >
-                                                        <Trash2 size={18} />
-                                                    </button>
+                                                    {isWithinEditWindow(v.created_at) && (
+                                                        <>
+                                                            <button
+                                                                onClick={() => router.push(`/outlet/expenses/edit/${v.id}`)}
+                                                                className="p-2.5 hover:bg-blue-50 text-blue-500 rounded-xl transition-all active:scale-95 border border-transparent hover:border-blue-100"
+                                                            >
+                                                                <Pencil size={18} />
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleDelete(v.id)}
+                                                                disabled={deletingId === v.id}
+                                                                className="p-2.5 hover:bg-red-50 text-red-500 rounded-xl transition-all active:scale-95 disabled:opacity-50 border border-transparent hover:border-red-100"
+                                                            >
+                                                                <Trash2 size={18} />
+                                                            </button>
+                                                        </>
+                                                    )}
                                                 </div>
                                             </td>
                                         </tr>

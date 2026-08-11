@@ -366,6 +366,15 @@ export default function OutletDashboardPage() {
           <h2 className="mb-4 text-xs font-black uppercase tracking-widest text-slate-400">Real-Time Indicators</h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-9 gap-3 sm:gap-4 w-full">
             <StatCard
+              icon={<BadgeDollarSign size={18} />}
+              label="Closing Balance"
+              value={PKR(stats.financials.closing_cash)}
+              accent="text-[#E31E24]"
+              bg="bg-red-50"
+              bar="bg-[#E31E24]"
+              onClick={() => router.push("/outlet/cash-register")}
+            />
+            <StatCard
               icon={<ShoppingBag size={18} />}
               label="Total Orders"
               value={stats.orders.todayOrders}
@@ -641,6 +650,10 @@ export default function OutletDashboardPage() {
             </div>
             
             <div className="space-y-3">
+              <div className="flex items-center justify-between rounded-2xl bg-red-50 border border-red-100 px-5 py-4 mb-3">
+                <span className="text-[10px] font-black uppercase tracking-widest text-[#E31E24]">Closing balance (Cash on Hand)</span>
+                <span className="text-lg font-black text-[#E31E24]">{PKR(stats.financials.closing_cash)}</span>
+              </div>
               {[
                 { label: "Down Payments Collected", value: stats.financials.down_payments, color: "text-emerald-600", bg: "bg-emerald-50/50 border border-emerald-100/30" },
                 { label: "Installments Received", value: stats.financials.installments_received, color: "text-blue-600", bg: "bg-blue-50/50 border border-blue-100/30" },
@@ -653,10 +666,6 @@ export default function OutletDashboardPage() {
                   <span className={`text-xs font-black ${row.color}`}>{PKR(row.value)}</span>
                 </div>
               ))}
-              <div className="flex items-center justify-between rounded-2xl bg-red-50 border border-red-100 px-5 py-4 mt-3">
-                <span className="text-[10px] font-black uppercase tracking-widest text-[#E31E24]">Closing balance (Cash on Hand)</span>
-                <span className="text-lg font-black text-[#E31E24]">{PKR(stats.financials.closing_cash)}</span>
-              </div>
             </div>
           </div>
 
