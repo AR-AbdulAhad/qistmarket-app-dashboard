@@ -9,9 +9,10 @@ import {
     ChevronDown, ChevronRight, Wallet,
     CreditCard, AlertCircle, CheckCircle2,
     Calendar, Trash2, PieChart, TrendingUp,
-    Receipt, Pencil
+    Receipt, Pencil, Filter
 } from "lucide-react";
 import Loader from "@/components/common/Loader";
+import { formatExactDate } from "@/utils/dateUtils";
 
 const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
 const getAuthHeaders = () => ({
@@ -54,6 +55,9 @@ export default function ExpensesPage() {
     const [searchTerm, setSearchTerm] = useState("");
     const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
     const [deletingId, setDeletingId] = useState<number | null>(null);
+    const [dateRange, setDateRange] = useState<"all" | "today" | "week" | "month" | "custom">("all");
+    const [customStart, setCustomStart] = useState("");
+    const [customEnd, setCustomEnd] = useState("");
 
     useEffect(() => {
         fetchData();
@@ -111,12 +115,39 @@ export default function ExpensesPage() {
     };
 
     const filteredVouchers = useMemo(() => {
-        return vouchers.filter(v =>
+        let list = vouchers;
+
+        if (dateRange !== "all") {
+            const now = new Date();
+            let start: Date;
+            let end: Date | null = null;
+
+            if (dateRange === "today") {
+                start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            } else if (dateRange === "week") {
+                start = new Date(now);
+                start.setDate(start.getDate() - 7);
+            } else if (dateRange === "month") {
+                start = new Date(now.getFullYear(), now.getMonth(), 1);
+            } else {
+                start = customStart ? new Date(customStart) : new Date(0);
+                end = customEnd ? new Date(new Date(customEnd).setHours(23, 59, 59, 999)) : null;
+            }
+
+            list = list.filter(v => {
+                const created = new Date(v.created_at);
+                if (created < start) return false;
+                if (end && created > end) return false;
+                return true;
+            });
+        }
+
+        return list.filter(v =>
             v.voucher_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
             v.payment_method.toLowerCase().includes(searchTerm.toLowerCase()) ||
             v.items.some(item => item.category.toLowerCase().includes(searchTerm.toLowerCase()))
         );
-    }, [vouchers, searchTerm]);
+    }, [vouchers, searchTerm, dateRange, customStart, customEnd]);
 
     if (loading) return <Loader text="Loading Outlet Expenses..." />;
 
@@ -201,6 +232,39 @@ export default function ExpensesPage() {
                             className="w-full pl-12 pr-4 py-3 rounded-2xl bg-gray-50 dark:bg-meta-4 border border-stroke dark:border-strokedark focus:border-primary outline-none text-sm transition-all font-medium"
                         />
                     </div>
+                    <div className="flex flex-wrap items-center gap-3">
+                        <div className="relative">
+                            <Filter className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={16} />
+                            <select
+                                value={dateRange}
+                                onChange={(e) => setDateRange(e.target.value as typeof dateRange)}
+                                className="pl-10 pr-8 py-3 rounded-2xl bg-gray-50 dark:bg-meta-4 border border-stroke dark:border-strokedark focus:border-primary outline-none text-sm font-bold transition-all appearance-none"
+                            >
+                                <option value="all">All Time</option>
+                                <option value="today">Today</option>
+                                <option value="week">Last 7 Days</option>
+                                <option value="month">This Month</option>
+                                <option value="custom">Custom Range</option>
+                            </select>
+                        </div>
+                        {dateRange === "custom" && (
+                            <div className="flex items-center gap-2">
+                                <input
+                                    type="date"
+                                    value={customStart}
+                                    onChange={(e) => setCustomStart(e.target.value)}
+                                    className="px-3 py-3 rounded-2xl bg-gray-50 dark:bg-meta-4 border border-stroke dark:border-strokedark focus:border-primary outline-none text-sm font-bold transition-all"
+                                />
+                                <span className="text-gray-400 text-xs font-bold">to</span>
+                                <input
+                                    type="date"
+                                    value={customEnd}
+                                    onChange={(e) => setCustomEnd(e.target.value)}
+                                    className="px-3 py-3 rounded-2xl bg-gray-50 dark:bg-meta-4 border border-stroke dark:border-strokedark focus:border-primary outline-none text-sm font-bold transition-all"
+                                />
+                            </div>
+                        )}
+                    </div>
                 </div>
 
                 <div className="overflow-x-auto">
@@ -239,7 +303,7 @@ export default function ExpensesPage() {
                                             <td className="p-5">
                                                 <div className="font-black text-gray-800 dark:text-white uppercase tracking-tight text-base">{v.voucher_number}</div>
                                                 <div className="text-[10px] text-gray-500 mt-0.5 font-bold flex items-center gap-1.5 uppercase">
-                                                    <Calendar size={10} /> {new Date(v.date).toLocaleDateString("en-PK", { day: '2-digit', month: 'short', year: 'numeric' })}
+                                                    <Calendar size={10} /> {formatExactDate(v.created_at, 'DD MMM YYYY, hh:mm A')}
                                                 </div>
                                             </td>
                                             <td className="p-5">

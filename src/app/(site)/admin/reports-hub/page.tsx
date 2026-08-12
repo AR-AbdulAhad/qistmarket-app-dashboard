@@ -8,6 +8,7 @@ import PageHeader from "@/components/Accounts/PageHeader";
 import EmptyState from "@/components/Accounts/EmptyState";
 import { TableSkeleton } from "@/components/Accounts/Skeleton";
 import StatCard, { PKR } from "@/components/Accounts/StatCard";
+import { formatExactDate } from "@/utils/dateUtils";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
 const authHeaders = () => ({ Authorization: `Bearer ${Cookies.get("auth_token")}` });
@@ -143,7 +144,7 @@ export default function AdminReportsHubPage() {
                   columns={[
                     { header: "Vendor", cell: (v: any) => v.vendor?.name || "—" },
                     { header: "Amount", align: "right", cell: (v: any) => PKR(v.amount) },
-                    { header: "Date", cell: (v: any) => new Date(v.created_at).toLocaleDateString() },
+                    { header: "Date", cell: (v: any) => formatExactDate(v.created_at, 'DD MMM YYYY, hh:mm A') },
                   ]}
                 />
               </div>

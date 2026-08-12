@@ -4,6 +4,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import Loader from '@/components/common/Loader';
 import { useReactToPrint } from 'react-to-print';
 import * as XLSX from 'xlsx';
+import { formatExactDate } from '@/utils/dateUtils';
 
 const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000';
 
@@ -51,7 +52,7 @@ export default function InstallmentRecoveriesTab({ token, startDate, endDate, se
     const handleExportCSV = () => {
         if (!data.recoveries || data.recoveries.length === 0) return;
         const rows = data.recoveries.map((r: any) => ({
-            "Paid Date": new Date(r.paid_at).toLocaleDateString(),
+            "Paid Date": formatExactDate(r.paid_at, 'DD MMM YYYY, hh:mm A'),
             "Order Ref": r.order_ref,
             "Customer": r.customer_name,
             "Phone": `"${r.whatsapp_number}"`,
@@ -122,7 +123,7 @@ export default function InstallmentRecoveriesTab({ token, startDate, endDate, se
                             <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
                                 {filteredRecoveries.length > 0 ? filteredRecoveries.map((r: any, idx: number) => (
                                     <tr key={idx} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                                        <td className="px-4 py-3 whitespace-nowrap">{new Date(r.paid_at).toLocaleString()}</td>
+                                        <td className="px-4 py-3 whitespace-nowrap">{formatExactDate(r.paid_at, 'DD MMM YYYY, hh:mm A')}</td>
                                         <td className="px-4 py-3 font-medium text-blue-600">{r.order_ref}</td>
                                         <td className="px-4 py-3">
                                             <p className="font-medium text-gray-800 dark:text-white">{r.customer_name}</p>

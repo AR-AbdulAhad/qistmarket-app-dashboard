@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Cookies from "js-cookie";
 import toast from "react-hot-toast";
-import { Trophy, Store, TrendingUp, TrendingDown, Minus, RefreshCw, Medal, Award } from "lucide-react";
+import { Trophy, Store, TrendingUp, TrendingDown, Minus, RefreshCw, Medal, Award, Calendar } from "lucide-react";
 import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
@@ -23,18 +23,27 @@ function tierFor(score: number): "Gold" | "Silver" | "Bronze" {
     return "Bronze";
 }
 
+const MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
 export default function OutletRankingsPage() {
     const [outlets, setOutlets] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [currentUser, setCurrentUser] = useState<any>(null);
 
-    const fetchRankings = async () => {
+    const now = new Date();
+    // "YYYY-MM" for the native month input, defaulting to the current month.
+    const [selectedMonth, setSelectedMonth] = useState(
+        `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`
+    );
+
+    const fetchRankings = async (monthValue = selectedMonth) => {
         setLoading(true);
         try {
+            const [year, month] = monthValue.split("-").map(Number);
             const userRes = await fetch(`${BACKEND_URL}/api/user/me`, { headers: authHeaders() });
             const userData = await userRes.json();
             if (userData.success) setCurrentUser(userData.data);
-            const res = await fetch(`${BACKEND_URL}/api/admin-panel/outlets/rankings`, { headers: authHeaders() });
+            const res = await fetch(`${BACKEND_URL}/api/admin-panel/outlets/rankings?year=${year}&month=${month}`, { headers: authHeaders() });
             const data = await res.json();
             if (data.success) {
                 setOutlets(data.data);
@@ -48,24 +57,39 @@ export default function OutletRankingsPage() {
         }
     };
 
-    useEffect(() => { fetchRankings(); }, []);
+    useEffect(() => { fetchRankings(selectedMonth); }, [selectedMonth]);
+
+    const [selYear, selMonth] = selectedMonth.split("-").map(Number);
+    const selectedMonthLabel = `${MONTH_NAMES[selMonth - 1]} ${selYear}`;
 
     return (
         <>
             <Breadcrumb pageName="Outlet Rankings" />
             <div className="mx-auto max-w-7xl space-y-8">
                 {/* Header */}
-                <div className="flex items-center justify-between">
+                <div className="flex flex-wrap items-center justify-between gap-4">
                     <div>
                         <h1 className="text-3xl font-black text-gray-800 dark:text-white flex items-center gap-3">
                             <div className="p-2.5 bg-primary/10 rounded-2xl text-primary"><Store size={28} /></div>
                             Outlet Rankings
                         </h1>
-                        <p className="text-sm text-gray-400 mt-2 font-bold">Live outlet performance leaderboard — current month</p>
+                        <p className="text-sm text-gray-400 mt-2 font-bold">Outlet performance leaderboard — {selectedMonthLabel}</p>
                     </div>
-                    <button onClick={fetchRankings} className="flex items-center gap-2 bg-white dark:bg-boxdark border border-stroke dark:border-strokedark px-5 py-2.5 rounded-2xl text-sm font-bold hover:bg-gray-50 transition-all">
-                        <RefreshCw size={16} className={loading ? "animate-spin" : ""} /> Refresh
-                    </button>
+                    <div className="flex items-center gap-3">
+                        <div className="relative">
+                            <Calendar size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                            <input
+                                type="month"
+                                value={selectedMonth}
+                                max={`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`}
+                                onChange={(e) => e.target.value && setSelectedMonth(e.target.value)}
+                                className="pl-11 pr-4 py-2.5 rounded-2xl bg-white dark:bg-boxdark border border-stroke dark:border-strokedark text-sm font-bold outline-none focus:border-primary transition-all"
+                            />
+                        </div>
+                        <button onClick={() => fetchRankings()} className="flex items-center gap-2 bg-white dark:bg-boxdark border border-stroke dark:border-strokedark px-5 py-2.5 rounded-2xl text-sm font-bold hover:bg-gray-50 transition-all">
+                            <RefreshCw size={16} className={loading ? "animate-spin" : ""} /> Refresh
+                        </button>
+                    </div>
                 </div>
 
                 {loading ? (

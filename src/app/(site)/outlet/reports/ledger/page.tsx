@@ -5,6 +5,7 @@ import Cookies from 'js-cookie'
 import Breadcrumb from '@/components/Breadcrumbs/Breadcrumb'
 import Loader from '@/components/common/Loader'
 import { Search, UserCircle, Calendar, Banknote } from 'lucide-react'
+import { formatExactDate } from '@/utils/dateUtils'
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
 
@@ -85,7 +86,7 @@ export default function CustomerLedgerPage() {
                     <UserCircle className="h-10 w-10 text-gray-400" />
                     <div>
                       <p className="font-mono text-sm font-bold text-dark dark:text-white">{order.order_ref}</p>
-                      <p className="text-xs text-gray-500">Order Date: {new Date(order.created_at).toLocaleDateString()}</p>
+                      <p className="text-xs text-gray-500">Order Date: {formatExactDate(order.created_at, 'DD MMM YYYY, hh:mm A')}</p>
                     </div>
                   </div>
                   <div className="text-right">
@@ -109,7 +110,7 @@ export default function CustomerLedgerPage() {
                       <tbody>
                         {order.payments.map((p) => (
                           <tr key={p.id} className="border-b border-stroke last:border-0 dark:border-dark-3 transition-colors hover:bg-gray-50 dark:hover:bg-dark-3 italic">
-                            <td className="py-3 pr-4 text-gray-600 dark:text-gray-400">{new Date(p.paidAt).toLocaleString()}</td>
+                            <td className="py-3 pr-4 text-gray-600 dark:text-gray-400">{formatExactDate(p.paidAt, 'DD MMM YYYY, hh:mm A')}</td>
                             <td className="py-3 pr-4 uppercase text-[11px] font-bold text-blue-500">{p.paymentType}</td>
                             <td className="py-3 pr-4 text-gray-500 text-xs">{p.paymentMethod || 'CASH'}</td>
                             <td className="py-3 text-right font-black text-emerald-600">Rs. {p.amount.toLocaleString()}</td>

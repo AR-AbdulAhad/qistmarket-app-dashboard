@@ -6,6 +6,7 @@ import Cookies from "js-cookie";
 import Loader from "@/components/common/Loader";
 import InstallmentPaymentModal from "@/components/Installments/InstallmentPaymentModal";
 import { toast } from "react-hot-toast";
+import { formatExactDate } from "@/utils/dateUtils";
 
 const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
 
@@ -232,7 +233,7 @@ export default function RecoveryPortalPage() {
                                                                     ) : (
                                                                         <div className="flex flex-col items-end">
                                                                             <span className="text-[10px] text-gray-400 uppercase font-bold">Paid via {inst.paymentMethod || 'N/A'}</span>
-                                                                            <span className="text-xs font-medium text-gray-500">{inst.paidAt ? new Date(inst.paidAt).toLocaleDateString() : ''}</span>
+                                                                            <span className="text-xs font-medium text-gray-500">{inst.paidAt ? formatExactDate(inst.paidAt, 'DD MMM YYYY, hh:mm A') : ''}</span>
                                                                         </div>
                                                                     )}
                                                                 </td>

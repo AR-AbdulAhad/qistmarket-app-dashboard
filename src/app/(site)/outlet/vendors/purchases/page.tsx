@@ -615,7 +615,7 @@ export default function VendorPurchasesPage() {
                                     <tr key={r.id} className="border-b border-stroke dark:border-strokedark hover:bg-gray-50 dark:hover:bg-meta-4/20 transition-colors">
                                         <td className="p-4">
                                             <div className="font-bold text-gray-800 dark:text-white uppercase tracking-tight">{r.return_number}</div>
-                                            <div className="text-[10px] text-gray-500 mt-0.5">{new Date(r.return_date).toLocaleDateString()}</div>
+                                            <div className="text-[10px] text-gray-500 mt-0.5">{formatExactDate(r.return_date, 'DD MMM YYYY, hh:mm A')}</div>
                                         </td>
                                         <td className="p-4">
                                             <div className="font-semibold text-gray-700 dark:text-gray-300">{r.vendor_name}</div>
@@ -992,7 +992,7 @@ export default function VendorPurchasesPage() {
                                 <h2 className="text-xl font-black flex items-center gap-2">
                                     <FileText size={24} /> Return Details: {selectedReturn.return_number}
                                 </h2>
-                                <p className="text-[10px] opacity-70 uppercase tracking-widest font-black mt-1">Vendor: {selectedReturn.vendor_name} | Date: {new Date(selectedReturn.return_date).toLocaleDateString()}</p>
+                                <p className="text-[10px] opacity-70 uppercase tracking-widest font-black mt-1">Vendor: {selectedReturn.vendor_name} | Date: {formatExactDate(selectedReturn.return_date, 'DD MMM YYYY, hh:mm A')}</p>
                             </div>
                             <button onClick={() => setSelectedReturn(null)} className="p-2 hover:bg-white/10 rounded-xl transition-colors">
                                 <X size={20} />

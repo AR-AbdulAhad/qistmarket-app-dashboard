@@ -135,7 +135,7 @@ export default function Home() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const { notifications, unreadCount } = useNotifications()
+  const { notifications, unreadCount, socket } = useNotifications()
   const { user, loading: authLoading } = useAuth()
   const router = useRouter()
 
@@ -163,114 +163,142 @@ export default function Home() {
     return res.json()
   }
 
-  const loadDashboard = async () => {
+  const loadDashboard = async (isBackgroundRefresh = false) => {
     if (!token) {
       setLoading(false)
       return
     }
 
-    try {
-      setLoading(true)
-      setError(null)
+    if (!isBackgroundRefresh) setLoading(true)
 
-      const [
-        allOrders,
-        todayOrders,
-        newPendingOrders,
-        inProgressOrders,
-        deliveredOrders,
-        cancelledOrders,
-        customersRes,
-        recentOrdersRes,
-        deliveryStatusRes,
-        reportSummaryRes,
-        accountsSummaryRes,
-        channelRecoveryRes,
-        employeesRes,
-      ] = await Promise.all([
-        fetchJson(`${BACKEND_URL}/api/orders?page=1&limit=1`),
-        fetchJson(
-          `${BACKEND_URL}/api/orders?page=1&limit=1&dateRange=Day`
-        ),
-        fetchJson(
-          `${BACKEND_URL}/api/orders?page=1&limit=1&status=new,pending`
-        ),
-        fetchJson(
-          `${BACKEND_URL}/api/orders?page=1&limit=1&status=in_progress,picked,approved`
-        ),
-        fetchJson(
-          `${BACKEND_URL}/api/orders?page=1&limit=1&status=delivered,completed`
-        ),
-        fetchJson(
-          `${BACKEND_URL}/api/orders?page=1&limit=1&status=cancelled`
-        ),
-        fetchJson(`${BACKEND_URL}/api/customers?page=1&limit=1`),
-        fetchJson(
-          `${BACKEND_URL}/api/orders?page=1&limit=10&sortBy=updated_at&sortDir=desc`
-        ),
-        fetchJson(`${BACKEND_URL}/api/orders/delivery-status`),
-        fetchJson(`${BACKEND_URL}/api/reports/summary?dateRange=Month`),
-        fetchJson(`${BACKEND_URL}/api/accounts/dashboard-summary`),
-        fetchJson(`${BACKEND_URL}/api/accounts/recovery-analytics/channel-wise`),
-        fetchJson(`${BACKEND_URL}/api/hr/employees`),
-      ])
+    const sources = [
+      { key: 'allOrders', url: `${BACKEND_URL}/api/orders?page=1&limit=1` },
+      { key: 'todayOrders', url: `${BACKEND_URL}/api/orders?page=1&limit=1&dateRange=Day` },
+      { key: 'newPendingOrders', url: `${BACKEND_URL}/api/orders?page=1&limit=1&status=new,pending` },
+      { key: 'inProgressOrders', url: `${BACKEND_URL}/api/orders?page=1&limit=1&status=in_progress,picked,approved` },
+      { key: 'deliveredOrders', url: `${BACKEND_URL}/api/orders?page=1&limit=1&status=delivered,completed` },
+      { key: 'cancelledOrders', url: `${BACKEND_URL}/api/orders?page=1&limit=1&status=cancelled` },
+      { key: 'customersRes', url: `${BACKEND_URL}/api/customers?page=1&limit=1` },
+      { key: 'recentOrdersRes', url: `${BACKEND_URL}/api/orders?page=1&limit=10&sortBy=updated_at&sortDir=desc` },
+      { key: 'deliveryStatusRes', url: `${BACKEND_URL}/api/orders/delivery-status` },
+      { key: 'reportSummaryRes', url: `${BACKEND_URL}/api/reports/summary?dateRange=Month` },
+      { key: 'accountsSummaryRes', url: `${BACKEND_URL}/api/accounts/dashboard-summary` },
+      { key: 'channelRecoveryRes', url: `${BACKEND_URL}/api/accounts/recovery-analytics/channel-wise` },
+      { key: 'employeesRes', url: `${BACKEND_URL}/api/hr/employees` },
+    ] as const
 
-      setStats({
-        totalOrders: allOrders?.data?.pagination?.total ?? 0,
-        todayOrders: todayOrders?.data?.pagination?.total ?? 0,
-        newPendingOrders: newPendingOrders?.data?.pagination?.total ?? 0,
-        inProgressOrders: inProgressOrders?.data?.pagination?.total ?? 0,
-        deliveredOrders: deliveredOrders?.data?.pagination?.total ?? 0,
-        cancelledOrders: cancelledOrders?.data?.pagination?.total ?? 0,
-        totalCustomers: customersRes?.data?.pagination?.total ?? 0,
-        activeDeliveries: Array.isArray(deliveryStatusRes?.data)
-          ? deliveryStatusRes.data.length
-          : 0,
-      })
+    // Each card/section is independent — one endpoint hiccuping (a deploy, a
+    // transient network blip) must not blank out the whole dashboard.
+    const settled = await Promise.allSettled(sources.map((s) => fetchJson(s.url)))
+    const results: Record<string, any> = {}
+    let failedCount = 0
+    settled.forEach((r, i) => {
+      if (r.status === 'fulfilled') {
+        results[sources[i].key] = r.value
+      } else {
+        failedCount += 1
+        console.error(`Dashboard source failed: ${sources[i].key}`, r.reason)
+      }
+    })
 
+    setError(
+      failedCount === 0
+        ? null
+        : failedCount === sources.length
+          ? 'Failed to load dashboard data'
+          : `${failedCount} of ${sources.length} dashboard sections failed to refresh — showing last known values for those.`
+    )
+
+    const {
+      allOrders, todayOrders, newPendingOrders, inProgressOrders,
+      deliveredOrders, cancelledOrders, customersRes, recentOrdersRes,
+      deliveryStatusRes, reportSummaryRes, accountsSummaryRes,
+      channelRecoveryRes, employeesRes,
+    } = results
+
+    setStats((prev) => ({
+      totalOrders: allOrders?.data?.pagination?.total ?? prev.totalOrders,
+      todayOrders: todayOrders?.data?.pagination?.total ?? prev.todayOrders,
+      newPendingOrders: newPendingOrders?.data?.pagination?.total ?? prev.newPendingOrders,
+      inProgressOrders: inProgressOrders?.data?.pagination?.total ?? prev.inProgressOrders,
+      deliveredOrders: deliveredOrders?.data?.pagination?.total ?? prev.deliveredOrders,
+      cancelledOrders: cancelledOrders?.data?.pagination?.total ?? prev.cancelledOrders,
+      totalCustomers: customersRes?.data?.pagination?.total ?? prev.totalCustomers,
+      activeDeliveries: Array.isArray(deliveryStatusRes?.data)
+        ? deliveryStatusRes.data.length
+        : prev.activeDeliveries,
+    }))
+
+    if (recentOrdersRes) {
       setRecentOrders(recentOrdersRes?.data?.orders ?? [])
       setRecentOrdersPagination(recentOrdersRes?.data?.pagination ?? null)
+    }
+    if (deliveryStatusRes) {
       setDeliveryStatus(Array.isArray(deliveryStatusRes?.data) ? deliveryStatusRes.data : [])
+    }
 
-      const overview = reportSummaryRes?.data?.overview
-      const dailyTrend = reportSummaryRes?.data?.breakdown?.dailyTrend
-      if (overview) {
-        setReportSummary({
-          totalReceived: overview.totalReceived ?? 0,
-          totalPending: overview.totalPending ?? 0,
-          dailyTrend: Array.isArray(dailyTrend) ? dailyTrend : [],
-        })
-      }
+    const overview = reportSummaryRes?.data?.overview
+    const dailyTrend = reportSummaryRes?.data?.breakdown?.dailyTrend
+    if (overview) {
+      setReportSummary({
+        totalReceived: overview.totalReceived ?? 0,
+        totalPending: overview.totalPending ?? 0,
+        dailyTrend: Array.isArray(dailyTrend) ? dailyTrend : [],
+      })
+    }
 
+    if (accountsSummaryRes || channelRecoveryRes || employeesRes) {
       const accountsSummary = accountsSummaryRes?.data
       const byChannel = channelRecoveryRes?.data?.byChannel ?? []
-      const employees = Array.isArray(employeesRes?.employees) ? employeesRes.employees : []
-      setExtras({
-        activeEmployees: employees.filter((e: any) => e.portal_active).length,
-        todaysExpense: accountsSummary?.todaysExpense ?? 0,
-        vendorPayables: accountsSummary?.vendorPayables ?? 0,
-        customerReceivables: accountsSummary?.customerReceivables ?? 0,
-        cashRecovered: byChannel.find((c: any) => c.channel === 'Cash')?.amount ?? 0,
-        onlineRecovered: byChannel.find((c: any) => c.channel === 'Online')?.amount ?? 0,
-      })
-    } catch (err) {
-      console.error(err)
-      setError('Failed to load dashboard data')
-    } finally {
-      setLoading(false)
+      const employees = Array.isArray(employeesRes?.employees) ? employeesRes.employees : null
+      setExtras((prev) => ({
+        activeEmployees: employees ? employees.filter((e: any) => e.portal_active).length : prev.activeEmployees,
+        todaysExpense: accountsSummary?.todaysExpense ?? prev.todaysExpense,
+        vendorPayables: accountsSummary?.vendorPayables ?? prev.vendorPayables,
+        customerReceivables: accountsSummary?.customerReceivables ?? prev.customerReceivables,
+        cashRecovered: byChannel.find((c: any) => c.channel === 'Cash')?.amount ?? prev.cashRecovered,
+        onlineRecovered: byChannel.find((c: any) => c.channel === 'Online')?.amount ?? prev.onlineRecovered,
+      }))
     }
+
+    setLoading(false)
   }
 
   useEffect(() => {
     loadDashboard()
 
-    const interval = setInterval(() => {
-      loadDashboard()
-    }, 30000)
+    // Belt-and-suspenders fallback only — the socket listener below is what
+    // actually keeps this live; this just guards against a missed/dropped event.
+    const fallbackInterval = setInterval(() => {
+      loadDashboard(true)
+    }, 5 * 60 * 1000)
 
-    return () => clearInterval(interval)
+    return () => clearInterval(fallbackInterval)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token])
+
+  // Live updates: refresh dashboard data the moment something actually
+  // changes (new order, status change, delivery/recovery activity, etc.)
+  // instead of blindly re-polling every few seconds. `new_notification` is
+  // already broadcast admin-wide by notifyAdmins() across the order/delivery/
+  // recovery lifecycle, so it's a reliable "something changed" signal.
+  useEffect(() => {
+    if (!socket) return
+
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null
+    const handleLiveUpdate = () => {
+      if (debounceTimer) clearTimeout(debounceTimer)
+      debounceTimer = setTimeout(() => loadDashboard(true), 2000)
+    }
+
+    socket.on('new_notification', handleLiveUpdate)
+
+    return () => {
+      if (debounceTimer) clearTimeout(debounceTimer)
+      socket.off('new_notification', handleLiveUpdate)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [socket])
 
   const paymentsChartData = useMemo(() => {
     const trend = reportSummary?.dailyTrend ?? []
