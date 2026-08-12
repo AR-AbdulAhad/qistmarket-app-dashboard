@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Cookies from "js-cookie";
 import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
 import {
-    CheckCircle2, TrendingUp, AlertCircle, Calculator, ScrollText, DollarSign, Wallet,
+    CheckCircle2, TrendingUp, AlertCircle, ScrollText, DollarSign, Wallet,
     Lock, Unlock, Filter, Building2, Calendar, FileText, CheckCircle, ShieldAlert, ArrowRight,
     ChevronDown, ChevronRight, Receipt
 } from "lucide-react";
@@ -84,7 +84,6 @@ export default function CashRegisterPage() {
     const [historyCategories, setHistoryCategories] = useState<HistoryCategory[]>([]);
     const [historyLoading, setHistoryLoading] = useState(true);
     const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
-    const [calculating, setCalculating] = useState(false);
     const [reconciling, setReconciling] = useState(false);
     const [approving, setApproving] = useState(false);
     const [reopening, setReopening] = useState(false);
@@ -151,28 +150,6 @@ export default function CashRegisterPage() {
             toast.error("Failed to load cash register data.");
         } finally {
             setLoading(false);
-        }
-    };
-
-    const handleSyncLedger = async () => {
-        setCalculating(true);
-        try {
-            const res = await fetch(`${API_BASE}/api/outlet/cash-register/calculate`, {
-                method: "POST",
-                headers: getAuthHeaders()
-            });
-            const data = await res.json();
-            if (data.success) {
-                toast.success("Daily ledger synced successfully!");
-                fetchData(filterType, startDate, endDate);
-                fetchHistory();
-            } else {
-                toast.error(data.message || "Failed to sync daily ledger.");
-            }
-        } catch {
-            toast.error("Network error while syncing ledger.");
-        } finally {
-            setCalculating(false);
         }
     };
 
@@ -295,14 +272,6 @@ export default function CashRegisterPage() {
                             <Lock size={14} /> Locked (10:00 PM / Closed)
                         </span>
                     )}
-                    <button
-                        onClick={handleSyncLedger}
-                        disabled={calculating || isLocked}
-                        className="bg-primary hover:bg-opacity-90 disabled:opacity-50 text-white px-5 py-2.5 rounded-xl text-xs font-black flex items-center gap-2 shadow-lg transition-all active:scale-95"
-                    >
-                        <Calculator size={16} className={calculating ? "animate-spin" : ""} />
-                        {calculating ? "Processing..." : "Sync Daily Ledger"}
-                    </button>
                 </div>
             </div>
 

@@ -166,6 +166,18 @@ export default function OutletInventoryPage() {
             grp.children.push(item);
         }
 
+        // Within each expanded group, show in-stock units before out-of-stock/sold
+        // ones — same "in-stock first" rule used for the group-level ordering below.
+        for (const grp of map.values()) {
+            grp.children.sort((a, b) => {
+                const aInStock = (a.status === "In Stock" || a.status === "Used Stock") ? a.quantity : 0;
+                const bInStock = (b.status === "In Stock" || b.status === "Used Stock") ? b.quantity : 0;
+                if (bInStock === 0 && aInStock > 0) return -1;
+                if (aInStock === 0 && bInStock > 0) return 1;
+                return bInStock - aInStock;
+            });
+        }
+
         return Array.from(map.values()).sort((a, b) => {
             if (b.inStockQty === 0 && a.inStockQty > 0) return -1;
             if (a.inStockQty === 0 && b.inStockQty > 0) return 1;
