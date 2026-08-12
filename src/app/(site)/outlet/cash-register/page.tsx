@@ -4,11 +4,13 @@ import { useEffect, useState } from "react";
 import Cookies from "js-cookie";
 import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
 import {
-    CheckCircle2, TrendingUp, AlertCircle, Calculator, ScrollText, DollarSign, Wallet,
-    Lock, Unlock, Filter, Building2, Calendar, FileText, CheckCircle, ShieldAlert, ArrowRight
+    CheckCircle2, TrendingUp, AlertCircle, ScrollText, DollarSign, Wallet,
+    Lock, Unlock, Filter, Building2, Calendar, FileText, CheckCircle, ShieldAlert, ArrowRight,
+    ChevronDown, ChevronRight, Receipt
 } from "lucide-react";
 import Loader from "@/components/common/Loader";
 import { toast } from "react-hot-toast";
+import { formatExactDate } from "@/utils/dateUtils";
 
 const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
 const getAuthHeaders = () => ({
@@ -29,6 +31,7 @@ type Metrics = {
     cash_transferred_out: number;
     closing_cash: number;
     expected_cash: number;
+    period_net_change: number;
     digital_bank_total: number;
     digital_1bill_total: number;
 };
@@ -57,13 +60,30 @@ type Register = {
     settlement_status: string | null;
 };
 
+type HistoryTransaction = {
+    id: string;
+    date: string;
+    title: string;
+    subtitle: string;
+    amount: number;
+};
+
+type HistoryCategory = {
+    label: string;
+    key: string;
+    count: number;
+    total: number;
+    transactions: HistoryTransaction[];
+};
+
 export default function CashRegisterPage() {
-    const [registers, setRegisters] = useState<Register[]>([]);
     const [metrics, setMetrics] = useState<Metrics | null>(null);
     const [todayRegister, setTodayRegister] = useState<Register | null>(null);
     const [isLocked, setIsLocked] = useState(false);
     const [loading, setLoading] = useState(true);
-    const [calculating, setCalculating] = useState(false);
+    const [historyCategories, setHistoryCategories] = useState<HistoryCategory[]>([]);
+    const [historyLoading, setHistoryLoading] = useState(true);
+    const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
     const [reconciling, setReconciling] = useState(false);
     const [approving, setApproving] = useState(false);
     const [reopening, setReopening] = useState(false);
@@ -81,6 +101,32 @@ export default function CashRegisterPage() {
         fetchData(filterType, startDate, endDate);
     }, [filterType]);
 
+    useEffect(() => {
+        fetchHistory();
+    }, []);
+
+    const fetchHistory = async () => {
+        setHistoryLoading(true);
+        try {
+            const res = await fetch(`${API_BASE}/api/outlet/cash-register/history`, { headers: getAuthHeaders() });
+            const data = await res.json();
+            if (data.success) setHistoryCategories(data.categories || []);
+        } catch (e) {
+            console.error(e);
+            toast.error("Failed to load transaction history.");
+        } finally {
+            setHistoryLoading(false);
+        }
+    };
+
+    const toggleCategory = (key: string) => {
+        setExpandedCategories(prev => {
+            const next = new Set(prev);
+            next.has(key) ? next.delete(key) : next.add(key);
+            return next;
+        });
+    };
+
     const fetchData = async (type: string, start?: string, end?: string) => {
         setLoading(true);
         try {
@@ -92,7 +138,6 @@ export default function CashRegisterPage() {
             const data = await res.json();
             if (data.success) {
                 setMetrics(data.metrics);
-                setRegisters(data.registers || []);
                 setTodayRegister(data.todayRegister || null);
                 setIsLocked(data.isLocked || false);
                 if (data.todayRegister?.physical_cash !== null && data.todayRegister?.physical_cash !== undefined) {
@@ -105,27 +150,6 @@ export default function CashRegisterPage() {
             toast.error("Failed to load cash register data.");
         } finally {
             setLoading(false);
-        }
-    };
-
-    const handleSyncLedger = async () => {
-        setCalculating(true);
-        try {
-            const res = await fetch(`${API_BASE}/api/outlet/cash-register/calculate`, {
-                method: "POST",
-                headers: getAuthHeaders()
-            });
-            const data = await res.json();
-            if (data.success) {
-                toast.success("Daily ledger synced successfully!");
-                fetchData(filterType, startDate, endDate);
-            } else {
-                toast.error(data.message || "Failed to sync daily ledger.");
-            }
-        } catch {
-            toast.error("Network error while syncing ledger.");
-        } finally {
-            setCalculating(false);
         }
     };
 
@@ -223,7 +247,7 @@ export default function CashRegisterPage() {
     const currentMetrics = metrics || {
         opening_cash: 0, down_payments: 0, installments_received: 0, cash_from_recovery: 0,
         cash_from_delivery: 0, expenses: 0, vendor_payments: 0, vendor_receipts: 0, cash_transferred_in: 0,
-        cash_transferred_out: 0, closing_cash: 0, expected_cash: 0, digital_bank_total: 0, digital_1bill_total: 0
+        cash_transferred_out: 0, closing_cash: 0, expected_cash: 0, period_net_change: 0, digital_bank_total: 0, digital_1bill_total: 0
     };
 
     const expectedVal = currentMetrics.expected_cash;
@@ -248,14 +272,6 @@ export default function CashRegisterPage() {
                             <Lock size={14} /> Locked (10:00 PM / Closed)
                         </span>
                     )}
-                    <button
-                        onClick={handleSyncLedger}
-                        disabled={calculating || isLocked}
-                        className="bg-primary hover:bg-opacity-90 disabled:opacity-50 text-white px-5 py-2.5 rounded-xl text-xs font-black flex items-center gap-2 shadow-lg transition-all active:scale-95"
-                    >
-                        <Calculator size={16} className={calculating ? "animate-spin" : ""} />
-                        {calculating ? "Processing..." : "Sync Daily Ledger"}
-                    </button>
                 </div>
             </div>
 
@@ -359,6 +375,13 @@ export default function CashRegisterPage() {
                                 >
                                     PKR {val.toLocaleString()}
                                 </div>
+                                {isClosing && (
+                                    <div className={`mt-1 text-[11px] font-bold ${
+                                        currentMetrics.period_net_change >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-500 dark:text-rose-400"
+                                    }`}>
+                                        {currentMetrics.period_net_change >= 0 ? "+" : "−"} PKR {Math.abs(currentMetrics.period_net_change).toLocaleString()} during {filterType === "custom" ? "this range" : filterType}
+                                    </div>
+                                )}
                             </div>
                         );
                     })}
@@ -508,71 +531,82 @@ export default function CashRegisterPage() {
             </div>
             )}
 
-            {/* History Archives Table */}
+            {/* Transaction History — grouped by category, expand to see individual entries */}
             <div className="bg-white dark:bg-boxdark rounded-2xl shadow-sm border border-stroke dark:border-strokedark overflow-hidden">
                 <div className="px-5 py-4 border-b border-stroke dark:border-strokedark bg-gray-50 dark:bg-meta-4 flex items-center justify-between">
                     <h2 className="text-xs font-black uppercase tracking-widest text-gray-500 flex items-center gap-2">
-                        <ScrollText size={14} /> Register Archives
+                        <ScrollText size={14} /> Transaction History
                     </h2>
-                    <span className="text-[10px] font-bold text-gray-400">Total Entries: {registers.length}</span>
+                    <span className="text-[10px] font-bold text-gray-400">
+                        {historyCategories.reduce((s, c) => s + c.count, 0)} total transactions
+                    </span>
                 </div>
 
-                <div className="overflow-x-auto">
-                    <table className="w-full text-xs text-left">
-                        <thead className="bg-white dark:bg-boxdark border-b border-stroke dark:border-strokedark">
-                            <tr className="text-gray-400 font-bold uppercase tracking-wider text-[10px]">
-                                <th className="px-5 py-4">Date</th>
-                                <th className="px-5 py-4 text-right">Opening</th>
-                                <th className="px-5 py-4 text-right">Down Pay</th>
-                                <th className="px-5 py-4 text-right">Installments</th>
-                                <th className="px-5 py-4 text-right">Expenses</th>
-                                <th className="px-5 py-4 text-right">Expected</th>
-                                <th className="px-5 py-4 text-right">Physical</th>
-                                <th className="px-5 py-4 text-right">Diff</th>
-                                <th className="px-5 py-4 text-center">Status</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-stroke dark:divide-strokedark">
-                            {registers.length === 0 ? (
-                                <tr>
-                                    <td colSpan={9} className="text-center py-16 text-gray-400 opacity-60">
-                                        <DollarSign size={36} className="mx-auto mb-3" />
-                                        <div className="font-bold uppercase tracking-widest text-xs">No register archives found.</div>
-                                    </td>
-                                </tr>
-                            ) : (
-                                registers.map((r) => (
-                                    <tr key={r.id} className="hover:bg-gray-50 dark:hover:bg-meta-4/20 transition-all font-medium">
-                                        <td className="px-5 py-4 text-gray-800 dark:text-white font-bold">
-                                            {new Date(r.date).toLocaleDateString("en-PK", { day: "2-digit", month: "short", year: "numeric" })}
-                                        </td>
-                                        <td className="px-5 py-4 text-right text-gray-500 tabular-nums">PKR {r.opening_cash?.toLocaleString()}</td>
-                                        <td className="px-5 py-4 text-right text-gray-500 tabular-nums">PKR {r.down_payments?.toLocaleString()}</td>
-                                        <td className="px-5 py-4 text-right text-gray-500 tabular-nums">PKR {r.installments_received?.toLocaleString()}</td>
-                                        <td className="px-5 py-4 text-right text-rose-500 dark:text-rose-400 tabular-nums">PKR {r.expenses?.toLocaleString()}</td>
-                                        <td className="px-5 py-4 text-right font-bold text-gray-800 dark:text-white tabular-nums">PKR {(r.expected_cash || r.closing_cash)?.toLocaleString()}</td>
-                                        <td className="px-5 py-4 text-right text-emerald-600 font-bold tabular-nums">
-                                            {r.physical_cash !== null ? `PKR ${r.physical_cash.toLocaleString()}` : "—"}
-                                        </td>
-                                        <td className={`px-5 py-4 text-right font-bold tabular-nums ${
-                                            r.difference < 0 ? "text-rose-500" : r.difference > 0 ? "text-amber-500" : "text-emerald-500"
-                                        }`}>
-                                            PKR {r.difference?.toLocaleString() || 0}
-                                        </td>
-                                        <td className="px-5 py-4 text-center">
-                                            <span className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase ${
-                                                r.register_status === 'closed' ? 'bg-emerald-100 text-emerald-700' :
-                                                r.register_status === 'pending_approval' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'
-                                            }`}>
-                                                {r.register_status || 'Open'}
+                {historyLoading ? (
+                    <div className="p-12 text-center text-gray-400 text-xs font-bold uppercase tracking-widest">Loading history...</div>
+                ) : historyCategories.every(c => c.count === 0) ? (
+                    <div className="text-center py-16 text-gray-400 opacity-60">
+                        <DollarSign size={36} className="mx-auto mb-3" />
+                        <div className="font-bold uppercase tracking-widest text-xs">No transaction history found.</div>
+                    </div>
+                ) : (
+                    <div className="divide-y divide-stroke dark:divide-strokedark">
+                        {historyCategories.map((cat) => {
+                            const isExpanded = expandedCategories.has(cat.key);
+                            const isOutflow = cat.key === "expenses" || cat.key === "vendor_payments";
+                            return (
+                                <div key={cat.key}>
+                                    <button
+                                        onClick={() => toggleCategory(cat.key)}
+                                        disabled={cat.count === 0}
+                                        className={`w-full flex items-center justify-between px-5 py-4 text-left transition-all ${
+                                            cat.count === 0 ? "opacity-40 cursor-not-allowed" : "hover:bg-gray-50 dark:hover:bg-meta-4/20"
+                                        } ${isExpanded ? "bg-primary/5 dark:bg-primary/10" : ""}`}
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            {cat.count === 0 ? (
+                                                <div className="w-4" />
+                                            ) : isExpanded ? (
+                                                <ChevronDown size={16} className="text-primary flex-shrink-0" />
+                                            ) : (
+                                                <ChevronRight size={16} className="text-gray-400 flex-shrink-0" />
+                                            )}
+                                            <Receipt size={16} className="text-gray-400 flex-shrink-0" />
+                                            <span className="text-sm font-bold text-gray-800 dark:text-white">{cat.label}</span>
+                                            <span className="text-[10px] font-bold text-gray-400 bg-gray-100 dark:bg-meta-4 px-2 py-0.5 rounded-full">
+                                                {cat.count}
                                             </span>
-                                        </td>
-                                    </tr>
-                                ))
-                            )}
-                        </tbody>
-                    </table>
-                </div>
+                                        </div>
+                                        <span className={`text-sm font-black tabular-nums ${isOutflow ? "text-rose-500" : "text-emerald-600"}`}>
+                                            {isOutflow ? "−" : "+"} PKR {cat.total.toLocaleString()}
+                                        </span>
+                                    </button>
+
+                                    {isExpanded && cat.transactions.length > 0 && (
+                                        <div className="bg-gray-50/50 dark:bg-meta-4/10 px-5 pb-4">
+                                            <div className="overflow-hidden rounded-xl border border-stroke dark:border-strokedark bg-white dark:bg-boxdark divide-y divide-stroke dark:divide-strokedark">
+                                                {cat.transactions.map((t) => (
+                                                    <div key={t.id} className="flex items-center justify-between px-4 py-3 text-xs">
+                                                        <div className="min-w-0">
+                                                            <div className="font-bold text-gray-800 dark:text-white truncate">{t.title}</div>
+                                                            <div className="text-gray-400 truncate">{t.subtitle}</div>
+                                                            <div className="text-[10px] text-gray-400 mt-0.5 flex items-center gap-1">
+                                                                <Calendar size={10} /> {formatExactDate(t.date, 'DD MMM YYYY, hh:mm A')}
+                                                            </div>
+                                                        </div>
+                                                        <div className={`font-black tabular-nums flex-shrink-0 ml-3 ${isOutflow ? "text-rose-500" : "text-emerald-600"}`}>
+                                                            {isOutflow ? "−" : "+"} PKR {t.amount.toLocaleString()}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
             </div>
         </div>
     );
