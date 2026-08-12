@@ -10,6 +10,7 @@ import PageHeader from "@/components/Accounts/PageHeader";
 import EmptyState from "@/components/Accounts/EmptyState";
 import { TableSkeleton } from "@/components/Accounts/Skeleton";
 import { PKR } from "@/components/Accounts/StatCard";
+import { formatExactDate } from "@/utils/dateUtils";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
 
@@ -432,7 +433,7 @@ export default function BankAccountsPage() {
                             <td className="px-4 py-3.5">
                               {!t.reconciled && <input type="checkbox" checked={selectedTxnIds.includes(t.id)} onChange={() => toggleTxnSelection(t.id)} className="size-4 rounded" />}
                             </td>
-                            <td className="px-2 py-3.5 text-gray-500">{new Date(t.transaction_date).toLocaleDateString()}</td>
+                            <td className="px-2 py-3.5 text-gray-500">{formatExactDate(t.transaction_date, 'DD MMM YYYY, hh:mm A')}</td>
                             <td className="px-6 py-3.5 text-gray-600 dark:text-gray-300">{t.description || "—"}</td>
                             <td className={`px-6 py-3.5 text-right tabular-nums font-bold ${t.type === "credit" ? "text-emerald-600" : "text-rose-600"}`}>
                               {t.type === "credit" ? "+" : "−"}{PKR(t.amount)}
@@ -466,7 +467,7 @@ export default function BankAccountsPage() {
                       <a key={s.id} href={`${BACKEND_URL}${s.file_url}`} target="_blank" rel="noreferrer" className="flex items-center gap-3 rounded-xl border border-slate-100 p-3 text-sm transition hover:bg-slate-50 dark:border-white/10 dark:hover:bg-white/5">
                         <FileText className="size-4 text-gray-400" />
                         <div className="flex-1">
-                          <p className="font-medium text-dark dark:text-white">Statement uploaded {new Date(s.created_at).toLocaleDateString()}</p>
+                          <p className="font-medium text-dark dark:text-white">Statement uploaded {formatExactDate(s.created_at, 'DD MMM YYYY, hh:mm A')}</p>
                           <p className="text-xs text-gray-400">{s._count.transactions} transaction(s) reconciled against this statement · by {s.uploaded_by?.full_name || "—"}</p>
                         </div>
                       </a>

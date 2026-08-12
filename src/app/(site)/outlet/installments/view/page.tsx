@@ -26,6 +26,7 @@ import SmartPayQrModal from "@/components/Installments/SmartPayQrModal";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
+import { formatExactDate } from "@/utils/dateUtils";
 const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
 
 const getAuthHeaders = () => {
@@ -261,9 +262,9 @@ function InstallmentsViewContent() {
   const getExportData = (rowsToExport: any[]) => {
     return rowsToExport.map((row, idx) => {
       const paymentHistoryStr = row.paymentHistory && row.paymentHistory.length > 0
-        ? row.paymentHistory.map((h: any) => `${new Date(h.date).toLocaleDateString("en-PK")}: Rs. ${h.amount} (${h.method})`).join(" | ")
+        ? row.paymentHistory.map((h: any) => `${formatExactDate(h.date, 'DD MMM YYYY, hh:mm A')}: Rs. ${h.amount} (${h.method})`).join(" | ")
         : row.paidDate
-          ? new Date(row.paidDate).toLocaleDateString("en-PK")
+          ? formatExactDate(row.paidDate, 'DD MMM YYYY, hh:mm A')
           : "-";
 
       return [
@@ -274,7 +275,7 @@ function InstallmentsViewContent() {
         row.alternate_number || '',
         row.area || '',
         row.dueDate ? new Date(row.dueDate).toLocaleDateString("en-PK") : '',
-        row.purchaseDate ? new Date(row.purchaseDate).toLocaleDateString("en-PK") : '',
+        row.purchaseDate ? formatExactDate(row.purchaseDate, 'DD MMM YYYY, hh:mm A') : '',
         row.grantor1Name || '',
         row.grantor1Phone || '',
         row.grantor2Name || '',
@@ -950,7 +951,7 @@ function InstallmentsViewContent() {
               ) : (
                 filteredInstallments.map((inst, index) => {
                   const isChecked = selectedRows.includes(getRowKey(inst));
-                  const purchaseDateStr = inst.purchaseDate ? new Date(inst.purchaseDate).toLocaleDateString("en-PK") : "N/A";
+                  const purchaseDateStr = inst.purchaseDate ? formatExactDate(inst.purchaseDate, 'DD MMM YYYY, hh:mm A') : "N/A";
                   const dueDateStr = inst.dueDate ? new Date(inst.dueDate).toLocaleDateString("en-PK") : "N/A";
 
                   return (
@@ -1014,7 +1015,7 @@ function InstallmentsViewContent() {
                         <div className="flex flex-col gap-0.5 font-black">
                           {inst.paidDate ? (
                             <span className="text-slate-800 dark:text-slate-200">
-                              {new Date(inst.paidDate).toLocaleDateString("en-PK", { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                              {formatExactDate(inst.paidDate, 'DD MMM YYYY, hh:mm A')}
                             </span>
                           ) : (
                             <span className="text-gray-300 font-black">-</span>
@@ -1023,7 +1024,7 @@ function InstallmentsViewContent() {
                             <span
                               className="text-[10px] text-[#E31E24] cursor-help hover:underline italic font-black uppercase tracking-wider"
                               title={inst.paymentHistory
-                                .map((h: any) => `Rs. ${h.amount.toLocaleString()} via ${h.method} on ${new Date(h.date).toLocaleDateString("en-PK")}`)
+                                .map((h: any) => `Rs. ${h.amount.toLocaleString()} via ${h.method} on ${formatExactDate(h.date, 'DD MMM YYYY, hh:mm A')}`)
                                 .join("\n")
                               }
                             >

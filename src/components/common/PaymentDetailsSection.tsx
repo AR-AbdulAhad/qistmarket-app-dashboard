@@ -175,7 +175,7 @@ export const PaymentDetailsSection = ({ paymentDetails, title = "Payment Details
                                                         </span>
                                                     </td>
                                                     <td className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400">
-                                                        {inst.paid_at ? new Date(inst.paid_at).toLocaleDateString() : '-'}
+                                                        {inst.paid_at ? formatExactDate(inst.paid_at, 'DD MMM YYYY, hh:mm A') : '-'}
                                                     </td>
                                                     <td className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400">
                                                         {inst.payment_method || '-'}

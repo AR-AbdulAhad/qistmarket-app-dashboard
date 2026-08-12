@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import Cookies from "js-cookie";
 import SmartPayQrModal from "./SmartPayQrModal";
+import { formatExactDate } from "@/utils/dateUtils";
 
 const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
 const pkr = (n: number) => `PKR ${Number(n || 0).toLocaleString()}`;
@@ -509,7 +510,7 @@ export default function InstallmentsTable({ data, onPay, selectedIds = [], onSel
                                                                                         {inst.payment_history.map((ph: any, phi: number) => (
                                                                                             <div key={phi} className="flex items-center gap-1.5 flex-wrap">
                                                                                                 <span className="text-[9px] text-emerald-600 font-bold bg-emerald-50 px-1.5 py-0.5 rounded shadow-sm">PAID: {pkr(ph.amount)}</span>
-                                                                                                <span className="text-[9px] text-gray-400">on {new Date(ph.date).toLocaleDateString('en-PK', { day: '2-digit', month: 'short', year: '2-digit' })}</span>
+                                                                                                <span className="text-[9px] text-gray-400">on {formatExactDate(ph.date, 'DD MMM, hh:mm A')}</span>
                                                                                                 <span className="text-[8px] font-semibold text-indigo-500 truncate max-w-[120px]" title={ph.method}>via {ph.method}</span>
                                                                                             </div>
                                                                                         ))}
@@ -520,7 +521,7 @@ export default function InstallmentsTable({ data, onPay, selectedIds = [], onSel
                                                                                             <span className="text-[9px] font-semibold text-indigo-500 truncate max-w-[140px]" title={inst.paymentMethod}>via {inst.paymentMethod}</span>
                                                                                         )}
                                                                                         {inst.paidAt && (
-                                                                                            <span className="text-[9px] text-emerald-600 font-semibold">· Paid on {new Date(inst.paidAt).toLocaleDateString('en-PK', { day: '2-digit', month: 'short', year: '2-digit' })}</span>
+                                                                                            <span className="text-[9px] text-emerald-600 font-semibold">· Paid on {formatExactDate(inst.paidAt, 'DD MMM, hh:mm A')}</span>
                                                                                         )}
                                                                                     </div>
                                                                                 )}
@@ -683,7 +684,7 @@ export default function InstallmentsTable({ data, onPay, selectedIds = [], onSel
                                                                                                 <td style="color:#dc2626; font-weight:bold;">${inst.remainingAmount && inst.remainingAmount > 0 ? pkr(inst.remainingAmount) : '-'}</td>
                                                                                                 <td class="status-${(inst.paidAmount && inst.paidAmount > 0 && inst.status !== 'paid') ? 'partial' : (inst.status || 'pending').toLowerCase()}">${(inst.paidAmount && inst.paidAmount > 0 && inst.status !== 'paid') ? 'PARTIAL' : (inst.status || 'PENDING').toUpperCase()}</td>
                                                                                                 <td>${inst.dueDate ? new Date(inst.dueDate).toLocaleDateString() : 'N/A'}</td>
-                                                                                                <td>${inst.paidAt ? new Date(inst.paidAt).toLocaleDateString() : '-'}</td>
+                                                                                                <td>${inst.paidAt ? formatExactDate(inst.paidAt, 'DD MMM YYYY, hh:mm A') : '-'}</td>
                                                                                             </tr>
                                                                                         `).join('')}
                                                                                     </tbody>

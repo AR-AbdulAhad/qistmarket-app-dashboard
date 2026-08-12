@@ -4,6 +4,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import Loader from '@/components/common/Loader';
 import { useReactToPrint } from 'react-to-print';
 import * as XLSX from 'xlsx';
+import { formatExactDate } from '@/utils/dateUtils';
 
 const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000';
 
@@ -61,7 +62,7 @@ export default function OfficerRecoveryTab({ token, startDate, endDate, searchQu
                         "Officer Phone": `"${officer.officer_phone}"`,
                         "Total Recovered By Officer": officer.total_recovered,
                         "Assigned Orders": officer.assigned_orders,
-                        "Recovery Date": new Date(r.paid_at).toLocaleDateString(),
+                        "Recovery Date": formatExactDate(r.paid_at, 'DD MMM YYYY, hh:mm A'),
                         "Order Ref": r.order_ref,
                         "Amount Recovered": r.amount
                     });
@@ -159,7 +160,7 @@ export default function OfficerRecoveryTab({ token, startDate, endDate, searchQu
                                         <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
                                             {officer.recoveries.map((r: any, idx: number) => (
                                                 <tr key={idx} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                                                    <td className="px-4 py-2">{new Date(r.paid_at).toLocaleString()}</td>
+                                                    <td className="px-4 py-2">{formatExactDate(r.paid_at, 'DD MMM YYYY, hh:mm A')}</td>
                                                     <td className="px-4 py-2 font-medium text-blue-600">{r.order_ref}</td>
                                                     <td className="px-4 py-2 font-medium text-right text-emerald-600">Rs {r.amount?.toLocaleString()}</td>
                                                 </tr>

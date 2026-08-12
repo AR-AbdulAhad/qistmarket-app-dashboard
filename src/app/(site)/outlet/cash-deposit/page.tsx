@@ -322,6 +322,13 @@ export default function CashDepositPage() {
                                             Use full amount (Rs {cashInHand.toLocaleString()})
                                         </button>
                                     )}
+                                    {cashInHand !== null && amount !== "" && !isNaN(Number(amount)) && (
+                                        <p className={`mt-1.5 text-xs font-medium ${
+                                            cashInHand - Number(amount) < 0 ? "text-danger" : "text-body-color"
+                                        }`}>
+                                            Remaining after this deposit: Rs {(cashInHand - Number(amount)).toLocaleString()}
+                                        </p>
+                                    )}
                                 </div>
                                 <div className="w-full xl:w-1/2">
                                     <label className="mb-2.5 block text-black dark:text-white">Payment Method <span className="text-meta-1">*</span></label>

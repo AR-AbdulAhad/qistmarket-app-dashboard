@@ -8,6 +8,7 @@ import InstallmentPaymentModal from "@/components/Installments/InstallmentPaymen
 import SmartPayQrModal from "@/components/Installments/SmartPayQrModal";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { formatExactDate } from "@/utils/dateUtils";
 
 const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
 
@@ -185,7 +186,7 @@ function GlobalInstallmentSearch({ onPay, onGenerateQR }: { onPay: (order: any, 
                                                 </div>
                                             ))}
                                             <div className="ml-auto flex flex-col justify-center text-[10px] text-right">
-                                                <p className="text-gray-500"><span className="font-bold">Date:</span> {new Date(order.created_at).toLocaleDateString('en-PK')}</p>
+                                                <p className="text-gray-500"><span className="font-bold">Date:</span> {formatExactDate(order.created_at, 'DD MMM YYYY, hh:mm A')}</p>
                                                 {order.consumer_number && (
                                                     <p className="text-blue-600 font-bold mt-0.5">1Bill: {order.consumer_number}
                                                     </p>
@@ -262,7 +263,7 @@ function GlobalInstallmentSearch({ onPay, onGenerateQR }: { onPay: (order: any, 
                                                                             {inst.payment_history.map((ph: any, phi: number) => (
                                                                                 <div key={phi} className="flex items-center gap-1.5 flex-wrap">
                                                                                     <span className="text-[9px] text-emerald-600 font-bold bg-emerald-50 px-1.5 py-0.5 rounded shadow-sm">PAID: {pkr(ph.amount)}</span>
-                                                                                    <span className="text-[9px] text-gray-400">on {new Date(ph.date).toLocaleDateString('en-PK', { day: '2-digit', month: 'short', year: '2-digit' })}</span>
+                                                                                    <span className="text-[9px] text-gray-400">on {formatExactDate(ph.date, 'DD MMM, hh:mm A')}</span>
                                                                                     <span className="text-[8px] font-semibold text-indigo-500 truncate max-w-[120px]" title={ph.method}>via {ph.method}</span>
                                                                                 </div>
                                                                             ))}
@@ -279,7 +280,7 @@ function GlobalInstallmentSearch({ onPay, onGenerateQR }: { onPay: (order: any, 
                                                                                     <span className="text-[9px] text-indigo-500 font-semibold truncate max-w-[120px]">{inst.paymentMethod}</span>
                                                                                 )}
                                                                                 {inst.paidAt && (
-                                                                                    <span className="text-[9px] text-emerald-600 font-semibold">· Paid {new Date(inst.paidAt).toLocaleDateString('en-PK', { day: '2-digit', month: 'short' })}</span>
+                                                                                    <span className="text-[9px] text-emerald-600 font-semibold">· Paid {formatExactDate(inst.paidAt, 'DD MMM, hh:mm A')}</span>
                                                                                 )}
                                                                             </div>
                                                                             {isPartial && (

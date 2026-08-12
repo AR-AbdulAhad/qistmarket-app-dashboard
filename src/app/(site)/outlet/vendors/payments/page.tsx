@@ -10,6 +10,7 @@ import {
     ChevronRight, Wallet, ArrowUpRight, ArrowDownLeft, ShoppingCart
 } from "lucide-react";
 import Loader from "@/components/common/Loader";
+import { formatExactDate } from "@/utils/dateUtils";
 
 const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
 const getAuthHeaders = () => ({
@@ -319,7 +320,7 @@ export default function VendorPaymentsPage() {
                                                     </div>
                                                     <div>
                                                         <div className="font-black text-gray-800 dark:text-white tabular-nums">#{p.id.split('-')[1]?.padStart(4, '0') || p.id}</div>
-                                                        <div className="text-[10px] text-gray-400 uppercase font-bold">{new Date(p.created_at).toLocaleDateString("en-PK", { day: '2-digit', month: 'short', year: 'numeric' })}</div>
+                                                        <div className="text-[10px] text-gray-400 uppercase font-bold">{formatExactDate(p.created_at, 'DD MMM YYYY, hh:mm A')}</div>
                                                     </div>
                                                 </div>
                                             </td>

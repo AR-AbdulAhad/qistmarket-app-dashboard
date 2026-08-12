@@ -6,6 +6,7 @@ import { toast } from "react-hot-toast";
 import io from "socket.io-client";
 import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
 import { CheckCircle, XCircle, Clock, ExternalLink, Image as ImageIcon } from "lucide-react";
+import { formatExactDate } from "@/utils/dateUtils";
 
 const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
 const getAuthHeaders = () => ({
@@ -184,8 +185,8 @@ export default function AccountsCashDepositsPage() {
                                     <Fragment key={deposit.id}>
                                     <tr>
                                         <td className="border-b border-[#eee] py-5 px-4 dark:border-strokedark">
-                                            <p className="text-black dark:text-white">{new Date(deposit.created_at).toLocaleDateString()}</p>
-                                            <p className="text-xs text-body-color">{new Date(deposit.created_at).toLocaleTimeString()}</p>
+                                            <p className="text-black dark:text-white">{formatExactDate(deposit.created_at, 'DD MMM YYYY')}</p>
+                                            <p className="text-xs text-body-color">{formatExactDate(deposit.created_at, 'hh:mm A')}</p>
                                         </td>
                                         <td className="border-b border-[#eee] py-5 px-4 dark:border-strokedark">
                                             <p className="text-black dark:text-white font-medium">{deposit.outlet?.name || "Accounts"}</p>

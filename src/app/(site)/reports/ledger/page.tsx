@@ -6,6 +6,7 @@ import Breadcrumb from '@/components/Breadcrumbs/Breadcrumb'
 import Loader from '@/components/common/Loader'
 import { Search, UserCircle, Calendar, Banknote, MapPin } from 'lucide-react'
 import OutletSelector from '@/components/common/OutletSelector'
+import { formatExactDate } from '@/utils/dateUtils'
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
 
@@ -103,7 +104,7 @@ export default function GlobalCustomerLedgerPage() {
                     <UserCircle className="h-12 w-12 text-gray-400" />
                     <div>
                       <p className="font-mono text-base font-black text-dark dark:text-white">{order.order_ref}</p>
-                      <p className="text-[11px] text-gray-500 uppercase tracking-widest">{new Date(order.created_at).toLocaleDateString(undefined, { dateStyle: 'long' })}</p>
+                      <p className="text-[11px] text-gray-500 uppercase tracking-widest">{formatExactDate(order.created_at, 'DD MMM YYYY, hh:mm A')}</p>
                     </div>
                   </div>
                   <div className="text-right">
@@ -126,7 +127,7 @@ export default function GlobalCustomerLedgerPage() {
                       <tbody>
                         {order.payments.map((p) => (
                           <tr key={p.id} className="border-b border-stroke last:border-0 dark:border-dark-3">
-                            <td className="py-4 text-gray-600 dark:text-gray-400 text-xs">{new Date(p.created_at).toLocaleDateString()}</td>
+                            <td className="py-4 text-gray-600 dark:text-gray-400 text-xs">{formatExactDate(p.created_at, 'DD MMM YYYY, hh:mm A')}</td>
                             <td className="py-4 font-bold capitalize">{p.paymentType}</td>
                             <td className="py-4">
                               <span className="rounded-lg bg-gray-100 px-2.5 py-1 text-[11px] font-bold text-gray-600 dark:bg-dark-3 dark:text-gray-400 italic">

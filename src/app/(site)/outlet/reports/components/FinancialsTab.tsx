@@ -4,6 +4,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import Loader from '@/components/common/Loader';
 import { useReactToPrint } from 'react-to-print';
 import * as XLSX from 'xlsx';
+import { formatExactDate } from '@/utils/dateUtils';
 
 const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000';
 
@@ -65,7 +66,7 @@ export default function FinancialsTab({ token, startDate, endDate, searchQuery }
 
         if (data.vendorPayments && data.vendorPayments.length > 0) {
             const vpRows = data.vendorPayments.map((vp: any) => ({
-                "Date": new Date(vp.created_at).toLocaleDateString(),
+                "Date": formatExactDate(vp.created_at, 'DD MMM YYYY, hh:mm A'),
                 "Vendor": vp.vendor_name || vp.vendor?.name || 'N/A',
                 "Amount Paid": vp.amount,
                 "Payment Method": vp.payment_method || 'Cash'
@@ -176,7 +177,7 @@ export default function FinancialsTab({ token, startDate, endDate, searchQuery }
                                 <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
                                     {filteredVendorPayments.length > 0 ? filteredVendorPayments.map((vp: any) => (
                                         <tr key={vp.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                                            <td className="px-4 py-3">{new Date(vp.created_at).toLocaleDateString()}</td>
+                                            <td className="px-4 py-3">{formatExactDate(vp.created_at, 'DD MMM YYYY, hh:mm A')}</td>
                                             <td className="px-4 py-3 font-medium">{vp.vendor_name || vp.vendor?.name || 'N/A'}</td>
                                             <td className="px-4 py-3">
                                                 <span className="inline-flex rounded-md bg-gray-100 px-2 py-1 text-xs font-medium text-gray-600 dark:bg-gray-700 dark:text-gray-300">
