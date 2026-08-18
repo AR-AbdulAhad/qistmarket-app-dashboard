@@ -8,16 +8,23 @@ import {
   CreditCard, Calendar, ArrowRight, PackageOpen,
   MessageSquare, ShieldCheck, ArrowLeft, ChevronRight,
   Info, Smartphone, QrCode, Camera, UserCheck, ImageIcon,
-  RefreshCcw, FlipHorizontal, Scissors, Maximize, CheckCircle, RotateCcw
+  RefreshCcw, FlipHorizontal, Scissors, Maximize, CheckCircle, RotateCcw,
+  Clock, Loader2, Wifi
 } from 'lucide-react';
 import { InstallmentLedgerEditor } from '@/components/Installments/InstallmentLedgerEditor';
 import toast from 'react-hot-toast';
 import Cookies from 'js-cookie';
+import io from 'socket.io-client';
 import { cn } from '@/lib/utils';
 import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
 import Loader from '@/components/common/Loader';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
+
+// Delivery lifecycle as reported by GET /api/delivery/order/:id (delivery.status).
+// 'awaiting_paytrigger_enrollment' means the device enrollment is still pending —
+// the backend has NOT marked the order Delivered yet, so the form must stay locked.
+const PAYTRIGGER_PENDING_STATUS = 'awaiting_paytrigger_enrollment';
 
 export default function SelfPickupPage() {
   const { id } = useParams();
@@ -30,6 +37,15 @@ export default function SelfPickupPage() {
   const [search, setSearch] = useState('');
   const [selectedInventory, setSelectedInventory] = useState<any>(null);
   const [isInventoryOpen, setIsInventoryOpen] = useState(false);
+
+  // Screen mode: 'form' is the normal multi-step wizard below. 'processing' and
+  // 'delivered' are dedicated full-screen states shown instead of the wizard when
+  // this order already has a Delivery record (gated-pending or already completed) —
+  // reusing the wizard's "already submitted" case would let the user re-submit,
+  // which the backend now blocks anyway, but we want a clear UI for it too.
+  const [screenMode, setScreenMode] = useState<'loading' | 'form' | 'processing' | 'delivered'>('loading');
+  const [deliveryRecord, setDeliveryRecord] = useState<any>(null);
+  const socketRef = useRef<any>(null);
 
   // PayTrigger opt-in
   const [isPtEligible, setIsPtEligible] = useState(false);
@@ -204,12 +220,102 @@ export default function SelfPickupPage() {
     }
   };
 
+  // Backend is the source of truth for whether this order's delivery is still
+  // pending PayTrigger confirmation or already completed — polled on mount, on
+  // every socket (re)connect, and periodically while a Delivery is pending, so a
+  // webhook that completed the delivery while this tab was closed/offline is
+  // always caught up on the next load.
+  const fetchDeliveryStatus = async (): Promise<any> => {
+    try {
+      const token = Cookies.get('auth_token');
+      const res = await fetch(`${BACKEND_URL}/api/delivery/order/${id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.status === 404) {
+        // No delivery submitted yet for this order — show the normal wizard.
+        setDeliveryRecord(null);
+        setScreenMode('form');
+        return null;
+      }
+      const json = await res.json();
+      if (json.success) {
+        const d = json.data.delivery;
+        setDeliveryRecord(d);
+        if (d.status === PAYTRIGGER_PENDING_STATUS) {
+          setScreenMode('processing');
+        } else {
+          // status === 'completed' (or any other terminal state) — delivery already exists.
+          setScreenMode('delivered');
+        }
+        return d;
+      }
+      setScreenMode('form');
+      return null;
+    } catch (err) {
+      console.error('Fetch delivery status error:', err);
+      // Network hiccup — don't strand the user on a blank screen; fall back to the form.
+      setScreenMode('form');
+      return null;
+    }
+  };
+
   useEffect(() => {
     if (id) {
       fetchOrder();
       fetchInventory();
+      fetchDeliveryStatus();
     }
   }, [id]);
+
+  // Live updates while a PayTrigger enrollment is pending. Sockets are a
+  // convenience, not the source of truth: every (re)connect re-fetches the
+  // backend status directly, so this still works if the webhook completed the
+  // delivery while this tab was offline.
+  useEffect(() => {
+    if (!id) return;
+    const token = Cookies.get('auth_token');
+    if (!token) return;
+
+    const socket = io(BACKEND_URL as string, {
+      auth: { token },
+      reconnection: true,
+      reconnectionAttempts: 10,
+      reconnectionDelay: 1000,
+    });
+    socketRef.current = socket;
+
+    socket.on('connect', () => {
+      socket.emit('join_admin_notifications', token);
+      fetchDeliveryStatus();
+    });
+
+    socket.on('delivery_data_updated', (data: any) => {
+      if (data?.orderId && String(data.orderId) === String(id)) {
+        fetchDeliveryStatus();
+      }
+    });
+
+    socket.on('notification', (data: any) => {
+      if (data?.title === 'PayTrigger') {
+        fetchDeliveryStatus();
+      }
+    });
+
+    return () => {
+      socket.disconnect();
+      socketRef.current = null;
+    };
+  }, [id]);
+
+  // Fallback poll while processing — covers the (unlikely) case where the socket
+  // silently stalls without firing its own disconnect/reconnect events.
+  useEffect(() => {
+    if (screenMode !== 'processing') return;
+    const interval = setInterval(() => {
+      fetchDeliveryStatus();
+    }, 8000);
+    return () => clearInterval(interval);
+  }, [screenMode, id]);
 
   const roundUp = (val: number) => Math.ceil(val / 50) * 50;
 
@@ -563,8 +669,18 @@ export default function SelfPickupPage() {
 
       const data = await res.json();
       if (data.success) {
-        toast.success('Service Pickup Completed!');
-        router.push('/approved-order-list');
+        if (data.status === PAYTRIGGER_PENDING_STATUS) {
+          // Gated case: the backend has NOT marked this delivered yet — it created a
+          // pending Delivery record and kicked off PayTrigger enrollment. Do not
+          // navigate away or show "completed"; switch to the processing screen and
+          // let the socket/poll effects pick up the webhook-driven completion.
+          toast.success('Delivery initiated — waiting for device enrollment.');
+          setDeliveryRecord(data.data.delivery);
+          setScreenMode('processing');
+        } else {
+          toast.success('Service Pickup Completed!');
+          router.push('/approved-order-list');
+        }
       } else {
         toast.error(data.message || 'Submission failed');
       }
@@ -580,7 +696,15 @@ export default function SelfPickupPage() {
     (item.imei_serial && item.imei_serial.includes(search))
   );
 
-  if (loading) return <Loader text="Loading self-pickup details..." />;
+  if (loading || screenMode === 'loading') return <Loader text="Loading self-pickup details..." />;
+
+  if (screenMode === 'processing') {
+    return <PaytriggerProcessingScreen order={order} delivery={deliveryRecord} onExit={() => router.push('/approved-order-list')} />;
+  }
+
+  if (screenMode === 'delivered') {
+    return <AlreadyDeliveredScreen order={order} delivery={deliveryRecord} onExit={() => router.push('/approved-order-list')} />;
+  }
 
   const steps = [
     { id: 1, name: 'Assets', icon: Smartphone },
@@ -1389,6 +1513,103 @@ export default function SelfPickupPage() {
 
         </div>
 
+      </div>
+    </div>
+  );
+}
+
+// ─── PayTrigger processing / already-delivered states ──────────────────────
+// Shown instead of the wizard whenever this order already has a Delivery record
+// (backend is the source of truth — fetched via GET /api/delivery/order/:id).
+// Prevents re-showing the form (and re-initiating delivery) while enrollment is
+// pending, and survives navigation: reopening this page re-fetches status and
+// lands back here automatically.
+
+function enrollmentStatusLabel(status?: string) {
+  switch (status) {
+    case 'pre_enrolled': return 'Waiting for Device Activation...';
+    case 'registered': return 'Device Registered — Waiting for Activation...';
+    case 'ready_to_activate': return 'Ready to Activate...';
+    case 'active': return 'Device Active — Finalizing...';
+    default: return 'Waiting for Device Activation...';
+  }
+}
+
+function PaytriggerProcessingScreen({ order, delivery, onExit }: { order: any; delivery: any; onExit: () => void }) {
+  const device = delivery?.paytrigger_devices?.[0];
+
+  return (
+    <div className="mx-auto max-w-2xl px-4 py-16 min-h-screen flex items-center justify-center">
+      <div className="w-full bg-white rounded-[2.5rem] shadow-xl shadow-gray-100/50 border border-gray-100 p-10 space-y-8 text-center">
+        <div className="w-20 h-20 mx-auto bg-blue-50 rounded-[2rem] flex items-center justify-center text-blue-600">
+          <Loader2 className="w-10 h-10 animate-spin" />
+        </div>
+
+        <div className="space-y-2">
+          <h2 className="text-2xl font-black text-gray-900 tracking-tight">Delivery Initiated</h2>
+          <p className="text-gray-500 font-bold">Your delivery process has started.</p>
+          <p className="text-gray-400 text-sm">Waiting for the device to be enrolled and activated in PayTrigger.</p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4 text-left">
+          <div className="p-5 bg-gray-50 rounded-2xl border border-gray-100">
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Delivery Status</p>
+            <p className="font-black text-amber-600 flex items-center gap-2"><Clock className="w-4 h-4" /> Processing</p>
+          </div>
+          <div className="p-5 bg-gray-50 rounded-2xl border border-gray-100">
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">PayTrigger Status</p>
+            <p className="font-black text-blue-600 flex items-center gap-2"><Wifi className="w-4 h-4" /> {enrollmentStatusLabel(device?.enrollment_status)}</p>
+          </div>
+        </div>
+
+        {device && (
+          <div className="p-5 bg-indigo-50/50 rounded-2xl border border-indigo-100 text-left space-y-1">
+            <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Device Information</p>
+            <p className="text-sm font-bold text-indigo-900">{device.product_model || order?.product_name}</p>
+            <p className="text-xs text-indigo-600 font-mono">IMEI: {device.imei}</p>
+          </div>
+        )}
+
+        <div className="flex items-center gap-3 p-4 bg-amber-50 rounded-2xl border border-amber-100 text-left">
+          <AlertCircle className="w-6 h-6 text-amber-600 flex-shrink-0" />
+          <p className="text-xs text-amber-800 font-bold leading-relaxed">
+            Do not initiate this delivery again. This screen updates automatically once PayTrigger confirms the device is active — you can safely leave and come back.
+          </p>
+        </div>
+
+        <button
+          onClick={onExit}
+          className="px-6 py-3 bg-gray-100 text-gray-600 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-gray-200 transition-all"
+        >
+          Back to Order List
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function AlreadyDeliveredScreen({ order, delivery, onExit }: { order: any; delivery: any; onExit: () => void }) {
+  return (
+    <div className="mx-auto max-w-2xl px-4 py-16 min-h-screen flex items-center justify-center">
+      <div className="w-full bg-white rounded-[2.5rem] shadow-xl shadow-gray-100/50 border border-gray-100 p-10 space-y-8 text-center">
+        <div className="w-20 h-20 mx-auto bg-emerald-50 rounded-[2rem] flex items-center justify-center text-emerald-600">
+          <CheckCircle2 className="w-10 h-10" />
+        </div>
+        <div className="space-y-2">
+          <h2 className="text-2xl font-black text-gray-900 tracking-tight">Delivery Completed</h2>
+          <p className="text-gray-500 font-bold">
+            {delivery?.paytrigger_devices?.[0]
+              ? 'Device successfully enrolled and activated in PayTrigger.'
+              : 'This order has already been picked up.'}
+          </p>
+          <p className="text-gray-400 text-sm">Order #{order?.order_ref}</p>
+        </div>
+        <button
+          onClick={onExit}
+          className="px-6 py-3 bg-red-600 text-white rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-red-700 transition-all"
+        >
+          Back to Order List
+        </button>
       </div>
     </div>
   );
