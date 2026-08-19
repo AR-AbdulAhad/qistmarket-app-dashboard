@@ -399,7 +399,7 @@ const OrderListContent = ({ forcedStatus, forcedChannel, apiEndpoint, hideAction
   }
 
   const confirmAssign = async () => {
-      const isVerification = selectedOrder?.status === 'new' || selectedOrder?.status === 'pending';
+      const isVerification = selectedOrder?.status === 'new' || selectedOrder?.status === 'pending' || selectedOrder?.status === 'transferred';
       const targetUserId = isVerification ? selectedVerifierId : selectedDeliveryOfficerId;
       
       if (!selectedOrder || !targetUserId) return
@@ -440,7 +440,7 @@ const OrderListContent = ({ forcedStatus, forcedChannel, apiEndpoint, hideAction
     if (!selectedOrder) return
     setIsSubmitting(true)
     try {
-      const isVerification = selectedOrder?.status === 'new' || selectedOrder?.status === 'pending';
+      const isVerification = selectedOrder?.status === 'new' || selectedOrder?.status === 'pending' || selectedOrder?.status === 'transferred';
       const token = Cookies.get('auth_token')
       const endpoint = isVerification
         ? `${BACKEND_URL}/api/orders/${selectedOrder.id}/assign`
@@ -845,7 +845,16 @@ const OrderListContent = ({ forcedStatus, forcedChannel, apiEndpoint, hideAction
       enableColumnFilter: true,
     },
     { accessorKey: 'order_ref', header: 'Order Ref', enableColumnFilter: true },
-    { accessorKey: 'customer_name', header: 'Customer Name', enableColumnFilter: true },
+    {
+      accessorKey: 'customer_name',
+      header: 'Customer Name',
+      enableColumnFilter: true,
+      // Prefer the verified purchaser's name (captured during verification)
+      // over order.customer_name, which is just whatever was typed at order
+      // creation and is often a placeholder/test value. Falls back to
+      // customer_name when there's no verification/purchaser yet.
+      cell: ({ row }) => row.original.verification?.purchaser?.name || row.original.customer_name,
+    },
     { accessorKey: 'whatsapp_number', header: 'WhatsApp', enableColumnFilter: true },
     { accessorKey: 'city', header: 'City', enableColumnFilter: true },
     { accessorKey: 'area', header: 'Area', enableColumnFilter: true },
@@ -888,6 +897,19 @@ const OrderListContent = ({ forcedStatus, forcedChannel, apiEndpoint, hideAction
             } else {
               label = 'Pending'
               className += ' bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-300'
+            }
+            break;
+
+          case 'transferred':
+            // Sent to an outlet but not yet actioned there — the outlet's
+            // own inbox should still read as "New" (it's new work for them),
+            // while everyone else (CSR/admin pipeline view) sees "Transferred".
+            if (isOutletBranchUser) {
+              label = 'New'
+              className += ' bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300'
+            } else {
+              label = 'Transferred'
+              className += ' bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300'
             }
             break;
 
@@ -1215,7 +1237,7 @@ const OrderListContent = ({ forcedStatus, forcedChannel, apiEndpoint, hideAction
                       )
                     ) : (
                       <>
-                        {(order.status === 'new' || order.status === 'pending') ? (
+                        {(order.status === 'new' || order.status === 'pending' || order.status === 'transferred') ? (
                           order.assigned_to ? (
                             <li>
                               <button
@@ -1749,12 +1771,12 @@ const OrderListContent = ({ forcedStatus, forcedChannel, apiEndpoint, hideAction
         className="max-w-md rounded-2xl bg-white p-8 shadow-xl dark:bg-gray-800"
       >
         <h2 className="mb-4 text-xl font-semibold text-dark dark:text-white">
-          {selectedOrder?.status === 'new' || selectedOrder?.status === 'pending' ? 'Assign Verification Officer' : 'Assign Delivery Officer'}
+          {selectedOrder?.status === 'new' || selectedOrder?.status === 'pending' || selectedOrder?.status === 'transferred' ? 'Assign Verification Officer' : 'Assign Delivery Officer'}
         </h2>
         <p className="mb-6 text-gray-600 dark:text-gray-300">
-          Select {selectedOrder?.status === 'new' || selectedOrder?.status === 'pending' ? 'a verification officer' : 'a delivery officer'}:
+          Select {selectedOrder?.status === 'new' || selectedOrder?.status === 'pending' || selectedOrder?.status === 'transferred' ? 'a verification officer' : 'a delivery officer'}:
         </p>
-        {selectedOrder?.status === 'new' || selectedOrder?.status === 'pending' ? (
+        {selectedOrder?.status === 'new' || selectedOrder?.status === 'pending' || selectedOrder?.status === 'transferred' ? (
           <select
             value={selectedVerifierId ?? ''}
             onChange={(e) => setSelectedVerifierId(Number(e.target.value))}
@@ -1795,7 +1817,7 @@ const OrderListContent = ({ forcedStatus, forcedChannel, apiEndpoint, hideAction
           </button>
           <button
             onClick={confirmAssign}
-            disabled={!(selectedOrder?.status === 'new' || selectedOrder?.status === 'pending' ? selectedVerifierId : selectedDeliveryOfficerId) || isSubmitting}
+            disabled={!(selectedOrder?.status === 'new' || selectedOrder?.status === 'pending' || selectedOrder?.status === 'transferred' ? selectedVerifierId : selectedDeliveryOfficerId) || isSubmitting}
             className="rounded bg-[#ff3d3d] px-6 py-2.5 text-white hover:bg-[#ff3d3d]/90 disabled:opacity-50"
           >
             {isSubmitting ? 'Assigning...' : 'Assign'}
@@ -1810,10 +1832,10 @@ const OrderListContent = ({ forcedStatus, forcedChannel, apiEndpoint, hideAction
         className="max-w-md rounded-2xl bg-white p-8 shadow-xl dark:bg-gray-800"
       >
         <h2 className="mb-4 text-xl font-semibold text-dark dark:text-white">
-          {selectedOrder?.status === 'new' || selectedOrder?.status === 'pending' ? 'Unassign Verification Officer' : 'Unassign Delivery Officer'}
+          {selectedOrder?.status === 'new' || selectedOrder?.status === 'pending' || selectedOrder?.status === 'transferred' ? 'Unassign Verification Officer' : 'Unassign Delivery Officer'}
         </h2>
         <p className="mb-6 text-gray-600 dark:text-gray-300">
-          Are you sure you want to unassign {selectedOrder?.status === 'new' || selectedOrder?.status === 'pending' ? 'Verification Officer' : 'Delivery Officer'} from order <strong>{selectedOrder?.order_ref}</strong>?
+          Are you sure you want to unassign {selectedOrder?.status === 'new' || selectedOrder?.status === 'pending' || selectedOrder?.status === 'transferred' ? 'Verification Officer' : 'Delivery Officer'} from order <strong>{selectedOrder?.order_ref}</strong>?
         </p>
         <div className="mt-6 flex justify-end gap-4">
           <button

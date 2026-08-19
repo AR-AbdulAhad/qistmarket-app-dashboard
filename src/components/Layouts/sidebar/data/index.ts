@@ -570,6 +570,12 @@ export const NAV_DATA = [
         items: [],
       },
       {
+        title: "Cash Sale",
+        icon: Icons.DollarSignIcon,
+        url: "/outlet/cash-sale",
+        items: [],
+      },
+      {
         title: "Cash In Hand",
         icon: Icons.BanknoteIcon,
         items: [
