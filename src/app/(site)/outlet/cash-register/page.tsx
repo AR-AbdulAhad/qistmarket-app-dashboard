@@ -27,6 +27,7 @@ type Metrics = {
     expenses: number;
     vendor_payments: number;
     vendor_receipts: number;
+    cash_sale: number;
     cash_transferred_in: number;
     cash_transferred_out: number;
     closing_cash: number;
@@ -47,6 +48,7 @@ type Register = {
     expenses: number;
     vendor_payments: number;
     vendor_receipts: number;
+    cash_sale: number;
     closing_cash: number;
     expected_cash: number;
     physical_cash: number | null;
@@ -239,6 +241,7 @@ export default function CashRegisterPage() {
         { key: "expenses", label: "Expenses (–)" },
         { key: "vendor_payments", label: "Vendor Payments (–)" },
         { key: "vendor_receipts", label: "Cash from Vendor" },
+        { key: "cash_sale", label: "Cash Sale" },
         { key: "closing_cash", label: "Closing / Expected Cash" },
     ];
 
@@ -246,7 +249,7 @@ export default function CashRegisterPage() {
 
     const currentMetrics = metrics || {
         opening_cash: 0, down_payments: 0, installments_received: 0, cash_from_recovery: 0,
-        cash_from_delivery: 0, expenses: 0, vendor_payments: 0, vendor_receipts: 0, cash_transferred_in: 0,
+        cash_from_delivery: 0, expenses: 0, vendor_payments: 0, vendor_receipts: 0, cash_sale: 0, cash_transferred_in: 0,
         cash_transferred_out: 0, closing_cash: 0, expected_cash: 0, period_net_change: 0, digital_bank_total: 0, digital_1bill_total: 0
     };
 
