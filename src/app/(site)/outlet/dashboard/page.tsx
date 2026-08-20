@@ -247,10 +247,14 @@ export default function OutletDashboardPage() {
   const previousCustomersTotal = stats?.graphData?.customers?.previous?.reduce((a: number, b: number) => a + b, 0) || 0;
 
   // Radial gauge: Installment collection rate
-  const collectionRate =
+  const rawCollectionRate =
     stats && stats.installments.totalInstallmentDue > 0
-      ? Math.round((stats.installments.totalInstallmentPaid / stats.installments.totalInstallmentDue) * 100)
+      ? (stats.installments.totalInstallmentPaid / stats.installments.totalInstallmentDue) * 100
       : 0;
+  const collectionRate =
+    rawCollectionRate > 0 && rawCollectionRate < 0.1
+      ? 0.1
+      : Math.round(rawCollectionRate * 10) / 10;
 
   const radialOptions: ApexOptions = {
     chart: { type: "radialBar", fontFamily: "inherit" },
@@ -364,7 +368,7 @@ export default function OutletDashboardPage() {
       {stats && (
         <section className="mb-8">
           <h2 className="mb-4 text-xs font-black uppercase tracking-widest text-slate-400">Real-Time Indicators</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-9 gap-3 sm:gap-4 w-full">
+          <div className="grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-3 sm:gap-4 w-full">
             <StatCard
               icon={<BadgeDollarSign size={18} />}
               label="Closing Balance"
@@ -604,7 +608,7 @@ export default function OutletDashboardPage() {
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Installment Recovery</h3>
               <button
-                onClick={() => router.push("/outlet/installments")}
+                onClick={() => router.push("/outlet/installments/view")}
                 className="flex items-center gap-1 rounded-xl bg-red-50 border border-red-100 px-3.5 py-2 text-[9px] font-black text-[#E31E24] uppercase tracking-wider transition-all hover:bg-[#E31E24] hover:text-white"
               >
                 Manage <ChevronRight className="size-3" />
@@ -613,12 +617,16 @@ export default function OutletDashboardPage() {
             
             <div className="grid grid-cols-2 gap-4 mb-4">
               {[
-                { label: "Pending Collections", value: stats.installments.pendingInstallmentCount, bg: "bg-amber-50", text: "text-amber-500", format: "number" },
-                { label: "Impacted Customers", value: stats.installments.ordersWithPendingInstallments, bg: "bg-orange-50", text: "text-orange-500", format: "number" },
-                { label: "Arrears", value: stats.installments.totalArrears, bg: "bg-rose-50", text: "text-rose-500", format: "currency" },
-                { label: "Cumulative Remaining", value: stats.installments.totalRemaining, bg: "bg-violet-50", text: "text-violet-500", format: "currency" },
+                { label: "Pending Collections", value: stats.installments.pendingInstallmentCount, bg: "bg-amber-50", text: "text-amber-500", format: "number", href: "/outlet/installments/view?category=all" },
+                { label: "Impacted Customers", value: stats.installments.ordersWithPendingInstallments, bg: "bg-orange-50", text: "text-orange-500", format: "number", href: "/outlet/installments/view?category=impacted" },
+                { label: "Arrears", value: stats.installments.totalArrears, bg: "bg-rose-50", text: "text-rose-500", format: "currency", href: "/outlet/installments/view?category=impacted" },
+                { label: "Cumulative Remaining", value: stats.installments.totalRemaining, bg: "bg-violet-50", text: "text-violet-500", format: "currency", href: "/outlet/installments/view" },
               ].map((item) => (
-                <div key={item.label} className={`rounded-2xl p-5 ${item.bg}`}>
+                <div
+                  key={item.label}
+                  onClick={() => router.push(item.href)}
+                  className={`rounded-2xl p-5 ${item.bg} cursor-pointer transition-all hover:scale-[1.02] hover:shadow-sm`}
+                >
                   <p className="text-[8px] font-black uppercase tracking-wider text-gray-400 mb-1">{item.label}</p>
                   <p className={`text-lg font-black ${item.text}`}>
                     {item.format === "currency" ? PKR(item.value as number) : item.value}
@@ -628,7 +636,10 @@ export default function OutletDashboardPage() {
             </div>
 
             {stats.installments.totalArrears > 0 && (
-              <div className="flex items-center gap-3 rounded-2xl bg-red-50 border border-red-100 p-4">
+              <div
+                onClick={() => router.push("/outlet/installments/view?category=impacted")}
+                className="flex items-center gap-3 rounded-2xl bg-red-50 border border-red-100 p-4 cursor-pointer hover:bg-red-100/50 transition-colors"
+              >
                 <AlertTriangle className="size-4 shrink-0 text-[#E31E24]" />
                 <p className="text-[10px] font-black text-[#E31E24] uppercase tracking-wider leading-relaxed">
                   PKR {stats.installments.totalArrears.toLocaleString()} in arrears require quick follow-up
