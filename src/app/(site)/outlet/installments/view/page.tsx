@@ -54,13 +54,14 @@ const YEARS_LIST = [2024, 2025, 2026, 2027, 2028];
 function InstallmentsViewContent() {
   const searchParams = useSearchParams();
   const initialSearch = searchParams.get("search") || "";
+  const initialCategory = (searchParams.get("category") as any) || "all";
 
   // UI States
   const [isFullView, setIsFullView] = useState(false);
 
   // Query state
   const [search, setSearch] = useState(initialSearch);
-  const [category, setCategory] = useState<'all' | 'regular' | 'fresh' | 'overdue' | 'blacklist' | 'defaulter' | 'ptp'>('all');
+  const [category, setCategory] = useState<'all' | 'regular' | 'fresh' | 'overdue' | 'blacklist' | 'defaulter' | 'ptp' | 'impacted'>(initialCategory);
   const [showAdvFilters, setShowAdvFilters] = useState(false);
   
   // Advanced Global Filters
@@ -129,10 +130,11 @@ function InstallmentsViewContent() {
   const [bulkReminderModalOpen, setBulkReminderModalOpen] = useState(false);
   const [sendingBulk, setSendingBulk] = useState(false);
 
-  // Sync search URL
+  // Sync search & category URL params
   useEffect(() => {
     if (initialSearch) setSearch(initialSearch);
-  }, [initialSearch]);
+    if (initialCategory) setCategory(initialCategory);
+  }, [initialSearch, initialCategory]);
 
   // Handle Escape key to exit full wall view
   useEffect(() => {
@@ -238,6 +240,30 @@ function InstallmentsViewContent() {
       (colFilters.status === "" || inst.status?.toLowerCase() === colFilters.status.toLowerCase())
     );
   });
+
+  const hasColFilters = Object.values(colFilters).some(v => v !== "");
+
+  const displayedMonthsDue = hasColFilters
+    ? filteredInstallments.reduce((sum, i) => sum + (i.monthlyAmount || 0), 0)
+    : stats.monthsDue;
+
+  const displayedMonthsCollected = hasColFilters
+    ? filteredInstallments.reduce((sum, i) => sum + (i.partialPayment || 0), 0)
+    : stats.monthsCollected;
+
+  const displayedMonthsRemaining = displayedMonthsDue - displayedMonthsCollected;
+
+  const displayedSystemPaid = hasColFilters
+    ? filteredInstallments.reduce((sum, i) => sum + (i.orderPaidTotal || 0), 0)
+    : stats.overallSystemPaid;
+
+  const displayedSystemOutstanding = hasColFilters
+    ? filteredInstallments.reduce((sum, i) => sum + (i.remainingAmount || 0), 0)
+    : stats.overallSystemRemaining;
+
+  const displayedCustomerCount = hasColFilters
+    ? filteredInstallments.length
+    : stats.customerCount;
 
   // Handle Multi-Checkbox Selection
   const getRowKey = (inst: any) => `${inst.order_ref}_${inst.dueDate}`;
@@ -470,6 +496,7 @@ function InstallmentsViewContent() {
             className="bg-transparent border-0 text-xs font-black uppercase text-[#E31E24] focus:ring-0 cursor-pointer py-1"
           >
             <option value="all">All Accounts</option>
+            <option value="impacted">Impacted Accounts (All Overdue)</option>
             <option value="regular">Regular Accounts</option>
             <option value="fresh">Fresh Accounts</option>
             <option value="overdue">Overdue Accounts</option>
@@ -487,7 +514,7 @@ function InstallmentsViewContent() {
           <div className="flex justify-between items-start">
             <div>
               <p className="text-[9px] font-black uppercase tracking-widest text-gray-400">Months Due</p>
-              <h3 className="mt-2 text-xl font-black text-slate-800 dark:text-white">{stats.monthsDue}</h3>
+              <h3 className="mt-2 text-xl font-black text-slate-800 dark:text-white">Rs. {displayedMonthsDue.toLocaleString()}</h3>
             </div>
             <div className="rounded-xl bg-[#E31E24]/5 p-2.5 text-[#E31E24]">
               <Calendar className="h-5 w-5" />
@@ -500,7 +527,7 @@ function InstallmentsViewContent() {
           <div className="flex justify-between items-start">
             <div>
               <p className="text-[9px] font-black uppercase tracking-widest text-gray-400">Months Collected</p>
-              <h3 className="mt-2 text-xl font-black text-slate-800 dark:text-white">{stats.monthsCollected}</h3>
+              <h3 className="mt-2 text-xl font-black text-slate-800 dark:text-white">Rs. {displayedMonthsCollected.toLocaleString()}</h3>
             </div>
             <div className="rounded-xl bg-emerald-50 p-2.5 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400">
               <CheckCircle2 className="h-5 w-5" />
@@ -513,7 +540,7 @@ function InstallmentsViewContent() {
           <div className="flex justify-between items-start">
             <div>
               <p className="text-[9px] font-black uppercase tracking-widest text-gray-400">Months Remaining</p>
-              <h3 className="mt-2 text-xl font-black text-slate-800 dark:text-white">Rs. {stats.monthsRemainingAmount.toLocaleString()}</h3>
+              <h3 className="mt-2 text-xl font-black text-slate-800 dark:text-white">Rs. {displayedMonthsRemaining.toLocaleString()}</h3>
             </div>
             <div className="rounded-xl bg-[#E31E24]/5 p-2.5 text-[#E31E24]">
               <Clock className="h-5 w-5" />
@@ -526,7 +553,7 @@ function InstallmentsViewContent() {
           <div className="flex justify-between items-start">
             <div>
               <p className="text-[9px] font-black uppercase tracking-widest text-gray-400">Total System Paid</p>
-              <h3 className="mt-2 text-xl font-black text-slate-800 dark:text-white">Rs. {stats.overallSystemPaid.toLocaleString()}</h3>
+              <h3 className="mt-2 text-xl font-black text-slate-800 dark:text-white">Rs. {displayedSystemPaid.toLocaleString()}</h3>
             </div>
             <div className="rounded-xl bg-purple-50 p-2.5 text-purple-600 dark:bg-purple-500/10 dark:text-purple-400">
               <TrendingUp className="h-5 w-5" />
@@ -539,7 +566,7 @@ function InstallmentsViewContent() {
           <div className="flex justify-between items-start">
             <div>
               <p className="text-[9px] font-black uppercase tracking-widest text-gray-400">System Outstanding</p>
-              <h3 className="mt-2 text-xl font-black text-slate-800 dark:text-white">Rs. {stats.overallSystemRemaining.toLocaleString()}</h3>
+              <h3 className="mt-2 text-xl font-black text-slate-800 dark:text-white">Rs. {displayedSystemOutstanding.toLocaleString()}</h3>
             </div>
             <div className="rounded-xl bg-slate-100 p-2.5 text-slate-600 dark:bg-meta-4 dark:text-slate-300">
               <Database className="h-5 w-5" />
@@ -552,7 +579,7 @@ function InstallmentsViewContent() {
           <div className="flex justify-between items-start">
             <div>
               <p className="text-[9px] font-black uppercase tracking-widest text-gray-400">Customer Count</p>
-              <h3 className="mt-2 text-xl font-black text-slate-800 dark:text-white">{stats.customerCount}</h3>
+              <h3 className="mt-2 text-xl font-black text-slate-800 dark:text-white">{displayedCustomerCount}</h3>
             </div>
             <div className="rounded-xl bg-teal-50 p-2.5 text-teal-600 dark:bg-meta-4 dark:text-teal-300">
               <Database className="h-5 w-5" />
