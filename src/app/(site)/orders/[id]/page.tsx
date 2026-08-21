@@ -298,6 +298,16 @@ interface Order {
         user?: { username: string, full_name: string } | null;
         role_name?: string | null;
     }[];
+    complaints?: {
+        id: number;
+        complaint_id: string;
+        description: string;
+        status: string;
+        resolution_note: string | null;
+        created_at: string;
+        created_by?: { username: string; full_name: string } | null;
+        assigned_to?: { username: string; full_name: string } | null;
+    }[];
     verification?: VerificationData | null;
     dummyCustomer?: DummyCustomer | null;
 }
@@ -1209,6 +1219,53 @@ export default function OrderDetailsPage() {
                         ))}
                     </div>
                     )}
+                </div>
+            )}
+
+            {/* Linked Complaints — complaints a CSR has confirmed belong to this
+                customer's order (see /csr/complaints "Link & View"), so this
+                order's page becomes their permanent record of it. */}
+            {order.complaints && order.complaints.length > 0 && (
+                <div className="mt-8 rounded-lg border border-stroke bg-white shadow-default dark:border-dark-3 dark:bg-gray-800 p-6">
+                    <div className="flex items-center justify-between border-b pb-4 mb-6">
+                        <h3 className="text-xl font-bold dark:text-white">Linked Complaints</h3>
+                        <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">{order.complaints.length} total</span>
+                    </div>
+
+                    <div className="relative pl-6 border-l-2 border-gray-200 dark:border-gray-700 ml-4">
+                        {order.complaints.map((c) => {
+                            const statusColor = c.status === 'Solved'
+                                ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
+                                : c.status === 'Pending'
+                                    ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300'
+                                    : 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300';
+                            return (
+                                <div key={c.id} className="mb-8 relative">
+                                    <div className="absolute -left-[35px] top-1.5 h-6 w-6 rounded-full border-4 border-white bg-[#ff3d3d] dark:border-gray-800 shadow-sm"></div>
+                                    <div className="bg-gray-50 dark:bg-dark-2 p-4 rounded-xl border border-gray-100 dark:border-dark-3 shadow-sm">
+                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                            <div className="flex items-center gap-3">
+                                                <span className="font-bold text-sm text-gray-800 dark:text-white">{c.complaint_id}</span>
+                                                <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase ${statusColor}`}>{c.status}</span>
+                                            </div>
+                                            <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">{formatExactDate(c.created_at)}</span>
+                                        </div>
+                                        <p className="mt-2 text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{c.description}</p>
+                                        {c.resolution_note && (
+                                            <div className="mt-2 px-3 py-2 rounded-lg bg-green-50 dark:bg-green-900/10 border border-green-100 dark:border-green-900/30 text-xs text-green-800 dark:text-green-300 italic">
+                                                "{c.resolution_note}"
+                                            </div>
+                                        )}
+                                        {(c.assigned_to || c.created_by) && (
+                                            <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                                                {c.assigned_to ? `Handled by ${c.assigned_to.full_name}` : `Filed by ${c.created_by?.full_name}`}
+                                            </p>
+                                        )}
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
                 </div>
             )}
 

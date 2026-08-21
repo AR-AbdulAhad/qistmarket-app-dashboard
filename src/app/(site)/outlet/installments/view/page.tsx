@@ -166,7 +166,8 @@ function InstallmentsViewContent() {
         ...(advFilters.min_amount && { min_amount: advFilters.min_amount }),
         ...(advFilters.max_amount && { max_amount: advFilters.max_amount }),
         ...(advFilters.min_balance && { min_balance: advFilters.min_balance }),
-        ...(advFilters.max_balance && { max_balance: advFilters.max_balance })
+        ...(advFilters.max_balance && { max_balance: advFilters.max_balance }),
+        ...(colFilters.status && { status: colFilters.status })
       });
 
       const res = await fetch(`${API_BASE}/api/outlet/installments/due-list?${queryParams.toString()}`, {
@@ -200,7 +201,7 @@ function InstallmentsViewContent() {
     } finally {
       setLoading(false);
     }
-  }, [page, limit, search, category, selectedMonth, selectedYear, advFilters]);
+  }, [page, limit, search, category, selectedMonth, selectedYear, advFilters, colFilters.status]);
 
   useEffect(() => {
     fetchInstallments();
@@ -236,12 +237,19 @@ function InstallmentsViewContent() {
       (colFilters.grantor1Name === "" || inst.grantor1Name?.toLowerCase().includes(colFilters.grantor1Name.toLowerCase())) &&
       (colFilters.grantor2Name === "" || inst.grantor2Name?.toLowerCase().includes(colFilters.grantor2Name.toLowerCase())) &&
       (colFilters.product_name === "" || inst.product_name?.toLowerCase().includes(colFilters.product_name.toLowerCase())) &&
-      (colFilters.imei_serial === "" || inst.imei_serial?.toLowerCase().includes(colFilters.imei_serial.toLowerCase())) &&
-      (colFilters.status === "" || inst.status?.toLowerCase() === colFilters.status.toLowerCase())
+      (colFilters.imei_serial === "" || inst.imei_serial?.toLowerCase().includes(colFilters.imei_serial.toLowerCase()))
+      // Status is not re-checked here — it's now a server-side filter (see
+      // fetchInstallments), so `installments` already only contains rows
+      // matching the selected status.
     );
   });
 
-  const hasColFilters = Object.values(colFilters).some(v => v !== "");
+  // Excludes `status` deliberately: that filter is now sent to the server
+  // and already reflected in `stats.*` (computed over every matching row,
+  // not just this page), so treating it like the other still-local column
+  // filters would wrongly swap those totals for a page-local sum again —
+  // which is exactly the Customer-Count-doesn't-add-up bug this fixes.
+  const hasColFilters = Object.entries(colFilters).some(([key, v]) => key !== "status" && v !== "");
 
   const displayedMonthsDue = hasColFilters
     ? filteredInstallments.reduce((sum, i) => sum + (i.monthlyAmount || 0), 0)
@@ -310,6 +318,7 @@ function InstallmentsViewContent() {
         row.imei_serial || '',
         row.monthlyAmount || 0,
         row.remainingAmount || 0,
+        row.arrearsAmount || 0,
         row.partialPayment || "-",
         paymentHistoryStr,
         row.status || '',
@@ -321,7 +330,7 @@ function InstallmentsViewContent() {
   const getExportHeaders = () => [
     "S.No", "Order Ref", "Customer Name", "WhatsApp", "Alt Contact", "Area",
     "Due Date", "Purchase Date", "G1 Name", "G1 Phone", "G2 Name", "G2 Phone",
-    "Product", "IMEI", "Due Amount", "Remaining", "Partial", "Logs", "Status", "Note"
+    "Product", "IMEI", "Due Amount", "Remaining", "Arrears", "Partial", "Logs", "Status", "Note"
   ];
 
   const exportPDF = (rowsToExport: any[], filename: string) => {
@@ -834,6 +843,7 @@ function InstallmentsViewContent() {
                 <th className="px-4 py-4 text-[10px] font-black text-gray-400 uppercase min-w-[170px]">Recovery Officer</th>
                 <th className="px-4 py-4 text-[10px] font-black text-gray-400 uppercase min-w-[110px] text-right">Monthly Due</th>
                 <th className="px-4 py-4 text-[10px] font-black text-gray-400 uppercase min-w-[125px] text-right">Total Remaining</th>
+                <th className="px-4 py-4 text-[10px] font-black text-gray-400 uppercase min-w-[110px] text-right">Arrears</th>
                 <th className="px-4 py-4 text-[10px] font-black text-gray-400 uppercase min-w-[120px] text-right">Partial Paid</th>
                 <th className="px-4 py-4 text-[10px] font-black text-gray-400 uppercase min-w-[160px]">Paid Date / History</th>
                 <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase min-w-[190px]">Installment Note</th>
@@ -939,10 +949,14 @@ function InstallmentsViewContent() {
                 <td className="px-2 py-2"></td>
                 <td className="px-2 py-2"></td>
                 <td className="px-2 py-2"></td>
+                <td className="px-2 py-2"></td>
                 <td className="px-2 py-2">
                   <select
                     value={colFilters.status}
-                    onChange={(e) => setColFilters(prev => ({ ...prev, status: e.target.value }))}
+                    onChange={(e) => {
+                      setColFilters(prev => ({ ...prev, status: e.target.value }));
+                      setPage(1);
+                    }}
                     className="w-full rounded bg-white dark:bg-boxdark border-gray-150 dark:border-strokedark px-2 py-1 text-xs outline-none focus:border-[#E31E24]"
                   >
                     <option value="">All</option>
@@ -1035,6 +1049,9 @@ function InstallmentsViewContent() {
                       </td>
                       <td className="px-4 py-3.5 text-right font-black text-slate-900 dark:text-white">Rs. {inst.monthlyAmount.toLocaleString()}</td>
                       <td className="px-4 py-3.5 text-right font-black text-[#E31E24]">Rs. {inst.remainingAmount.toLocaleString()}</td>
+                      <td className="px-4 py-3.5 text-right font-black text-amber-600 dark:text-amber-400">
+                        {inst.arrearsAmount ? `Rs. ${inst.arrearsAmount.toLocaleString()}` : "-"}
+                      </td>
                       <td className="px-4 py-3.5 text-right font-black text-emerald-600 dark:text-emerald-400">
                         {inst.partialPayment ? `Rs. ${inst.partialPayment.toLocaleString()}` : "-"}
                       </td>

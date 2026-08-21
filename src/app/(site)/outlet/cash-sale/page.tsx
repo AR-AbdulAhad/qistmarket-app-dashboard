@@ -1,14 +1,21 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
+import { useRouter } from "next/navigation";
 import Cookies from "js-cookie";
 import toast from "react-hot-toast";
 import {
   Search, ShoppingBag, User, Phone, CreditCard, Smartphone,
-  CheckCircle2, X, ChevronLeft, ChevronRight, Receipt, Tag,
+  CheckCircle2, X, ChevronLeft, ChevronRight, Receipt,
+  Printer, Pencil, Trash2, ShoppingCart,
 } from "lucide-react";
 import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
-import { cn } from "@/lib/utils";
+
+// Edit/Delete are only allowed within 3 days of the sale (mirrors the backend
+// rule in cashSaleController.js) — used here just to grey the buttons out
+// early instead of letting the user hit a 403 after filling the modal.
+const EDIT_WINDOW_MS = 3 * 24 * 60 * 60 * 1000;
+const isWithinEditWindow = (createdAt: string) => (Date.now() - new Date(createdAt).getTime()) <= EDIT_WINDOW_MS;
 
 const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL;
 
@@ -43,59 +50,73 @@ interface InventoryItem {
 const suggestedPriceOf = (item: InventoryItem) =>
   item.sale_price || item.installment_price || item.purchase_price || 0;
 
-interface CashSale {
-  id: number;
+// One line in a cart — decoupled from InventoryItem so it can represent
+// either a freshly-picked search result or a product loaded back out of an
+// existing sale being edited (which only has the CashSale snapshot fields,
+// not the live inventory record's stock/pricing metadata).
+interface CartItem {
+  inventory_id: number;
   product_name: string;
   category: string | null;
   imei_serial: string | null;
   color_variant: string | null;
+  quoted_price: number;
+  final_price: number;
+}
+
+const cartItemFromInventory = (item: InventoryItem): CartItem => ({
+  inventory_id: item.id,
+  product_name: item.product_name,
+  category: item.category,
+  imei_serial: item.imei_serial,
+  color_variant: item.color_variant,
+  quoted_price: item.suggested_price,
+  final_price: item.suggested_price,
+});
+
+// One row in the history table — a whole transaction (one or more products
+// checked out together). `sale_group` non-null and `item_count` > 1 means
+// several CashSale rows are collapsed into this one summary row.
+interface CashSaleTxn {
+  id: number;
+  sale_group: string | null;
+  item_count: number;
+  product_name: string;
+  imei_serial: string | null;
   customer_name: string;
   customer_phone: string | null;
   customer_cnic: string | null;
-  quoted_price: number;
   final_price: number;
   created_at: string;
   sold_by: { username: string; full_name: string } | null;
 }
 
-export default function CashSalePage() {
-  // ── Sale form state ────────────────────────────────────────────────
-  const [customerName, setCustomerName] = useState("");
-  const [customerPhone, setCustomerPhone] = useState("");
-  const [customerCnic, setCustomerCnic] = useState("");
-  const [productSearch, setProductSearch] = useState("");
-  const [searchResults, setSearchResults] = useState<InventoryItem[]>([]);
+function ProductSearchBox({
+  search,
+  onSearchChange,
+  onPick,
+  placeholder = "Search in-stock product by name or IMEI...",
+}: {
+  search: string;
+  onSearchChange: (v: string) => void;
+  onPick: (item: InventoryItem) => void;
+  placeholder?: string;
+}) {
+  const [results, setResults] = useState<InventoryItem[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [showResults, setShowResults] = useState(false);
-  const [selectedProduct, setSelectedProduct] = useState<InventoryItem | null>(null);
-  const [finalPrice, setFinalPrice] = useState<number | "">("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const searchBoxRef = useRef<HTMLDivElement>(null);
+  const boxRef = useRef<HTMLDivElement>(null);
 
-  // ── History state ──────────────────────────────────────────────────
-  const [history, setHistory] = useState<CashSale[]>([]);
-  const [historyLoading, setHistoryLoading] = useState(true);
-  const [historySearch, setHistorySearch] = useState("");
-  const [page, setPage] = useState(1);
-  const [limit, setLimit] = useState(10);
-  const [pagination, setPagination] = useState({ total: 0, totalPages: 1, hasNext: false, hasPrev: false });
-
-  // ── Product search (debounced) ───────────────────────────────────────
   // Reuses the exact same GET /api/outlet/inventory endpoint the Stock List
   // page calls, so Cash Sale can never show a product Stock List doesn't —
   // filtered here to just what Stock List itself treats as available
   // (status "In Stock", not flagged is_used; "Used Stock"/"Out Of
   // Stock"/"Sold" units are excluded, matching getInventory's own rule).
-  //
-  // Runs on an empty search too (search="" — the backend's own `undefined`
-  // OR-clause behavior returns everything unfiltered), so clicking into the
-  // box immediately shows a browsable list of in-stock products instead of
-  // staying blank until the user types something.
   useEffect(() => {
     setIsSearching(true);
     const handle = setTimeout(async () => {
       try {
-        const res = await fetch(`${API_BASE}/api/outlet/inventory?search=${encodeURIComponent(productSearch.trim())}&limit=50&page=1`, {
+        const res = await fetch(`${API_BASE}/api/outlet/inventory?search=${encodeURIComponent(search.trim())}&limit=50&page=1`, {
           headers: getAuthHeaders(),
         });
         const data = await res.json();
@@ -103,7 +124,7 @@ export default function CashSalePage() {
           const sellable: InventoryItem[] = (data.inventory || [])
             .filter((item: InventoryItem) => item.status === "In Stock" && !item.is_used)
             .map((item: InventoryItem) => ({ ...item, suggested_price: suggestedPriceOf(item) }));
-          setSearchResults(sellable);
+          setResults(sellable);
         }
       } catch (err) {
         console.error("Product search error:", err);
@@ -112,31 +133,183 @@ export default function CashSalePage() {
       }
     }, 300);
     return () => clearTimeout(handle);
-  }, [productSearch]);
+  }, [search]);
 
-  // Close the results dropdown when clicking outside it
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (searchBoxRef.current && !searchBoxRef.current.contains(e.target as Node)) {
-        setShowResults(false);
-      }
+      if (boxRef.current && !boxRef.current.contains(e.target as Node)) setShowResults(false);
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const handleSelectProduct = (item: InventoryItem) => {
-    setSelectedProduct(item);
-    setProductSearch(`${item.product_name}${item.imei_serial ? ` — ${item.imei_serial}` : ""}`);
-    setFinalPrice(item.suggested_price || 0);
-    setShowResults(false);
+  return (
+    <div className="relative" ref={boxRef}>
+      <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300" />
+      <input
+        type="text"
+        placeholder={placeholder}
+        value={search}
+        onChange={(e) => {
+          onSearchChange(e.target.value);
+          setShowResults(true);
+        }}
+        onFocus={() => setShowResults(true)}
+        className="w-full pl-11 pr-4 py-3.5 bg-gray-50 dark:bg-dark-2 border-2 border-transparent focus:border-[#E31E24] rounded-2xl outline-none transition-all font-semibold text-sm text-gray-900 dark:text-white placeholder:text-gray-400 placeholder:font-medium"
+      />
+
+      {showResults && (
+        <div className="absolute z-20 mt-2 w-full bg-white dark:bg-dark-2 rounded-2xl shadow-2xl border border-gray-100 dark:border-dark-3 max-h-72 overflow-y-auto">
+          {isSearching ? (
+            <div className="p-6 text-center text-sm text-gray-400 font-medium">Searching...</div>
+          ) : results.length > 0 ? (
+            results.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => {
+                  onPick(item);
+                  setShowResults(false);
+                }}
+                className="w-full flex items-center justify-between gap-3 px-5 py-3.5 text-left hover:bg-gray-50 dark:hover:bg-dark-3 border-b border-gray-50 dark:border-dark-3 last:border-0 transition-colors"
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-9 h-9 rounded-xl bg-gray-100 dark:bg-dark-3 flex items-center justify-center text-gray-400 shrink-0">
+                    <Smartphone className="w-4 h-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-bold text-sm text-gray-900 dark:text-white truncate">{item.product_name}</p>
+                    <p className="text-xs text-gray-400 font-mono truncate">{item.imei_serial} {item.color_variant ? `• ${item.color_variant}` : ""}</p>
+                  </div>
+                </div>
+                <span className="text-xs font-black text-emerald-600 shrink-0">{PKR(item.suggested_price)}</span>
+              </button>
+            ))
+          ) : (
+            <div className="p-6 text-center text-sm text-gray-400 font-medium">No in-stock items found</div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CartList({
+  items,
+  onPriceChange,
+  onRemove,
+}: {
+  items: CartItem[];
+  onPriceChange: (inventory_id: number, price: number) => void;
+  onRemove: (inventory_id: number) => void;
+}) {
+  if (items.length === 0) {
+    return (
+      <div className="p-6 rounded-2xl border-2 border-dashed border-gray-200 dark:border-dark-3 text-center text-sm text-gray-400 font-medium">
+        No products added yet — search above and pick one or more.
+      </div>
+    );
+  }
+
+  const total = items.reduce((s, it) => s + (it.final_price || 0), 0);
+
+  return (
+    <div className="space-y-3">
+      {items.map((it) => (
+        <div
+          key={it.inventory_id}
+          className="p-4 rounded-2xl border-2 border-emerald-100 bg-emerald-50/50 dark:bg-emerald-900/10 dark:border-emerald-900/30 flex items-center gap-3"
+        >
+          <div className="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center text-white shrink-0">
+            <CheckCircle2 className="w-4 h-4" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-black text-gray-900 dark:text-white text-sm truncate">{it.product_name}</p>
+            <div className="flex items-center gap-2 flex-wrap mt-1">
+              {it.imei_serial && (
+                <span className="text-[10px] font-bold text-gray-500 bg-white dark:bg-dark-2 px-2 py-0.5 rounded-lg font-mono">{it.imei_serial}</span>
+              )}
+              {it.color_variant && (
+                <span className="text-[10px] font-bold text-gray-500 bg-white dark:bg-dark-2 px-2 py-0.5 rounded-lg">{it.color_variant}</span>
+              )}
+            </div>
+          </div>
+          <div className="flex items-center gap-1 bg-white dark:bg-dark-2 rounded-xl px-3 py-2 shrink-0">
+            <span className="text-xs font-bold text-gray-400">Rs.</span>
+            <input
+              type="number"
+              value={it.final_price}
+              onChange={(e) => onPriceChange(it.inventory_id, e.target.value === "" ? 0 : Number(e.target.value))}
+              className="w-24 bg-transparent outline-none font-black text-sm text-gray-900 dark:text-white"
+            />
+          </div>
+          <button
+            type="button"
+            onClick={() => onRemove(it.inventory_id)}
+            className="p-2 rounded-lg text-gray-300 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors shrink-0"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      ))}
+      <div className="flex items-center justify-between px-1 pt-1">
+        <span className="text-xs font-black text-gray-400 uppercase tracking-widest">{items.length} item{items.length === 1 ? "" : "s"}</span>
+        <span className="text-lg font-black text-gray-900 dark:text-white">{PKR(total)}</span>
+      </div>
+    </div>
+  );
+}
+
+export default function CashSalePage() {
+  const router = useRouter();
+
+  // ── New Sale form state ──────────────────────────────────────────────
+  const [customerName, setCustomerName] = useState("");
+  const [customerPhone, setCustomerPhone] = useState("");
+  const [customerCnic, setCustomerCnic] = useState("");
+  const [productSearch, setProductSearch] = useState("");
+  const [cartItems, setCartItems] = useState<CartItem[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // ── History state ──────────────────────────────────────────────────
+  const [history, setHistory] = useState<CashSaleTxn[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(true);
+  const [historySearch, setHistorySearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
+  const [pagination, setPagination] = useState({ total: 0, totalPages: 1, hasNext: false, hasPrev: false });
+
+  // ── Edit / Delete state ────────────────────────────────────────────
+  const [editingSale, setEditingSale] = useState<CashSaleTxn | null>(null);
+  const [editLoading, setEditLoading] = useState(false);
+  const [editCustomerName, setEditCustomerName] = useState("");
+  const [editCustomerPhone, setEditCustomerPhone] = useState("");
+  const [editCustomerCnic, setEditCustomerCnic] = useState("");
+  const [editProductSearch, setEditProductSearch] = useState("");
+  const [editCartItems, setEditCartItems] = useState<CartItem[]>([]);
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+
+  const addToCart = (item: InventoryItem) => {
+    setCartItems((prev) => (prev.some((c) => c.inventory_id === item.id) ? prev : [...prev, cartItemFromInventory(item)]));
+    setProductSearch("");
+  };
+  const updateCartPrice = (inventory_id: number, price: number) => {
+    setCartItems((prev) => prev.map((c) => (c.inventory_id === inventory_id ? { ...c, final_price: price } : c)));
+  };
+  const removeFromCart = (inventory_id: number) => {
+    setCartItems((prev) => prev.filter((c) => c.inventory_id !== inventory_id));
   };
 
-  const clearProduct = () => {
-    setSelectedProduct(null);
-    setProductSearch("");
-    setSearchResults([]);
-    setFinalPrice("");
+  const addToEditCart = (item: InventoryItem) => {
+    setEditCartItems((prev) => (prev.some((c) => c.inventory_id === item.id) ? prev : [...prev, cartItemFromInventory(item)]));
+    setEditProductSearch("");
+  };
+  const updateEditCartPrice = (inventory_id: number, price: number) => {
+    setEditCartItems((prev) => prev.map((c) => (c.inventory_id === inventory_id ? { ...c, final_price: price } : c)));
+  };
+  const removeFromEditCart = (inventory_id: number) => {
+    setEditCartItems((prev) => prev.filter((c) => c.inventory_id !== inventory_id));
   };
 
   // ── History fetch ───────────────────────────────────────────────────
@@ -178,14 +351,14 @@ export default function CashSalePage() {
     setCustomerName("");
     setCustomerPhone("");
     setCustomerCnic("");
-    clearProduct();
+    setProductSearch("");
+    setCartItems([]);
   };
 
   const handleConfirmSale = async () => {
-    if (!selectedProduct) return toast.error("Select a product to sell");
+    if (cartItems.length === 0) return toast.error("Add at least one product to sell");
     if (!customerName.trim()) return toast.error("Customer name is required");
-    const priceNum = Number(finalPrice);
-    if (!priceNum || priceNum <= 0) return toast.error("Enter a valid final price");
+    if (cartItems.some((it) => !it.final_price || it.final_price <= 0)) return toast.error("Every item needs a valid final price");
 
     setIsSubmitting(true);
     try {
@@ -193,12 +366,14 @@ export default function CashSalePage() {
         method: "POST",
         headers: getAuthHeaders(),
         body: JSON.stringify({
-          inventory_id: selectedProduct.id,
           customer_name: customerName.trim(),
           customer_phone: customerPhone.trim() || undefined,
           customer_cnic: customerCnic.trim() || undefined,
-          quoted_price: selectedProduct.suggested_price || priceNum,
-          final_price: priceNum,
+          items: cartItems.map((it) => ({
+            inventory_id: it.inventory_id,
+            quoted_price: it.quoted_price,
+            final_price: it.final_price,
+          })),
         }),
       });
       const data = await res.json();
@@ -215,6 +390,102 @@ export default function CashSalePage() {
     }
   };
 
+  // ── Edit sale ───────────────────────────────────────────────────────
+  const openEdit = async (sale: CashSaleTxn) => {
+    setEditingSale(sale);
+    setEditLoading(true);
+    setEditCustomerName(sale.customer_name);
+    setEditCustomerPhone(sale.customer_phone || "");
+    setEditCustomerCnic(sale.customer_cnic || "");
+    setEditProductSearch("");
+    setEditCartItems([]);
+    try {
+      const res = await fetch(`${API_BASE}/api/outlet/cash-sale/${sale.id}`, { headers: getAuthHeaders() });
+      const data = await res.json();
+      if (data.success) {
+        setEditCartItems(
+          (data.data.items || []).map((it: any) => ({
+            inventory_id: it.inventory_id,
+            product_name: it.product_name,
+            category: it.category,
+            imei_serial: it.imei_serial,
+            color_variant: it.color_variant,
+            quoted_price: it.quoted_price,
+            final_price: it.final_price,
+          }))
+        );
+      }
+    } catch (err) {
+      console.error("Fetch sale for edit error:", err);
+      toast.error("Failed to load sale details");
+    } finally {
+      setEditLoading(false);
+    }
+  };
+
+  const closeEdit = () => {
+    setEditingSale(null);
+    setEditProductSearch("");
+    setEditCartItems([]);
+  };
+
+  const saveEdit = async () => {
+    if (!editingSale) return;
+    if (!editCustomerName.trim()) return toast.error("Customer name is required");
+    if (editCartItems.length === 0) return toast.error("Add at least one product");
+    if (editCartItems.some((it) => !it.final_price || it.final_price <= 0)) return toast.error("Every item needs a valid final price");
+
+    setIsSavingEdit(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/outlet/cash-sale/${editingSale.id}`, {
+        method: "PUT",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          customer_name: editCustomerName.trim(),
+          customer_phone: editCustomerPhone.trim() || null,
+          customer_cnic: editCustomerCnic.trim() || null,
+          items: editCartItems.map((it) => ({
+            inventory_id: it.inventory_id,
+            quoted_price: it.quoted_price,
+            final_price: it.final_price,
+          })),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.success === false) throw new Error(data.message || "Update failed");
+
+      toast.success("Sale updated successfully!");
+      closeEdit();
+      fetchHistory();
+    } catch (err: any) {
+      toast.error(err.message || "Update failed");
+    } finally {
+      setIsSavingEdit(false);
+    }
+  };
+
+  // ── Delete / cancel sale ────────────────────────────────────────────
+  const handleDelete = async (sale: CashSaleTxn) => {
+    const label = sale.item_count > 1 ? `${sale.item_count} items` : `"${sale.product_name}"`;
+    if (!confirm(`Cancel this sale of ${label} to ${sale.customer_name}? Every item will be restored to stock and the amount reversed from today's Cash Register.`)) return;
+    setDeletingId(sale.id);
+    try {
+      const res = await fetch(`${API_BASE}/api/outlet/cash-sale/${sale.id}`, {
+        method: "DELETE",
+        headers: getAuthHeaders(),
+      });
+      const data = await res.json();
+      if (!res.ok || data.success === false) throw new Error(data.message || "Cancellation failed");
+
+      toast.success("Sale cancelled successfully!");
+      fetchHistory();
+    } catch (err: any) {
+      toast.error(err.message || "Cancellation failed");
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   return (
     <div className="mx-auto max-w-7xl">
       <Breadcrumb pageName="Cash Sale" />
@@ -228,7 +499,7 @@ export default function CashSalePage() {
             </div>
             <div>
               <h3 className="text-xl font-black text-gray-900 dark:text-white tracking-tight">New Cash Sale</h3>
-              <p className="text-gray-400 dark:text-dark-6 text-sm font-medium">Outright walk-in sale against branch stock</p>
+              <p className="text-gray-400 dark:text-dark-6 text-sm font-medium">Outright walk-in sale against branch stock — add one or more products</p>
             </div>
           </div>
 
@@ -269,112 +540,16 @@ export default function CashSalePage() {
             </div>
           </div>
 
-          {/* Product Search */}
+          {/* Product Search + Cart */}
           <div className="space-y-4 mb-8">
-            <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest">Product</p>
-            <div className="relative" ref={searchBoxRef}>
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300" />
-              <input
-                type="text"
-                placeholder="Search in-stock product by name or IMEI..."
-                value={productSearch}
-                onChange={(e) => {
-                  setProductSearch(e.target.value);
-                  setShowResults(true);
-                  if (selectedProduct) setSelectedProduct(null);
-                }}
-                onFocus={() => setShowResults(true)}
-                className="w-full pl-11 pr-11 py-3.5 bg-gray-50 dark:bg-dark-2 border-2 border-transparent focus:border-[#E31E24] rounded-2xl outline-none transition-all font-semibold text-sm text-gray-900 dark:text-white placeholder:text-gray-400 placeholder:font-medium"
-              />
-              {(productSearch || selectedProduct) && (
-                <button
-                  type="button"
-                  onClick={clearProduct}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-300 hover:text-gray-500"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              )}
-
-              {showResults && !selectedProduct && (
-                <div className="absolute z-20 mt-2 w-full bg-white dark:bg-dark-2 rounded-2xl shadow-2xl border border-gray-100 dark:border-dark-3 max-h-80 overflow-y-auto">
-                  {isSearching ? (
-                    <div className="p-6 text-center text-sm text-gray-400 font-medium">Searching...</div>
-                  ) : searchResults.length > 0 ? (
-                    searchResults.map((item) => (
-                      <button
-                        key={item.id}
-                        type="button"
-                        onClick={() => handleSelectProduct(item)}
-                        className="w-full flex items-center justify-between gap-3 px-5 py-3.5 text-left hover:bg-gray-50 dark:hover:bg-dark-3 border-b border-gray-50 dark:border-dark-3 last:border-0 transition-colors"
-                      >
-                        <div className="flex items-center gap-3 min-w-0">
-                          <div className="w-9 h-9 rounded-xl bg-gray-100 dark:bg-dark-3 flex items-center justify-center text-gray-400 shrink-0">
-                            <Smartphone className="w-4 h-4" />
-                          </div>
-                          <div className="min-w-0">
-                            <p className="font-bold text-sm text-gray-900 dark:text-white truncate">{item.product_name}</p>
-                            <p className="text-xs text-gray-400 font-mono truncate">{item.imei_serial} {item.color_variant ? `• ${item.color_variant}` : ""}</p>
-                          </div>
-                        </div>
-                        <span className="text-xs font-black text-emerald-600 shrink-0">{PKR(item.suggested_price)}</span>
-                      </button>
-                    ))
-                  ) : (
-                    <div className="p-6 text-center text-sm text-gray-400 font-medium">No in-stock items found</div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {selectedProduct && (
-              <div className="p-5 rounded-2xl border-2 border-emerald-100 bg-emerald-50/50 dark:bg-emerald-900/10 dark:border-emerald-900/30 flex items-center gap-4 animate-in fade-in slide-in-from-top-2 duration-200">
-                <div className="w-11 h-11 bg-emerald-500 rounded-2xl flex items-center justify-center text-white shrink-0">
-                  <CheckCircle2 className="w-5 h-5" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-black text-gray-900 dark:text-white text-sm truncate">{selectedProduct.product_name}</p>
-                  <div className="flex items-center gap-2 flex-wrap mt-1">
-                    {selectedProduct.imei_serial && (
-                      <span className="text-[10px] font-bold text-gray-500 bg-white dark:bg-dark-2 px-2 py-0.5 rounded-lg font-mono">{selectedProduct.imei_serial}</span>
-                    )}
-                    {selectedProduct.color_variant && (
-                      <span className="text-[10px] font-bold text-gray-500 bg-white dark:bg-dark-2 px-2 py-0.5 rounded-lg">{selectedProduct.color_variant}</span>
-                    )}
-                    {selectedProduct.category && (
-                      <span className="text-[10px] font-bold text-blue-600 bg-blue-50 dark:bg-blue-900/20 px-2 py-0.5 rounded-lg uppercase">{selectedProduct.category}</span>
-                    )}
-                  </div>
-                </div>
-                <div className="text-right shrink-0">
-                  <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Suggested</p>
-                  <p className="font-black text-emerald-600 text-sm">{PKR(selectedProduct.suggested_price)}</p>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Final Price */}
-          <div className="space-y-3 mb-8">
-            <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest">Final Sale Price</p>
-            <div className="flex items-center gap-3 bg-gray-900 dark:bg-dark-2 rounded-2xl p-5">
-              <Tag className="w-6 h-6 text-emerald-400 shrink-0" />
-              <span className="text-gray-400 font-black text-lg">Rs.</span>
-              <input
-                type="number"
-                placeholder="0"
-                value={finalPrice}
-                onChange={(e) => setFinalPrice(e.target.value === "" ? "" : Number(e.target.value))}
-                disabled={!selectedProduct}
-                className="flex-1 bg-transparent outline-none font-black text-2xl text-white placeholder:text-gray-600 disabled:opacity-40"
-              />
-            </div>
-            <p className="text-xs text-gray-400 dark:text-dark-6 font-medium px-1">Editable — override the suggested price if needed.</p>
+            <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest">Products</p>
+            <ProductSearchBox search={productSearch} onSearchChange={setProductSearch} onPick={addToCart} />
+            <CartList items={cartItems} onPriceChange={updateCartPrice} onRemove={removeFromCart} />
           </div>
 
           <button
             onClick={handleConfirmSale}
-            disabled={isSubmitting || !selectedProduct}
+            disabled={isSubmitting || cartItems.length === 0}
             className="w-full py-4 bg-[#E31E24] text-white rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl shadow-red-100 dark:shadow-none hover:bg-red-700 active:scale-[0.99] disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-3"
           >
             {isSubmitting ? (
@@ -399,10 +574,10 @@ export default function CashSalePage() {
               </div>
               <ul className="space-y-3 text-sm text-gray-300 font-semibold">
                 <li className="flex gap-2"><span className="text-emerald-400">1.</span> Enter the customer's details.</li>
-                <li className="flex gap-2"><span className="text-emerald-400">2.</span> Search &amp; select a product — only in-stock items appear.</li>
-                <li className="flex gap-2"><span className="text-emerald-400">3.</span> Adjust the final price if needed, then confirm.</li>
-                <li className="flex gap-2"><span className="text-emerald-400">4.</span> The item is marked Sold and removed from available stock.</li>
-                <li className="flex gap-2"><span className="text-emerald-400">5.</span> The amount is added to today's Cash Register automatically.</li>
+                <li className="flex gap-2"><span className="text-emerald-400">2.</span> Search &amp; add one or more products — only in-stock items appear.</li>
+                <li className="flex gap-2"><span className="text-emerald-400">3.</span> Adjust each item's price if needed, then confirm.</li>
+                <li className="flex gap-2"><span className="text-emerald-400">4.</span> Every item is marked Sold and removed from available stock.</li>
+                <li className="flex gap-2"><span className="text-emerald-400">5.</span> The total is added to today's Cash Register automatically.</li>
               </ul>
             </div>
           </div>
@@ -445,31 +620,75 @@ export default function CashSalePage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-100 dark:border-dark-3">
-                {["Date", "Product", "IMEI", "Customer", "Phone", "Price", "Sold By"].map((h) => (
+                {["Date", "Product", "IMEI", "Customer", "Phone", "Price", "Sold By", "Actions"].map((h) => (
                   <th key={h} className="text-left py-3 px-3 text-[10px] font-black text-gray-400 uppercase tracking-widest whitespace-nowrap">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {historyLoading ? (
-                <tr><td colSpan={7} className="py-12 text-center text-gray-400 font-medium">Loading...</td></tr>
+                <tr><td colSpan={8} className="py-12 text-center text-gray-400 font-medium">Loading...</td></tr>
               ) : history.length === 0 ? (
-                <tr><td colSpan={7} className="py-12 text-center text-gray-400 font-medium">No cash sales yet</td></tr>
+                <tr><td colSpan={8} className="py-12 text-center text-gray-400 font-medium">No cash sales yet</td></tr>
               ) : (
-                history.map((sale) => (
-                  <tr key={sale.id} className="border-b border-gray-50 dark:border-dark-3 hover:bg-gray-50/50 dark:hover:bg-dark-2/50 transition-colors">
-                    <td className="py-3.5 px-3 whitespace-nowrap text-gray-500 dark:text-dark-6 font-medium">
-                      {new Date(sale.created_at).toLocaleDateString("en-PK", { day: "2-digit", month: "short", year: "numeric" })}
-                      <div className="text-[10px] text-gray-400">{new Date(sale.created_at).toLocaleTimeString("en-PK", { hour: "2-digit", minute: "2-digit" })}</div>
-                    </td>
-                    <td className="py-3.5 px-3 font-bold text-gray-900 dark:text-white whitespace-nowrap max-w-[220px] truncate">{sale.product_name}</td>
-                    <td className="py-3.5 px-3 font-mono text-xs text-gray-500 dark:text-dark-6 whitespace-nowrap">{sale.imei_serial || "—"}</td>
-                    <td className="py-3.5 px-3 font-semibold text-gray-700 dark:text-dark-6 whitespace-nowrap">{sale.customer_name}</td>
-                    <td className="py-3.5 px-3 text-gray-500 dark:text-dark-6 whitespace-nowrap">{sale.customer_phone || "—"}</td>
-                    <td className="py-3.5 px-3 font-black text-emerald-600 whitespace-nowrap">{PKR(sale.final_price)}</td>
-                    <td className="py-3.5 px-3 text-gray-500 dark:text-dark-6 whitespace-nowrap">{sale.sold_by?.full_name || sale.sold_by?.username || "—"}</td>
-                  </tr>
-                ))
+                history.map((sale) => {
+                  const editable = isWithinEditWindow(sale.created_at);
+                  return (
+                    <tr key={sale.id} className="border-b border-gray-50 dark:border-dark-3 hover:bg-gray-50/50 dark:hover:bg-dark-2/50 transition-colors">
+                      <td className="py-3.5 px-3 whitespace-nowrap text-gray-500 dark:text-dark-6 font-medium">
+                        {new Date(sale.created_at).toLocaleDateString("en-PK", { day: "2-digit", month: "short", year: "numeric" })}
+                        <div className="text-[10px] text-gray-400">{new Date(sale.created_at).toLocaleTimeString("en-PK", { hour: "2-digit", minute: "2-digit" })}</div>
+                      </td>
+                      <td className="py-3.5 px-3 font-bold text-gray-900 dark:text-white whitespace-nowrap max-w-[240px] truncate">
+                        {sale.product_name}
+                        {sale.item_count > 1 && (
+                          <span className="ml-2 inline-flex items-center gap-1 text-[9px] font-black text-blue-600 bg-blue-50 dark:bg-blue-900/20 px-1.5 py-0.5 rounded-md align-middle">
+                            <ShoppingCart className="w-2.5 h-2.5" /> {sale.item_count}
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-3.5 px-3 font-mono text-xs text-gray-500 dark:text-dark-6 whitespace-nowrap">{sale.imei_serial || "—"}</td>
+                      <td className="py-3.5 px-3 font-semibold text-gray-700 dark:text-dark-6 whitespace-nowrap">{sale.customer_name}</td>
+                      <td className="py-3.5 px-3 text-gray-500 dark:text-dark-6 whitespace-nowrap">{sale.customer_phone || "—"}</td>
+                      <td className="py-3.5 px-3 font-black text-emerald-600 whitespace-nowrap">{PKR(sale.final_price)}</td>
+                      <td className="py-3.5 px-3 text-gray-500 dark:text-dark-6 whitespace-nowrap">{sale.sold_by?.full_name || sale.sold_by?.username || "—"}</td>
+                      <td className="py-3.5 px-3 whitespace-nowrap">
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            title="Print / Download Invoice"
+                            onClick={() => router.push(`/outlet/cash-sale/invoice/${sale.id}`)}
+                            className="p-2 rounded-lg text-gray-400 hover:text-[#E31E24] hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors"
+                          >
+                            <Printer className="w-4 h-4" />
+                          </button>
+                          <button
+                            type="button"
+                            title={editable ? "Edit sale" : "Older than 3 days — can no longer be edited"}
+                            onClick={() => editable && openEdit(sale)}
+                            disabled={!editable}
+                            className="p-2 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/10 transition-colors disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </button>
+                          <button
+                            type="button"
+                            title={editable ? "Cancel sale" : "Older than 3 days — can no longer be cancelled"}
+                            onClick={() => editable && handleDelete(sale)}
+                            disabled={!editable || deletingId === sale.id}
+                            className="p-2 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                          >
+                            {deletingId === sale.id ? (
+                              <div className="w-4 h-4 border-2 border-red-300 border-t-red-600 rounded-full animate-spin" />
+                            ) : (
+                              <Trash2 className="w-4 h-4" />
+                            )}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
@@ -498,6 +717,89 @@ export default function CashSalePage() {
           </div>
         </div>
       </div>
+
+      {/* ── Edit Sale Modal ───────────────────────────────────────────── */}
+      {editingSale && (
+        <div className="fixed inset-0 z-[999] bg-black/40 flex items-center justify-center p-4" onClick={closeEdit}>
+          <div
+            className="bg-white dark:bg-gray-dark rounded-[2rem] shadow-2xl w-full max-w-lg p-8 max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-lg font-black text-gray-900 dark:text-white">Edit Sale</h3>
+              <button onClick={closeEdit} className="text-gray-300 hover:text-gray-500">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {editLoading ? (
+              <div className="py-16 text-center text-gray-400 font-medium text-sm">Loading sale details...</div>
+            ) : (
+              <>
+                <div className="space-y-4">
+                  <div className="relative">
+                    <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300" />
+                    <input
+                      type="text"
+                      placeholder="Customer Name *"
+                      value={editCustomerName}
+                      onChange={(e) => setEditCustomerName(e.target.value)}
+                      className="w-full pl-11 pr-4 py-3.5 bg-gray-50 dark:bg-dark-2 border-2 border-transparent focus:border-[#E31E24] rounded-2xl outline-none transition-all font-semibold text-sm text-gray-900 dark:text-white"
+                    />
+                  </div>
+                  <div className="relative">
+                    <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300" />
+                    <input
+                      type="text"
+                      placeholder="Phone Number"
+                      value={editCustomerPhone}
+                      onChange={(e) => setEditCustomerPhone(e.target.value)}
+                      className="w-full pl-11 pr-4 py-3.5 bg-gray-50 dark:bg-dark-2 border-2 border-transparent focus:border-[#E31E24] rounded-2xl outline-none transition-all font-semibold text-sm text-gray-900 dark:text-white"
+                    />
+                  </div>
+                  <div className="relative">
+                    <CreditCard className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300" />
+                    <input
+                      type="text"
+                      placeholder="CNIC (optional)"
+                      value={editCustomerCnic}
+                      onChange={(e) => setEditCustomerCnic(e.target.value)}
+                      className="w-full pl-11 pr-4 py-3.5 bg-gray-50 dark:bg-dark-2 border-2 border-transparent focus:border-[#E31E24] rounded-2xl outline-none transition-all font-semibold text-sm text-gray-900 dark:text-white"
+                    />
+                  </div>
+
+                  <div>
+                    <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-2">Products</p>
+                    <ProductSearchBox
+                      search={editProductSearch}
+                      onSearchChange={setEditProductSearch}
+                      onPick={addToEditCart}
+                      placeholder="Search to add another product..."
+                    />
+                    <div className="mt-3">
+                      <CartList items={editCartItems} onPriceChange={updateEditCartPrice} onRemove={removeFromEditCart} />
+                    </div>
+                  </div>
+                </div>
+
+                <button
+                  onClick={saveEdit}
+                  disabled={isSavingEdit}
+                  className="w-full mt-6 py-3.5 bg-[#E31E24] text-white rounded-2xl font-black text-sm uppercase tracking-widest shadow-lg hover:bg-red-700 active:scale-[0.99] disabled:opacity-40 transition-all flex items-center justify-center gap-2"
+                >
+                  {isSavingEdit ? (
+                    <div className="size-5 border-[3px] border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    <>
+                      <CheckCircle2 className="w-4 h-4" /> Save Changes
+                    </>
+                  )}
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
