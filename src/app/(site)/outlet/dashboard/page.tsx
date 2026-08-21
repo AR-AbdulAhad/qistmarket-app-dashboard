@@ -42,6 +42,12 @@ type Stats = {
     totalInstallmentDue: number;
     totalInstallmentPaid: number;
     totalRemaining: number;
+    monthDue?: number;
+    monthPaid?: number;
+    monthRemaining?: number;
+    paidPercentage?: number;
+    remainingPercentage?: number;
+    cumulativeRemaining?: number;
     totalArrears: number;
     pendingInstallmentCount: number;
     ordersWithPendingInstallments: number;
@@ -246,30 +252,44 @@ export default function OutletDashboardPage() {
   const currentCustomersTotal = stats?.graphData?.customers?.current?.reduce((a: number, b: number) => a + b, 0) || 0;
   const previousCustomersTotal = stats?.graphData?.customers?.previous?.reduce((a: number, b: number) => a + b, 0) || 0;
 
-  // Radial gauge: Installment collection rate
-  const rawCollectionRate =
-    stats && stats.installments.totalInstallmentDue > 0
-      ? (stats.installments.totalInstallmentPaid / stats.installments.totalInstallmentDue) * 100
-      : 0;
-  const collectionRate =
-    rawCollectionRate > 0 && rawCollectionRate < 0.1
-      ? 0.1
-      : Math.round(rawCollectionRate * 10) / 10;
+  // Month-wise Collection Rate calculations
+  const monthDue = stats?.installments?.monthDue ?? stats?.installments?.totalInstallmentDue ?? 0;
+  const monthPaid = stats?.installments?.monthPaid ?? stats?.installments?.totalInstallmentPaid ?? 0;
+  const monthRemaining = stats?.installments?.monthRemaining ?? stats?.installments?.totalRemaining ?? 0;
 
-  const radialOptions: ApexOptions = {
-    chart: { type: "radialBar", fontFamily: "inherit" },
+  const paidPct = stats?.installments?.paidPercentage ?? (monthDue > 0 ? Math.round((monthPaid / monthDue) * 1000) / 10 : 0);
+  const remainingPct = stats?.installments?.remainingPercentage ?? (monthDue > 0 ? Math.round((monthRemaining / monthDue) * 1000) / 10 : 0);
+
+  const collectionDonutOptions: ApexOptions = {
+    chart: { type: "donut", fontFamily: "inherit" },
+    labels: ["Total Month Paid", "Month Remaining"],
+    colors: ["#10B981", "#F43F5E"],
     plotOptions: {
-      radialBar: {
-        hollow: { size: "62%" },
-        dataLabels: {
-          name: { show: true, fontSize: "11px", color: "#6B7280", offsetY: -6 },
-          value: { show: true, fontSize: "22px", fontWeight: "800", color: "#111827", formatter: (val) => `${val}%` },
+      pie: {
+        donut: {
+          size: "72%",
+          labels: {
+            show: true,
+            name: { show: true, fontSize: "10px", color: "#6B7280", offsetY: -4 },
+            value: { show: true, fontSize: "18px", fontWeight: "800", color: "#111827", formatter: () => `${paidPct}%` },
+            total: {
+              show: true,
+              label: "Recovered",
+              fontSize: "10px",
+              fontWeight: "700",
+              color: "#6B7280",
+              formatter: () => `${paidPct}%`,
+            },
+          },
         },
-        track: { background: "#F3F4F6" },
       },
     },
-    colors: ["#10B981"],
-    labels: ["Recovered"],
+    dataLabels: { enabled: false },
+    legend: { show: false },
+    tooltip: {
+      theme: "dark",
+      y: { formatter: (val) => `${PKR(val)}` }
+    },
   };
 
   const quickLinks = [
@@ -545,7 +565,7 @@ export default function OutletDashboardPage() {
         <section className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mb-8">
           
           {/* Order Breakdown Donut */}
-          <div className="col-span-12 lg:col-span-5 rounded-3xl border border-gray-100 bg-white p-6 shadow-xl shadow-gray-200/40">
+          <div className="col-span-12 lg:col-span-4 rounded-3xl border border-gray-100 bg-white p-6 shadow-xl shadow-gray-200/40">
             <h3 className="text-sm font-black text-gray-800 uppercase tracking-tight">Order Breakdown</h3>
             <p className="text-[9px] font-bold text-gray-400 mt-0.5 mb-6 uppercase tracking-widest">Status ratio split</p>
             {orderDonutSeries.reduce((a, b) => a + b, 0) > 0 ? (
@@ -555,25 +575,35 @@ export default function OutletDashboardPage() {
             )}
           </div>
 
-          {/* Collection Progress Radial */}
-          <div className="col-span-12 lg:col-span-3 rounded-3xl border border-gray-100 bg-white p-6 shadow-xl shadow-gray-200/40 flex flex-col justify-between">
+          {/* Collection Progress Radial / Donut */}
+          <div className="col-span-12 lg:col-span-4 rounded-3xl border border-gray-100 bg-white p-6 shadow-xl shadow-gray-200/40 flex flex-col justify-between">
             <div>
               <h3 className="text-sm font-black text-gray-800 uppercase tracking-tight">Collection Rate</h3>
-              <p className="text-[9px] font-bold text-gray-400 mt-0.5 mb-4 uppercase tracking-widest">Installment returns</p>
-              <Chart options={radialOptions} series={[collectionRate]} type="radialBar" height={190} />
+              <p className="text-[9px] font-bold text-gray-400 mt-0.5 mb-3 uppercase tracking-widest">Installment Returns (Month-Wise)</p>
+              {monthDue > 0 ? (
+                <Chart options={collectionDonutOptions} series={[monthPaid, monthRemaining]} type="donut" height={190} />
+              ) : (
+                <div className="flex h-44 items-center justify-center text-gray-300 font-bold uppercase tracking-widest text-xs">No Due Data</div>
+              )}
             </div>
-            <div className="space-y-2 border-t border-slate-50 pt-4">
-              <div className="flex justify-between text-[10px] font-black uppercase">
-                <span className="text-gray-400">Total Due</span>
-                <span className="text-gray-800">{PKR(stats.installments.totalInstallmentDue)}</span>
+            <div className="space-y-2.5 border-t border-slate-100 pt-4">
+              <div className="flex items-center justify-between text-[10px] font-black uppercase gap-2">
+                <span className="text-gray-400 whitespace-nowrap shrink-0">Total Due</span>
+                <span className="text-gray-800 whitespace-nowrap shrink-0">{PKR(monthDue)}</span>
               </div>
-              <div className="flex justify-between text-[10px] font-black uppercase">
-                <span className="text-gray-400">Total Paid</span>
-                <span className="text-emerald-500">{PKR(stats.installments.totalInstallmentPaid)}</span>
+              <div className="flex items-center justify-between text-[10px] font-black uppercase gap-2">
+                <span className="text-gray-400 whitespace-nowrap shrink-0">Total Month Paid</span>
+                <div className="flex items-center gap-1.5 whitespace-nowrap shrink-0">
+                  <span className="text-emerald-600">{PKR(monthPaid)}</span>
+                  <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-[9px] font-black text-emerald-600">{paidPct}%</span>
+                </div>
               </div>
-              <div className="flex justify-between text-[10px] font-black uppercase">
-                <span className="text-gray-400">Remaining</span>
-                <span className="text-rose-500">{PKR(stats.installments.totalRemaining)}</span>
+              <div className="flex items-center justify-between text-[10px] font-black uppercase gap-2">
+                <span className="text-gray-400 whitespace-nowrap shrink-0">Month Remaining</span>
+                <div className="flex items-center gap-1.5 whitespace-nowrap shrink-0">
+                  <span className="text-rose-600">{PKR(monthRemaining)}</span>
+                  <span className="rounded bg-rose-50 px-1.5 py-0.5 text-[9px] font-black text-rose-600">{remainingPct}%</span>
+                </div>
               </div>
             </div>
           </div>
@@ -620,7 +650,7 @@ export default function OutletDashboardPage() {
                 { label: "Pending Collections", value: stats.installments.pendingInstallmentCount, bg: "bg-amber-50", text: "text-amber-500", format: "number", href: "/outlet/installments/view?category=all" },
                 { label: "Impacted Customers", value: stats.installments.ordersWithPendingInstallments, bg: "bg-orange-50", text: "text-orange-500", format: "number", href: "/outlet/installments/view?category=impacted" },
                 { label: "Arrears", value: stats.installments.totalArrears, bg: "bg-rose-50", text: "text-rose-500", format: "currency", href: "/outlet/installments/view?category=impacted" },
-                { label: "Cumulative Remaining", value: stats.installments.totalRemaining, bg: "bg-violet-50", text: "text-violet-500", format: "currency", href: "/outlet/installments/view" },
+                { label: "Cumulative Remaining", value: stats.installments.cumulativeRemaining ?? stats.installments.totalRemaining, bg: "bg-violet-50", text: "text-violet-500", format: "currency", href: "/outlet/installments/view" },
               ].map((item) => (
                 <div
                   key={item.label}

@@ -1,11 +1,21 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
 import toast from "react-hot-toast";
 import Cookies from "js-cookie";
-import { Search, Image as ImageIcon, X, CheckSquare, Clock, Grab } from "lucide-react";
+import { Search, Image as ImageIcon, X, CheckSquare, Clock, Grab, Eye, Link2, ExternalLink } from "lucide-react";
 import CnicSearch from "@/components/complaints/CnicSearch";
+
+interface LinkedOrder {
+  id: number;
+  order_ref: string;
+  customer_name: string;
+  product_name?: string;
+  status?: string;
+  created_at?: string;
+}
 
 interface ComplaintItem {
   id: number;
@@ -20,6 +30,7 @@ interface ComplaintItem {
   media_urls: string[] | null;
   created_by?: { full_name: string; role?: { name: string } };
   assigned_to?: { full_name: string };
+  order?: LinkedOrder | null;
 }
 
 type TabType = "unassigned" | "picked" | "solved" | "new";
@@ -45,6 +56,10 @@ export default function CsrComplaintsPage() {
 
   // Resolve State
   const [selectedComplaint, setSelectedComplaint] = useState<ComplaintItem | null>(null);
+  const [selectedTab, setSelectedTab] = useState<TabType>("unassigned");
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [candidateOrders, setCandidateOrders] = useState<LinkedOrder[]>([]);
+  const [linkingOrderId, setLinkingOrderId] = useState<number | null>(null);
   const [resolveNote, setResolveNote] = useState("");
   const [resolveStatus, setResolveStatus] = useState("Pending");
   const [resolving, setResolving] = useState(false);
@@ -124,14 +139,69 @@ export default function CsrComplaintsPage() {
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error?.message || "Failed to pick complaint.");
-      
+
       toast.success("Complaint picked successfully.");
+      if (selectedComplaint?.id === id) setSelectedComplaint(null);
       loadComplaints(page, activeTab, search);
     } catch (error: any) {
       console.error(error);
       toast.error(error.message);
     } finally {
       setPickingId(null);
+    }
+  };
+
+  // Opens the detail modal for any tab (including "unassigned", where a CSR
+  // couldn't previously see full details/attachments before deciding whether
+  // to pick a complaint) and fetches candidate matching orders so it can be
+  // linked into that customer's actual profile.
+  const viewComplaint = async (item: ComplaintItem, tab: TabType) => {
+    setSelectedComplaint(item);
+    setSelectedTab(tab);
+    setResolveStatus(item.status);
+    setResolveNote(item.resolution_note || "");
+    setCandidateOrders([]);
+    setDetailLoading(true);
+    try {
+      const token = Cookies.get("auth_token");
+      const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/complaints/${item.id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const json = await res.json();
+      if (json.success) {
+        setSelectedComplaint(json.data.complaint);
+        setCandidateOrders(json.data.candidateOrders || []);
+      }
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
+  const linkOrder = async (orderId: number) => {
+    if (!selectedComplaint) return;
+    setLinkingOrderId(orderId);
+    try {
+      const token = Cookies.get("auth_token");
+      const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/complaints/${selectedComplaint.id}/link`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ order_id: orderId }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error?.message || "Failed to link complaint.");
+      setSelectedComplaint(json.data.complaint);
+      toast.success("Complaint linked to the customer's order.");
+      loadComplaints(page, activeTab, search);
+    } catch (error: any) {
+      console.error(error);
+      toast.error(error.message || "Failed to link complaint.");
+    } finally {
+      setLinkingOrderId(null);
     }
   };
 
@@ -376,25 +446,35 @@ export default function CsrComplaintsPage() {
                         <ImageIcon className="h-3 w-3" /> {item.media_urls.length} Attachments
                       </div>
                     )}
+
+                    {item.order && (
+                      <div className="mt-2 flex items-center gap-1 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                        <Link2 className="h-3 w-3" /> Linked to {item.order.order_ref}
+                      </div>
+                    )}
                   </div>
-                  
+
                   <div className="mt-4 flex items-center gap-2 pt-4 border-t border-gray-100 dark:border-gray-800">
                     {activeTab === 'unassigned' ? (
-                      <button
-                        onClick={() => handlePick(item.id)}
-                        disabled={pickingId === item.id}
-                        className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#ff3d3d] py-2 text-sm font-medium text-white transition hover:bg-red-600 disabled:opacity-50"
-                      >
-                        <Grab className="h-4 w-4" />
-                        {pickingId === item.id ? "Picking..." : "Pick Complaint"}
-                      </button>
+                      <>
+                        <button
+                          onClick={() => viewComplaint(item, activeTab)}
+                          className="flex items-center justify-center gap-2 rounded-lg bg-gray-100 px-3 py-2 text-sm font-medium text-gray-900 transition hover:bg-gray-200 dark:bg-gray-800 dark:text-white dark:hover:bg-gray-700"
+                        >
+                          <Eye className="h-4 w-4" /> View
+                        </button>
+                        <button
+                          onClick={() => handlePick(item.id)}
+                          disabled={pickingId === item.id}
+                          className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-[#ff3d3d] py-2 text-sm font-medium text-white transition hover:bg-red-600 disabled:opacity-50"
+                        >
+                          <Grab className="h-4 w-4" />
+                          {pickingId === item.id ? "Picking..." : "Pick Complaint"}
+                        </button>
+                      </>
                     ) : (
                       <button
-                        onClick={() => {
-                          setSelectedComplaint(item);
-                          setResolveStatus(item.status);
-                          setResolveNote(item.resolution_note || "");
-                        }}
+                        onClick={() => viewComplaint(item, activeTab)}
                         className="w-full rounded-lg bg-gray-100 py-2 text-sm font-medium text-gray-900 transition hover:bg-gray-200 dark:bg-gray-800 dark:text-white dark:hover:bg-gray-700"
                       >
                         {activeTab === 'solved' ? 'View Details' : 'View & Resolve'}
@@ -479,13 +559,66 @@ export default function CsrComplaintsPage() {
                 </div>
               )}
 
-              {activeTab !== 'solved' && (
+              <hr className="my-6 border-gray-200 dark:border-gray-800" />
+              <h4 className="font-semibold text-gray-900 dark:text-white flex items-center gap-2 mb-4">
+                <Link2 className="h-4 w-4" /> Customer Profile
+              </h4>
+
+              {detailLoading ? (
+                <p className="text-sm text-gray-400">Looking up matching customer records...</p>
+              ) : selectedComplaint.order ? (
+                <div className="flex items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-900/40 dark:bg-emerald-900/10">
+                  <div>
+                    <p className="text-sm font-semibold text-emerald-800 dark:text-emerald-300">Linked to Order {selectedComplaint.order.order_ref}</p>
+                    <p className="text-xs text-emerald-600 dark:text-emerald-400">{selectedComplaint.order.customer_name}</p>
+                  </div>
+                  <Link
+                    href={`/orders/${selectedComplaint.order.id}`}
+                    target="_blank"
+                    className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-700 transition"
+                  >
+                    View Ledger & Profile <ExternalLink className="h-3 w-3" />
+                  </Link>
+                </div>
+              ) : candidateOrders.length > 0 ? (
+                <div className="space-y-2">
+                  <p className="text-xs text-gray-500 dark:text-gray-400">Matched by CNIC/mobile number — confirm the right order to link this complaint to that customer's profile.</p>
+                  {candidateOrders.map((o) => (
+                    <div key={o.id} className="flex items-center justify-between rounded-xl border border-gray-200 p-3 dark:border-gray-700">
+                      <div>
+                        <p className="text-sm font-medium text-gray-900 dark:text-white">{o.order_ref} — {o.customer_name}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">{o.product_name} {o.status && `• ${o.status}`}</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Link
+                          href={`/orders/${o.id}`}
+                          target="_blank"
+                          className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800 transition"
+                        >
+                          Preview
+                        </Link>
+                        <button
+                          onClick={() => linkOrder(o.id)}
+                          disabled={linkingOrderId === o.id}
+                          className="rounded-lg bg-[#ff3d3d] px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-600 transition disabled:opacity-50"
+                        >
+                          {linkingOrderId === o.id ? "Linking..." : "Link & View"}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-gray-400">No matching customer/order found by CNIC or mobile number.</p>
+              )}
+
+              {selectedTab === 'picked' && (
                 <>
                   <hr className="my-6 border-gray-200 dark:border-gray-800" />
                   <h4 className="font-semibold text-gray-900 dark:text-white flex items-center gap-2 mb-4">
                     <CheckSquare className="h-4 w-4" /> Resolution Action
                   </h4>
-                  
+
                   <div className="space-y-4">
                     <div>
                       <label className="mb-1 block text-sm text-gray-600 dark:text-gray-400">Update Status</label>
@@ -514,7 +647,7 @@ export default function CsrComplaintsPage() {
                 </>
               )}
 
-              {activeTab === 'solved' && selectedComplaint.resolution_note && (
+              {selectedTab === 'solved' && selectedComplaint.resolution_note && (
                 <div className="mt-6 border-t pt-4">
                    <p className="text-xs text-gray-500 dark:text-gray-400 uppercase font-bold tracking-wider mb-2">Resolution Note</p>
                    <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-xl text-green-800 dark:text-green-300 text-sm italic">
@@ -531,7 +664,17 @@ export default function CsrComplaintsPage() {
               >
                 Close
               </button>
-              {activeTab !== 'solved' && (
+              {selectedTab === 'unassigned' && (
+                <button
+                  onClick={() => handlePick(selectedComplaint.id)}
+                  disabled={pickingId === selectedComplaint.id}
+                  className="flex items-center gap-2 rounded-lg bg-[#ff3d3d] px-6 py-2 text-sm font-medium text-white hover:bg-red-600 transition disabled:opacity-50"
+                >
+                  <Grab className="h-4 w-4" />
+                  {pickingId === selectedComplaint.id ? "Picking..." : "Pick Complaint"}
+                </button>
+              )}
+              {selectedTab === 'picked' && (
                 <button
                   onClick={handleUpdateStatus}
                   disabled={resolving}
