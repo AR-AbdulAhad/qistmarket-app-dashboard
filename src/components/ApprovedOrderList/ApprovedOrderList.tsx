@@ -303,15 +303,16 @@ const ApprovedOrderList = () => {
         body: JSON.stringify({ action: 'unassign' }),
       })
 
-      if (!res.ok) throw new Error('Failed to unassign delivery officer')
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data?.message || 'Failed to unassign delivery officer')
 
       await fetchApprovedOrders()
       toast.success('Unassigned delivery officer successfully')
       setSingleUnassignModalOpen(false)
       setSelectedOrder(null)
-    } catch (err) {
+    } catch (err: any) {
       console.error('Unassign delivery error:', err)
-      toast.error('Failed to unassign delivery officer')
+      toast.error(err?.message || 'Failed to unassign delivery officer')
     } finally {
       setIsUnassigning(false)
     }
@@ -367,15 +368,16 @@ const ApprovedOrderList = () => {
         body: JSON.stringify({ order_ids: ids, action: 'unassign' }),
       })
 
-      if (!res.ok) throw new Error('Bulk unassign failed')
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data?.message || 'Bulk unassign failed')
 
       await fetchApprovedOrders()
-      toast.success(`Bulk unassigned delivery officer from ${ids.length} orders`)
+      toast.success(data?.message || `Bulk unassigned delivery officer from ${ids.length} orders`)
       setBulkUnassignModalOpen(false)
       setRowSelection({})
-    } catch (err) {
+    } catch (err: any) {
       console.error('Bulk unassign delivery error:', err)
-      toast.error('Failed to perform bulk unassign')
+      toast.error(err?.message || 'Failed to perform bulk unassign')
     } finally {
       setIsBulkUnassigning(false)
     }
