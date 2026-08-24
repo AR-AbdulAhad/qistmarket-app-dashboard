@@ -76,6 +76,7 @@ export default function OutletReturnsPage() {
     setOrderQuery(o.order_ref);
     setRefundAmt("");
     setCustomerPhone(o.whatsapp_number || "");
+    setBlacklistCustomer(false);
   };
 
   const handleInitiateReturn = async () => {
@@ -127,6 +128,7 @@ export default function OutletReturnsPage() {
   const filteredRecords = records.filter(r =>
     r.order?.order_ref?.toLowerCase().includes(search.toLowerCase()) ||
     r.order?.customer_name?.toLowerCase().includes(search.toLowerCase()) ||
+    r.order?.whatsapp_number?.toLowerCase().includes(search.toLowerCase()) ||
     r.imei_returned?.toLowerCase().includes(search.toLowerCase())
   );
 
@@ -185,7 +187,7 @@ export default function OutletReturnsPage() {
           </label>
           <div className="relative">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-            <input type="text" placeholder="Order ref, customer name, or IMEI" value={orderQuery}
+            <input type="text" placeholder="Order ref, token no, customer name, phone, CNIC, or IMEI" value={orderQuery}
               onChange={e => setOrderQuery(e.target.value)}
               className="w-full pl-12 pr-4 py-4 bg-gray-50 dark:bg-gray-900 border-2 border-stroke dark:border-strokedark rounded-2xl focus:border-primary outline-none font-bold text-gray-800 dark:text-white transition-all" />
             {searching && <div className="absolute right-4 top-1/2 -translate-y-1/2"><div className="w-5 h-5 border-2 border-primary/30 border-t-primary rounded-full animate-spin"></div></div>}
@@ -197,8 +199,15 @@ export default function OutletReturnsPage() {
                 <button key={o.id} onClick={() => handleSelectOrder(o)}
                   className="w-full px-5 py-4 text-left hover:bg-primary/5 border-b border-stroke dark:border-strokedark last:border-none transition-colors flex items-center justify-between group">
                   <div>
-                    <p className="font-black text-gray-800 dark:text-white group-hover:text-primary transition-colors">#{o.order_ref}</p>
-                    <p className="text-[10px] font-bold text-gray-400 uppercase">{o.customer_name} &bull; {o.delivered_product_name} &bull; IMEI: {o.delivered_imei}</p>
+                    <p className="font-black text-gray-800 dark:text-white group-hover:text-primary transition-colors flex items-center gap-2">
+                      #{o.order_ref}
+                      {o.is_customer_blacklisted && (
+                        <span className="text-[9px] font-black px-1.5 py-0.5 rounded uppercase tracking-tighter bg-red-100 text-red-600 border border-red-200 dark:bg-red-900/30 dark:border-red-900/50">
+                          Blacklisted
+                        </span>
+                      )}
+                    </p>
+                    <p className="text-[10px] font-bold text-gray-400 uppercase">{o.customer_name} &bull; {o.whatsapp_number} &bull; {o.delivered_product_name} &bull; IMEI: {o.delivered_imei}</p>
                   </div>
                   <ChevronRight size={16} className="text-gray-300 group-hover:text-primary" />
                 </button>
@@ -214,7 +223,14 @@ export default function OutletReturnsPage() {
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary"><PackageX size={22} /></div>
                 <div>
-                  <p className="text-sm font-black text-gray-800 dark:text-white">#{selectedOrder.order_ref}</p>
+                  <p className="text-sm font-black text-gray-800 dark:text-white flex items-center gap-2">
+                    #{selectedOrder.order_ref}
+                    {selectedOrder.is_customer_blacklisted && (
+                      <span className="text-[9px] font-black px-1.5 py-0.5 rounded uppercase tracking-tighter bg-red-100 text-red-600 border border-red-200 dark:bg-red-900/30 dark:border-red-900/50">
+                        Blacklisted
+                      </span>
+                    )}
+                  </p>
                   <p className="text-xs text-gray-500">{selectedOrder.customer_name} &bull; {selectedOrder.delivered_product_name}</p>
                   <p className="text-[10px] font-mono text-gray-400 mt-0.5">IMEI: {selectedOrder.delivered_imei}</p>
                 </div>
@@ -276,17 +292,19 @@ export default function OutletReturnsPage() {
                 className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border-2 border-stroke dark:border-strokedark rounded-2xl focus:border-primary outline-none font-bold text-gray-800 dark:text-white transition-all" />
             </div>
 
-            {/* Blacklist Toggle */}
-            <div className="flex items-center justify-between bg-gray-50 dark:bg-gray-900 border border-stroke dark:border-strokedark p-4 rounded-xl">
-              <div>
-                <h4 className="text-sm font-black text-gray-800 dark:text-white uppercase tracking-tight">Blacklist Customer</h4>
-                <p className="text-[10px] text-gray-500 uppercase font-bold mt-1">If enabled, the customer & order will be blacklisted.</p>
+            {/* Blacklist Toggle (hidden when customer is already blacklisted) */}
+            {!selectedOrder.is_customer_blacklisted && (
+              <div className="flex items-center justify-between bg-gray-50 dark:bg-gray-900 border border-stroke dark:border-strokedark p-4 rounded-xl">
+                <div>
+                  <h4 className="text-sm font-black text-gray-800 dark:text-white uppercase tracking-tight">Blacklist Customer</h4>
+                  <p className="text-[10px] text-gray-500 uppercase font-bold mt-1">If enabled, the customer & order will be blacklisted.</p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" className="sr-only peer" checked={blacklistCustomer} onChange={() => setBlacklistCustomer(!blacklistCustomer)} />
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-red-600"></div>
+                </label>
               </div>
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input type="checkbox" className="sr-only peer" checked={blacklistCustomer} onChange={() => setBlacklistCustomer(!blacklistCustomer)} />
-                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-red-600"></div>
-              </label>
-            </div>
+            )}
 
             <button onClick={handleInitiateReturn} disabled={submitting || (isCash && !refundAmt)}
               className="w-full py-5 bg-primary hover:bg-opacity-90 disabled:opacity-50 text-white rounded-2xl text-sm font-black uppercase tracking-widest shadow-2xl shadow-primary/30 transition-all active:scale-[0.98] flex items-center justify-center gap-3">

@@ -1295,8 +1295,8 @@ const OrderListContent = ({ forcedStatus, forcedChannel, apiEndpoint, hideAction
                   </>
                 )}
 
-                {/* Self Pickup (for outlet users when approved) */}
-                {isOutletBranchUser && !isSuperAdmin && order.status === 'approved' && !order.delivery_officer && !order.verification?.home_location_required && (
+                {/* Self Pickup (for outlet users when approved or returned) */}
+                {isOutletBranchUser && !isSuperAdmin && (order.status === 'approved' || order.status === 'returned') && !order.delivery_officer && !order.verification?.home_location_required && (
                   <li>
                     <button
                       onClick={() => {

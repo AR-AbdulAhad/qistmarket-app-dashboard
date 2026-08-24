@@ -1683,7 +1683,7 @@ export default function OrderDetailsPage() {
                 )}
             </div>
 
-            {(order.status === 'delivered') && (
+            {(order.status === 'delivered' || order.status?.toLowerCase() === 'returned') && (
                 <div className="mt-10">
                     <DeliveredProductDetails 
                         orderId={order.id} 

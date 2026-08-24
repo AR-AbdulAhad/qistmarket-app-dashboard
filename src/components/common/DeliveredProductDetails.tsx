@@ -109,6 +109,8 @@ export default function DeliveredProductDetails({
 
     if (!deliveredProduct) return null;
 
+    const isReturned = deliveredProduct.order_info?.status?.toLowerCase() === 'returned';
+
     // Helper function to get delivery agent name
     const getDeliveryAgentName = () => {
         // First check if we have delivery agent details from API
@@ -128,16 +130,21 @@ export default function DeliveredProductDetails({
             <div className="border-b border-stroke px-6 py-4 dark:border-dark-3">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                        <span className="flex h-10 w-10 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30">
-                            <svg className="h-5 w-5 text-green-600 dark:text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <span className={cn(
+                            "flex h-10 w-10 items-center justify-center rounded-full",
+                            isReturned ? "bg-orange-100 dark:bg-orange-900/30" : "bg-green-100 dark:bg-green-900/30"
+                        )}>
+                            <svg className={cn("h-5 w-5", isReturned ? "text-orange-600 dark:text-orange-400" : "text-green-600 dark:text-green-400")} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                             </svg>
                         </span>
-                        <h2 className="text-xl font-bold text-dark dark:text-white">Delivered Product Details</h2>
+                        <h2 className="text-xl font-bold text-dark dark:text-white">
+                            {isReturned ? 'Delivered & Returned Product Details' : 'Delivered Product Details'}
+                        </h2>
                     </div>
                     {deliveredProduct.order_info?.delivered_at && (
                         <span className="text-sm text-gray-500 dark:text-gray-400">
-                            Delivered on: {formatDateTimeUTC(deliveredProduct.order_info.delivered_at)}
+                            {isReturned ? 'Returned on' : 'Delivered on'}: {formatDateTimeUTC(deliveredProduct.order_info.delivered_at)}
                         </span>
                     )}
                 </div>
@@ -289,13 +296,92 @@ export default function DeliveredProductDetails({
                 )}
 
                 {/* Payment Details Section */}
-                <PaymentDetailsSection 
-                    paymentDetails={deliveredProduct.payment_details} 
-                    title="Payment Details (Current Delivery)" 
+                <PaymentDetailsSection
+                    paymentDetails={deliveredProduct.payment_details}
+                    title="Payment Details (Current Delivery)"
                 />
-                
+
+                {/* Return / Archived Delivery History */}
+                {deliveredProduct.archived_deliveries && deliveredProduct.archived_deliveries.length > 0 && (
+                    <div className="mb-6">
+                        <h3 className="mb-3 flex items-center gap-2 text-lg font-semibold text-dark dark:text-white">
+                            <svg className="h-5 w-5 text-orange-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a5 5 0 015 5v1M3 10l4-4M3 10l4 4" />
+                            </svg>
+                            Returned Delivery History ({deliveredProduct.archived_deliveries.length})
+                        </h3>
+                        <div className="space-y-4">
+                            {deliveredProduct.archived_deliveries.map((ad: any, adIdx: number) => (
+                                <div key={ad.id || adIdx} className="rounded-lg border-2 border-orange-200 bg-orange-50/40 p-4 dark:border-orange-900/40 dark:bg-orange-900/5">
+                                    <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+                                        <span className="inline-flex items-center gap-1.5 rounded-full bg-orange-100 px-3 py-1 text-xs font-bold uppercase tracking-wide text-orange-700 dark:bg-orange-900/30 dark:text-orange-400">
+                                            Delivered &amp; Returned
+                                        </span>
+                                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                                            Returned on: {formatDateTimeUTC(ad.archived_at)}
+                                        </span>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 gap-4 rounded-lg border border-stroke bg-white p-4 dark:border-dark-3 dark:bg-dark-3 md:grid-cols-2 lg:grid-cols-4">
+                                        <div>
+                                            <label className="block text-xs font-medium text-gray-500 dark:text-gray-400">IMEI / Serial Number</label>
+                                            <p className="mt-1 font-mono text-sm text-dark dark:text-white">{ad.product_imei || 'N/A'}</p>
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-medium text-gray-500 dark:text-gray-400">Delivery Status</label>
+                                            <p className="mt-1 text-dark dark:text-white">{ad.status || 'N/A'}</p>
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-medium text-gray-500 dark:text-gray-400">Self Pickup</label>
+                                            <p className="mt-1 text-dark dark:text-white">{ad.self_pickup ? 'Yes' : 'No'}</p>
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-medium text-gray-500 dark:text-gray-400">Delivered On</label>
+                                            <p className="mt-1 text-dark dark:text-white">{ad.end_time ? formatDateTimeUTC(ad.end_time) : 'N/A'}</p>
+                                        </div>
+                                        {ad.feedback && (
+                                            <div className="md:col-span-2 lg:col-span-4">
+                                                <label className="block text-xs font-medium text-gray-500 dark:text-gray-400">Delivery Feedback</label>
+                                                <p className="mt-1 text-dark dark:text-white">{ad.feedback}</p>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {ad.uploads && ad.uploads.length > 0 && (
+                                        <div className="mt-4">
+                                            <h4 className="mb-3 text-sm font-medium text-dark dark:text-white">Delivery Uploads</h4>
+                                            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+                                                {ad.uploads.map((upload: any, idx: number) => (
+                                                    <MediaCard
+                                                        key={upload.id || idx}
+                                                        id={upload.id}
+                                                        title={`Delivery Upload #${idx + 1}`}
+                                                        subtitle={upload.upload_type?.replace(/_/g, ' ')}
+                                                        fileUrl={upload.file_url}
+                                                        uploadedAt={upload.uploaded_at}
+                                                        isEditable={false}
+                                                    />
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {ad.payment_details && (
+                                        <div className="mt-4">
+                                            <PaymentDetailsSection
+                                                paymentDetails={ad.payment_details}
+                                                title="Payment Details (Before Return)"
+                                            />
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
                 {/* No Data Message */}
-                {!deliveredProduct.product_details && !deliveredProduct.delivery_details && !deliveredProduct.payment_details && (
+                {!deliveredProduct.product_details && !deliveredProduct.delivery_details && !deliveredProduct.payment_details && (!deliveredProduct.archived_deliveries || deliveredProduct.archived_deliveries.length === 0) && (
                     <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-6 text-center dark:border-yellow-800 dark:bg-yellow-900/10">
                         <p className="text-yellow-800 dark:text-yellow-400">No delivered product details available for this order.</p>
                     </div>
