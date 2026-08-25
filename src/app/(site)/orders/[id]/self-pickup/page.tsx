@@ -1024,26 +1024,26 @@ export default function SelfPickupPage() {
                 {/* Advance & Ledger */}
                 {selectedPlan && (
                   <div className="space-y-8">
-                    <div className="bg-gray-900 p-8 rounded-[2.5rem] text-white flex flex-col md:flex-row items-center justify-between gap-8 shadow-2xl">
-                      <div className="flex items-center gap-6">
-                        <div className="w-16 h-16 bg-white/10 backdrop-blur-xl rounded-3xl flex items-center justify-center text-blue-400">
+                    <div className="bg-gray-900 p-6 sm:p-8 rounded-[2.5rem] text-white flex flex-col xl:flex-row items-center justify-between gap-6 sm:gap-8 shadow-2xl">
+                      <div className="flex items-center gap-6 w-full xl:w-auto">
+                        <div className="w-16 h-16 shrink-0 bg-white/10 backdrop-blur-xl rounded-3xl flex items-center justify-center text-blue-400">
                           <CreditCard className="w-8 h-8" />
                         </div>
-                        <div>
+                        <div className="min-w-0">
                           <p className="text-xs font-black text-blue-400 uppercase tracking-[0.2em] mb-1">Advance Payment</p>
-                          <div className="flex items-baseline gap-2">
-                            <span className="text-4xl font-black tracking-tighter">Rs. {Number(advanceOverride).toLocaleString()}</span>
-                            <span className="text-gray-500 text-xs font-bold font-mono">/ Due At Branch</span>
+                          <div className="flex items-baseline gap-2 flex-wrap">
+                            <span className="text-3xl sm:text-4xl font-black tracking-tighter break-all">Rs. {Number(advanceOverride).toLocaleString()}</span>
+                            <span className="text-gray-500 text-xs font-bold font-mono whitespace-nowrap">/ Due At Branch</span>
                           </div>
                         </div>
                       </div>
-                      <div className="w-full md:w-auto flex items-center gap-4 bg-white/5 p-4 rounded-3xl border border-white/10">
-                        <label className="text-xs font-black text-gray-400 uppercase ml-2">Edit Down Payment</label>
+                      <div className="w-full xl:w-auto flex items-center justify-between gap-4 bg-white/5 p-4 rounded-3xl border border-white/10">
+                        <label className="text-xs font-black text-gray-400 uppercase ml-2 whitespace-nowrap">Edit Down Payment</label>
                         <input
                           type="number"
                           value={advanceOverride}
                           onChange={(e) => setAdvanceOverride(e.target.value ? Number(e.target.value) : '')}
-                          className="bg-transparent border-b-2 border-blue-500/50 focus:border-blue-500 font-black text-2xl text-white w-32 outline-none p-1 text-right"
+                          className="bg-transparent border-b-2 border-blue-500/50 focus:border-blue-500 font-black text-2xl text-white w-20 sm:w-32 min-w-0 outline-none p-1 text-right"
                         />
                       </div>
                     </div>
