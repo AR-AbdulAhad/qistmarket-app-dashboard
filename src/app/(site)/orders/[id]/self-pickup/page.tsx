@@ -243,9 +243,11 @@ export default function SelfPickupPage() {
         setDeliveryRecord(d);
         if (d.status === PAYTRIGGER_PENDING_STATUS) {
           setScreenMode('processing');
-        } else {
-          // status === 'completed' (or any other terminal state) — delivery already exists.
+        } else if ((d.status === 'completed' || d.status === 'delivered') && (order?.is_delivered || order?.status === 'delivered')) {
           setScreenMode('delivered');
+        } else {
+          // If the order is still approved and not delivered yet, allow the self-pickup wizard form!
+          setScreenMode('form');
         }
         return d;
       }
