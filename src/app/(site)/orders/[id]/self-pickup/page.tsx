@@ -50,6 +50,8 @@ export default function SelfPickupPage() {
   // PayTrigger opt-in
   const [isPtEligible, setIsPtEligible] = useState(false);
   const [enrollPaytrigger, setEnrollPaytrigger] = useState(true);
+  const [availableLicenses, setAvailableLicenses] = useState<number | null>(null);
+  const [isLicenseExceeded, setIsLicenseExceeded] = useState(false);
 
   const [activeStep, setActiveStep] = useState(1);
 
@@ -205,7 +207,28 @@ export default function SelfPickupPage() {
     }
   };
 
+  const fetchLicenseStatus = async () => {
+    try {
+      const token = Cookies.get('auth_token');
+      const res = await fetch(`${BACKEND_URL}/api/paytrigger/company/license`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (data.success && data.data) {
+        const unused = data.data.availableLicenses ?? data.data.unusedNum ?? 0;
+        setAvailableLicenses(unused);
+        if (unused <= 0) {
+          setIsLicenseExceeded(true);
+          setEnrollPaytrigger(false);
+        }
+      }
+    } catch (error) {
+      console.error('Fetch license error:', error);
+    }
+  };
+
   const fetchInventory = async () => {
+    fetchLicenseStatus();
     try {
       const token = Cookies.get('auth_token');
       const res = await fetch(`${BACKEND_URL}/api/orders/self-pickup/inventory`, {
@@ -243,9 +266,11 @@ export default function SelfPickupPage() {
         setDeliveryRecord(d);
         if (d.status === PAYTRIGGER_PENDING_STATUS) {
           setScreenMode('processing');
-        } else {
-          // status === 'completed' (or any other terminal state) — delivery already exists.
+        } else if ((d.status === 'completed' || d.status === 'delivered') && (order?.is_delivered || order?.status === 'delivered')) {
           setScreenMode('delivered');
+        } else {
+          // If the order is still approved and not delivered yet, allow the self-pickup wizard form!
+          setScreenMode('form');
         }
         return d;
       }
@@ -861,25 +886,42 @@ export default function SelfPickupPage() {
 
                 {/* PayTrigger Opt-In Toggle — only shown for supported brands */}
                 {isPtEligible && selectedInventory && (
-                  <div className="mt-6 p-5 rounded-3xl border-2 border-blue-100 bg-gradient-to-r from-blue-50 to-indigo-50 flex items-center justify-between gap-4 animate-in fade-in slide-in-from-bottom-3 duration-300">
+                  <div className={cn(
+                    "mt-6 p-5 rounded-3xl border-2 flex items-center justify-between gap-4 animate-in fade-in slide-in-from-bottom-3 duration-300",
+                    isLicenseExceeded ? "border-red-200 bg-red-50/50" : "border-blue-100 bg-gradient-to-r from-blue-50 to-indigo-50"
+                  )}>
                     <div className="flex items-center gap-4">
-                      <div className="w-11 h-11 bg-blue-600 rounded-2xl flex items-center justify-center flex-shrink-0">
+                      <div className={cn(
+                        "w-11 h-11 rounded-2xl flex items-center justify-center flex-shrink-0",
+                        isLicenseExceeded ? "bg-red-600" : "bg-blue-600"
+                      )}>
                         <Smartphone className="w-5 h-5 text-white" />
                       </div>
                       <div>
                         <p className="font-black text-gray-900 text-sm">Enroll in PayTrigger?</p>
-                        <p className="text-xs text-gray-500 font-medium mt-0.5">Activate installment lock enforcement for this device</p>
-                        <span className="inline-block mt-1 text-[9px] font-black text-blue-600 bg-blue-100 px-2 py-0.5 rounded-full uppercase tracking-wider">
-                          {selectedInventory.product_name?.split(' ')[0] || 'Supported'} — PayTrigger Compatible
-                        </span>
+                        <p className="text-xs text-gray-500 font-medium mt-0.5">
+                          {isLicenseExceeded ? "PayTrigger toggle is disabled because license limit is reached." : "Activate installment lock enforcement for this device"}
+                        </p>
+                        {isLicenseExceeded ? (
+                          <span className="inline-block mt-1 text-[9px] font-black text-red-600 bg-red-100 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                            ⚠ Licence Exceed (0 Available Licenses)
+                          </span>
+                        ) : (
+                          <span className="inline-block mt-1 text-[9px] font-black text-blue-600 bg-blue-100 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                            {selectedInventory.product_name?.split(' ')[0] || 'Supported'} — PayTrigger Compatible
+                          </span>
+                        )}
                       </div>
                     </div>
                     <button
                       type="button"
-                      onClick={() => setEnrollPaytrigger(v => !v)}
+                      disabled={isLicenseExceeded}
+                      onClick={() => !isLicenseExceeded && setEnrollPaytrigger(v => !v)}
                       className={cn(
                         "relative w-14 h-7 rounded-full transition-all duration-300 flex-shrink-0 focus:outline-none focus:ring-2 focus:ring-offset-2",
-                        enrollPaytrigger
+                        isLicenseExceeded
+                          ? "bg-gray-300 cursor-not-allowed opacity-60"
+                          : enrollPaytrigger
                           ? "bg-blue-600 focus:ring-blue-500"
                           : "bg-gray-200 focus:ring-gray-400"
                       )}
@@ -887,7 +929,7 @@ export default function SelfPickupPage() {
                     >
                       <span className={cn(
                         "absolute top-0.5 left-0.5 w-6 h-6 bg-white rounded-full shadow-md transition-transform duration-300",
-                        enrollPaytrigger ? "translate-x-7" : "translate-x-0"
+                        enrollPaytrigger && !isLicenseExceeded ? "translate-x-7" : "translate-x-0"
                       )} />
                     </button>
                   </div>
