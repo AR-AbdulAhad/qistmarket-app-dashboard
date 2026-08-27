@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
 import Cookies from "js-cookie";
 import { Loader2, Search, User, FileText, MapPin, Phone, UserCheck, ClipboardList, PartyPopper } from "lucide-react";
-import CustomerProfileModal from "@/components/common/CustomerProfileModal";
+import { useProfileModal } from "../../../../contexts/ProfileModalContext";
 
 const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
 
@@ -16,7 +16,7 @@ function SearchResultsContent() {
 
     const [results, setResults] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
-    const [selectedProfile, setSelectedProfile] = useState<any>(null);
+    const { openProfile } = useProfileModal();
 
     useEffect(() => {
         if (query) {
@@ -95,7 +95,7 @@ function SearchResultsContent() {
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                                 {results.filter(i => i.status === 'delivered').map((item) => (
-                                    <ResultCard key={item.id} item={item} onProfileClick={() => setSelectedProfile(item)} />
+                                    <ResultCard key={item.id} item={item} onProfileClick={() => openProfile(item)} />
                                 ))}
                             </div>
                         </div>
@@ -112,7 +112,7 @@ function SearchResultsContent() {
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                                 {results.filter(i => i.status !== 'delivered').map((item) => (
-                                    <ResultCard key={item.id} item={item} onProfileClick={() => setSelectedProfile(item)} />
+                                    <ResultCard key={item.id} item={item} onProfileClick={() => openProfile(item)} />
                                 ))}
                             </div>
                         </div>
@@ -135,12 +135,6 @@ function SearchResultsContent() {
                     </button>
                 </div>
             )}
-
-            <CustomerProfileModal 
-                open={!!selectedProfile} 
-                onClose={() => setSelectedProfile(null)} 
-                data={selectedProfile} 
-            />
         </div>
     );
 }

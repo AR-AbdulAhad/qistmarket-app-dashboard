@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Search, User, FileText, ClipboardList, Loader2, X, Hash, MapPin, Phone, ArrowRight, UserCheck, ExternalLink, PartyPopper } from "lucide-react";
 import Cookies from "js-cookie";
-import CustomerProfileModal from "./CustomerProfileModal";
+import { useProfileModal } from "../../../contexts/ProfileModalContext";
 
 const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
 
@@ -26,7 +26,7 @@ export default function GlobalSearch() {
     const [loading, setLoading] = useState(false);
     const [isOpen, setIsOpen] = useState(false);
     const [searchType, setSearchType] = useState("all");
-    const [selectedProfile, setSelectedProfile] = useState<any>(null);
+    const { openProfile } = useProfileModal();
     const searchRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -141,7 +141,7 @@ export default function GlobalSearch() {
                                         </div>
                                         <div className="grid gap-4">
                                             {results.filter(i => i.status === 'delivered').slice(0, searchType === 'all' ? 5 : 10).map((item) => (
-                                                <ResultItem key={item.id} item={item} setSelectedProfile={setSelectedProfile} setIsOpen={setIsOpen} />
+                                                <ResultItem key={item.id} item={item} openProfile={openProfile} setIsOpen={setIsOpen} />
                                             ))}
                                         </div>
                                     </div>
@@ -159,7 +159,7 @@ export default function GlobalSearch() {
                                         </div>
                                         <div className="grid gap-4">
                                             {results.filter(i => i.status !== 'delivered').slice(0, searchType === 'all' ? 5 : 10).map((item) => (
-                                                <ResultItem key={item.id} item={item} setSelectedProfile={setSelectedProfile} setIsOpen={setIsOpen} />
+                                                <ResultItem key={item.id} item={item} openProfile={openProfile} setIsOpen={setIsOpen} />
                                             ))}
                                         </div>
                                     </div>
@@ -191,17 +191,11 @@ export default function GlobalSearch() {
                     )}
                 </div>
             )}
-
-            <CustomerProfileModal 
-                open={!!selectedProfile} 
-                onClose={() => setSelectedProfile(null)} 
-                data={selectedProfile} 
-            />
         </div>
     );
 }
 
-function ResultItem({ item, setSelectedProfile, setIsOpen }: any) {
+function ResultItem({ item, openProfile, setIsOpen }: any) {
     const purchaserPhoto = item.verification?.documents?.find((d: any) => d.document_type === 'photo' && d.person_type === 'purchaser')?.file_url;
     const isBlacklisted = item.is_blacklisted === true || item.verification?.is_blacklisted === true || item.verification?.purchaser?.is_blacklisted === true;
 
@@ -265,7 +259,7 @@ function ResultItem({ item, setSelectedProfile, setIsOpen }: any) {
                                 icon={<User size={16} />} 
                                 label="Profile"
                                 color="blue"
-                                onClick={() => { setSelectedProfile(item); setIsOpen(false); }}
+                                onClick={() => { openProfile(item); setIsOpen(false); }}
                             />
                         )}
                         <ActionIconButton 

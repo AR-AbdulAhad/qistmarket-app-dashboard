@@ -10,7 +10,7 @@ import {
 } from '@tanstack/react-table'
 import Cookies from 'js-cookie'
 import { SearchIcon } from '@/assets/icons'
-import CustomerProfileModal from '@/components/common/CustomerProfileModal'
+import { useProfileModal } from '../../../contexts/ProfileModalContext'
 import { CheckCircle, PartyPopper } from 'lucide-react'
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL
@@ -28,8 +28,7 @@ const ClearedCustomerList = () => {
   const [customers, setCustomers] = useState<CustomerGroup[]>([])
   const [globalFilter, setGlobalFilter] = useState('')
   const [loading, setLoading] = useState(false)
-  const [selectedOrder, setSelectedOrder] = useState<any>(null)
-  const [modalOpen, setModalOpen] = useState(false)
+  const { openProfile } = useProfileModal()
 
   const fetchCleared = async () => {
     setLoading(true)
@@ -57,12 +56,9 @@ const ClearedCustomerList = () => {
     fetchCleared()
   }, [])
 
-  console.log('Cleared Customers:', selectedOrder)
-
-  const openProfile = (customerGroup: CustomerGroup) => {
+  const handleViewProfile = (customerGroup: CustomerGroup) => {
     if (customerGroup.orders && customerGroup.orders.length > 0) {
-        setSelectedOrder(customerGroup.orders[0]); 
-        setModalOpen(true);
+        openProfile(customerGroup.orders[0]);
     }
   }
 
@@ -135,7 +131,7 @@ const ClearedCustomerList = () => {
       cell: ({ row }) => (
         <div className="flex items-center gap-2">
           <button
-            onClick={() => openProfile(row.original)}
+            onClick={() => handleViewProfile(row.original)}
             className="rounded-xl bg-emerald-500 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-white hover:bg-emerald-600 shadow-lg shadow-emerald-500/20 transition-all hover:scale-105 active:scale-95 whitespace-nowrap"
           >
             View Profile
@@ -238,12 +234,6 @@ const ClearedCustomerList = () => {
           </tbody>
         </table>
       </div>
-
-      <CustomerProfileModal 
-        open={modalOpen} 
-        onClose={() => setModalOpen(false)} 
-        data={selectedOrder} 
-      />
     </section>
   )
 }

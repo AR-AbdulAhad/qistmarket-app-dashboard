@@ -5,7 +5,7 @@ import {
     CreditCard, Calendar, Briefcase, Building,
     Wallet, Camera, Download, CheckCircle2,
     Home, Smartphone, Notebook, UserPlus, Image as ImageIcon,
-    Activity, Globe, Fingerprint, ExternalLink, AlertTriangle
+    Activity, Globe, Fingerprint, ExternalLink, AlertTriangle, ArrowRight
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import Cookies from "js-cookie";
@@ -75,7 +75,7 @@ export default function CustomerProfileModal({ open, onClose, data }: ProfileMod
         { id: "personal", label: "Identity", icon: <Fingerprint size={14} /> },
         { id: "employment", label: "Work Profile", icon: <Briefcase size={14} /> },
         { id: "guarantors", label: `Guarantors`, icon: <UserPlus size={14} /> },
-        ...(order.status === 'delivered' ? [{ id: "financials", label: "Ledger Summary", icon: <Wallet size={14} /> }] : []),
+        ...(order.status === 'delivered' || order.clear_reason === 'returned' ? [{ id: "financials", label: "Ledger Summary", icon: <Wallet size={14} /> }] : []),
         { id: "documents", label: "Media Assets", icon: <ImageIcon size={14} /> },
     ];
 
@@ -168,7 +168,12 @@ export default function CustomerProfileModal({ open, onClose, data }: ProfileMod
         return pendingCount === 0 && isAdvancePaid;
     };
 
-    const isCleared = !isBlacklisted && getClearedStatus();
+    // Trust the API's clear_reason when the caller supplied one (Cleared
+    // Accounts flows) instead of re-deriving from ledger math — a returned
+    // account can be "cleared" via return even with unpaid installments,
+    // which the dynamic ledger check alone would misread as not cleared.
+    const clearReason: 'completed' | 'returned' | null = order.clear_reason || null;
+    const isCleared = !isBlacklisted && (clearReason ? true : getClearedStatus());
 
     return (
         <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 overflow-y-auto custom-scrollbar">
@@ -216,6 +221,11 @@ export default function CustomerProfileModal({ open, onClose, data }: ProfileMod
                                 ) : isCleared ? (
                                     <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-[0.2em] bg-emerald-500 text-white border-2 border-emerald-200 shadow-lg shadow-emerald-500/20">
                                         <CheckCircle2 size={14} /> CLEARED
+                                        {clearReason === 'returned' && (
+                                            <span className="inline-flex items-center gap-1.5 opacity-90">
+                                                <ArrowRight size={12} /> DUE TO RETURN
+                                            </span>
+                                        )}
                                     </span>
                                 ) : (
                                     <span className="inline-block px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-[0.2em] bg-primary/5 text-primary border border-primary/10">

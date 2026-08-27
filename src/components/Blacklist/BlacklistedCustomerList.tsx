@@ -9,7 +9,7 @@ import {
 } from '@tanstack/react-table'
 import Cookies from 'js-cookie'
 import { SearchIcon, PointerUp } from '@/assets/icons'
-import CustomerProfileModal from '@/components/common/CustomerProfileModal'
+import { useProfileModal } from '../../../contexts/ProfileModalContext'
 import { AlertTriangle, Ban } from 'lucide-react'
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL
@@ -26,8 +26,7 @@ const BlacklistedCustomerList = () => {
   const [customers, setCustomers] = useState<CustomerGroup[]>([])
   const [globalFilter, setGlobalFilter] = useState('')
   const [loading, setLoading] = useState(false)
-  const [selectedOrder, setSelectedOrder] = useState<any>(null)
-  const [modalOpen, setModalOpen] = useState(false)
+  const { openProfile } = useProfileModal()
 
   const fetchBlacklist = async () => {
     setLoading(true)
@@ -55,17 +54,9 @@ const BlacklistedCustomerList = () => {
     fetchBlacklist()
   }, [])
 
-  const openProfile = (customerGroup: CustomerGroup) => {
-    // The profile modal expects an 'order' object that has 'verification' and other details.
-    // Our API returns grouped customers. In CustomerProfileModal, it's used with an order.
-    // We'll pass the first blacklisted order from the group.
+  const handleViewProfile = (customerGroup: CustomerGroup) => {
     if (customerGroup.orders && customerGroup.orders.length > 0) {
-      // We need to fetch the full order details for the modal to work properly
-      // Or ensure the API returns enough info.
-      // Let's check CustomerProfileModal requirements: verification (purchaser, grantors, documents).
-      // My getBlacklistedCustomers already includes these!
-      setSelectedOrder(customerGroup.orders[0]);
-      setModalOpen(true);
+      openProfile(customerGroup.orders[0]);
     }
   }
 
@@ -147,7 +138,7 @@ const BlacklistedCustomerList = () => {
       header: 'Deep View',
       cell: ({ row }) => (
         <button
-          onClick={() => openProfile(row.original)}
+          onClick={() => handleViewProfile(row.original)}
           className="rounded-xl bg-red-500 px-6 py-2 text-xs font-black uppercase tracking-widest text-white hover:bg-red-600 shadow-lg shadow-red-500/20 transition-all hover:scale-105 active:scale-95"
         >
           Open Profile
@@ -238,12 +229,6 @@ const BlacklistedCustomerList = () => {
           </tbody>
         </table>
       </div>
-
-      <CustomerProfileModal
-        open={modalOpen}
-        onClose={() => setModalOpen(false)}
-        data={selectedOrder}
-      />
     </section>
   )
 }
