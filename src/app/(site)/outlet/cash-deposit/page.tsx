@@ -181,14 +181,22 @@ export default function CashDepositPage() {
             const res = await fetch(`${API_BASE}/api/outlet/bank-deposits`, {
                 method: "POST", headers: getAuthHeaders(), body: formData,
             });
-            const data = await res.json();
+            let data: any = null;
+            try {
+                data = await res.json();
+            } catch {
+                // Server didn't return JSON (e.g. a proxy/gateway timeout page) —
+                // surface the HTTP status instead of a completely opaque error.
+                toast.error(`Server error (HTTP ${res.status}). Please try again in a moment.`);
+                return;
+            }
             if (data.success) {
                 toast.success(isRoutedMethod ? "Generated — check history below." : "Deposit request submitted successfully!");
                 setAmount(""); setBankAccountId(""); setReceiptId(""); setDescription(""); setFile(null);
                 fetchDepositHistory();
                 fetchCashInHand();
             } else { toast.error(data.message || "Failed to submit request."); }
-        } catch (err) { toast.error("An error occurred. Please try again."); }
+        } catch (err) { toast.error("Network error — could not reach the server. Please check your connection and try again."); }
         finally { setLoading(false); }
     };
 
