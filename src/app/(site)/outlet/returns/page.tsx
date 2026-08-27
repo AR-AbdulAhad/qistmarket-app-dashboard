@@ -309,11 +309,21 @@ export default function OutletReturnsPage() {
             {/* Customer Phone */}
             <div>
               <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2 ml-1 flex items-center gap-2">
-                <Phone size={12} /> Customer Phone (OTP will be sent here)
+                <Phone size={12} /> Customer Phone (for return confirmation)
               </label>
               <input type="text" placeholder="03XXXXXXXXX" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)}
                 className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border-2 border-stroke dark:border-strokedark rounded-2xl focus:border-primary outline-none font-bold text-gray-800 dark:text-white transition-all" />
             </div>
+
+            {/* Already-blacklisted warning (return is blocked) */}
+            {selectedOrder.is_customer_blacklisted && (
+              <div className="flex items-center gap-3 bg-red-50 dark:bg-red-900/10 border-2 border-red-200 dark:border-red-900/30 p-4 rounded-2xl">
+                <AlertCircle size={20} className="text-red-600 shrink-0" />
+                <p className="text-xs font-bold text-red-600 uppercase tracking-tight">
+                  This customer/account is already blacklisted. This order cannot be returned.
+                </p>
+              </div>
+            )}
 
             {/* Blacklist Toggle (hidden when customer is already blacklisted) */}
             {!selectedOrder.is_customer_blacklisted && (
@@ -329,7 +339,7 @@ export default function OutletReturnsPage() {
               </div>
             )}
 
-            <button onClick={handleInitiateReturn} disabled={submitting || (isCash && !refundAmt)}
+            <button onClick={handleInitiateReturn} disabled={submitting || (isCash && !refundAmt) || selectedOrder.is_customer_blacklisted}
               className="w-full py-5 bg-primary hover:bg-opacity-90 disabled:opacity-50 text-white rounded-2xl text-sm font-black uppercase tracking-widest shadow-2xl shadow-primary/30 transition-all active:scale-[0.98] flex items-center justify-center gap-3">
               {submitting ? (
                 <><div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div><span>Processing...</span></>

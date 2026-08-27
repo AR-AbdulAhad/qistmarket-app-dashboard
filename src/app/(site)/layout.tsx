@@ -13,6 +13,7 @@ import { toast } from "react-hot-toast";
 import { CashSubmissionPopup } from "@/components/CashSubmissionPopup";
 import { ReturnExchangePopup } from "@/components/ReturnExchangePopup";
 import { StockTransferOTPPopup } from "@/components/StockTransferOTPPopup";
+import { ProfileModalProvider } from "../../../contexts/ProfileModalContext";
 
 export default function Layout({ children }: PropsWithChildren) {
   const { socket: socketInstance } = useNotifications();
@@ -21,24 +22,26 @@ export default function Layout({ children }: PropsWithChildren) {
     <AuthProvider>
       <ProtectedRoute>
         <SidebarProvider>
-          <div className="flex min-h-screen">
-            <Sidebar />
+          <ProfileModalProvider>
+            <div className="flex min-h-screen">
+              <Sidebar />
 
-            <div className="w-full bg-gray-2 dark:bg-[#000000]">
-              <Header />
+              <div className="w-full bg-gray-2 dark:bg-[#000000]">
+                <Header />
 
-              <main className="mx-auto w-full max-w-screen-2xl overflow-hidden p-4 md:p-6 2xl:p-10">
-                {children}
-              </main>
+                <main className="mx-auto w-full max-w-screen-2xl overflow-hidden p-4 md:p-6 2xl:p-10">
+                  {children}
+                </main>
+              </div>
+
+              {/* Global OTP Popup for Cash Submission */}
+              <CashSubmissionPopup socket={socketInstance} />
+              {/* Global OTP Popup for Return/Exchange */}
+              <ReturnExchangePopup socket={socketInstance} />
+              {/* Global OTP Popup for Stock Transfer */}
+              <StockTransferOTPPopup />
             </div>
-
-            {/* Global OTP Popup for Cash Submission */}
-            <CashSubmissionPopup socket={socketInstance} />
-            {/* Global OTP Popup for Return/Exchange */}
-            <ReturnExchangePopup socket={socketInstance} />
-            {/* Global OTP Popup for Stock Transfer */}
-            <StockTransferOTPPopup />
-          </div>
+          </ProfileModalProvider>
         </SidebarProvider>
       </ProtectedRoute>
     </AuthProvider>
