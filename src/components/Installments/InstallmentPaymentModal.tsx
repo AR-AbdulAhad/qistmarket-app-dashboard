@@ -273,12 +273,11 @@ export default function InstallmentPaymentModal({ open, onClose, onSuccess, orde
                         <div>
                             <label className="block text-xs font-bold text-gray-500 uppercase mb-1 flex justify-between">
                                 <span>Collection Amount</span>
-                                <span className="text-blue-500 font-normal normal-case opacity-80 text-[10px]">Editable for Partial Payment</span>
+                                <span className="text-blue-500 font-normal normal-case opacity-80 text-[10px]">Editable — extra pays off next month(s)</span>
                             </label>
                             <input
                                 type="number"
                                 min="1"
-                                max={installment.dueAmount}
                                 value={paymentAmount || ''}
                                 onChange={(e) => setPaymentAmount(parseFloat(e.target.value))}
                                 className="w-full px-4 py-3 rounded-xl border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/30 font-bold focus:ring-2 focus:ring-blue-500 outline-none transition-all text-blue-700 dark:text-blue-400"

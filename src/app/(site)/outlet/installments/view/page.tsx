@@ -130,6 +130,69 @@ function InstallmentsViewContent() {
   const [bulkReminderModalOpen, setBulkReminderModalOpen] = useState(false);
   const [sendingBulk, setSendingBulk] = useState(false);
 
+  // PTP (Promise to Pay) Modal state
+  const [ptpModalOpen, setPtpModalOpen] = useState(false);
+  const [ptpRow, setPtpRow] = useState<any>(null);
+  const [ptpDate, setPtpDate] = useState("");
+  const [ptpLoading, setPtpLoading] = useState(false);
+
+  const tomorrowStr = (() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    return d.toISOString().split("T")[0];
+  })();
+
+  // PTP can unlock the device for at most 10 days
+  const maxPtpStr = (() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 10);
+    return d.toISOString().split("T")[0];
+  })();
+
+  const openPtpModal = (inst: any) => {
+    if (!inst.imei_serial) {
+      toast.error("No IMEI/device associated with this order");
+      return;
+    }
+    const defaultDate = new Date();
+    defaultDate.setDate(defaultDate.getDate() + 7);
+    setPtpRow(inst);
+    setPtpDate(defaultDate.toISOString().split("T")[0]);
+    setPtpModalOpen(true);
+  };
+
+  const handleSubmitPtp = async () => {
+    if (!ptpRow || !ptpDate) return;
+    if (ptpDate > maxPtpStr) {
+      toast.error("Promised payment date cannot be more than 10 days from today");
+      return;
+    }
+    const promisedDate = new Date(ptpDate);
+    promisedDate.setHours(23, 59, 59, 999);
+
+    setPtpLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/paytrigger/device/${ptpRow.imei_serial}/ptp`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ promised_date: promisedDate.toISOString() }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success(`Device temporarily unlocked until ${new Date(ptpDate).toLocaleDateString('en-PK')}. Customer notified via WhatsApp.`);
+        setPtpModalOpen(false);
+        fetchInstallments();
+      } else {
+        toast.error(data.message || "Failed to activate PTP");
+      }
+    } catch (e) {
+      console.error(e);
+      toast.error("Error communicating with PayTrigger");
+    } finally {
+      setPtpLoading(false);
+    }
+  };
+
   // Sync search & category URL params
   useEffect(() => {
     if (initialSearch) setSearch(initialSearch);
@@ -1132,6 +1195,18 @@ function InstallmentsViewContent() {
                                   </svg>
                               </button>
                           )}
+                          {inst.status !== "paid" && (
+                              <button
+                                  onClick={() => openPtpModal(inst)}
+                                  disabled={!inst.imei_serial}
+                                  className="rounded-lg p-1.5 text-gray-400 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-meta-4 transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                                  title={!inst.imei_serial ? "No IMEI/device registered" : "Promise to Pay — temporarily unlock device"}
+                              >
+                                  <svg className="w-4.5 h-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                  </svg>
+                              </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -1349,14 +1424,112 @@ function InstallmentsViewContent() {
         </div>
       )}
 
-      <SmartPayQrModal 
-          open={qrModalOpen} 
-          onClose={() => setQrModalOpen(false)} 
-          orderId={qrOrderId} 
-          monthNumber={qrMonthNumber} 
+      <SmartPayQrModal
+          open={qrModalOpen}
+          onClose={() => setQrModalOpen(false)}
+          orderId={qrOrderId}
+          monthNumber={qrMonthNumber}
           defaultAmount={qrDefaultAmount}
           customerName={qrCustomerName}
       />
+
+      {/* PTP (Promise to Pay) MODAL */}
+      {ptpModalOpen && ptpRow && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md bg-white dark:bg-boxdark rounded-3xl shadow-2xl overflow-hidden border border-gray-100 dark:border-strokedark">
+
+            <div className="px-6 py-5 border-b border-gray-100 dark:border-strokedark bg-amber-50 dark:bg-amber-900/20">
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-3">
+                  <div className="rounded-xl bg-amber-500/15 p-2">
+                    <svg className="h-5 w-5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-black text-slate-800 dark:text-white uppercase tracking-wider">Promise to Pay</h3>
+                    <p className="text-[10px] text-amber-600 dark:text-amber-400 font-bold tracking-widest mt-0.5">DEVICE TEMP-UNLOCK</p>
+                  </div>
+                </div>
+                <button onClick={() => setPtpModalOpen(false)} className="text-gray-400 hover:text-red-500 p-2 rounded-xl transition-all cursor-pointer">
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+            </div>
+
+            <div className="p-6 flex flex-col gap-5">
+              <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-2xl flex flex-col gap-1">
+                <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Customer</p>
+                <p className="text-sm font-bold text-slate-800 dark:text-white">{ptpRow.customer_name}</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">{ptpRow.order_ref} &bull; {ptpRow.product_name}</p>
+                <p className="text-[10px] text-gray-400 mt-1">IMEI: <span className="font-mono">{ptpRow.imei_serial || 'N/A'}</span></p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-black text-gray-500 uppercase mb-2 tracking-widest">Promised Payment Date</label>
+                <input
+                  type="date"
+                  min={tomorrowStr}
+                  max={maxPtpStr}
+                  value={ptpDate}
+                  onChange={(e) => setPtpDate(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border-2 border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/30 font-bold text-amber-700 dark:text-amber-300 focus:ring-2 focus:ring-amber-500 outline-none transition-all text-sm cursor-pointer"
+                />
+                <p className="text-[10px] text-gray-400 mt-1.5 pl-1">The device will be temporarily unlocked until this date (max 10 days). If payment is not received by then, the device will auto-lock again.</p>
+              </div>
+
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Quick Select</p>
+                <div className="flex gap-2 flex-wrap">
+                  {[3, 7, 10].map(days => {
+                    const d = new Date();
+                    d.setDate(d.getDate() + days);
+                    const dStr = d.toISOString().split('T')[0];
+                    return (
+                      <button
+                        key={days}
+                        onClick={() => setPtpDate(dStr)}
+                        className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer border ${
+                          ptpDate === dStr
+                            ? 'bg-amber-500 text-white border-amber-500'
+                            : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-600 hover:border-amber-300'
+                        }`}
+                      >
+                        +{days}d
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-100 dark:border-blue-900/40">
+                <svg className="h-4 w-4 text-blue-500 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                <p className="text-[10px] text-blue-600 dark:text-blue-300 font-medium leading-relaxed">
+                  A WhatsApp confirmation will be sent to <strong>{ptpRow.whatsapp_number || 'the customer'}</strong> with the promised date and due amount.
+                </p>
+              </div>
+
+              <div className="flex gap-3 pt-1">
+                <button
+                  onClick={() => setPtpModalOpen(false)}
+                  className="flex-1 border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-400 font-semibold py-3 px-4 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-all cursor-pointer text-sm"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSubmitPtp}
+                  disabled={ptpLoading || !ptpDate}
+                  className="flex-[2] bg-amber-500 hover:bg-amber-600 text-white font-black py-3 px-4 rounded-xl transition-all shadow-lg shadow-amber-200 dark:shadow-none disabled:opacity-50 cursor-pointer text-sm uppercase tracking-wider flex items-center justify-center gap-2"
+                >
+                  {ptpLoading ? (
+                    <><Loader2 className="h-4 w-4 animate-spin" /> Activating...</>
+                  ) : (
+                    <>Activate PTP &amp; Unlock Device</>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

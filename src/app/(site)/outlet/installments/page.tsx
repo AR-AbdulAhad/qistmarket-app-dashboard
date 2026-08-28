@@ -236,6 +236,8 @@ function GlobalInstallmentSearch({ onPay, onGenerateQR }: { onPay: (order: any, 
                                             )}
                                             {/* Monthly Installment Rows */}
                                             {order.installmentLedger?.map((inst: any, idx: number) => {
+                                                const firstUnpaidIndex = order.installmentLedger?.findIndex((r: any) => r.status !== 'paid' && r.status !== 'Paid') ?? -1;
+                                                const isPayable = idx === firstUnpaidIndex;
                                                 const isPaid = inst.status === 'paid' || inst.status === 'Paid';
                                                 const isPartial = inst.status === 'partial';
                                                 const instDueDate = inst.dueDate ? new Date(inst.dueDate) : null;
@@ -303,7 +305,7 @@ function GlobalInstallmentSearch({ onPay, onGenerateQR }: { onPay: (order: any, 
                                                             }`}>
                                                                 {isPaid ? '✓ PAID' : isPartial ? 'PARTIAL' : isOverdue ? 'OVERDUE' : 'PENDING'}
                                                             </span>
-                                                            {!isPaid && (
+                                                            {!isPaid && isPayable && (
                                                                 <>
                                                                     <button
                                                                         onClick={() => { onPay(order, inst); setShowPanel(false); }}
@@ -321,6 +323,11 @@ function GlobalInstallmentSearch({ onPay, onGenerateQR }: { onPay: (order: any, 
                                                                         </svg>
                                                                     </button>
                                                                 </>
+                                                            )}
+                                                            {!isPaid && !isPayable && (
+                                                                <span className="text-[8px] font-black text-gray-300 dark:text-gray-600 uppercase tracking-widest cursor-not-allowed" title="Collect the earlier month(s) first">
+                                                                    Locked
+                                                                </span>
                                                             )}
                                                         </div>
                                                     </div>
