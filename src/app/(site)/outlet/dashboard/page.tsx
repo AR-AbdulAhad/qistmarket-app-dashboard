@@ -106,9 +106,6 @@ const StatCard = ({
   bar: string;
   onClick?: () => void;
 }) => {
-  const isPositive = inc > 0;
-  const isNegative = inc < 0;
-
   return (
     <div
       onClick={onClick}
@@ -128,14 +125,6 @@ const StatCard = ({
 
         {/* Value */}
         <p className="text-base sm:text-xl lg:text-2xl font-black text-slate-800 dark:text-white leading-none tracking-tight break-all sm:break-normal">{value}</p>
-
-        {/* Increment badge */}
-        <div className={`inline-flex items-center gap-1 self-start rounded-full px-2 py-0.5 text-[9px] font-black ${
-          isPositive ? "bg-emerald-50 text-emerald-600" : isNegative ? "bg-rose-50 text-rose-600" : "bg-slate-50 text-slate-400"
-        }`}>
-          <span>{isPositive ? "↑" : isNegative ? "↓" : "–"}</span>
-          <span>{Math.abs(inc)}%</span>
-        </div>
       </div>
     </div>
   );
