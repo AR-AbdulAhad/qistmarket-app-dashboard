@@ -91,7 +91,7 @@ export default function CashRegisterPage() {
     const [reopening, setReopening] = useState(false);
 
     // Filter states
-    const [filterType, setFilterType] = useState<"today" | "week" | "month" | "custom">("today");
+    const [filterType, setFilterType] = useState<"today" | "week" | "month" | "custom">("month");
     const [startDate, setStartDate] = useState("");
     const [endDate, setEndDate] = useState("");
 
@@ -104,13 +104,17 @@ export default function CashRegisterPage() {
     }, [filterType]);
 
     useEffect(() => {
-        fetchHistory();
-    }, []);
+        fetchHistory(filterType, startDate, endDate);
+    }, [filterType]);
 
-    const fetchHistory = async () => {
+    const fetchHistory = async (type: string, start?: string, end?: string) => {
         setHistoryLoading(true);
         try {
-            const res = await fetch(`${API_BASE}/api/outlet/cash-register/history`, { headers: getAuthHeaders() });
+            let url = `${API_BASE}/api/outlet/cash-register/history?filter=${type}`;
+            if (type === "custom" && start && end) {
+                url += `&startDate=${start}&endDate=${end}`;
+            }
+            const res = await fetch(url, { headers: getAuthHeaders() });
             const data = await res.json();
             if (data.success) setHistoryCategories(data.categories || []);
         } catch (e) {
@@ -315,7 +319,10 @@ export default function CashRegisterPage() {
                             />
                         </div>
                         <button
-                            onClick={() => fetchData("custom", startDate, endDate)}
+                            onClick={() => {
+                                fetchData("custom", startDate, endDate);
+                                fetchHistory("custom", startDate, endDate);
+                            }}
                             className="bg-primary text-white px-4 py-1.5 rounded-lg text-xs font-black flex items-center gap-1"
                         >
                             <Filter size={12} /> Apply
@@ -342,19 +349,22 @@ export default function CashRegisterPage() {
                     <TrendingUp size={14} /> Master Ledger Cards — Filter: <span className="uppercase text-primary">{filterType}</span>
                 </h2>
 
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-8 gap-3">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3">
                     {fields.map((f) => {
                         const isClosing = f.key === "closing_cash";
                         const isOutflow = f.key === "expenses" || f.key === "vendor_payments";
                         const isOpening = f.key === "opening_cash";
                         const val = (currentMetrics as any)[f.key] || 0;
+                        const isBigValue = val >= 100000;
 
                         return (
                             <div
                                 key={f.key}
-                                className={`rounded-2xl p-4 border shadow-sm flex flex-col justify-between ${
+                                className={`rounded-2xl p-4 border shadow-sm flex flex-col justify-between min-w-0 ${
+                                    isClosing || isBigValue ? "col-span-2" : "col-span-1"
+                                } ${
                                     isClosing
-                                        ? "bg-emerald-50 dark:bg-emerald-900/20 col-span-2 sm:col-span-1 lg:col-span-2 xl:col-span-1 border-emerald-200 dark:border-emerald-800/30 border-l-4 border-l-emerald-500"
+                                        ? "bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800/30 border-l-4 border-l-emerald-500"
                                         : isOutflow
                                         ? "bg-rose-50 dark:bg-rose-900/10 border-rose-100 dark:border-rose-900/20 border-l-4 border-l-rose-500"
                                         : isOpening
@@ -366,9 +376,9 @@ export default function CashRegisterPage() {
                                     {f.label}
                                 </div>
                                 <div
-                                    className={`text-lg sm:text-xl font-black tabular-nums break-all ${
+                                    className={`text-base sm:text-lg md:text-xl font-black tabular-nums whitespace-normal break-words min-w-0 ${
                                         isClosing
-                                            ? "text-emerald-600 dark:text-emerald-400 text-xl sm:text-2xl"
+                                            ? "text-emerald-600 dark:text-emerald-400 text-lg sm:text-xl md:text-2xl"
                                             : isOutflow
                                             ? "text-rose-500 dark:text-rose-400"
                                             : isOpening

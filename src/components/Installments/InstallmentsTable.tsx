@@ -87,6 +87,11 @@ export default function InstallmentsTable({ data, onPay, selectedIds = [], onSel
     tomorrow.setDate(tomorrow.getDate() + 1);
     const tomorrowStr = tomorrow.toISOString().split("T")[0];
 
+    // PTP can unlock the device for at most 10 days
+    const maxPtp = new Date();
+    maxPtp.setDate(maxPtp.getDate() + 10);
+    const maxPtpStr = maxPtp.toISOString().split("T")[0];
+
     // Pre-fill date 7 days from now (matching recovery app default)
     const defaultPtpDate = new Date();
     defaultPtpDate.setDate(defaultPtpDate.getDate() + 7);
@@ -102,6 +107,10 @@ export default function InstallmentsTable({ data, onPay, selectedIds = [], onSel
         if (!ptpOrder || !ptpDate) return;
         if (!ptpOrder.imei_serial) {
             alert("No IMEI/device associated with this order");
+            return;
+        }
+        if (ptpDate > maxPtpStr) {
+            alert("Promised payment date cannot be more than 10 days from today");
             return;
         }
 
@@ -444,7 +453,11 @@ export default function InstallmentsTable({ data, onPay, selectedIds = [], onSel
                                                                 <span className="text-right">Remaining</span>
                                                                 <span className="text-center">Action</span>
                                                             </div>
-                                                            {(order.installmentLedger || []).map((inst, idx) => {
+                                                            {(() => {
+                                                                const ledgerRows = order.installmentLedger || [];
+                                                                const firstUnpaidIndex = ledgerRows.findIndex(r => r.status !== 'paid');
+                                                                return ledgerRows.map((inst, idx) => {
+                                                                const isPayable = idx === firstUnpaidIndex;
                                                                 const isPaid = inst.status === 'paid';
                                                                 const isPartial = inst.status === 'partial' || (!isPaid && (inst.paidAmount || 0) > 0);
                                                                 const isNext = !isPaid && !isPartial && (order.installmentLedger || [])
@@ -554,7 +567,7 @@ export default function InstallmentsTable({ data, onPay, selectedIds = [], onSel
                                                                                 <div className="w-7 h-7 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center">
                                                                                     <svg className="w-3.5 h-3.5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" /></svg>
                                                                                 </div>
-                                                                            ) : (
+                                                                            ) : isPayable ? (
                                                                                 <>
                                                                                     <button
                                                                                         onClick={() => onPay(order, inst)}
@@ -578,11 +591,19 @@ export default function InstallmentsTable({ data, onPay, selectedIds = [], onSel
                                                                                         </svg>
                                                                                     </button>
                                                                                 </>
+                                                                            ) : (
+                                                                                <span
+                                                                                    className="text-[8px] font-black text-gray-300 dark:text-gray-600 uppercase tracking-widest cursor-not-allowed"
+                                                                                    title="Collect the earlier month(s) first"
+                                                                                >
+                                                                                    Locked
+                                                                                </span>
                                                                             )}
                                                                         </div>
                                                                     </div>
                                                                 );
-                                                            })}
+                                                                });
+                                                            })()}
                                                         </div>
                                                     </div>
                                                 </div>
@@ -839,18 +860,19 @@ export default function InstallmentsTable({ data, onPay, selectedIds = [], onSel
                                 <input
                                     type="date"
                                     min={tomorrowStr}
+                                    max={maxPtpStr}
                                     value={ptpDate}
                                     onChange={(e) => setPtpDate(e.target.value)}
                                     className="w-full px-4 py-3 rounded-xl border-2 border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/30 font-bold text-amber-700 dark:text-amber-300 focus:ring-2 focus:ring-amber-500 outline-none transition-all text-sm cursor-pointer"
                                 />
-                                <p className="text-[10px] text-gray-400 mt-1.5 pl-1">The device will be temporarily unlocked until this date. If payment is not received by then, the device will auto-lock again.</p>
+                                <p className="text-[10px] text-gray-400 mt-1.5 pl-1">The device will be temporarily unlocked until this date (max 10 days). If payment is not received by then, the device will auto-lock again.</p>
                             </div>
 
                             {/* Quick date preset buttons */}
                             <div>
                                 <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Quick Select</p>
                                 <div className="flex gap-2 flex-wrap">
-                                    {[3, 7, 14, 30].map(days => {
+                                    {[3, 7, 10].map(days => {
                                         const d = new Date();
                                         d.setDate(d.getDate() + days);
                                         const dStr = d.toISOString().split('T')[0];

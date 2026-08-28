@@ -59,6 +59,10 @@ export const NAV_DATA = [
             url: "/approved-orders",
           },
           {
+            title: "Waiting PayTrigger Approval",
+            url: "/paytrigger-pending-orders",
+          },
+          {
             title: "Picked Orders",
             url: "/picked-orders",
           },
@@ -374,6 +378,10 @@ export const NAV_DATA = [
             url: "/approved-orders",
           },
           {
+            title: "Waiting PayTrigger Approval",
+            url: "/paytrigger-pending-orders",
+          },
+          {
             title: "Picked Orders",
             url: "/picked-orders",
           },
@@ -489,6 +497,10 @@ export const NAV_DATA = [
           {
             title: "Approved Orders",
             url: "/approved-orders",
+          },
+          {
+            title: "Waiting PayTrigger Approval",
+            url: "/paytrigger-pending-orders",
           },
           {
             title: "Picked Orders",

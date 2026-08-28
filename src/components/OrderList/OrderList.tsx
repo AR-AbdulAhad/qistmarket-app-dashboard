@@ -399,7 +399,7 @@ const OrderListContent = ({ forcedStatus, forcedChannel, apiEndpoint, hideAction
   }
 
   const confirmAssign = async () => {
-      const isVerification = selectedOrder?.status === 'new' || selectedOrder?.status === 'pending' || selectedOrder?.status === 'transferred';
+      const isVerification = selectedOrder?.status === 'new' || selectedOrder?.status === 'pending' || selectedOrder?.status === 'transferred' || selectedOrder?.status === 'in_progress';
       const targetUserId = isVerification ? selectedVerifierId : selectedDeliveryOfficerId;
       
       if (!selectedOrder || !targetUserId) return
@@ -440,7 +440,7 @@ const OrderListContent = ({ forcedStatus, forcedChannel, apiEndpoint, hideAction
     if (!selectedOrder) return
     setIsSubmitting(true)
     try {
-      const isVerification = selectedOrder?.status === 'new' || selectedOrder?.status === 'pending' || selectedOrder?.status === 'transferred';
+      const isVerification = selectedOrder?.status === 'new' || selectedOrder?.status === 'pending' || selectedOrder?.status === 'transferred' || selectedOrder?.status === 'in_progress';
       const token = Cookies.get('auth_token')
       const endpoint = isVerification
         ? `${BACKEND_URL}/api/orders/${selectedOrder.id}/assign`
@@ -483,7 +483,7 @@ const OrderListContent = ({ forcedStatus, forcedChannel, apiEndpoint, hideAction
   }
 
   const confirmBulkAssign = async () => {
-      const isVerification = forcedStatus === 'new' || forcedStatus === 'pending';
+      const isVerification = forcedStatus === 'new' || forcedStatus === 'pending' || forcedStatus === 'in_progress';
       const targetUserId = isVerification ? selectedVerifierId : selectedDeliveryOfficerId;
       
       if (!targetUserId) return
@@ -707,6 +707,29 @@ const OrderListContent = ({ forcedStatus, forcedChannel, apiEndpoint, hideAction
     }
   }
 
+  const handleCancelEnrollment = async (order: Order) => {
+    if (!confirm('Cancel PayTrigger enrollment for this order? It will move back to Approved Orders so delivery can be re-processed.')) return
+    try {
+      const token = Cookies.get('auth_token')
+      const res = await fetch(`${BACKEND_URL}/api/paytrigger/order/${order.id}/cancel-enrollment`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      })
+
+      const data = await res.json()
+      if (!res.ok || data.success === false) throw new Error(data.message || data.error?.message || 'Failed to cancel enrollment')
+
+      toast.success(data.message || 'Enrollment cancelled, order moved back to Approved')
+      await fetchOrders()
+    } catch (err: any) {
+      console.error('Cancel enrollment error:', err)
+      toast.error(err.message || 'Failed to cancel enrollment')
+    }
+  }
+
   const handleEditClick = (order: Order) => {
     setSelectedOrder(order)
     setNewProductName(order.product_name)
@@ -759,7 +782,7 @@ const OrderListContent = ({ forcedStatus, forcedChannel, apiEndpoint, hideAction
   }
 
   const confirmBulkUnassign = async () => {
-      const isVerification = forcedStatus === 'new' || forcedStatus === 'pending';
+      const isVerification = forcedStatus === 'new' || forcedStatus === 'pending' || forcedStatus === 'in_progress';
       const ids = table.getSelectedRowModel().rows.map((r) => r.original.id)
       setIsSubmitting(true)
 
@@ -921,6 +944,11 @@ const OrderListContent = ({ forcedStatus, forcedChannel, apiEndpoint, hideAction
           case 'ready_for_pickup':
             label = 'Ready for Pickup';
             className += ' bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300';
+            break;
+
+          case 'awaiting_paytrigger_enrollment':
+            label = 'Waiting PayTrigger Approval';
+            className += ' bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300';
             break;
 
           case 'picked':
@@ -1201,8 +1229,23 @@ const OrderListContent = ({ forcedStatus, forcedChannel, apiEndpoint, hideAction
                   return null;
                 })()}
 
+                {/* Cancel Enrollment — order is stuck waiting on PayTrigger device enrollment */}
+                {!hideActions && orderStatus === 'awaiting_paytrigger_enrollment' && (
+                  <li>
+                    <button
+                      onClick={() => {
+                        handleCancelEnrollment(order)
+                        setIsOpen(false)
+                      }}
+                      className="block w-full px-4 py-2.5 text-left hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/30 dark:hover:text-red-400"
+                    >
+                      Cancel Enrollment
+                    </button>
+                  </li>
+                )}
+
                 {/* Assignment/Transfer Actions */}
-                {!hideActions && !showAllStatuses && !isRestrictedStatus && (
+                {!hideActions && !showAllStatuses && !isRestrictedStatus && orderStatus !== 'awaiting_paytrigger_enrollment' && (
                   <>
                     {isSalesOfficer ? (
                       order.status !== 'picked' && (
@@ -1237,7 +1280,7 @@ const OrderListContent = ({ forcedStatus, forcedChannel, apiEndpoint, hideAction
                       )
                     ) : (
                       <>
-                        {(order.status === 'new' || order.status === 'pending' || order.status === 'transferred') ? (
+                        {(order.status === 'new' || order.status === 'pending' || order.status === 'transferred' || order.status === 'in_progress') ? (
                           order.assigned_to ? (
                             <li>
                               <button
@@ -1771,12 +1814,12 @@ const OrderListContent = ({ forcedStatus, forcedChannel, apiEndpoint, hideAction
         className="max-w-md rounded-2xl bg-white p-8 shadow-xl dark:bg-gray-800"
       >
         <h2 className="mb-4 text-xl font-semibold text-dark dark:text-white">
-          {selectedOrder?.status === 'new' || selectedOrder?.status === 'pending' || selectedOrder?.status === 'transferred' ? 'Assign Verification Officer' : 'Assign Delivery Officer'}
+          {selectedOrder?.status === 'new' || selectedOrder?.status === 'pending' || selectedOrder?.status === 'transferred' || selectedOrder?.status === 'in_progress' ? 'Assign Verification Officer' : 'Assign Delivery Officer'}
         </h2>
         <p className="mb-6 text-gray-600 dark:text-gray-300">
-          Select {selectedOrder?.status === 'new' || selectedOrder?.status === 'pending' || selectedOrder?.status === 'transferred' ? 'a verification officer' : 'a delivery officer'}:
+          Select {selectedOrder?.status === 'new' || selectedOrder?.status === 'pending' || selectedOrder?.status === 'transferred' || selectedOrder?.status === 'in_progress' ? 'a verification officer' : 'a delivery officer'}:
         </p>
-        {selectedOrder?.status === 'new' || selectedOrder?.status === 'pending' || selectedOrder?.status === 'transferred' ? (
+        {selectedOrder?.status === 'new' || selectedOrder?.status === 'pending' || selectedOrder?.status === 'transferred' || selectedOrder?.status === 'in_progress' ? (
           <select
             value={selectedVerifierId ?? ''}
             onChange={(e) => setSelectedVerifierId(Number(e.target.value))}
@@ -1817,7 +1860,7 @@ const OrderListContent = ({ forcedStatus, forcedChannel, apiEndpoint, hideAction
           </button>
           <button
             onClick={confirmAssign}
-            disabled={!(selectedOrder?.status === 'new' || selectedOrder?.status === 'pending' || selectedOrder?.status === 'transferred' ? selectedVerifierId : selectedDeliveryOfficerId) || isSubmitting}
+            disabled={!(selectedOrder?.status === 'new' || selectedOrder?.status === 'pending' || selectedOrder?.status === 'transferred' || selectedOrder?.status === 'in_progress' ? selectedVerifierId : selectedDeliveryOfficerId) || isSubmitting}
             className="rounded bg-[#ff3d3d] px-6 py-2.5 text-white hover:bg-[#ff3d3d]/90 disabled:opacity-50"
           >
             {isSubmitting ? 'Assigning...' : 'Assign'}
@@ -1832,10 +1875,10 @@ const OrderListContent = ({ forcedStatus, forcedChannel, apiEndpoint, hideAction
         className="max-w-md rounded-2xl bg-white p-8 shadow-xl dark:bg-gray-800"
       >
         <h2 className="mb-4 text-xl font-semibold text-dark dark:text-white">
-          {selectedOrder?.status === 'new' || selectedOrder?.status === 'pending' || selectedOrder?.status === 'transferred' ? 'Unassign Verification Officer' : 'Unassign Delivery Officer'}
+          {selectedOrder?.status === 'new' || selectedOrder?.status === 'pending' || selectedOrder?.status === 'transferred' || selectedOrder?.status === 'in_progress' ? 'Unassign Verification Officer' : 'Unassign Delivery Officer'}
         </h2>
         <p className="mb-6 text-gray-600 dark:text-gray-300">
-          Are you sure you want to unassign {selectedOrder?.status === 'new' || selectedOrder?.status === 'pending' || selectedOrder?.status === 'transferred' ? 'Verification Officer' : 'Delivery Officer'} from order <strong>{selectedOrder?.order_ref}</strong>?
+          Are you sure you want to unassign {selectedOrder?.status === 'new' || selectedOrder?.status === 'pending' || selectedOrder?.status === 'transferred' || selectedOrder?.status === 'in_progress' ? 'Verification Officer' : 'Delivery Officer'} from order <strong>{selectedOrder?.order_ref}</strong>?
         </p>
         <div className="mt-6 flex justify-end gap-4">
           <button
@@ -1866,12 +1909,12 @@ const OrderListContent = ({ forcedStatus, forcedChannel, apiEndpoint, hideAction
         className="max-w-md rounded-2xl bg-white p-8 shadow-xl dark:bg-gray-800"
       >
         <h2 className="mb-4 text-xl font-semibold text-dark dark:text-white">
-          {forcedStatus === 'new' || forcedStatus === 'pending' ? 'Bulk Assign Verification Officers' : 'Bulk Assign Delivery Officers'}
+          {forcedStatus === 'new' || forcedStatus === 'pending' || forcedStatus === 'in_progress' ? 'Bulk Assign Verification Officers' : 'Bulk Assign Delivery Officers'}
         </h2>
         <p className="mb-6 text-gray-600 dark:text-gray-300">
-          Select {forcedStatus === 'new' || forcedStatus === 'pending' ? 'a verification officer' : 'a delivery officer'} for {selectedCount} selected orders:
+          Select {forcedStatus === 'new' || forcedStatus === 'pending' || forcedStatus === 'in_progress' ? 'a verification officer' : 'a delivery officer'} for {selectedCount} selected orders:
         </p>
-        {forcedStatus === 'new' || forcedStatus === 'pending' ? (
+        {forcedStatus === 'new' || forcedStatus === 'pending' || forcedStatus === 'in_progress' ? (
           <select
             value={selectedVerifierId ?? ''}
             onChange={(e) => setSelectedVerifierId(Number(e.target.value))}
@@ -1912,7 +1955,7 @@ const OrderListContent = ({ forcedStatus, forcedChannel, apiEndpoint, hideAction
           </button>
           <button
             onClick={confirmBulkAssign}
-            disabled={!(forcedStatus === 'new' || forcedStatus === 'pending' ? selectedVerifierId : selectedDeliveryOfficerId) || isSubmitting}
+            disabled={!(forcedStatus === 'new' || forcedStatus === 'pending' || forcedStatus === 'in_progress' ? selectedVerifierId : selectedDeliveryOfficerId) || isSubmitting}
             className="rounded bg-[#ff3d3d] px-6 py-2.5 text-white hover:bg-[#ff3d3d]/90 disabled:opacity-50"
           >
             {isSubmitting ? 'Assigning All...' : 'Assign All'}
@@ -1927,10 +1970,10 @@ const OrderListContent = ({ forcedStatus, forcedChannel, apiEndpoint, hideAction
         className="max-w-md rounded-2xl bg-white p-8 shadow-xl dark:bg-gray-800"
       >
         <h2 className="mb-4 text-xl font-semibold text-dark dark:text-white">
-          {forcedStatus === 'new' || forcedStatus === 'pending' ? 'Bulk Unassign Verification Officers' : 'Bulk Unassign Delivery Officers'}
+          {forcedStatus === 'new' || forcedStatus === 'pending' || forcedStatus === 'in_progress' ? 'Bulk Unassign Verification Officers' : 'Bulk Unassign Delivery Officers'}
         </h2>
         <p className="mb-6 text-gray-600 dark:text-gray-300">
-          Are you sure you want to unassign {forcedStatus === 'new' || forcedStatus === 'pending' ? 'Verification Officers' : 'Delivery Officers'} from <strong>{selectedCount}</strong> selected orders?
+          Are you sure you want to unassign {forcedStatus === 'new' || forcedStatus === 'pending' || forcedStatus === 'in_progress' ? 'Verification Officers' : 'Delivery Officers'} from <strong>{selectedCount}</strong> selected orders?
         </p>
         <div className="mt-6 flex justify-end gap-4">
           <button

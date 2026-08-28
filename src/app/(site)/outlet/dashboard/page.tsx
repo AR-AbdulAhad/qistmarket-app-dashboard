@@ -60,6 +60,12 @@ type Stats = {
     expenses: number;
     closing_cash: number;
   };
+  stock: {
+    totalItems: number;
+    inStock: number;
+    sold: number;
+    distinctProducts: number;
+  };
   todayIncrement: {
     total: number;
     pending: number;
@@ -397,6 +403,15 @@ export default function OutletDashboardPage() {
               bg="bg-red-50"
               bar="bg-[#E31E24]"
               onClick={() => router.push("/outlet/cash-register")}
+            />
+            <StatCard
+              icon={<BoxIcon size={18} />}
+              label="Stock In Hand"
+              value={`${stats.stock.distinctProducts.toLocaleString()} Items · Qty ${stats.stock.inStock.toLocaleString()}`}
+              accent="text-violet-600"
+              bg="bg-violet-50"
+              bar="bg-violet-400"
+              onClick={() => router.push("/outlet/inventory")}
             />
             <StatCard
               icon={<ShoppingBag size={18} />}
