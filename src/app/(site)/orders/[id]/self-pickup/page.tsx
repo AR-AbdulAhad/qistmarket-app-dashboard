@@ -215,11 +215,14 @@ export default function SelfPickupPage() {
       });
       const data = await res.json();
       if (data.success && data.data) {
-        const unused = data.data.availableLicenses ?? data.data.unusedNum ?? 0;
+        const unused = data.data.availableLicenses ?? data.data.remainingAmountOfLicense ?? data.data.unusedNum ?? 0;
+        const isExceeded = data.data.isLicenseExceeded ?? (unused <= 0);
         setAvailableLicenses(unused);
-        if (unused <= 0) {
+        if (isExceeded) {
           setIsLicenseExceeded(true);
           setEnrollPaytrigger(false);
+        } else {
+          setIsLicenseExceeded(false);
         }
       }
     } catch (error) {

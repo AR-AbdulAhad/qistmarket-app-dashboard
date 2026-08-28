@@ -55,10 +55,13 @@ export default function OutletReturnsPage() {
       .then(r => r.json())
       .then(res => {
         if (res?.success && res?.data) {
-          const unused = res.data.availableLicenses ?? res.data.unusedNum ?? 0;
-          if (unused <= 0) {
+          const unused = res.data.availableLicenses ?? res.data.remainingAmountOfLicense ?? res.data.unusedNum ?? 0;
+          const isExceeded = res.data.isLicenseExceeded ?? (unused <= 0);
+          if (isExceeded) {
             setIsLicenseExceeded(true);
             setKeepEnrolled(false);
+          } else {
+            setIsLicenseExceeded(false);
           }
         }
       })

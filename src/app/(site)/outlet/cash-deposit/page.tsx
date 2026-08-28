@@ -167,19 +167,31 @@ export default function CashDepositPage() {
     const handleDepositSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
-        const formData = new FormData();
-        formData.append("amount", amount);
-        formData.append("payment_method", paymentMethod);
-        if (!isRoutedMethod) {
+
+        // 1bill/qr_payment never attach a file — send them as plain JSON instead
+        // of multipart/form-data. A production-only proxy/WAF in front of this
+        // endpoint was interfering with multipart POSTs here specifically (the
+        // JSON-only SmartPay QR endpoint elsewhere in the app was unaffected),
+        // which surfaced as a generic "Network error" with no server response.
+        let body: FormData | string;
+        let extraHeaders: Record<string, string> = {};
+        if (isRoutedMethod) {
+            body = JSON.stringify({ amount, payment_method: paymentMethod });
+            extraHeaders = { "Content-Type": "application/json" };
+        } else {
+            const formData = new FormData();
+            formData.append("amount", amount);
+            formData.append("payment_method", paymentMethod);
             if (bankAccountId) formData.append("bank_account_id", bankAccountId);
             if (receiptId) formData.append("receipt_id", receiptId);
             if (description) formData.append("description", description);
             if (file) formData.append("receipt_photo", file);
+            body = formData;
         }
 
         try {
             const res = await fetch(`${API_BASE}/api/outlet/bank-deposits`, {
-                method: "POST", headers: getAuthHeaders(), body: formData,
+                method: "POST", headers: { ...getAuthHeaders(), ...extraHeaders }, body,
             });
             let data: any = null;
             try {

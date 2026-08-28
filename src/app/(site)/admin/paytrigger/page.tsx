@@ -469,16 +469,16 @@ export default function PayTriggerAdminPage() {
                 <div className="space-y-4">
                   <div className="bg-gray-50 dark:bg-gray-900 p-4 rounded-xl border">
                     <p className="text-xs font-bold text-gray-500 uppercase mb-1">Total Licenses</p>
-                    <p className="text-2xl font-black text-gray-800 dark:text-white">{licenseInfo.totalAmountOfLicense?.toLocaleString() || 0}</p>
+                    <p className="text-2xl font-black text-gray-800 dark:text-white">{(licenseInfo.totalAmountOfLicense ?? licenseInfo.totalNum ?? 0).toLocaleString()}</p>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="bg-emerald-50 dark:bg-emerald-900/20 p-4 rounded-xl border border-emerald-100 dark:border-emerald-800">
                       <p className="text-xs font-bold text-emerald-600 dark:text-emerald-400 uppercase mb-1">Available</p>
-                      <p className="text-xl font-black text-emerald-700 dark:text-emerald-300">{licenseInfo.remainingAmountOfLicense?.toLocaleString() || 0}</p>
+                      <p className="text-xl font-black text-emerald-700 dark:text-emerald-300">{(licenseInfo.remainingAmountOfLicense ?? licenseInfo.availableLicenses ?? licenseInfo.unusedNum ?? 0).toLocaleString()}</p>
                     </div>
                     <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-xl border border-blue-100 dark:border-blue-800">
                       <p className="text-xs font-bold text-blue-600 dark:text-blue-400 uppercase mb-1">Used</p>
-                      <p className="text-xl font-black text-blue-700 dark:text-blue-300">{licenseInfo.amountUsedOfLicense?.toLocaleString() || 0}</p>
+                      <p className="text-xl font-black text-blue-700 dark:text-blue-300">{(licenseInfo.amountUsedOfLicense ?? licenseInfo.usedNum ?? 0).toLocaleString()}</p>
                     </div>
                   </div>
                 </div>
