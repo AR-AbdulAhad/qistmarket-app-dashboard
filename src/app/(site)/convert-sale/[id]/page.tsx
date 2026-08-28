@@ -104,7 +104,12 @@ const ConvertSalePage = ({ params }: { params: Promise<{ id: string }> }) => {
             monthly_amount: o.monthly_amount,
             months: o.months,
             channel: 'Repeat Customer',
-            outlet_id: o.outlet_id || ''
+            // Pre-select the branch the customer actually got the product
+            // from (the order's own outlet). Older/legacy orders can have no
+            // outlet_id recorded at all — fall back to the outlet of whoever
+            // is processing this conversion, since that's who it's almost
+            // always for, rather than leaving the dropdown on "Select Outlet".
+            outlet_id: o.outlet_id || user?.outlet_id || ''
           });
 
           let steps = [];
