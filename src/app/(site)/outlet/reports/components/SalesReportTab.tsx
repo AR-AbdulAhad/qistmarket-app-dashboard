@@ -57,7 +57,7 @@ export default function SalesReportTab({ token, startDate, endDate, searchQuery 
             "Phone": `"${o.whatsapp_number}"`,
             "Product": o.product_name,
             "Total Amount": o.total_amount,
-            "Advance": o.advance_payment,
+            "Down Payment": o.down_payment_amount,
             "Status": o.status
         }));
         const ws = XLSX.utils.json_to_sheet(rows);
@@ -123,7 +123,7 @@ export default function SalesReportTab({ token, startDate, endDate, searchQuery 
                                     <th className="px-4 py-3 font-medium">Date</th>
                                     <th className="px-4 py-3 font-medium">Customer</th>
                                     <th className="px-4 py-3 font-medium">Product</th>
-                                    <th className="px-4 py-3 font-medium">Total Amount</th>
+                                    <th className="px-4 py-3 font-medium">Down Payment</th>
                                     <th className="px-4 py-3 font-medium">Status</th>
                                 </tr>
                             </thead>
@@ -137,7 +137,7 @@ export default function SalesReportTab({ token, startDate, endDate, searchQuery 
                                             <p className="text-xs text-gray-500">{order.whatsapp_number}</p>
                                         </td>
                                         <td className="px-4 py-3">{order.product_name}</td>
-                                        <td className="px-4 py-3 font-medium">Rs {order.total_amount?.toLocaleString()}</td>
+                                        <td className="px-4 py-3 font-medium">Rs {(order.down_payment_amount ?? 0).toLocaleString()}</td>
                                         <td className="px-4 py-3">
                                             <span className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${
                                                 order.status === 'delivered' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' :
