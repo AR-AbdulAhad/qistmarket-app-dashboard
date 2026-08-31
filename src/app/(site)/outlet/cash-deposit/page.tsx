@@ -372,7 +372,11 @@ export default function CashDepositPage() {
                                     <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)} className="w-full rounded border-[1.5px] border-stroke bg-transparent py-3 px-5 font-medium outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:focus:border-primary">
                                         <option value="manual_deposit">Manual Bank Deposit</option>
                                         <option value="1bill">1Bill Payment</option>
-                                        <option value="qr_payment">QR Payment</option>
+                                        {/* Disabled — SmartPay rejects this flow's consumer number with
+                                            "Invalid bill data" on every attempt; pending confirmation from
+                                            SmartPay support on why (see bankAccountController.submitBankDeposit,
+                                            qr_payment branch). 1Bill Payment works and covers the same need. */}
+                                        <option value="qr_payment" disabled>QR Payment (temporarily unavailable)</option>
                                     </select>
                                 </div>
                             </div>
