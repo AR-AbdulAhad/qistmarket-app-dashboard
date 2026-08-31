@@ -189,10 +189,23 @@ export default function CashDepositPage() {
             body = formData;
         }
 
+        const doFetch = () => fetch(`${API_BASE}/api/outlet/bank-deposits`, {
+            method: "POST", headers: { ...getAuthHeaders(), ...extraHeaders }, body,
+        });
+
         try {
-            const res = await fetch(`${API_BASE}/api/outlet/bank-deposits`, {
-                method: "POST", headers: { ...getAuthHeaders(), ...extraHeaders }, body,
-            });
+            let res: Response;
+            try {
+                res = await doFetch();
+            } catch (err) {
+                // A raw fetch failure (not an error response) for the QR/1bill
+                // path is usually a transient hiccup reaching the payment
+                // gateway — worth one retry before giving up, since the manual
+                // deposit path doesn't hit that gateway at all.
+                if (!isRoutedMethod) throw err;
+                await new Promise((resolve) => setTimeout(resolve, 800));
+                res = await doFetch();
+            }
             let data: any = null;
             try {
                 data = await res.json();
@@ -208,7 +221,11 @@ export default function CashDepositPage() {
                 fetchDepositHistory();
                 fetchCashInHand();
             } else { toast.error(data.message || "Failed to submit request."); }
-        } catch (err) { toast.error("Network error — could not reach the server. Please check your connection and try again."); }
+        } catch (err) {
+            toast.error(isRoutedMethod
+                ? "Could not reach the payment gateway after retrying. Please try again in a moment."
+                : "Network error — could not reach the server. Please check your connection and try again.");
+        }
         finally { setLoading(false); }
     };
 
