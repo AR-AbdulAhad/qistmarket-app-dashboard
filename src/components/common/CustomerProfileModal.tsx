@@ -20,6 +20,35 @@ export default function CustomerProfileModal({ open, onClose, data }: ProfileMod
     const [activeTab, setActiveTab] = useState("personal");
     const [cnicOrders, setCnicOrders] = useState<any>({});
     const [isCheckingCnic, setIsCheckingCnic] = useState(false);
+    const [wasEverBlacklisted, setWasEverBlacklisted] = useState(false);
+
+    // Once whitelisted, is_blacklisted flips to false everywhere this data is
+    // (re)fetched from, so the modal already stops showing "BLACKLISTED"
+    // automatically — this just adds the "Previously Blacklisted" history
+    // marker so a cleared customer doesn't look indistinguishable from one
+    // who was never flagged. Non-gated endpoint (any role can view it).
+    useEffect(() => {
+        const cnic = data?.verification?.purchaser?.cnic_number;
+        if (!open || !cnic) {
+            setWasEverBlacklisted(false);
+            return;
+        }
+        const fetchBlacklistStatus = async () => {
+            try {
+                const token = Cookies.get("auth_token");
+                const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000"}/api/customers/blacklist-status/${encodeURIComponent(cnic)}`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                const result = await res.json();
+                if (result.success) {
+                    setWasEverBlacklisted(!!result.data.wasEverBlacklisted);
+                }
+            } catch (e) {
+                console.error("Blacklist status check error:", e);
+            }
+        };
+        fetchBlacklistStatus();
+    }, [open, data?.verification?.purchaser?.cnic_number]);
 
     useEffect(() => {
         if (open && data && data.verification) {
@@ -230,6 +259,11 @@ export default function CustomerProfileModal({ open, onClose, data }: ProfileMod
                                 ) : (
                                     <span className="inline-block px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-[0.2em] bg-primary/5 text-primary border border-primary/10">
                                         {order.status?.replace('_', ' ')}
+                                    </span>
+                                )}
+                                {!isBlacklisted && wasEverBlacklisted && (
+                                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-[0.2em] bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800/40">
+                                        <ShieldCheck size={12} /> Previously Blacklisted — Whitelisted
                                     </span>
                                 )}
                             </div>
