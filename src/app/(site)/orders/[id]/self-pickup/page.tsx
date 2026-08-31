@@ -49,7 +49,7 @@ export default function SelfPickupPage() {
 
   // PayTrigger opt-in
   const [isPtEligible, setIsPtEligible] = useState(false);
-  const [enrollPaytrigger, setEnrollPaytrigger] = useState(true);
+  const [enrollPaytrigger, setEnrollPaytrigger] = useState(false);
   const [availableLicenses, setAvailableLicenses] = useState<number | null>(null);
   const [isLicenseExceeded, setIsLicenseExceeded] = useState(false);
 
@@ -427,7 +427,9 @@ export default function SelfPickupPage() {
     // Detect PayTrigger eligibility (Tecno / Infinix / Itel)
     const ptEligible = /(tecno|infinix|itel)/i.test(item.product_name || '');
     setIsPtEligible(ptEligible);
-    setEnrollPaytrigger(true); // default ON whenever a new item is selected
+    // Only default the toggle on when it's actually shown (eligible brand) —
+    // otherwise the flag would still submit as true underneath a hidden toggle.
+    setEnrollPaytrigger(ptEligible);
   };
 
   // Re-calculate plans when custom cash price is entered

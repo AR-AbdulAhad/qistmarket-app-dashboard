@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import Cookies from "js-cookie";
 import toast from "react-hot-toast";
 import { Ban, Search, History, ShieldCheck, ShieldX, Loader2, ClipboardCheck, Check, X, Gauge } from "lucide-react";
@@ -157,8 +158,8 @@ export default function BlacklistPage() {
   };
 
   const handleAction = async (cnic: string, action: "blacklist" | "whitelist") => {
-    if (action === "blacklist" && !reason.trim()) {
-      toast.error("Please enter a reason for blacklisting.");
+    if (!reason.trim()) {
+      toast.error(`Please enter a reason for ${action === "whitelist" ? "whitelisting" : "blacklisting"}.`);
       return;
     }
 
@@ -172,10 +173,10 @@ export default function BlacklistPage() {
       const json = await res.json();
       if (!res.ok) throw new Error(json.message || "Action failed.");
       if (action === "blacklist") {
-        toast.success("Customer blacklisted.");
+        toast.success(json.message || "Customer blacklisted.");
         setResults((prev) => prev.map((r) => (r.cnic_number === cnic ? { ...r, is_blacklisted: true } : r)));
       } else {
-        toast.success("Whitelist request submitted for approval.");
+        toast.success(json.message || "Customer whitelisted.");
       }
       setReason("");
       setCategory("");
@@ -267,7 +268,7 @@ export default function BlacklistPage() {
             <input
               value={reason}
               onChange={(e) => setReason(e.target.value)}
-              placeholder="Reason (required for blacklist)"
+              placeholder="Reason (required for every action)"
               className="w-64 rounded-xl border border-stroke bg-white px-4 py-2.5 text-sm outline-none transition focus:border-[#ff3d3d] dark:border-dark-3 dark:bg-gray-dark dark:text-white"
             />
             <button type="submit" disabled={searching} className="flex items-center gap-1.5 rounded-xl bg-[#ff3d3d] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-opacity-90 disabled:opacity-50">
@@ -314,6 +315,12 @@ export default function BlacklistPage() {
                       </td>
                       <td className="px-4 py-3.5">
                         <div className="flex items-center justify-end gap-2">
+                          <Link
+                            href={`/verifications/${r.verification_id}`}
+                            className="text-xs font-semibold text-slate-600 hover:underline dark:text-slate-300"
+                          >
+                            Profile
+                          </Link>
                           <button onClick={() => handleRiskLookup(r.cnic_number)} className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:underline"><Gauge className="size-3.5" /> Risk</button>
                           {r.is_blacklisted ? (
                             <button

@@ -243,6 +243,71 @@ const shouldDisplay = (value: any): boolean => {
   return true
 }
 
+// Shows how many other orders this CNIC is linked to (as purchaser or
+// guarantor) and lets the officer expand a list of them — role + status —
+// so cross-order connections are visible right where the CNIC is shown,
+// instead of requiring a separate manual search.
+const LinkedOrdersBadge = ({
+  cnic,
+  orders,
+  currentOrderId,
+}: {
+  cnic?: string
+  orders: any[]
+  currentOrderId: number
+}) => {
+  const [showDetails, setShowDetails] = useState(false)
+
+  if (!cnic) return null
+  const otherOrders = orders.filter((o) => o.id !== currentOrderId)
+  if (otherOrders.length === 0) return null
+
+  return (
+    <div className="relative mb-4 -mt-1">
+      <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/30 w-fit">
+        <span className="text-[10px] font-black text-amber-700 dark:text-amber-300 uppercase tracking-tight">
+          Also linked to {otherOrders.length} other order{otherOrders.length > 1 ? 's' : ''}
+        </span>
+        <button
+          onClick={() => setShowDetails(!showDetails)}
+          className="text-[10px] font-black text-blue-600 dark:text-blue-400 hover:underline"
+        >
+          {showDetails ? 'Hide' : 'View'}
+        </button>
+      </div>
+
+      {showDetails && (
+        <div className="z-40 mt-2 p-3 bg-white dark:bg-boxdark border border-stroke dark:border-strokedark rounded-xl shadow-lg max-w-md">
+          <div className="space-y-2 max-h-64 overflow-y-auto">
+            {otherOrders.map((o: any) => (
+              <a
+                key={o.id}
+                href={`/orders/${o.id}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-between p-2.5 rounded-lg hover:bg-gray-50 dark:hover:bg-meta-4 transition-colors"
+              >
+                <div>
+                  <p className="text-xs font-black text-gray-800 dark:text-white">{o.order_ref}</p>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">Role: {o.role}</p>
+                </div>
+                <div className="text-right">
+                  <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest ${
+                    o.status === 'delivered' ? 'bg-green-100 text-green-600' : 'bg-amber-100 text-amber-600'
+                  }`}>
+                    {o.status}
+                  </span>
+                  <p className="text-[9px] text-gray-400 mt-1">{new Date(o.created_at).toLocaleDateString()}</p>
+                </div>
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // Editable Field Component
 const EditableField = ({
   label,
@@ -425,7 +490,11 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
   // Timeline collapse states
   const [isAssignmentTimelineCollapsed, setIsAssignmentTimelineCollapsed] = useState(true);
   const [isStatusTimelineCollapsed, setIsStatusTimelineCollapsed] = useState(true);
-  
+
+  // CNIC -> other orders this same person (purchaser or grantor) is linked to,
+  // so the verification officer can see all their connections in one glance.
+  const [cnicOrders, setCnicOrders] = useState<Record<string, any[]>>({})
+
   const { user } = useAuth();
   // Set officer details from loaded data when officerIdInput changes
   useEffect(() => {
@@ -500,6 +569,39 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
 
     fetchData()
   }, [id])
+
+  // Cross-reference the purchaser's and every grantor's CNIC against all other
+  // orders, so the officer can see at a glance who's a purchaser vs a
+  // guarantor elsewhere.
+  useEffect(() => {
+    if (!data) return
+    const cnics = [
+      data.purchaser?.cnic_number,
+      ...(data.grantors || []).map(g => g.cnic_number),
+    ].filter((c): c is string => !!c)
+
+    if (cnics.length === 0) return
+
+    const fetchCnicOrders = async () => {
+      try {
+        const token = Cookies.get('auth_token')
+        const res = await fetch(`${BACKEND_URL}/api/check-cnic`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ cnics }),
+        })
+        const result = await res.json()
+        if (result.success) setCnicOrders(result.results)
+      } catch (err) {
+        console.error('CNIC cross-reference check error:', err)
+      }
+    }
+
+    fetchCnicOrders()
+  }, [data?.purchaser?.cnic_number, data?.grantors])
 
   const handleFieldSave = async (
     entityType: 'purchaser' | 'grantor',
@@ -1376,6 +1478,11 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
           <h2 className="mb-4 text-2xl font-semibold text-dark dark:text-white">
             Purchaser Details
           </h2>
+          <LinkedOrdersBadge
+            cnic={data.purchaser.cnic_number}
+            orders={cnicOrders[data.purchaser.cnic_number] || []}
+            currentOrderId={data.order.id}
+          />
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
             <EditableField
               label="Name"
@@ -1595,6 +1702,11 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
             <h2 className="mb-4 text-2xl font-semibold text-dark dark:text-white">
               Grantor {grantor.grantor_number} Details
             </h2>
+            <LinkedOrdersBadge
+              cnic={grantor.cnic_number}
+              orders={cnicOrders[grantor.cnic_number] || []}
+              currentOrderId={data.order.id}
+            />
 
             {hasGrantorData && (
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
