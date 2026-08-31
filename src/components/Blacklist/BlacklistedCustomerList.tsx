@@ -10,6 +10,7 @@ import {
 import Cookies from 'js-cookie'
 import { SearchIcon, PointerUp } from '@/assets/icons'
 import { useProfileModal } from '../../../contexts/ProfileModalContext'
+import { useAuth } from '../../../contexts/AuthContext'
 import { AlertTriangle, Ban, ShieldCheck } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -29,6 +30,8 @@ const BlacklistedCustomerList = () => {
   const [loading, setLoading] = useState(false)
   const [whitelistingCnic, setWhitelistingCnic] = useState<string | null>(null)
   const { openProfile } = useProfileModal()
+  const { user } = useAuth()
+  const canWhitelist = ['admin', 'super admin', 'accountant'].includes(user?.role?.toLowerCase() || '')
 
   const fetchBlacklist = async () => {
     setLoading(true)
@@ -71,8 +74,12 @@ const BlacklistedCustomerList = () => {
       toast.error('This customer has no CNIC on file — cannot whitelist.')
       return
     }
-    const reason = window.prompt(`Reason for whitelisting ${customerGroup.customer.name} (optional):`, '')
+    const reason = window.prompt(`Reason for whitelisting ${customerGroup.customer.name}:`, '')
     if (reason === null) return // cancelled
+    if (!reason.trim()) {
+      toast.error('A reason is required to whitelist a customer.')
+      return
+    }
 
     setWhitelistingCnic(cnic)
     try {
@@ -83,7 +90,7 @@ const BlacklistedCustomerList = () => {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ cnic, action: 'whitelist', reason: reason || undefined }),
+        body: JSON.stringify({ cnic, action: 'whitelist', reason: reason.trim() }),
       })
       const json = await res.json()
       if (!res.ok || json.success === false) throw new Error(json.message || 'Failed to whitelist customer')
@@ -185,14 +192,16 @@ const BlacklistedCustomerList = () => {
             >
               Open Profile
             </button>
-            <button
-              onClick={() => handleWhitelist(row.original)}
-              disabled={isWhitelisting}
-              title={cnic ? undefined : 'No CNIC on file'}
-              className="flex items-center gap-1.5 rounded-xl bg-emerald-500 px-4 py-2 text-xs font-black uppercase tracking-widest text-white hover:bg-emerald-600 shadow-lg shadow-emerald-500/20 transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
-            >
-              <ShieldCheck size={14} /> {isWhitelisting ? 'Whitelisting...' : 'Whitelist'}
-            </button>
+            {canWhitelist && (
+              <button
+                onClick={() => handleWhitelist(row.original)}
+                disabled={isWhitelisting}
+                title={cnic ? undefined : 'No CNIC on file'}
+                className="flex items-center gap-1.5 rounded-xl bg-emerald-500 px-4 py-2 text-xs font-black uppercase tracking-widest text-white hover:bg-emerald-600 shadow-lg shadow-emerald-500/20 transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
+              >
+                <ShieldCheck size={14} /> {isWhitelisting ? 'Whitelisting...' : 'Whitelist'}
+              </button>
+            )}
           </div>
         )
       },
