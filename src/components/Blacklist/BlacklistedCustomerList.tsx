@@ -10,7 +10,8 @@ import {
 import Cookies from 'js-cookie'
 import { SearchIcon, PointerUp } from '@/assets/icons'
 import { useProfileModal } from '../../../contexts/ProfileModalContext'
-import { AlertTriangle, Ban } from 'lucide-react'
+import { AlertTriangle, Ban, ShieldCheck } from 'lucide-react'
+import toast from 'react-hot-toast'
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL
 
@@ -26,6 +27,7 @@ const BlacklistedCustomerList = () => {
   const [customers, setCustomers] = useState<CustomerGroup[]>([])
   const [globalFilter, setGlobalFilter] = useState('')
   const [loading, setLoading] = useState(false)
+  const [whitelistingCnic, setWhitelistingCnic] = useState<string | null>(null)
   const { openProfile } = useProfileModal()
 
   const fetchBlacklist = async () => {
@@ -57,6 +59,42 @@ const BlacklistedCustomerList = () => {
   const handleViewProfile = (customerGroup: CustomerGroup) => {
     if (customerGroup.orders && customerGroup.orders.length > 0) {
       openProfile(customerGroup.orders[0]);
+    }
+  }
+
+  // Admin/Super Admin acts as final authority here — setBlacklistStatus
+  // applies the whitelist immediately for that role instead of leaving it
+  // pending for a separate accountant approval (see blacklistController.js).
+  const handleWhitelist = async (customerGroup: CustomerGroup) => {
+    const cnic = customerGroup.customer.cnic_number
+    if (!cnic) {
+      toast.error('This customer has no CNIC on file — cannot whitelist.')
+      return
+    }
+    const reason = window.prompt(`Reason for whitelisting ${customerGroup.customer.name} (optional):`, '')
+    if (reason === null) return // cancelled
+
+    setWhitelistingCnic(cnic)
+    try {
+      const token = Cookies.get('auth_token')
+      const res = await fetch(`${BACKEND_URL}/api/accounts/blacklist/action`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ cnic, action: 'whitelist', reason: reason || undefined }),
+      })
+      const json = await res.json()
+      if (!res.ok || json.success === false) throw new Error(json.message || 'Failed to whitelist customer')
+
+      toast.success(json.message || 'Customer whitelisted.')
+      setCustomers(prev => prev.filter(c => c.customer.cnic_number !== cnic))
+    } catch (err: any) {
+      console.error(err)
+      toast.error(err.message || 'Failed to whitelist customer')
+    } finally {
+      setWhitelistingCnic(null)
     }
   }
 
@@ -135,15 +173,29 @@ const BlacklistedCustomerList = () => {
     },
     {
       id: 'actions',
-      header: 'Deep View',
-      cell: ({ row }) => (
-        <button
-          onClick={() => handleViewProfile(row.original)}
-          className="rounded-xl bg-red-500 px-6 py-2 text-xs font-black uppercase tracking-widest text-white hover:bg-red-600 shadow-lg shadow-red-500/20 transition-all hover:scale-105 active:scale-95"
-        >
-          Open Profile
-        </button>
-      ),
+      header: 'Actions',
+      cell: ({ row }) => {
+        const cnic = row.original.customer.cnic_number
+        const isWhitelisting = whitelistingCnic === cnic
+        return (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => handleViewProfile(row.original)}
+              className="rounded-xl bg-red-500 px-6 py-2 text-xs font-black uppercase tracking-widest text-white hover:bg-red-600 shadow-lg shadow-red-500/20 transition-all hover:scale-105 active:scale-95"
+            >
+              Open Profile
+            </button>
+            <button
+              onClick={() => handleWhitelist(row.original)}
+              disabled={isWhitelisting}
+              title={cnic ? undefined : 'No CNIC on file'}
+              className="flex items-center gap-1.5 rounded-xl bg-emerald-500 px-4 py-2 text-xs font-black uppercase tracking-widest text-white hover:bg-emerald-600 shadow-lg shadow-emerald-500/20 transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
+            >
+              <ShieldCheck size={14} /> {isWhitelisting ? 'Whitelisting...' : 'Whitelist'}
+            </button>
+          </div>
+        )
+      },
     },
   ]
 
