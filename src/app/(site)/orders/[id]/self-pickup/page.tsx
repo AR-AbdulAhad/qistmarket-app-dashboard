@@ -677,7 +677,10 @@ export default function SelfPickupPage() {
 
       const formData = new FormData();
       formData.append('order_id', String(id));
-      formData.append('product_imei', selectedInventory.imei_serial);
+      formData.append('inventory_id', String(selectedInventory.id));
+      if (selectedInventory.imei_serial) {
+        formData.append('product_imei', selectedInventory.imei_serial);
+      }
       formData.append('selected_plan', JSON.stringify(submittedPlan));
       formData.append('custom_ledger', JSON.stringify(ledger));
       formData.append('phone', phone);
@@ -864,8 +867,8 @@ export default function SelfPickupPage() {
                             <h4 className="font-black text-gray-900 text-lg">{item.product_name}</h4>
                             {item.is_used && <span className="text-xs font-black text-white bg-red-500 px-2.5 py-1 rounded-lg uppercase tracking-tighter mb-[24px]">Used Stock</span>}
                             <div className="flex items-center gap-3 flex-wrap">
-                              <span className="text-xs font-black text-gray-400 bg-gray-100 px-2.5 py-1 rounded-lg uppercase tracking-tighter">IMEI: {item.imei_serial}</span>
-                              <span className="text-xs font-black text-gray-400 bg-gray-100 px-2.5 py-1 rounded-lg uppercase tracking-tighter">Color: {item.color_variant}</span>
+                              {item.imei_serial && <span className="text-xs font-black text-gray-400 bg-gray-100 px-2.5 py-1 rounded-lg uppercase tracking-tighter">IMEI: {item.imei_serial}</span>}
+                              {item.color_variant && <span className="text-xs font-black text-gray-400 bg-gray-100 px-2.5 py-1 rounded-lg uppercase tracking-tighter">Color: {item.color_variant}</span>}
                               {item.category && <span className="text-xs font-black text-gray-400 bg-gray-100 px-2.5 py-1 rounded-lg uppercase tracking-tighter">{item.category}</span>}
                               {(() => { const m = item.product_name?.split(' ')[0]; return m ? <span className="text-xs font-black text-blue-500 bg-blue-50 px-2.5 py-1 rounded-lg uppercase tracking-tighter">{m}</span> : null; })()}
                             </div>
@@ -1450,7 +1453,7 @@ export default function SelfPickupPage() {
                     <div className="bg-gray-50 border border-gray-100 p-6 rounded-[2rem]">
                       <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Asset Details</p>
                       <h4 className="font-black text-gray-900 text-lg mb-1">{selectedInventory?.product_name}</h4>
-                      <p className="text-xs font-bold text-gray-500 uppercase tracking-tighter">{selectedInventory?.imei_serial}</p>
+                      <p className="text-xs font-bold text-gray-500 uppercase tracking-tighter">{selectedInventory?.imei_serial || 'No serial recorded'}</p>
                     </div>
                     <div className="bg-gray-50 border border-gray-100 p-6 rounded-[2rem]">
                       <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Payment Info</p>
@@ -1535,7 +1538,7 @@ export default function SelfPickupPage() {
                 <div className="p-4 bg-emerald-50 rounded-2xl border-2 border-emerald-100 flex items-center gap-4">
                   <Smartphone className="w-8 h-8 text-emerald-600" />
                   <div>
-                    <p className="text-sm font-black text-emerald-900">{selectedInventory.imei_serial}</p>
+                    <p className="text-sm font-black text-emerald-900">{selectedInventory.imei_serial || selectedInventory.product_name}</p>
                     <p className="text-[10px] font-black text-emerald-600/70 uppercase">{selectedInventory.color_variant}</p>
                   </div>
                 </div>

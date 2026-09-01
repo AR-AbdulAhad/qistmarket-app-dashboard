@@ -412,9 +412,9 @@ export default function OutletInventoryPage() {
                     </div>
                     <input
                         type="text"
-                        placeholder="Search by name, IMEI, category, variant..."
+                        placeholder="Search by product name or IMEI/serial..."
                         value={search}
-                        onChange={(e) => setSearch(e.target.value)}
+                        onChange={(e) => { setSearch(e.target.value); setPage(1); }}
                         className="w-full border border-stroke dark:border-strokedark rounded-lg pl-10 pr-4 py-2.5 text-sm bg-gray-50 dark:bg-form-input focus:border-primary outline-none dark:text-white"
                     />
                 </div>
