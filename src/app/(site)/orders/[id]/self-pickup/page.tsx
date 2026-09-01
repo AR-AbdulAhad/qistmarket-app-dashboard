@@ -724,13 +724,16 @@ export default function SelfPickupPage() {
     }
   };
 
-  const searchWords = search.toLowerCase().trim().split(/\s+/).filter(Boolean);
-  const filteredInventory = inventory.filter(item => {
-    const haystacks = [item.product_name, item.imei_serial, item.category, item.color_variant]
-      .filter(Boolean)
-      .map((v: string) => v.toLowerCase());
-    return searchWords.every(word => haystacks.some(h => h.includes(word)));
-  });
+  const normalizeForSearch = (s: string) => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const normalizedSearch = normalizeForSearch(search);
+  const filteredInventory = normalizedSearch
+    ? inventory.filter(item => {
+        const haystack = normalizeForSearch(
+          [item.product_name, item.imei_serial, item.category, item.color_variant].filter(Boolean).join(' ')
+        );
+        return haystack.includes(normalizedSearch);
+      })
+    : inventory;
 
   if (loading || screenMode === 'loading') return <Loader text="Loading self-pickup details..." />;
 
