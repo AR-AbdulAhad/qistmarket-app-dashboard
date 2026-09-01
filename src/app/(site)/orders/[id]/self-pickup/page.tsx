@@ -724,10 +724,15 @@ export default function SelfPickupPage() {
     }
   };
 
-  const filteredInventory = inventory.filter(item =>
-    item.product_name.toLowerCase().includes(search.toLowerCase()) ||
-    (item.imei_serial && item.imei_serial.includes(search))
-  );
+  const filteredInventory = inventory.filter(item => {
+    const q = search.toLowerCase();
+    return (
+      item.product_name.toLowerCase().includes(q) ||
+      (item.imei_serial && item.imei_serial.toLowerCase().includes(q)) ||
+      (item.category && item.category.toLowerCase().includes(q)) ||
+      (item.color_variant && item.color_variant.toLowerCase().includes(q))
+    );
+  });
 
   if (loading || screenMode === 'loading') return <Loader text="Loading self-pickup details..." />;
 
