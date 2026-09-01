@@ -210,10 +210,10 @@ export default function CustomerProfileModal({ open, onClose, data }: ProfileMod
                 className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-fade-in"
                 onClick={onClose}
             />
-            <div className="relative w-full max-w-5xl bg-white dark:bg-boxdark rounded-[2.5rem] shadow-[0_40px_100px_rgba(0,0,0,0.2)] overflow-hidden border border-stroke dark:border-strokedark animate-zoom-in my-8">
+            <div className="relative w-full max-w-5xl max-h-[90vh] flex flex-col bg-white dark:bg-boxdark rounded-[2.5rem] shadow-[0_40px_100px_rgba(0,0,0,0.2)] overflow-hidden border border-stroke dark:border-strokedark animate-zoom-in my-8">
 
                 {/* Premium Header - Subdued and Sophisticated */}
-                <div className="bg-gray-50 dark:bg-meta-4/20 p-8 md:p-12 border-b border-stroke dark:border-strokedark relative overflow-hidden">
+                <div className="shrink-0 bg-gray-50 dark:bg-meta-4/20 p-8 md:p-12 border-b border-stroke dark:border-strokedark relative overflow-hidden">
                     <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl opacity-50" />
 
                     <button
@@ -277,7 +277,7 @@ export default function CustomerProfileModal({ open, onClose, data }: ProfileMod
                 </div>
 
                 {/* Modern Tabs */}
-                <div className="flex bg-white dark:bg-boxdark px-8 md:px-12 border-b border-stroke dark:border-strokedark overflow-x-auto no-scrollbar">
+                <div className="shrink-0 flex bg-white dark:bg-boxdark px-8 md:px-12 border-b border-stroke dark:border-strokedark overflow-x-auto no-scrollbar">
                     {tabs.map(tab => (
                         <button
                             key={tab.id}
@@ -297,7 +297,7 @@ export default function CustomerProfileModal({ open, onClose, data }: ProfileMod
                 </div>
 
                 {/* Content Area - Spacious and Clean */}
-                <div className="p-8 md:p-12 lg:p-16 max-h-[55vh] overflow-y-auto custom-scrollbar bg-white dark:bg-boxdark">
+                <div className="flex-1 min-h-0 p-8 md:p-12 lg:p-16 overflow-y-auto custom-scrollbar bg-white dark:bg-boxdark">
                     {activeTab === "personal" && (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-12 lg:gap-16 animate-fade-in-up">
                             <SectionNew title="Identity Breakdown" icon={<Fingerprint size={18} />}>
@@ -418,7 +418,7 @@ export default function CustomerProfileModal({ open, onClose, data }: ProfileMod
                 </div>
 
                 {/* Elegant Footer */}
-                <div className="px-8 md:px-12 py-8 border-t border-stroke dark:border-strokedark flex flex-col sm:flex-row justify-between items-center gap-6 bg-gray-50 dark:bg-meta-4/20">
+                <div className="shrink-0 px-8 md:px-12 py-8 border-t border-stroke dark:border-strokedark flex flex-col sm:flex-row justify-between items-center gap-6 bg-gray-50 dark:bg-meta-4/20">
                     <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-2lx bg-primary/5 flex items-center justify-center border border-primary/10">
                             <ShieldCheck size={20} className="text-primary" />
