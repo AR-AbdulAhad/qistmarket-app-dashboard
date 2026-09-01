@@ -50,15 +50,16 @@ export default function SalesReportTab({ token, startDate, endDate, searchQuery 
 
     const handleExportCSV = () => {
         if (!data.orders || data.orders.length === 0) return;
-        const rows = data.orders.map((o: any) => ({
-            "Order Ref": o.order_ref,
-            "Date": new Date(o.created_at).toLocaleDateString(),
-            "Customer": o.customer_name,
-            "Phone": `"${o.whatsapp_number}"`,
+        const rows = data.orders.map((o: any, index: number) => ({
+            "Serial No": index + 1,
+            "Order ID": o.order_ref,
+            "Customer Name": o.customer_name,
             "Product": o.product_name,
-            "Total Amount": o.total_amount,
+            "Sales Value": o.sales_value,
             "Down Payment": o.down_payment_amount,
-            "Status": o.status
+            "Balance": o.balance,
+            "Tenure": o.tenure,
+            "Installment": o.installment_amount
         }));
         const ws = XLSX.utils.json_to_sheet(rows);
         const wb = XLSX.utils.book_new();
@@ -119,38 +120,36 @@ export default function SalesReportTab({ token, startDate, endDate, searchQuery 
                         <table className="w-full text-left text-sm text-gray-600 dark:text-gray-400">
                             <thead className="bg-gray-50 text-gray-800 dark:bg-gray-900/50 dark:text-white">
                                 <tr>
-                                    <th className="px-4 py-3 font-medium">Ref #</th>
-                                    <th className="px-4 py-3 font-medium">Date</th>
-                                    <th className="px-4 py-3 font-medium">Customer</th>
+                                    <th className="px-4 py-3 font-medium">Sr #</th>
+                                    <th className="px-4 py-3 font-medium">Order ID</th>
+                                    <th className="px-4 py-3 font-medium">Customer Name</th>
                                     <th className="px-4 py-3 font-medium">Product</th>
+                                    <th className="px-4 py-3 font-medium">Sales Value</th>
                                     <th className="px-4 py-3 font-medium">Down Payment</th>
-                                    <th className="px-4 py-3 font-medium">Status</th>
+                                    <th className="px-4 py-3 font-medium">Balance</th>
+                                    <th className="px-4 py-3 font-medium">Tenure</th>
+                                    <th className="px-4 py-3 font-medium">Installment</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-                                {filteredOrders.length > 0 ? filteredOrders.map((order: any) => (
+                                {filteredOrders.length > 0 ? filteredOrders.map((order: any, index: number) => (
                                     <tr key={order.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                                        <td className="px-4 py-3">{index + 1}</td>
                                         <td className="px-4 py-3 font-medium text-blue-600">{order.order_ref}</td>
-                                        <td className="px-4 py-3">{new Date(order.created_at).toLocaleDateString()}</td>
                                         <td className="px-4 py-3">
                                             <p className="font-medium text-gray-800 dark:text-white">{order.customer_name}</p>
                                             <p className="text-xs text-gray-500">{order.whatsapp_number}</p>
                                         </td>
                                         <td className="px-4 py-3">{order.product_name}</td>
+                                        <td className="px-4 py-3 font-medium">Rs {(order.sales_value ?? 0).toLocaleString()}</td>
                                         <td className="px-4 py-3 font-medium">Rs {(order.down_payment_amount ?? 0).toLocaleString()}</td>
-                                        <td className="px-4 py-3">
-                                            <span className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${
-                                                order.status === 'delivered' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' :
-                                                order.status === 'cancelled' ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400' :
-                                                'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400'
-                                            }`}>
-                                                {order.status}
-                                            </span>
-                                        </td>
+                                        <td className="px-4 py-3 font-medium">Rs {(order.balance ?? 0).toLocaleString()}</td>
+                                        <td className="px-4 py-3">{order.tenure ?? 0} months</td>
+                                        <td className="px-4 py-3 font-medium">Rs {(order.installment_amount ?? 0).toLocaleString()}</td>
                                     </tr>
                                 )) : (
                                     <tr>
-                                        <td colSpan={6} className="px-4 py-8 text-center text-gray-500">No sales data found for the selected range.</td>
+                                        <td colSpan={9} className="px-4 py-8 text-center text-gray-500">No sales data found for the selected range.</td>
                                     </tr>
                                 )}
                             </tbody>
