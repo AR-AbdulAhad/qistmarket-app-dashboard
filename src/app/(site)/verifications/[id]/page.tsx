@@ -12,6 +12,7 @@ import { useAuth } from '../../../../../contexts/AuthContext'
 import OrderCustomerInfo from '@/components/common/OrderCustomerInfo'
 import { MediaCard } from '@/components/common/MediaCard'
 import { formatExactDate } from "@/utils/dateUtils";
+import LinkedAccountsBadge from '@/components/common/LinkedAccountsBadge';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL
 
@@ -247,66 +248,7 @@ const shouldDisplay = (value: any): boolean => {
 // guarantor) and lets the officer expand a list of them — role + status —
 // so cross-order connections are visible right where the CNIC is shown,
 // instead of requiring a separate manual search.
-const LinkedOrdersBadge = ({
-  cnic,
-  orders,
-  currentOrderId,
-}: {
-  cnic?: string
-  orders: any[]
-  currentOrderId: number
-}) => {
-  const [showDetails, setShowDetails] = useState(false)
-
-  if (!cnic) return null
-  const otherOrders = orders.filter((o) => o.id !== currentOrderId)
-  if (otherOrders.length === 0) return null
-
-  return (
-    <div className="relative mb-4 -mt-1">
-      <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/30 w-fit">
-        <span className="text-[10px] font-black text-amber-700 dark:text-amber-300 uppercase tracking-tight">
-          Also linked to {otherOrders.length} other order{otherOrders.length > 1 ? 's' : ''}
-        </span>
-        <button
-          onClick={() => setShowDetails(!showDetails)}
-          className="text-[10px] font-black text-blue-600 dark:text-blue-400 hover:underline"
-        >
-          {showDetails ? 'Hide' : 'View'}
-        </button>
-      </div>
-
-      {showDetails && (
-        <div className="z-40 mt-2 p-3 bg-white dark:bg-boxdark border border-stroke dark:border-strokedark rounded-xl shadow-lg max-w-md">
-          <div className="space-y-2 max-h-64 overflow-y-auto">
-            {otherOrders.map((o: any) => (
-              <a
-                key={o.id}
-                href={`/orders/${o.id}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center justify-between p-2.5 rounded-lg hover:bg-gray-50 dark:hover:bg-meta-4 transition-colors"
-              >
-                <div>
-                  <p className="text-xs font-black text-gray-800 dark:text-white">{o.order_ref}</p>
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">Role: {o.role}</p>
-                </div>
-                <div className="text-right">
-                  <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest ${
-                    o.status === 'delivered' ? 'bg-green-100 text-green-600' : 'bg-amber-100 text-amber-600'
-                  }`}>
-                    {o.status}
-                  </span>
-                  <p className="text-[9px] text-gray-400 mt-1">{new Date(o.created_at).toLocaleDateString()}</p>
-                </div>
-              </a>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
+const LinkedOrdersBadge = LinkedAccountsBadge;
 
 // Editable Field Component
 const EditableField = ({
@@ -1475,14 +1417,16 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
       {/* Purchaser Details - EDITABLE */}
       {data.purchaser && Object.values(data.purchaser).some(val => shouldDisplay(val)) && (
         <div className="mb-12">
-          <h2 className="mb-4 text-2xl font-semibold text-dark dark:text-white">
-            Purchaser Details
-          </h2>
-          <LinkedOrdersBadge
-            cnic={data.purchaser.cnic_number}
-            orders={cnicOrders[data.purchaser.cnic_number] || []}
-            currentOrderId={data.order.id}
-          />
+          <div className="flex flex-wrap items-center gap-3 mb-4">
+            <h2 className="text-2xl font-semibold text-dark dark:text-white">
+              Purchaser Details
+            </h2>
+            <LinkedAccountsBadge
+              cnic={data.purchaser.cnic_number}
+              orders={cnicOrders[data.purchaser.cnic_number] || []}
+              currentOrderId={data.order.id}
+            />
+          </div>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
             <EditableField
               label="Name"
@@ -1699,14 +1643,16 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
 
         return (
           <div key={grantor.id} className="mb-16">
-            <h2 className="mb-4 text-2xl font-semibold text-dark dark:text-white">
-              Grantor {grantor.grantor_number} Details
-            </h2>
-            <LinkedOrdersBadge
-              cnic={grantor.cnic_number}
-              orders={cnicOrders[grantor.cnic_number] || []}
-              currentOrderId={data.order.id}
-            />
+            <div className="flex flex-wrap items-center gap-3 mb-4">
+              <h2 className="text-2xl font-semibold text-dark dark:text-white">
+                Grantor {grantor.grantor_number} Details
+              </h2>
+              <LinkedAccountsBadge
+                cnic={grantor.cnic_number}
+                orders={cnicOrders[grantor.cnic_number] || []}
+                currentOrderId={data.order.id}
+              />
+            </div>
 
             {hasGrantorData && (
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">

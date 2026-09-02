@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import Cookies from "js-cookie";
+import LinkedAccountsBadge from "./LinkedAccountsBadge";
 
 interface ProfileModalProps {
     open: boolean;
@@ -523,58 +524,9 @@ function DocSectionNew({ title, person, docs }: any) {
 }
 
 function CnicWarning({ cnic, orders, currentOrderId }: { cnic: string, orders: any[], currentOrderId: number }) {
-    const [showDetails, setShowDetails] = useState(false);
-    
-    // Filter out the current order from the count and list
-    const otherOrders = orders.filter(o => o.id !== currentOrderId);
-    
-    if (otherOrders.length === 0) return null;
-
     return (
-        <div className="mt-2 relative">
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/30 animate-pulse">
-                <AlertTriangle size={12} className="text-amber-600 dark:text-amber-400" />
-                <span className="text-[10px] font-black text-amber-700 dark:text-amber-300 uppercase tracking-tight">
-                    Already in {otherOrders.length} other order{otherOrders.length > 1 ? 's' : ''}
-                </span>
-                <button 
-                    onClick={() => setShowDetails(!showDetails)}
-                    className="ml-auto text-[10px] font-black text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
-                >
-                    View Details <ExternalLink size={10} />
-                </button>
-            </div>
-
-            {showDetails && (
-                <div className="absolute top-full left-0 right-0 z-50 mt-2 p-3 bg-white dark:bg-boxdark border border-stroke dark:border-strokedark rounded-xl shadow-2xl animate-zoom-in min-w-[240px]">
-                    <div className="flex justify-between items-center mb-3 pb-2 border-b border-stroke dark:border-strokedark">
-                        <span className="text-[9px] font-black uppercase text-gray-400 tracking-widest">Order History</span>
-                        <button onClick={() => setShowDetails(false)} className="text-gray-400 hover:text-red-500"><X size={14} /></button>
-                    </div>
-                    <div className="space-y-2 max-h-48 overflow-y-auto custom-scrollbar">
-                        {otherOrders.map((o: any) => (
-                            <a 
-                                key={o.id}
-                                href={`/orders/${o.id}`}
-                                className="flex items-center justify-between p-2.5 rounded-lg hover:bg-gray-50 dark:hover:bg-meta-4 transition-colors group"
-                            >
-                                <div>
-                                    <p className="text-[10px] font-black text-gray-800 dark:text-white group-hover:text-primary transition-colors">{o.order_ref}</p>
-                                    <p className="text-[8px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">Role: {o.role}</p>
-                                </div>
-                                <div className="text-right">
-                                    <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest ${
-                                        o.status === 'delivered' ? 'bg-green-100 text-green-600' : 'bg-amber-100 text-amber-600'
-                                    }`}>
-                                        {o.status}
-                                    </span>
-                                    <p className="text-[7px] text-gray-400 mt-1">{new Date(o.created_at).toLocaleDateString()}</p>
-                                </div>
-                            </a>
-                        ))}
-                    </div>
-                </div>
-            )}
+        <div className="mt-2">
+            <LinkedAccountsBadge cnic={cnic} orders={orders} currentOrderId={currentOrderId} />
         </div>
     );
 }
