@@ -5,7 +5,8 @@ import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
 import Cookies from "js-cookie";
 import toast from "react-hot-toast";
 import * as XLSX from 'xlsx';
-import { Upload, FileText, CheckCircle2, AlertCircle, Loader2, XCircle } from 'lucide-react';
+import Link from 'next/link';
+import { Upload, FileText, CheckCircle2, AlertCircle, Loader2, XCircle, Download, ArrowRight } from 'lucide-react';
 import { useAuth } from "../../../../../contexts/AuthContext";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
@@ -25,20 +26,13 @@ const COLUMNS = [
 
 type LegacyRow = Record<(typeof COLUMNS)[number], any> & { _rowNum: number; _issues: string[] };
 
-// Mirrors legacyImportController.js's VALID_STATUSES exactly — every value
-// here is a real order status the rest of the dashboard already renders
-// (OrderList.tsx's status badge). "Completed"-group statuses (delivered,
-// completed) get the full delivery/installment-ledger/consumer-number graph
-// built; every other status is a bare record awaiting the live workflow.
-const STATUS_OPTIONS: { value: string; label: string; group: 'Already a completed sale' | 'Not yet / no longer active' }[] = [
-  { value: 'delivered', label: 'Delivered (recommended — already-sold stock)', group: 'Already a completed sale' },
-  { value: 'completed', label: 'Completed (fully paid off)', group: 'Already a completed sale' },
-  { value: 'new', label: 'New — route through live verification/delivery', group: 'Not yet / no longer active' },
-  { value: 'in_progress', label: 'In Progress', group: 'Not yet / no longer active' },
-  { value: 'cancelled', label: 'Cancelled', group: 'Not yet / no longer active' },
-  { value: 'rejected', label: 'Rejected', group: 'Not yet / no longer active' },
-  { value: 'expired', label: 'Expired', group: 'Not yet / no longer active' },
-  { value: 'returned', label: 'Returned', group: 'Not yet / no longer active' },
+// Mirrors legacyImportController.js's VALID_STATUSES exactly. Every legacy
+// row is an already-transacted historical sale, so these are the only two
+// statuses that make sense here — both build the full order (delivery,
+// installment ledger, 1Bill/SmartPay numbers).
+const STATUS_OPTIONS: { value: string; label: string }[] = [
+  { value: 'delivered', label: 'Delivered (recommended — already-sold stock)' },
+  { value: 'completed', label: 'Completed (fully paid off)' },
 ];
 
 type ImportResult = { row: number; success: boolean; order_id?: number; error?: string; reconciliation_warning?: string | null };
@@ -72,6 +66,49 @@ export default function LegacyImportPage() {
   const [parsing, setParsing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [results, setResults] = useState<ImportResult[] | null>(null);
+
+  const downloadDemoSheet = () => {
+    try {
+      const headers = [
+        'ACC NO', 'G.NO', 'S.NO', 'DATE', 'ORDER BY', 'INS DATE', '1BILL ID',
+        'Name', 'CNIC', 'Contact No.', 'Address',
+        'ITEM PRICE', 'ITEM MODEL', 'SERIAL', 'Tenure', 'ADVANCE', 'INSTALLMENT',
+        "Granter's 1 Name", 'Cnic', 'Contact No.',
+        "Granter's 2 Name", 'Cnic', 'Contact No.',
+        'PAY 1', 'PAY 2', 'PAY 3', 'PAY 4', 'remain',
+      ];
+
+      const sampleRows = [
+        // Row 1: Delivered, ongoing installments (2 of 12 paid)
+        [
+          1, 1, 1, '04/06/2026', 'WALKING CUSTOMER', 1, '1017100015525265',
+          'ADNAN AHSAN', '42101-9297807-5', '03153188174', 'FB AREA KARACHI',
+          61500, 'ZTE V80 8/256', '862484082525265', 12, 6300, 4600,
+          'MATHEW EMMANUAL', '42101-9237108-3', '03118959818',
+          'NAVEED UL HASSAN', '42201-1866190-5', '03333387388',
+          4600, 4600, '', '', 46000,
+        ],
+        // Row 2: Fully paid off (completed)
+        [
+          2, 2, 2, '10/01/2026', 'MUQADDAS', 2, '1017100015789412',
+          'SANA YOUSUF', '42301-0633320-4', '03168125822', 'RAMSUAMI KARACHI',
+          45300, 'OPPO A6X 6/128', '351122098765432', 6, 4800, 6750,
+          'M IBAD KHAN', '42101-7547131-1', '03013321417',
+          'M HASSAN', '42101-72170517', '03174732419',
+          6750, 6750, 6750, 6750, 0,
+        ],
+      ];
+
+      const worksheet = XLSX.utils.aoa_to_sheet([headers, ...sampleRows]);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Legacy Ledger');
+      XLSX.writeFile(workbook, 'demo_legacy_import.xlsx');
+      toast.success('Downloaded demo_legacy_import.xlsx successfully');
+    } catch (err: any) {
+      console.error(err);
+      toast.error('Failed to download demo sheet');
+    }
+  };
 
   const parseFile = useCallback((selectedFile: File) => {
     setParsing(true);
@@ -189,14 +226,33 @@ export default function LegacyImportPage() {
       <Breadcrumb pageName="Legacy Data Import" />
 
       <div className="bg-white dark:bg-gray-dark rounded-2xl shadow-sm p-8 mb-8">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="p-3 bg-red-100 dark:bg-red-900/20 text-red-600 rounded-xl">
-            <Upload className="w-6 h-6" />
+        <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+          <div className="flex items-center gap-3">
+            <div className="p-3 bg-red-100 dark:bg-red-900/20 text-red-600 rounded-xl">
+              <Upload className="w-6 h-6" />
+            </div>
+            <div>
+              <h3 className="text-2xl font-bold text-gray-800 dark:text-white">Upload Legacy Excel Sheet</h3>
+              <p className="text-xs text-gray-400">Import historical sales records, installment ledgers & customer profiles</p>
+            </div>
           </div>
-          <h3 className="text-2xl font-bold text-gray-800 dark:text-white">Upload Legacy Excel Sheet</h3>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={downloadDemoSheet}
+              className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-xl font-bold text-sm transition shadow-sm"
+            >
+              <Download className="w-4 h-4" /> Download Demo Excel Sheet
+            </button>
+            <Link
+              href="/admin/legacy-import/pending"
+              className="inline-flex items-center gap-2 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 px-4 py-2.5 rounded-xl font-bold text-sm transition"
+            >
+              Pending Legacy Profiles <ArrowRight className="w-4 h-4" />
+            </Link>
+          </div>
         </div>
 
-        <p className="text-gray-500 dark:text-gray-400 mb-6 font-medium">
+        <p className="text-gray-500 dark:text-gray-400 mb-6 font-medium text-sm">
           Upload the old paper-ledger .xlsx sheet (ACC NO ... remain, 28 columns). Each row becomes a full
           customer profile — order, customer, purchaser + guarantor records, and installment history —
           exactly like a normal completed sale. Photos and GPS location aren&apos;t in the sheet, so every
@@ -229,22 +285,15 @@ export default function LegacyImportPage() {
             onChange={(e) => setDefaultStatus(e.target.value)}
             className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-2 text-sm font-medium"
           >
-            <optgroup label="Already a completed sale">
-              {STATUS_OPTIONS.filter((s) => s.group === 'Already a completed sale').map((s) => (
-                <option key={s.value} value={s.value}>{s.label}</option>
-              ))}
-            </optgroup>
-            <optgroup label="Not yet / no longer active">
-              {STATUS_OPTIONS.filter((s) => s.group === 'Not yet / no longer active').map((s) => (
-                <option key={s.value} value={s.value}>{s.label}</option>
-              ))}
-            </optgroup>
+            {STATUS_OPTIONS.map((s) => (
+              <option key={s.value} value={s.value}>{s.label}</option>
+            ))}
           </select>
         </div>
         <p className="text-xs text-gray-400 mb-6">
-          &quot;Delivered&quot; and &quot;Completed&quot; build the full order — delivery, installment ledger, 1Bill/SmartPay numbers.
-          Every other status skips those and creates just the customer + purchaser/guarantor records — use it only if these
-          leads still need to go through the normal verification/delivery process.
+          Every legacy row is treated as an already-transacted sale — the full order gets built either way
+          (delivery, installment ledger, 1Bill/SmartPay numbers). &quot;Completed&quot; is for accounts that are
+          fully paid off; &quot;Delivered&quot; also marks the exact handover date.
         </p>
 
         {parsing && <p className="text-sm text-gray-500 flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Parsing file…</p>}

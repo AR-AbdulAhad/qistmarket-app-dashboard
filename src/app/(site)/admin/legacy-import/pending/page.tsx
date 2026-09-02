@@ -69,6 +69,27 @@ export default function PendingLegacyProfilesPage() {
     }
   };
 
+  const deletePermanently = async (orderId: number, orderRef: string, customerName: string) => {
+    if (!confirm(`Are you sure you want to PERMANENTLY DELETE order ${orderRef} (${customerName})?\n\nThis will completely remove the order, purchaser/grantor verification, installment ledger, and customer records. This action CANNOT be undone.`)) {
+      return;
+    }
+
+    try {
+      const token = Cookies.get('auth_token');
+      const res = await fetch(`${BACKEND_URL}/api/admin-panel/orders/${orderId}/permanent-delete`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.message || 'Failed to delete order');
+      setOrders((prev) => prev.filter((o) => o.id !== orderId));
+      toast.success(data.message || 'Order deleted permanently');
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || 'Failed to delete order');
+    }
+  };
+
   if (!isSuperAdmin) {
     return (
       <div className="mx-auto max-w-3xl py-16 text-center">
@@ -121,7 +142,7 @@ export default function PendingLegacyProfilesPage() {
                   <th className="py-3 px-3">Item</th>
                   <th className="py-3 px-3">Status</th>
                   <th className="py-3 px-3">Missing</th>
-                  <th className="py-3 px-3"></th>
+                  <th className="py-3 px-3">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
@@ -148,7 +169,7 @@ export default function PendingLegacyProfilesPage() {
                     </td>
                     <td className="py-2 px-3">
                       <div className="flex items-center gap-3">
-                        <Link href={`/verifications/${o.id}`} className="text-red-600 font-semibold hover:underline">
+                        <Link href={`/verifications/${o.id}`} className="text-blue-600 font-semibold hover:underline">
                           Open Profile
                         </Link>
                         <button
@@ -156,6 +177,12 @@ export default function PendingLegacyProfilesPage() {
                           className="text-green-600 font-semibold hover:underline"
                         >
                           Mark Complete
+                        </button>
+                        <button
+                          onClick={() => deletePermanently(o.id, o.order_ref, o.customer_name)}
+                          className="text-red-600 font-semibold hover:underline"
+                        >
+                          Delete Permanently
                         </button>
                       </div>
                     </td>
@@ -169,3 +196,4 @@ export default function PendingLegacyProfilesPage() {
     </div>
   );
 }
+

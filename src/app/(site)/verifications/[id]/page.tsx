@@ -815,6 +815,216 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
     }
   };
 
+  const handleNewDocumentUpload = async (file: File, documentType: string, personType: 'purchaser' | 'grantor1' | 'grantor2') => {
+    if (!data) return;
+    const token = Cookies.get('auth_token');
+    if (!token) {
+      toast.error('Authentication required');
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('document_type', documentType);
+
+    let url = `${BACKEND_URL}/api/verification/${data.id}/purchaser/document`;
+    if (personType.startsWith('grantor')) {
+      const grantorNum = personType.replace('grantor', '');
+      url = `${BACKEND_URL}/api/verification/${data.id}/grantor/${grantorNum}/document`;
+    }
+
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      });
+
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || json.message || 'Failed to upload document');
+
+      // Refresh data to show newly uploaded document
+      const refreshRes = await fetch(`${BACKEND_URL}/api/verification/order/${id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const refreshJson = await refreshRes.json();
+      if (refreshJson.success && refreshJson.data?.verification) {
+        setData(refreshJson.data.verification);
+        toast.success('Document uploaded successfully!');
+      }
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || 'Error uploading document');
+    }
+  };
+
+  const renderDocumentSlots = (personType: 'purchaser' | 'grantor1' | 'grantor2') => {
+    if (!data) return null;
+
+    const personDocs = (data.documents || []).filter((doc) => doc.person_type === personType);
+
+    let standardSlots: { key: string; title: string }[] = [];
+    if (personType === 'purchaser') {
+      standardSlots = [
+        { key: 'cnic_front', title: 'CNIC Front' },
+        { key: 'cnic_back', title: 'CNIC Back' },
+        { key: 'utility_bill', title: 'Utility Bill' },
+        { key: 'service_card', title: 'Salary Slip / Service Card' },
+        { key: 'signature', title: 'Signature' },
+        { key: 'photo', title: 'Purchaser Live Photo' },
+      ];
+    } else {
+      const gNum = personType === 'grantor1' ? '1' : '2';
+      standardSlots = [
+        { key: 'cnic_front', title: `Grantor ${gNum} CNIC Front` },
+        { key: 'cnic_back', title: `Grantor ${gNum} CNIC Back` },
+        { key: 'utility_bill', title: `Grantor ${gNum} Utility Bill / Proof` },
+      ];
+    }
+
+    const matchedKeys = new Set<string>();
+
+    return (
+      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        {standardSlots.map((slot) => {
+          const doc = personDocs.find((d) => d.document_type === slot.key);
+          if (doc) matchedKeys.add(doc.document_type);
+
+          return (
+            <div key={slot.key}>
+              {doc ? (
+                <MediaCard
+                  id={doc.id}
+                  title={doc.label || slot.title}
+                  fileUrl={doc.file_url}
+                  uploadedAt={doc.uploaded_at}
+                  isEditable={user?.role === 'Super Admin'}
+                  onEdit={(file) => handleMediaSave(doc, file)}
+                  editHistory={data.edit_history}
+                  historyFilter={(h) => h.field_name === doc.document_type}
+                />
+              ) : (
+                <div className="flex flex-col items-center justify-center p-5 rounded-2xl border-2 border-dashed border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/30 hover:border-primary/50 transition text-center min-h-[170px]">
+                  <div className="p-3 rounded-full bg-primary/10 text-primary mb-3">
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                    </svg>
+                  </div>
+                  <p className="text-sm font-bold text-gray-800 dark:text-gray-200 mb-1">{slot.title}</p>
+                  <p className="text-xs text-gray-400 mb-4">No file uploaded yet</p>
+                  <label className="relative cursor-pointer inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-primary hover:bg-primary-dark text-white font-bold text-xs shadow-sm transition">
+                    Upload {slot.title}
+                    <input
+                      type="file"
+                      accept="image/*,.pdf"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleNewDocumentUpload(file, slot.key, personType);
+                        e.target.value = '';
+                      }}
+                      className="sr-only"
+                    />
+                  </label>
+                </div>
+              )}
+            </div>
+          );
+        })}
+
+        {/* Custom / Additional uploaded documents for this person */}
+        {personDocs
+          .filter((d) => !matchedKeys.has(d.document_type))
+          .map((doc) => (
+            <MediaCard
+              key={doc.id}
+              id={doc.id}
+              title={doc.label || doc.document_type}
+              fileUrl={doc.file_url}
+              uploadedAt={doc.uploaded_at}
+              isEditable={user?.role === 'Super Admin'}
+              onEdit={(file) => handleMediaSave(doc, file)}
+              editHistory={data.edit_history}
+              historyFilter={(h) => h.field_name === doc.document_type}
+            />
+          ))}
+      </div>
+    );
+  };
+
+
+  const [officers, setOfficers] = useState<{ id: number; full_name: string; username: string }[]>([]);
+  const [outlets, setOutlets] = useState<{ id: number; name: string; code: string }[]>([]);
+  const [updatingAssignment, setUpdatingAssignment] = useState(false);
+
+  useEffect(() => {
+    const fetchOptions = async () => {
+      const token = Cookies.get('auth_token');
+      if (!token) return;
+
+      try {
+        const [offRes, outRes] = await Promise.all([
+          fetch(`${BACKEND_URL}/api/officer/assignments/officers?role=verification&all=true`, { headers: { Authorization: `Bearer ${token}` } }),
+          fetch(`${BACKEND_URL}/api/outlet/list/basic`, { headers: { Authorization: `Bearer ${token}` } }),
+        ]);
+
+        const offJson = await offRes.json();
+        const outJson = await outRes.json();
+
+        if (offJson.success && Array.isArray(offJson.data)) {
+          setOfficers(offJson.data);
+        }
+        if (outJson.success && Array.isArray(outJson.data)) {
+          setOutlets(outJson.data);
+        }
+      } catch (err) {
+        console.error('Error fetching officer/outlet options:', err);
+      }
+    };
+    fetchOptions();
+  }, []);
+
+  const handleAssignmentChange = async (newOfficerId?: number | null, newOutletId?: number | null) => {
+    if (!data) return;
+    const token = Cookies.get('auth_token');
+    if (!token) {
+      toast.error('Authentication required');
+      return;
+    }
+
+    setUpdatingAssignment(true);
+    try {
+      const payload: any = {};
+      if (newOfficerId !== undefined) payload.verification_officer_id = newOfficerId;
+      if (newOutletId !== undefined) payload.outlet_id = newOutletId;
+
+      const res = await fetch(`${BACKEND_URL}/api/verification/${data.id}/assignment`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const json = await res.json();
+      if (!res.ok || !json.success) throw new Error(json.message || 'Failed to update assignment');
+
+      // Refresh verification data
+      const refreshRes = await fetch(`${BACKEND_URL}/api/verification/order/${id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const refreshJson = await refreshRes.json();
+      if (refreshJson.success && refreshJson.data?.verification) {
+        setData(refreshJson.data.verification);
+        toast.success(json.message || 'Assignment updated successfully');
+      }
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || 'Failed to update assignment');
+    } finally {
+      setUpdatingAssignment(false);
+    }
+  };
 
   if (loading) return <Loader text="Loading verification details..." />
   if (error) return <div className="py-20 text-center text-red-600">{error}</div>
@@ -824,26 +1034,64 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
   const percentage = approves * 30
   const hasReviewed = data.reviews.some((r) => r.reviewer.username === user?.username)
 
+  const handleDeleteOrder = async () => {
+    if (!data?.order?.id) return;
+    if (!confirm(`Are you sure you want to PERMANENTLY DELETE order ${data.order.order_ref} (${data.order.customer_name || 'Customer'})?\n\nThis will completely remove the order, purchaser/grantor verification, installment ledger, and customer records from the database. This action CANNOT be undone.`)) {
+      return;
+    }
+
+    try {
+      const token = Cookies.get('auth_token');
+      const res = await fetch(`${BACKEND_URL}/api/admin-panel/orders/${data.order.id}/permanent-delete`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) throw new Error(json.message || 'Failed to delete order');
+      toast.success('Order deleted permanently');
+      if (window.history.length > 1) {
+        router.back();
+      } else {
+        window.location.href = '/admin/legacy-import/pending';
+      }
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || 'Failed to delete order');
+    }
+  };
+
   return (
     <section className="rounded-[10px] bg-white p-8 shadow-1 dark:bg-gray-dark dark:shadow-card">
-      <div className="mb-8 flex items-center justify-between">
-        <h1 className="text-3xl font-bold text-dark dark:text-white">
-          Verification Details
-        </h1>
-        {data.order?.order_ref && (
-          <div className="text-right">
-            <p className="text-sm text-gray-500 dark:text-gray-400">Order Reference</p>
-            <div className="flex flex-col items-end gap-1.5">
-                <p className="text-lg font-semibold text-primary">{data.order.order_ref}</p>
-                {data.order.channel === 'Repeat Customer' && (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-black uppercase tracking-widest text-emerald-700 border border-emerald-200">
-                        <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20"><path d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812z"></path></svg>
-                        Repeat Verified
-                    </span>
-                )}
+      <div className="mb-8 flex items-center justify-between flex-wrap gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-dark dark:text-white">
+            Verification Details
+          </h1>
+        </div>
+        <div className="flex items-center gap-4">
+          {user?.role === 'Super Admin' && data.order?.id && (
+            <button
+              onClick={handleDeleteOrder}
+              className="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-sm transition"
+            >
+              Permanently Delete Order
+            </button>
+          )}
+          {data.order?.order_ref && (
+            <div className="text-right">
+              <p className="text-sm text-gray-500 dark:text-gray-400">Order Reference</p>
+              <div className="flex flex-col items-end gap-1.5">
+                  <p className="text-lg font-semibold text-primary">{data.order.order_ref}</p>
+                  {data.order.channel === 'Repeat Customer' && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-black uppercase tracking-widest text-emerald-700 border border-emerald-200">
+                          <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20"><path d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812z"></path></svg>
+                          Repeat Verified
+                      </span>
+                  )}
+              </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* Verification Information - NON-EDITABLE */}
@@ -855,12 +1103,56 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
           <Field label="ID" value={data.id} />
           <Field label="Order ID" value={data.order_id} />
           {data.order?.status && <Field label="Order Status" value={data.order.status} />}
-          {data.verification_officer && (
-            <Field
-              label="Verification Officer"
-              value={`${data.verification_officer.full_name} (${data.verification_officer.username})`}
-            />
-          )}
+          {/* Verification Officer Select */}
+          <div>
+            <label className="block text-sm font-medium text-gray-500 dark:text-gray-400">Verification Officer</label>
+            <div className="mt-1">
+              <select
+                value={data.verification_officer_id || ''}
+                onChange={(e) => handleAssignmentChange(e.target.value ? Number(e.target.value) : null, undefined)}
+                disabled={updatingAssignment}
+                className="w-full rounded-lg border border-stroke bg-gray-100 px-4 py-2.5 text-sm font-bold text-dark dark:border-dark-3 dark:bg-dark-3 dark:text-white transition focus:border-primary"
+              >
+                <option value="">Unassigned</option>
+                {data.verification_officer && !officers.some(o => o.id === data.verification_officer_id) && (
+                  <option value={data.verification_officer_id}>
+                    {data.verification_officer.full_name} ({data.verification_officer.username})
+                  </option>
+                )}
+                {officers.map((o) => (
+                  <option key={o.id} value={o.id}>
+                    {o.full_name} ({o.username})
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Assigned Outlet Select */}
+          <div>
+            <label className="block text-sm font-medium text-gray-500 dark:text-gray-400">Assigned Branch / Outlet</label>
+            <div className="mt-1">
+              <select
+                value={(data.order as any)?.outlet_id || (data.order as any)?.outlet?.id || ''}
+                onChange={(e) => handleAssignmentChange(undefined, e.target.value ? Number(e.target.value) : null)}
+                disabled={updatingAssignment}
+                className="w-full rounded-lg border border-stroke bg-gray-100 px-4 py-2.5 text-sm font-bold text-primary dark:border-dark-3 dark:bg-dark-3 dark:text-white transition focus:border-primary"
+              >
+                <option value="">Unassigned (Head Office)</option>
+                {(data.order as any)?.outlet && !outlets.some(o => o.id === (data.order as any).outlet?.id) && (
+                  <option value={(data.order as any).outlet.id}>
+                    {(data.order as any).outlet.name}
+                  </option>
+                )}
+                {outlets.map((o) => (
+                  <option key={o.id} value={o.id}>
+                    {o.name} {o.code ? `(${o.code})` : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
           {data.order.delivery_officer && (
             <Field
               label="Delivery Officer"
@@ -889,6 +1181,34 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
           <Field label="Verification Feedback" value={(data as any).verification_feedback} />
         </div>
       </div>
+
+      {/* Product & Financial Plan Information */}
+      <div className="mb-12 rounded-xl border border-primary/20 bg-primary/5 p-6 dark:bg-gray-800/60 dark:border-primary/30">
+        <div className="flex items-center justify-between mb-4 border-b border-primary/10 pb-3">
+          <h2 className="text-xl font-bold text-dark dark:text-white flex items-center gap-2">
+            <svg className="w-5 h-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+            </svg>
+            Product & Financial Plan Details
+          </h2>
+          {data.order?.status && (
+            <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-primary text-white capitalize">
+              {data.order.status}
+            </span>
+          )}
+        </div>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          <Field label="Item / Product Name" value={data.order?.product_name} />
+          <Field label="IMEI / Serial Number" value={data.order?.imei_serial} />
+          <Field label="Total Item Price" value={data.order?.total_amount ? `PKR ${Number(data.order.total_amount).toLocaleString()}` : null} />
+          <Field label="Advance Payment" value={data.order?.advance_amount ? `PKR ${Number(data.order.advance_amount).toLocaleString()}` : null} />
+          <Field label="Monthly Installment" value={data.order?.monthly_amount ? `PKR ${Number(data.order.monthly_amount).toLocaleString()} / month` : null} />
+          <Field label="Tenure Duration" value={data.order?.months ? `${data.order.months} Months` : null} />
+          <Field label="Booking Channel" value={data.order?.channel} />
+          <Field label="Order Reference" value={data.order?.order_ref} />
+        </div>
+      </div>
+
 
       {/* Assignment Timeline Card (Spans full width) */}
       <div className="mb-12 rounded-lg border border-stroke bg-white shadow-default dark:border-dark-3 dark:bg-gray-800 p-6">
@@ -1606,63 +1926,49 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
             <Field label="Verified" value={data.purchaser.is_verified} />
           </div>
 
-          {/* Purchaser Documents */}
-          {data.documents.filter((doc) => doc.person_type === 'purchaser').length > 0 && (
-            <div className="mt-8">
-              <h3 className="mb-4 text-xl font-semibold text-blue-700 dark:text-blue-400">
-                Purchaser Uploaded Documents
-              </h3>
-              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                {data.documents
-                  .filter((doc) => doc.person_type === 'purchaser')
-                  .map((doc) => (
-                    <MediaCard 
-                        key={doc.id} 
-                        id={doc.id}
-                        title={doc.label || doc.document_type}
-                        fileUrl={doc.file_url}
-                        uploadedAt={doc.uploaded_at}
-                        isEditable={user?.role === 'Super Admin'}
-                        onEdit={(file) => handleMediaSave(doc, file)}
-                        editHistory={data.edit_history}
-                        historyFilter={(h) => h.field_name === doc.document_type && (h.entity_type === doc.person_type || (h.entity_id !== null && h.entity_id === doc.person_id))}
-                    />
-                  ))}
-              </div>
-            </div>
-          )}
+          {/* Purchaser Documents & Media Uploads */}
+          <div className="mt-8">
+            <h3 className="mb-4 text-xl font-semibold text-blue-700 dark:text-blue-400">
+              Purchaser Documents & Media Files
+            </h3>
+            {renderDocumentSlots('purchaser')}
+          </div>
         </div>
       )}
 
-      {/* Grantors - EDITABLE */}
-      {data.grantors.map((grantor) => {
-        const hasGrantorData = Object.values(grantor).some(val => shouldDisplay(val))
-        const hasDocuments = data.documents.filter(doc => doc.person_type === `grantor${grantor.grantor_number}`).length > 0
+      {/* Grantors - EDITABLE & DOCUMENT UPLOADS */}
+      {(() => {
+        const grantorsList = [
+          (data.grantors || []).find((g) => g.grantor_number === 1) || { id: 0, grantor_number: 1, name: 'Grantor 1' },
+          (data.grantors || []).find((g) => g.grantor_number === 2) || { id: 0, grantor_number: 2, name: 'Grantor 2' },
+        ];
 
-        if (!hasGrantorData && !hasDocuments) return null
+        return grantorsList.map((grantor: any) => {
+          const personTypeKey = `grantor${grantor.grantor_number}` as 'grantor1' | 'grantor2';
 
-        return (
-          <div key={grantor.id} className="mb-16">
-            <div className="flex flex-wrap items-center gap-3 mb-4">
-              <h2 className="text-2xl font-semibold text-dark dark:text-white">
-                Grantor {grantor.grantor_number} Details
-              </h2>
-              <LinkedAccountsBadge
-                cnic={grantor.cnic_number}
-                orders={cnicOrders[grantor.cnic_number] || []}
-                currentOrderId={data.order.id}
-              />
-            </div>
+          return (
+            <div key={grantor.grantor_number} className="mb-16">
+              <div className="flex flex-wrap items-center gap-3 mb-4">
+                <h2 className="text-2xl font-semibold text-dark dark:text-white">
+                  Grantor {grantor.grantor_number} Details & Documents
+                </h2>
+                {grantor.cnic_number && (
+                  <LinkedAccountsBadge
+                    cnic={grantor.cnic_number}
+                    orders={cnicOrders[grantor.cnic_number] || []}
+                    currentOrderId={data.order.id}
+                  />
+                )}
+              </div>
 
-            {hasGrantorData && (
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
                 <EditableField
                   label="Name"
                   value={grantor.name}
                   fieldName="name"
                   entityType="grantor"
-                  entityId={grantor.id}
-                  onSave={(field, value) => handleFieldSave('grantor', grantor.id, field, value)}
+                  entityId={grantor.id || 0}
+                  onSave={(field, value) => handleFieldSave('grantor', grantor.id || 0, field, value)}
                   editHistory={grantor.edit_history}
                 />
                 <EditableField
@@ -1670,39 +1976,35 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
                   value={grantor.father_husband_name}
                   fieldName="father_husband_name"
                   entityType="grantor"
-                  entityId={grantor.id}
-                  onSave={(field, value) => handleFieldSave('grantor', grantor.id, field, value)}
+                  entityId={grantor.id || 0}
+                  onSave={(field, value) => handleFieldSave('grantor', grantor.id || 0, field, value)}
                   editHistory={grantor.edit_history}
                 />
-                {shouldDisplay(grantor.present_address) && (
-                  <EditableField
-                    label="Present Address"
-                    value={`${grantor.present_address}${grantor.present_zone ? `\nZone: ${grantor.present_zone}` : ''}${grantor.present_area ? `\nArea: ${grantor.present_area}` : ''}${grantor.present_block ? `\nBlock: ${grantor.present_block}` : ''}${grantor.present_street ? `\nStreet: ${grantor.present_street}` : ''}${grantor.present_house_no ? `\nHouse No: ${grantor.present_house_no}` : ''}`}
-                    fieldName="present_address"
-                    entityType="grantor"
-                    entityId={grantor.id}
-                    onSave={(field, value) => handleFieldSave('grantor', grantor.id, field, value)}
-                    editHistory={grantor.edit_history}
-                  />
-                )}
-                {shouldDisplay(grantor.permanent_address) && (
-                  <EditableField
-                    label="Permanent Address"
-                    value={`${grantor.permanent_address}${grantor.permanent_zone ? `\nZone: ${grantor.permanent_zone}` : ''}${grantor.permanent_area ? `\nArea: ${grantor.permanent_area}` : ''}${grantor.permanent_block ? `\nBlock: ${grantor.permanent_block}` : ''}${grantor.permanent_street ? `\nStreet: ${grantor.permanent_street}` : ''}${grantor.permanent_house_no ? `\nHouse No: ${grantor.permanent_house_no}` : ''}`}
-                    fieldName="permanent_address"
-                    entityType="grantor"
-                    entityId={grantor.id}
-                    onSave={(field, value) => handleFieldSave('grantor', grantor.id, field, value)}
-                    editHistory={grantor.edit_history}
-                  />
-                )}
+                <EditableField
+                  label="Present Address"
+                  value={grantor.present_address}
+                  fieldName="present_address"
+                  entityType="grantor"
+                  entityId={grantor.id || 0}
+                  onSave={(field, value) => handleFieldSave('grantor', grantor.id || 0, field, value)}
+                  editHistory={grantor.edit_history}
+                />
+                <EditableField
+                  label="Permanent Address"
+                  value={grantor.permanent_address}
+                  fieldName="permanent_address"
+                  entityType="grantor"
+                  entityId={grantor.id || 0}
+                  onSave={(field, value) => handleFieldSave('grantor', grantor.id || 0, field, value)}
+                  editHistory={grantor.edit_history}
+                />
                 <EditableField
                   label="CNIC Number"
                   value={grantor.cnic_number}
                   fieldName="cnic_number"
                   entityType="grantor"
-                  entityId={grantor.id}
-                  onSave={(field, value) => handleFieldSave('grantor', grantor.id, field, value)}
+                  entityId={grantor.id || 0}
+                  onSave={(field, value) => handleFieldSave('grantor', grantor.id || 0, field, value)}
                   editHistory={grantor.edit_history}
                 />
                 <EditableField
@@ -1710,8 +2012,8 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
                   value={grantor.telephone_number}
                   fieldName="telephone_number"
                   entityType="grantor"
-                  entityId={grantor.id}
-                  onSave={(field, value) => handleFieldSave('grantor', grantor.id, field, value)}
+                  entityId={grantor.id || 0}
+                  onSave={(field, value) => handleFieldSave('grantor', grantor.id || 0, field, value)}
                   editHistory={grantor.edit_history}
                 />
                 <EditableField
@@ -1719,17 +2021,8 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
                   value={grantor.employment_type}
                   fieldName="employment_type"
                   entityType="grantor"
-                  entityId={grantor.id}
-                  onSave={(field, value) => handleFieldSave('grantor', grantor.id, field, value)}
-                  editHistory={grantor.edit_history}
-                />
-                <EditableField
-                  label="Job Type"
-                  value={grantor.job_type}
-                  fieldName="job_type"
-                  entityType="grantor"
-                  entityId={grantor.id}
-                  onSave={(field, value) => handleFieldSave('grantor', grantor.id, field, value)}
+                  entityId={grantor.id || 0}
+                  onSave={(field, value) => handleFieldSave('grantor', grantor.id || 0, field, value)}
                   editHistory={grantor.edit_history}
                 />
                 <EditableField
@@ -1737,98 +2030,17 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
                   value={grantor.designation}
                   fieldName="designation"
                   entityType="grantor"
-                  entityId={grantor.id}
-                  onSave={(field, value) => handleFieldSave('grantor', grantor.id, field, value)}
+                  entityId={grantor.id || 0}
+                  onSave={(field, value) => handleFieldSave('grantor', grantor.id || 0, field, value)}
                   editHistory={grantor.edit_history}
                 />
                 <EditableField
-                  label="Official Number"
-                  value={grantor.official_number}
-                  fieldName="official_number"
-                  entityType="grantor"
-                  entityId={grantor.id}
-                  onSave={(field, value) => handleFieldSave('grantor', grantor.id, field, value)}
-                  editHistory={grantor.edit_history}
-                />
-                <EditableField
-                  label="Office Address"
-                  value={grantor.office_address}
+                  label="Office / Business Address"
+                  value={grantor.office_address || grantor.business_address}
                   fieldName="office_address"
                   entityType="grantor"
-                  entityId={grantor.id}
-                  onSave={(field, value) => handleFieldSave('grantor', grantor.id, field, value)}
-                  editHistory={grantor.edit_history}
-                />
-                <EditableField
-                  label="Company Name"
-                  value={grantor.company_name}
-                  fieldName="company_name"
-                  entityType="grantor"
-                  entityId={grantor.id}
-                  onSave={(field, value) => handleFieldSave('grantor', grantor.id, field, value)}
-                  editHistory={grantor.edit_history}
-                />
-                <EditableField
-                  label="Years in Company"
-                  value={grantor.years_in_company}
-                  fieldName="years_in_company"
-                  entityType="grantor"
-                  entityId={grantor.id}
-                  onSave={(field, value) => handleFieldSave('grantor', grantor.id, field, value)}
-                  editHistory={grantor.edit_history}
-                />
-                <EditableField
-                  label="Monthly Income"
-                  value={grantor.monthly_income}
-                  fieldName="monthly_income"
-                  entityType="grantor"
-                  entityId={grantor.id}
-                  onSave={(field, value) => handleFieldSave('grantor', grantor.id, field, value)}
-                  editHistory={grantor.edit_history}
-                />
-                <EditableField
-                  label="Business Name"
-                  value={grantor.business_name}
-                  fieldName="business_name"
-                  entityType="grantor"
-                  entityId={grantor.id}
-                  onSave={(field, value) => handleFieldSave('grantor', grantor.id, field, value)}
-                  editHistory={grantor.edit_history}
-                />
-                <EditableField
-                  label="Established Since"
-                  value={grantor.established_since}
-                  fieldName="established_since"
-                  entityType="grantor"
-                  entityId={grantor.id}
-                  onSave={(field, value) => handleFieldSave('grantor', grantor.id, field, value)}
-                  editHistory={grantor.edit_history}
-                />
-                <EditableField
-                  label="Business Address"
-                  value={grantor.business_address}
-                  fieldName="business_address"
-                  entityType="grantor"
-                  entityId={grantor.id}
-                  onSave={(field, value) => handleFieldSave('grantor', grantor.id, field, value)}
-                  editHistory={grantor.edit_history}
-                />
-                <EditableField
-                  label="Net Income"
-                  value={grantor.net_income}
-                  fieldName="net_income"
-                  entityType="grantor"
-                  entityId={grantor.id}
-                  onSave={(field, value) => handleFieldSave('grantor', grantor.id, field, value)}
-                  editHistory={grantor.edit_history}
-                />
-                <EditableField
-                  label="Full Residential Address"
-                  value={grantor.full_residential_address}
-                  fieldName="full_residential_address"
-                  entityType="grantor"
-                  entityId={grantor.id}
-                  onSave={(field, value) => handleFieldSave('grantor', grantor.id, field, value)}
+                  entityId={grantor.id || 0}
+                  onSave={(field, value) => handleFieldSave('grantor', grantor.id || 0, field, value)}
                   editHistory={grantor.edit_history}
                 />
                 <EditableField
@@ -1836,8 +2048,8 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
                   value={grantor.relationship}
                   fieldName="relationship"
                   entityType="grantor"
-                  entityId={grantor.id}
-                  onSave={(field, value) => handleFieldSave('grantor', grantor.id, field, value)}
+                  entityId={grantor.id || 0}
+                  onSave={(field, value) => handleFieldSave('grantor', grantor.id || 0, field, value)}
                   editHistory={grantor.edit_history}
                 />
                 <EditableField
@@ -1845,43 +2057,25 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
                   value={grantor.nearest_location}
                   fieldName="nearest_location"
                   entityType="grantor"
-                  entityId={grantor.id}
-                  onSave={(field, value) => handleFieldSave('grantor', grantor.id, field, value)}
+                  entityId={grantor.id || 0}
+                  onSave={(field, value) => handleFieldSave('grantor', grantor.id || 0, field, value)}
                   editHistory={grantor.edit_history}
                 />
-                <Field label="Verified" value={grantor.is_verified} />
+                <Field label="Verified" value={grantor.is_verified || 'No'} />
               </div>
-            )}
 
-            {/* Grantor Documents */}
-            {hasDocuments && (
+              {/* Grantor Documents & Uploads */}
               <div className="mt-8">
                 <h3 className="mb-4 text-xl font-semibold text-indigo-700 dark:text-indigo-400">
-                  Grantor {grantor.grantor_number} Uploaded Documents
+                  Grantor {grantor.grantor_number} Documents & Media Files
                   {grantor.name && ` – ${grantor.name}`}
                 </h3>
-                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                  {data.documents
-                    .filter(doc => doc.person_type === `grantor${grantor.grantor_number}`)
-                    .map((doc) => (
-                      <MediaCard 
-                        key={doc.id} 
-                        id={doc.id}
-                        title={doc.label || doc.document_type}
-                        fileUrl={doc.file_url}
-                        uploadedAt={doc.uploaded_at}
-                        isEditable={user?.role === 'Super Admin'}
-                        onEdit={(file) => handleMediaSave(doc, file)}
-                        editHistory={data.edit_history}
-                        historyFilter={(h) => h.field_name === doc.document_type && (h.entity_type === doc.person_type || (h.entity_id !== null && h.entity_id === doc.person_id))}
-                      />
-                    ))}
-                </div>
+                {renderDocumentSlots(personTypeKey)}
               </div>
-            )}
-          </div>
-        )
-      })}
+            </div>
+          );
+        });
+      })()}
 
       {/* Next of Kin */}
       {data.nextOfKin && Object.values(data.nextOfKin).some(val => shouldDisplay(val)) && (
