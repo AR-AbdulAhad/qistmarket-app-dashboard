@@ -1050,7 +1050,7 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
       if (!res.ok || !json.success) throw new Error(json.message || 'Failed to delete order');
       toast.success('Order deleted permanently');
       if (window.history.length > 1) {
-        router.back();
+        window.history.back();
       } else {
         window.location.href = '/admin/legacy-import/pending';
       }
