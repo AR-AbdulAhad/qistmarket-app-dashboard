@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Cookies from "js-cookie";
 import toast from "react-hot-toast";
-import { ShieldCheck, ShieldOff, KeyRound } from "lucide-react";
+import { ShieldCheck, ShieldOff, KeyRound, MessageSquare, PhoneCall, Save, Loader2, AlertTriangle, CheckCircle2 } from "lucide-react";
 import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
 import PageHeader from "@/components/Accounts/PageHeader";
 
@@ -19,6 +19,12 @@ export default function AdminSecuritySettingsPage() {
   const [code, setCode] = useState("");
   const [saving, setSaving] = useState(false);
 
+  // OTP Channel Settings State
+  const [watiEnabled, setWatiEnabled] = useState(true);
+  const [jazzEnabled, setJazzEnabled] = useState(true);
+  const [otpLoading, setOtpLoading] = useState(true);
+  const [otpSaving, setOtpSaving] = useState(false);
+
   const loadStatus = () => {
     setLoading(true);
     fetch(`${BACKEND_URL}/api/2fa/status`, { headers: authHeaders() })
@@ -28,7 +34,49 @@ export default function AdminSecuritySettingsPage() {
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { loadStatus(); }, []);
+  const loadOtpSettings = () => {
+    setOtpLoading(true);
+    fetch(`${BACKEND_URL}/api/admin-panel/settings/otp`, { headers: authHeaders() })
+      .then((r) => r.json())
+      .then((json) => {
+        if (json.success && json.settings) {
+          setWatiEnabled(json.settings.wati_enabled);
+          setJazzEnabled(json.settings.jazz_enabled);
+        }
+      })
+      .catch((err) => console.error("Failed to load OTP settings:", err))
+      .finally(() => setOtpLoading(false));
+  };
+
+  useEffect(() => {
+    loadStatus();
+    loadOtpSettings();
+  }, []);
+
+  const handleSaveOtpSettings = async () => {
+    setOtpSaving(true);
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/admin-panel/settings/otp`, {
+        method: "POST",
+        headers: authHeaders(),
+        body: JSON.stringify({
+          wati_enabled: watiEnabled,
+          jazz_enabled: jazzEnabled,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) throw new Error(json.message || "Failed to update OTP settings");
+      toast.success(json.message || "OTP channel settings updated");
+      if (json.settings) {
+        setWatiEnabled(json.settings.wati_enabled);
+        setJazzEnabled(json.settings.jazz_enabled);
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Failed to save OTP settings");
+    } finally {
+      setOtpSaving(false);
+    }
+  };
 
   const startEnrollment = async () => {
     setEnrolling(true);
@@ -81,13 +129,17 @@ export default function AdminSecuritySettingsPage() {
   return (
     <>
       <Breadcrumb pageName="Security Settings" />
-      <PageHeader icon={ShieldCheck} title="Security Settings" subtitle="Two-factor authentication for your own account — opt-in, off by default." />
+      <PageHeader icon={ShieldCheck} title="Security & Gateway Control" subtitle="Configure account 2FA and manage global OTP dispatch channels." />
 
-      {loading ? (
-        <div className="rounded-2xl border border-slate-100 bg-white p-8 text-center text-sm text-gray-400 dark:border-white/10 dark:bg-boxdark">Loading...</div>
-      ) : (
-        <div className="max-w-xl rounded-2xl border border-slate-100 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-boxdark">
-          {enabled && !enrolling ? (
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-6">
+        {/* Account 2FA Card */}
+        <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-boxdark">
+          <h3 className="text-lg font-bold text-dark dark:text-white mb-4 flex items-center gap-2">
+            <KeyRound className="w-5 h-5 text-red-600" /> Account 2FA Authentication
+          </h3>
+          {loading ? (
+            <div className="text-sm text-gray-400 py-4 flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Loading 2FA status...</div>
+          ) : enabled && !enrolling ? (
             <div className="flex flex-col items-start gap-4">
               <div className="flex items-center gap-3">
                 <div className="flex size-11 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10"><ShieldCheck className="size-5" /></div>
@@ -126,7 +178,108 @@ export default function AdminSecuritySettingsPage() {
             </div>
           )}
         </div>
-      )}
+
+        {/* OTP Channel Control Card */}
+        <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-boxdark">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-bold text-dark dark:text-white flex items-center gap-2">
+              <MessageSquare className="w-5 h-5 text-emerald-600" /> OTP Dispatch Channels
+            </h3>
+            <span className="text-xs text-gray-400 font-medium">Real-time Control</span>
+          </div>
+
+          <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+            Control which gateways dispatch OTPs across the system (Login, Stock Transfers, Verification OTPs, Ledger Access, etc.).
+          </p>
+
+          {otpLoading ? (
+            <div className="text-sm text-gray-400 py-4 flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Loading OTP channel settings...</div>
+          ) : (
+            <div className="space-y-5">
+              {/* WATI WhatsApp Toggle */}
+              <div className="flex items-center justify-between p-4 rounded-xl border border-stroke dark:border-dark-3 bg-gray-50 dark:bg-gray-800/40">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 rounded-lg bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+                    <MessageSquare className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <p className="font-bold text-gray-800 dark:text-white text-sm">WATI WhatsApp OTP</p>
+                    <p className="text-xs text-gray-400">Send OTPs via WATI WhatsApp gateway</p>
+                  </div>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={watiEnabled}
+                    onChange={(e) => setWatiEnabled(e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-emerald-600"></div>
+                </label>
+              </div>
+
+              {/* Jazz SMS Toggle */}
+              <div className="flex items-center justify-between p-4 rounded-xl border border-stroke dark:border-dark-3 bg-gray-50 dark:bg-gray-800/40">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 rounded-lg bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+                    <PhoneCall className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <p className="font-bold text-gray-800 dark:text-white text-sm">Jazz CMT SMS OTP</p>
+                    <p className="text-xs text-gray-400">Send OTPs via Jazz CMT SMS gateway</p>
+                  </div>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={jazzEnabled}
+                    onChange={(e) => setJazzEnabled(e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+                </label>
+              </div>
+
+              {/* Status Badge */}
+              <div className="p-3.5 rounded-xl border text-xs font-semibold flex items-center gap-2">
+                {watiEnabled && jazzEnabled ? (
+                  <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-400">
+                    <CheckCircle2 className="w-4 h-4 shrink-0" />
+                    <span>Both WATI (WhatsApp) and Jazz (SMS) gateways are ACTIVE. OTPs will be sent via BOTH channels.</span>
+                  </div>
+                ) : watiEnabled ? (
+                  <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-400">
+                    <CheckCircle2 className="w-4 h-4 shrink-0" />
+                    <span>WATI (WhatsApp) is ACTIVE. Jazz SMS is OFF.</span>
+                  </div>
+                ) : jazzEnabled ? (
+                  <div className="flex items-center gap-2 text-blue-700 dark:text-blue-400">
+                    <CheckCircle2 className="w-4 h-4 shrink-0" />
+                    <span>Jazz SMS is ACTIVE. WATI WhatsApp is OFF.</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 text-red-600 dark:text-red-400">
+                    <AlertTriangle className="w-4 h-4 shrink-0 animate-bounce" />
+                    <span>WARNING: No OTP gateway is active! OTPs will NOT be delivered.</span>
+                  </div>
+                )}
+              </div>
+
+              <button
+                onClick={handleSaveOtpSettings}
+                disabled={otpSaving}
+                className="w-full flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm py-3 rounded-xl transition shadow-sm disabled:opacity-50"
+              >
+                {otpSaving ? (
+                  <><Loader2 className="w-4 h-4 animate-spin" /> Saving Settings…</>
+                ) : (
+                  <><Save className="w-4 h-4" /> Save OTP Channel Settings</>
+                )}
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
     </>
   );
 }
