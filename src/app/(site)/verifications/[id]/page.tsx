@@ -1049,7 +1049,11 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
       const json = await res.json();
       if (!res.ok || !json.success) throw new Error(json.message || 'Failed to delete order');
       toast.success('Order deleted permanently');
-      window.location.href = '/admin/legacy-import/pending';
+      if (window.history.length > 1) {
+        router.back();
+      } else {
+        window.location.href = '/admin/legacy-import/pending';
+      }
     } catch (err: any) {
       console.error(err);
       toast.error(err.message || 'Failed to delete order');

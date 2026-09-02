@@ -15,6 +15,8 @@ import { MediaCard } from '@/components/common/MediaCard';
 import { formatExactDate } from "@/utils/dateUtils";
 import LinkedAccountsBadge from '@/components/common/LinkedAccountsBadge';
 
+const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
+
 // --- Editable Field Component ---
 const EditableField = ({
     label,
@@ -679,6 +681,37 @@ export default function OrderDetailsPage() {
                         className="rounded-md bg-green-600 px-6 py-2 text-white hover:bg-opacity-90 shadow-md transition-colors"
                     >
                         📤 Send Ledger
+                    </button>
+                )}
+                {user?.role === 'Super Admin' && (
+                    <button
+                        onClick={async () => {
+                            if (!confirm(`Are you sure you want to PERMANENTLY delete Order #${order.order_ref}? This action CANNOT be undone.`)) return;
+                            const token = Cookies.get('auth_token');
+                            try {
+                                const res = await fetch(`${API_BASE}/api/admin-panel/orders/${order.id}/permanent-delete`, {
+                                    method: 'DELETE',
+                                    headers: { Authorization: `Bearer ${token}` }
+                                });
+                                const json = await res.json();
+                                if (json.success) {
+                                    toast.success('Order deleted permanently');
+                                    if (window.history.length > 1) {
+                                        router.back();
+                                    } else {
+                                        router.push('/orders');
+                                    }
+                                } else {
+                                    toast.error(json.message || 'Failed to delete order');
+                                }
+                            } catch (e: any) {
+                                console.error(e);
+                                toast.error(e.message || 'Error deleting order');
+                            }
+                        }}
+                        className="rounded-md bg-red-700 px-6 py-2 font-bold text-white hover:bg-red-800 shadow-md transition-colors"
+                    >
+                        Permanently Delete Order
                     </button>
                 )}
             </div>

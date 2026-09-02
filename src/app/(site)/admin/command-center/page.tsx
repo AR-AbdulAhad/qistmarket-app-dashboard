@@ -238,15 +238,52 @@ export default function AdminCommandCenterPage() {
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead className="bg-gray-50 text-[11px] uppercase tracking-wide text-gray-500 dark:bg-dark-3 dark:text-gray-400">
-              <tr><th className="px-3 py-2">Order</th><th className="px-3 py-2">Customer</th><th className="px-3 py-2">Status</th><th className="px-3 py-2">Updated</th></tr>
+              <tr>
+                <th className="px-3 py-2">Order</th>
+                <th className="px-3 py-2">Customer</th>
+                <th className="px-3 py-2">Status</th>
+                <th className="px-3 py-2">Updated</th>
+                <th className="px-3 py-2 text-right">Actions</th>
+              </tr>
             </thead>
             <tbody>
               {orders.map((o) => (
                 <tr key={o.id} className="border-b border-stroke last:border-0 dark:border-dark-3">
-                  <td className="px-3 py-2 font-semibold text-[#ff3d3d]">{o.order_ref}</td>
+                  <td className="px-3 py-2 font-semibold text-[#ff3d3d]">
+                    <Link href={`/verifications/${o.id}`} className="hover:underline">
+                      {o.order_ref}
+                    </Link>
+                  </td>
                   <td className="px-3 py-2 text-dark dark:text-white">{o.customer_name}</td>
                   <td className="px-3 py-2 capitalize text-gray-600 dark:text-gray-300">{o.status}</td>
                   <td className="px-3 py-2 text-gray-400">{new Date(o.updated_at).toLocaleTimeString()}</td>
+                  <td className="px-3 py-2 text-right space-x-2">
+                    <Link href={`/verifications/${o.id}`} className="font-semibold text-primary hover:underline">
+                      View
+                    </Link>
+                    <button
+                      onClick={async () => {
+                        if (!confirm(`Are you sure you want to PERMANENTLY delete Order #${o.order_ref}?`)) return;
+                        try {
+                          const res = await fetch(`${BACKEND_URL}/api/admin-panel/orders/${o.id}/permanent-delete`, {
+                            method: "DELETE",
+                            headers: authHeaders(),
+                          });
+                          const json = await res.json();
+                          if (json.success) {
+                            setOrders(orders.filter(item => item.id !== o.id));
+                          } else {
+                            alert(json.message || "Failed to delete order");
+                          }
+                        } catch (err: any) {
+                          alert(err.message || "Error deleting order");
+                        }
+                      }}
+                      className="font-bold text-red-600 hover:underline ml-2"
+                    >
+                      Delete
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
