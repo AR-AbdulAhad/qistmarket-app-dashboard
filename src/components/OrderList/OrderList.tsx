@@ -867,7 +867,24 @@ const OrderListContent = ({ forcedStatus, forcedChannel, apiEndpoint, hideAction
       },
       enableColumnFilter: true,
     },
-    { accessorKey: 'order_ref', header: 'Order Ref', enableColumnFilter: true },
+    {
+      accessorKey: 'order_ref',
+      header: 'Order Ref',
+      enableColumnFilter: true,
+      cell: ({ row }) => (
+        <div className="flex items-center gap-2">
+          <span>{row.original.order_ref}</span>
+          {row.original.channel === 'legacy_import' && (
+            <span
+              title="Imported from the old paper-ledger records"
+              className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
+            >
+              Legacy
+            </span>
+          )}
+        </div>
+      ),
+    },
     {
       accessorKey: 'customer_name',
       header: 'Customer Name',
