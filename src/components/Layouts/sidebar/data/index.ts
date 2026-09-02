@@ -231,6 +231,14 @@ export const NAV_DATA = [
         items: [],
       },
       {
+        title: "Legacy Data Import",
+        icon: Icons.ArchiveIcon,
+        items: [
+          { title: "Import Legacy Data", url: "/admin/legacy-import" },
+          { title: "Pending Legacy Profiles", url: "/admin/legacy-import/pending" },
+        ],
+      },
+      {
         title: "Outlets Management",
         icon: Icons.StoreIcon,
         url: "/admin/outlets",
