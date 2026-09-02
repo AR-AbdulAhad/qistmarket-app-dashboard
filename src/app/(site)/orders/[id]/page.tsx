@@ -13,6 +13,7 @@ import DeliveredProductDetails from '@/components/common/DeliveredProductDetails
 import RecoveryVisitDetails from '@/components/common/RecoveryVisitDetails';
 import { MediaCard } from '@/components/common/MediaCard';
 import { formatExactDate } from "@/utils/dateUtils";
+import LinkedAccountsBadge from '@/components/common/LinkedAccountsBadge';
 
 // --- Editable Field Component ---
 const EditableField = ({
@@ -1426,7 +1427,10 @@ export default function OrderDetailsPage() {
                         {/* Purchaser Details */}
                         {verification.purchaser && (
                             <div className="mb-12">
-                                <h2 className="mb-4 text-2xl font-semibold text-dark dark:text-white">Purchaser Details</h2>
+                                <div className="flex flex-wrap items-center gap-3 mb-4">
+                                    <h2 className="text-2xl font-semibold text-dark dark:text-white">Purchaser Details</h2>
+                                    <LinkedAccountsBadge cnic={verification.purchaser.cnic_number} currentOrderId={order.id} />
+                                </div>
                                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
                                     {[
                                         { label: "Name", field: "name" },
@@ -1499,7 +1503,10 @@ export default function OrderDetailsPage() {
                             const isEditable = user?.role === 'Super Admin' && order.status === 'delivered';
                             return (
                                 <div key={grantor.id} className="mb-16">
-                                    <h2 className="mb-4 text-2xl font-semibold text-dark dark:text-white">Grantor {grantor.grantor_number} Details</h2>
+                                    <div className="flex flex-wrap items-center gap-3 mb-4">
+                                        <h2 className="text-2xl font-semibold text-dark dark:text-white">Grantor {grantor.grantor_number} Details</h2>
+                                        <LinkedAccountsBadge cnic={grantor.cnic_number} currentOrderId={order.id} />
+                                    </div>
                                     <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
                                         {[
                                             { label: "Name", field: "name" },
