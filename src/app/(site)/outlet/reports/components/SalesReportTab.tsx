@@ -110,7 +110,7 @@ export default function SalesReportTab({ token, startDate, endDate, searchQuery 
                     </div>
                     <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800">
                         <p className="text-sm text-gray-500 dark:text-gray-400">Total Amount Received</p>
-                        <p className="text-2xl font-bold text-green-600">Rs {data.summary.totalReceived?.toLocaleString() || 0}</p>
+                        <p className="text-2xl font-bold text-green-600">Rs {(data.summary.totalDownPaymentsReceived ?? data.summary.totalReceived ?? 0).toLocaleString()}</p>
                     </div>
                 </div>
 
