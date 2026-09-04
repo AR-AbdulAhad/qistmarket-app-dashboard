@@ -3,12 +3,13 @@
 import { useEffect, useState } from "react";
 import Cookies from "js-cookie";
 import toast from "react-hot-toast";
-import { Trophy, Headset, ShieldCheck, Truck, RotateCcw, TrendingUp, TrendingDown, Minus, Award, RefreshCw, Store } from "lucide-react";
+import { Trophy, Headset, ShieldCheck, Truck, RotateCcw, TrendingUp, TrendingDown, Minus, Award, RefreshCw, Store, Settings2 } from "lucide-react";
 import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
 import PageHeader from "@/components/Accounts/PageHeader";
 import EmptyState from "@/components/Accounts/EmptyState";
 import { TableSkeleton } from "@/components/Accounts/Skeleton";
 import { useAuth } from "../../../../../contexts/AuthContext";
+import ScoringConfigModal from "@/components/Admin/ScoringConfigModal";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
 const authHeaders = () => ({ Authorization: `Bearer ${Cookies.get("auth_token")}`, "Content-Type": "application/json" });
@@ -117,7 +118,9 @@ function achievementLabel(row: RankRow): { label: string; className: string } | 
 
 export default function AdminRankingsPage() {
   const { user } = useAuth();
-  const isSuperAdmin = (user?.role || "").toLowerCase() === "super admin";
+  const roleLower = (user?.role || "").toLowerCase();
+  const isSuperAdmin = roleLower === "super admin";
+  const isAdminOrSuper = ["super admin", "admin"].includes(roleLower);
 
   const [data, setData] = useState<RankingsData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -126,17 +129,9 @@ export default function AdminRankingsPage() {
   const [syncing, setSyncing] = useState(false);
   const [outletRankings, setOutletRankings] = useState<OutletRankRow[]>([]);
   const [outletLoading, setOutletLoading] = useState(true);
+  const [isScoringModalOpen, setIsScoringModalOpen] = useState(false);
 
-  const loadBadges = () => {
-    setBadgesLoading(true);
-    fetch(`${BACKEND_URL}/api/admin-panel/badges`, { headers: authHeaders() })
-      .then((r) => r.json())
-      .then((json) => { if (json.success) setBadges(json.data || []); })
-      .catch((err) => console.error("Failed to load badges:", err))
-      .finally(() => setBadgesLoading(false));
-  };
-
-  useEffect(() => {
+  const loadData = () => {
     fetch(`${BACKEND_URL}/api/admin-panel/rankings`, { headers: authHeaders() })
       .then((r) => r.json())
       .then((json) => { if (json.success) setData(json.data); })
@@ -148,6 +143,19 @@ export default function AdminRankingsPage() {
       .then((json) => { if (json.success) setOutletRankings(json.data || []); })
       .catch((err) => console.error("Failed to load outlet rankings:", err))
       .finally(() => setOutletLoading(false));
+  };
+
+  const loadBadges = () => {
+    setBadgesLoading(true);
+    fetch(`${BACKEND_URL}/api/admin-panel/badges`, { headers: authHeaders() })
+      .then((r) => r.json())
+      .then((json) => { if (json.success) setBadges(json.data || []); })
+      .catch((err) => console.error("Failed to load badges:", err))
+      .finally(() => setBadgesLoading(false));
+  };
+
+  useEffect(() => {
+    loadData();
   }, []);
 
   const handleSyncBadges = async () => {
@@ -175,12 +183,28 @@ export default function AdminRankingsPage() {
         title="Rankings & Leaderboards"
         subtitle={data ? `Company-wide performance leaderboard for ${monthLabel}.` : "Company-wide performance leaderboard."}
         actions={
-          isSuperAdmin ? (
-            <button onClick={handleSyncBadges} disabled={syncing} className="flex items-center gap-1.5 rounded-xl bg-[#ff3d3d] px-4 py-2.5 text-sm font-semibold text-white hover:bg-opacity-90 disabled:opacity-50">
-              <RefreshCw className={`size-4 ${syncing ? "animate-spin" : ""}`} /> {syncing ? "Syncing..." : "Sync Badges"}
-            </button>
-          ) : undefined
+          <div className="flex items-center gap-2">
+            {isAdminOrSuper && (
+              <button
+                onClick={() => setIsScoringModalOpen(true)}
+                className="flex items-center gap-1.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-boxdark px-4 py-2.5 text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-meta-4 transition-colors"
+              >
+                <Settings2 className="size-4 text-primary" /> Configure Scoring Rules
+              </button>
+            )}
+            {isSuperAdmin && (
+              <button onClick={handleSyncBadges} disabled={syncing} className="flex items-center gap-1.5 rounded-xl bg-[#ff3d3d] px-4 py-2.5 text-sm font-semibold text-white hover:bg-opacity-90 disabled:opacity-50">
+                <RefreshCw className={`size-4 ${syncing ? "animate-spin" : ""}`} /> {syncing ? "Syncing..." : "Sync Badges"}
+              </button>
+            )}
+          </div>
         }
+      />
+
+      <ScoringConfigModal
+        isOpen={isScoringModalOpen}
+        onClose={() => setIsScoringModalOpen(false)}
+        onSaved={loadData}
       />
 
       {loading ? (

@@ -528,6 +528,7 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
     const cnics = [
       data.purchaser?.cnic_number,
       ...(data.grantors || []).map(g => g.cnic_number),
+      data.nextOfKin?.cnic_number,
     ].filter((c): c is string => !!c)
 
     if (cnics.length === 0) return
@@ -2088,9 +2089,18 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
       {/* Next of Kin */}
       {data.nextOfKin && Object.values(data.nextOfKin).some(val => shouldDisplay(val)) && (
         <div className="mb-12">
-          <h2 className="mb-4 text-2xl font-semibold text-dark dark:text-white">
-            Next of Kin Details
-          </h2>
+          <div className="flex flex-wrap items-center gap-3 mb-4">
+            <h2 className="text-2xl font-semibold text-dark dark:text-white">
+              Next of Kin Details
+            </h2>
+            {data.nextOfKin.cnic_number && (
+              <LinkedAccountsBadge
+                cnic={data.nextOfKin.cnic_number}
+                orders={cnicOrders[data.nextOfKin.cnic_number] || []}
+                currentOrderId={data.order.id}
+              />
+            )}
+          </div>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
             <Field label="Name" value={data.nextOfKin.name} />
             <Field label="CNIC Number" value={data.nextOfKin.cnic_number} />

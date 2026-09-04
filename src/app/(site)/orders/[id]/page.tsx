@@ -686,7 +686,7 @@ export default function OrderDetailsPage() {
                 {user?.role === 'Super Admin' && (
                     <button
                         onClick={async () => {
-                            if (!confirm(`Are you sure you want to PERMANENTLY delete Order #${order.order_ref}? This action CANNOT be undone.`)) return;
+                            if (!confirm(`Move Order #${order.order_ref} to the Recycle Bin? It will disappear from the app but can be restored from the Recycle Bin later.`)) return;
                             const token = Cookies.get('auth_token');
                             try {
                                 const res = await fetch(`${API_BASE}/api/admin-panel/orders/${order.id}/permanent-delete`, {
@@ -695,7 +695,7 @@ export default function OrderDetailsPage() {
                                 });
                                 const json = await res.json();
                                 if (json.success) {
-                                    toast.success('Order deleted permanently');
+                                    toast.success('Order moved to Recycle Bin');
                                     if (window.history.length > 1) {
                                         router.back();
                                     } else {
@@ -711,7 +711,7 @@ export default function OrderDetailsPage() {
                         }}
                         className="rounded-md bg-red-700 px-6 py-2 font-bold text-white hover:bg-red-800 shadow-md transition-colors"
                     >
-                        Permanently Delete Order
+                        Delete Order
                     </button>
                 )}
             </div>

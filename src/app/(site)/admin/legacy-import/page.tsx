@@ -11,28 +11,118 @@ import { useAuth } from "../../../../../contexts/AuthContext";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
 
-// Fixed column order for the legacy paper-ledger spreadsheets (confirmed
-// consistent across all sheets) — position-based, not header-name-based,
-// since the sheet repeats header text like "Cnic" / "Contact No." for both
-// granters, which would collide if mapped by name.
+// Column order the import expects — position-based, not header-name-based,
+// since guarantor 1/2 repeat the same field names, which would collide if
+// mapped by header text instead. Matches, field for field, every input the
+// order detail page's Purchaser/Grantor Details sections show — the goal is
+// that after import there's as little left to hand-retype as possible; any
+// field the sheet genuinely doesn't have a column for is still editable
+// right there on the profile afterward. ACC NO/G.NO/S.NO/ORDER BY/INS DATE
+// from the original paper ledger were dropped — the system doesn't use
+// paper-ledger serial numbers, and ORDER BY/INS DATE didn't map to anything.
 const COLUMNS = [
-  'acc_no', 'g_no', 's_no', 'order_date', 'order_by', 'ins_date', 'bill_id',
-  'purchaser_name', 'purchaser_cnic', 'purchaser_phone', 'purchaser_address',
+  // Sale basics
+  'order_date', 'bill_id',
+  // Purchaser — Customer Information card
+  'purchaser_name', 'purchaser_cnic', 'purchaser_phone', 'purchaser_alt_contact',
+  'purchaser_city', 'purchaser_area', 'purchaser_zone', 'purchaser_house_street',
+  'purchaser_gender', 'purchaser_residential_type',
+  // Purchaser — Purchaser Details section (employment/business profile)
+  'purchaser_father_husband_name', 'purchaser_job_type',
+  'purchaser_employer_name', 'purchaser_employer_address', 'purchaser_designation', 'purchaser_official_number',
+  'purchaser_business_name', 'purchaser_established_since', 'purchaser_business_address',
+  'purchaser_net_income', 'purchaser_years_in_company', 'purchaser_gross_salary', 'purchaser_nearest_location',
+  // Item / installment plan
   'item_price', 'item_model', 'serial', 'tenure_months', 'advance', 'installment',
-  'grantor1_name', 'grantor1_cnic', 'grantor1_phone',
-  'grantor2_name', 'grantor2_cnic', 'grantor2_phone',
+  // Guarantor 1 — Grantor Details section
+  'grantor1_name', 'grantor1_cnic', 'grantor1_phone', 'grantor1_father_husband_name', 'grantor1_relationship',
+  'grantor1_job_type', 'grantor1_designation', 'grantor1_official_number',
+  'grantor1_office_address', 'grantor1_company_name', 'grantor1_years_in_company', 'grantor1_monthly_income',
+  'grantor1_business_name', 'grantor1_established_since', 'grantor1_business_address', 'grantor1_net_income',
+  'grantor1_full_residential_address', 'grantor1_nearest_location',
+  // Guarantor 2 — same shape as Guarantor 1
+  'grantor2_name', 'grantor2_cnic', 'grantor2_phone', 'grantor2_father_husband_name', 'grantor2_relationship',
+  'grantor2_job_type', 'grantor2_designation', 'grantor2_official_number',
+  'grantor2_office_address', 'grantor2_company_name', 'grantor2_years_in_company', 'grantor2_monthly_income',
+  'grantor2_business_name', 'grantor2_established_since', 'grantor2_business_address', 'grantor2_net_income',
+  'grantor2_full_residential_address', 'grantor2_nearest_location',
+  // Payment history
   'pay1', 'pay2', 'pay3', 'pay4', 'remain',
 ] as const;
 
 type LegacyRow = Record<(typeof COLUMNS)[number], any> & { _rowNum: number; _issues: string[] };
 
-// Mirrors legacyImportController.js's VALID_STATUSES exactly. Every legacy
-// row is an already-transacted historical sale, so these are the only two
-// statuses that make sense here — both build the full order (delivery,
-// installment ledger, 1Bill/SmartPay numbers).
-const STATUS_OPTIONS: { value: string; label: string }[] = [
-  { value: 'delivered', label: 'Delivered (recommended — already-sold stock)' },
-  { value: 'completed', label: 'Completed (fully paid off)' },
+// Human labels + grouping for every column, used by the expandable "Full
+// Details" panel in the preview — so every field the sheet can capture is
+// actually visible before import, not just the handful of core columns the
+// main table has room for.
+const FIELD_LABELS: Record<string, string> = {
+  order_date: 'Date', bill_id: '1Bill ID',
+  purchaser_name: 'Name', purchaser_cnic: 'CNIC', purchaser_phone: 'Contact No.', purchaser_alt_contact: 'Alternate Contact',
+  purchaser_city: 'City', purchaser_area: 'Area', purchaser_zone: 'Zone', purchaser_house_street: 'House No / Street',
+  purchaser_gender: 'Gender', purchaser_residential_type: 'Residential Type',
+  purchaser_father_husband_name: 'Father/Husband Name', purchaser_job_type: 'Job Type',
+  purchaser_employer_name: 'Employer Name', purchaser_employer_address: 'Employer Address',
+  purchaser_designation: 'Designation', purchaser_official_number: 'Official Number',
+  purchaser_business_name: 'Business Name', purchaser_established_since: 'Established Since',
+  purchaser_business_address: 'Business Address', purchaser_net_income: 'Net Income',
+  purchaser_years_in_company: 'Years in Company', purchaser_gross_salary: 'Gross Salary',
+  purchaser_nearest_location: 'Nearest Location',
+  item_price: 'Item Price', item_model: 'Item Model', serial: 'Serial', tenure_months: 'Tenure',
+  advance: 'Advance', installment: 'Installment',
+  pay1: 'Pay 1', pay2: 'Pay 2', pay3: 'Pay 3', pay4: 'Pay 4', remain: 'Remain',
+};
+for (const n of [1, 2] as const) {
+  Object.assign(FIELD_LABELS, {
+    [`grantor${n}_name`]: 'Name', [`grantor${n}_cnic`]: 'CNIC', [`grantor${n}_phone`]: 'Contact No.',
+    [`grantor${n}_father_husband_name`]: 'Father/Husband Name', [`grantor${n}_relationship`]: 'Relationship',
+    [`grantor${n}_job_type`]: 'Job Type', [`grantor${n}_designation`]: 'Designation',
+    [`grantor${n}_official_number`]: 'Official Number', [`grantor${n}_office_address`]: 'Office Address',
+    [`grantor${n}_company_name`]: 'Company Name', [`grantor${n}_years_in_company`]: 'Years in Company',
+    [`grantor${n}_monthly_income`]: 'Monthly Income', [`grantor${n}_business_name`]: 'Business Name',
+    [`grantor${n}_established_since`]: 'Established Since', [`grantor${n}_business_address`]: 'Business Address',
+    [`grantor${n}_net_income`]: 'Net Income', [`grantor${n}_full_residential_address`]: 'Full Residential Address',
+    [`grantor${n}_nearest_location`]: 'Nearest Location',
+  });
+}
+
+const FIELD_SECTIONS: { title: string; fields: string[] }[] = [
+  { title: 'Sale Basics', fields: ['order_date', 'bill_id'] },
+  {
+    title: 'Purchaser — Contact & Address', fields: [
+      'purchaser_name', 'purchaser_cnic', 'purchaser_phone', 'purchaser_alt_contact',
+      'purchaser_city', 'purchaser_area', 'purchaser_zone', 'purchaser_house_street',
+      'purchaser_gender', 'purchaser_residential_type',
+    ],
+  },
+  {
+    title: 'Purchaser — Employment & Business', fields: [
+      'purchaser_father_husband_name', 'purchaser_job_type', 'purchaser_employer_name', 'purchaser_employer_address',
+      'purchaser_designation', 'purchaser_official_number', 'purchaser_business_name', 'purchaser_established_since',
+      'purchaser_business_address', 'purchaser_net_income', 'purchaser_years_in_company', 'purchaser_gross_salary',
+      'purchaser_nearest_location',
+    ],
+  },
+  { title: 'Item & Installment Plan', fields: ['item_price', 'item_model', 'serial', 'tenure_months', 'advance', 'installment'] },
+  {
+    title: 'Guarantor 1', fields: [
+      'grantor1_name', 'grantor1_cnic', 'grantor1_phone', 'grantor1_father_husband_name', 'grantor1_relationship',
+      'grantor1_job_type', 'grantor1_designation', 'grantor1_official_number', 'grantor1_office_address',
+      'grantor1_company_name', 'grantor1_years_in_company', 'grantor1_monthly_income', 'grantor1_business_name',
+      'grantor1_established_since', 'grantor1_business_address', 'grantor1_net_income',
+      'grantor1_full_residential_address', 'grantor1_nearest_location',
+    ],
+  },
+  {
+    title: 'Guarantor 2', fields: [
+      'grantor2_name', 'grantor2_cnic', 'grantor2_phone', 'grantor2_father_husband_name', 'grantor2_relationship',
+      'grantor2_job_type', 'grantor2_designation', 'grantor2_official_number', 'grantor2_office_address',
+      'grantor2_company_name', 'grantor2_years_in_company', 'grantor2_monthly_income', 'grantor2_business_name',
+      'grantor2_established_since', 'grantor2_business_address', 'grantor2_net_income',
+      'grantor2_full_residential_address', 'grantor2_nearest_location',
+    ],
+  },
+  { title: 'Payment History', fields: ['pay1', 'pay2', 'pay3', 'pay4', 'remain'] },
 ];
 
 type ImportResult = { row: number; success: boolean; order_id?: number; error?: string; reconciliation_warning?: string | null };
@@ -62,7 +152,7 @@ export default function LegacyImportPage() {
   const [file, setFile] = useState<File | null>(null);
   const [rows, setRows] = useState<LegacyRow[]>([]);
   const [excludedRows, setExcludedRows] = useState<Set<number>>(new Set());
-  const [defaultStatus, setDefaultStatus] = useState<string>('delivered');
+  const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
   const [parsing, setParsing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [results, setResults] = useState<ImportResult[] | null>(null);
@@ -70,31 +160,72 @@ export default function LegacyImportPage() {
   const downloadDemoSheet = () => {
     try {
       const headers = [
-        'ACC NO', 'G.NO', 'S.NO', 'DATE', 'ORDER BY', 'INS DATE', '1BILL ID',
-        'Name', 'CNIC', 'Contact No.', 'Address',
+        'DATE', '1BILL ID',
+        'Name', 'CNIC', 'Contact No.', 'Alternate Contact',
+        'City', 'Area', 'Zone', 'House No / Street', 'Gender', 'Residential Type',
+        "Father/Husband Name", 'Job Type',
+        'Employer Name', 'Employer Address', 'Designation', 'Official Number',
+        'Business Name', 'Established Since', 'Business Address',
+        'Net Income', 'Years in Company', 'Gross Salary', 'Nearest Location',
         'ITEM PRICE', 'ITEM MODEL', 'SERIAL', 'Tenure', 'ADVANCE', 'INSTALLMENT',
-        "Granter's 1 Name", 'Cnic', 'Contact No.',
-        "Granter's 2 Name", 'Cnic', 'Contact No.',
+        "Guarantor 1 Name", 'Guarantor 1 CNIC', 'Guarantor 1 Contact', 'Guarantor 1 Father/Husband Name', 'Guarantor 1 Relationship',
+        'Guarantor 1 Job Type', 'Guarantor 1 Designation', 'Guarantor 1 Official Number',
+        'Guarantor 1 Office Address', 'Guarantor 1 Company Name', 'Guarantor 1 Years in Company', 'Guarantor 1 Monthly Income',
+        'Guarantor 1 Business Name', 'Guarantor 1 Established Since', 'Guarantor 1 Business Address', 'Guarantor 1 Net Income',
+        'Guarantor 1 Full Residential Address', 'Guarantor 1 Nearest Location',
+        "Guarantor 2 Name", 'Guarantor 2 CNIC', 'Guarantor 2 Contact', 'Guarantor 2 Father/Husband Name', 'Guarantor 2 Relationship',
+        'Guarantor 2 Job Type', 'Guarantor 2 Designation', 'Guarantor 2 Official Number',
+        'Guarantor 2 Office Address', 'Guarantor 2 Company Name', 'Guarantor 2 Years in Company', 'Guarantor 2 Monthly Income',
+        'Guarantor 2 Business Name', 'Guarantor 2 Established Since', 'Guarantor 2 Business Address', 'Guarantor 2 Net Income',
+        'Guarantor 2 Full Residential Address', 'Guarantor 2 Nearest Location',
         'PAY 1', 'PAY 2', 'PAY 3', 'PAY 4', 'remain',
       ];
 
       const sampleRows = [
-        // Row 1: Delivered, ongoing installments (2 of 12 paid)
+        // Row 1: Delivered, ongoing installments (2 of 12 paid) — every
+        // column filled in to show the full width of what import can capture.
         [
-          1, 1, 1, '04/06/2026', 'WALKING CUSTOMER', 1, '1017100015525265',
-          'ADNAN AHSAN', '42101-9297807-5', '03153188174', 'FB AREA KARACHI',
+          '04/06/2026', '1017100015525265',
+          'ADNAN AHSAN', '42101-9297807-5', '03153188174', '03001234567',
+          'Karachi', 'FB Area', 'Central', 'House 12, Street 4', 'Male', 'Owned',
+          'Ahsan Ali', 'Salaried',
+          'ABC Textiles', 'SITE Area, Karachi', 'Supervisor', '02112345678',
+          '', '', '',
+          '', '5', '45000', 'Near FB Area Chowrangi',
           61500, 'ZTE V80 8/256', '862484082525265', 12, 6300, 4600,
-          'MATHEW EMMANUAL', '42101-9237108-3', '03118959818',
-          'NAVEED UL HASSAN', '42201-1866190-5', '03333387388',
+          'MATHEW EMMANUAL', '42101-9237108-3', '03118959818', 'Emmanual Sr', 'Friend',
+          'Salaried', 'Manager', '02198765432',
+          'Office Plaza, Karachi', 'XYZ Corp', '8', '60000',
+          '', '', '',
+          '', 'MATHEW EMMANUAL House, FB Area', 'Near office',
+          'NAVEED UL HASSAN', '42201-1866190-5', '03333387388', '', 'Colleague',
+          '', '', '',
+          '', '', '', '',
+          '', '', '', '',
+          '', '',
           4600, 4600, '', '', 46000,
         ],
-        // Row 2: Fully paid off (completed)
+        // Row 2: Fully paid off (completed) — sparser row, showing that most
+        // fields are optional and left blank falls back cleanly.
         [
-          2, 2, 2, '10/01/2026', 'MUQADDAS', 2, '1017100015789412',
-          'SANA YOUSUF', '42301-0633320-4', '03168125822', 'RAMSUAMI KARACHI',
+          '10/01/2026', '1017100015789412',
+          'SANA YOUSUF', '42301-0633320-4', '03168125822', '',
+          'Karachi', 'Ramswami', '', '', '', '',
+          '', '',
+          '', '', '', '',
+          '', '', '',
+          '', '', '', '',
           45300, 'OPPO A6X 6/128', '351122098765432', 6, 4800, 6750,
-          'M IBAD KHAN', '42101-7547131-1', '03013321417',
-          'M HASSAN', '42101-72170517', '03174732419',
+          'M IBAD KHAN', '42101-7547131-1', '03013321417', '', '',
+          '', '', '',
+          '', '', '', '',
+          '', '', '', '',
+          '', '',
+          'M HASSAN', '42101-72170517', '03174732419', '', '',
+          '', '', '',
+          '', '', '', '',
+          '', '', '', '',
+          '', '',
           6750, 6750, 6750, 6750, 0,
         ],
       ];
@@ -128,7 +259,7 @@ export default function LegacyImportPage() {
             const row: any = { _rowNum: idx + 2 }; // +2 = 1-indexed + header row
             COLUMNS.forEach((col, i) => {
               let v = r[i];
-              if (col === 'order_date' || col === 'ins_date') v = excelValueToIso(v);
+              if (col === 'order_date') v = excelValueToIso(v);
               row[col] = v;
             });
             row._issues = validateRow(row);
@@ -181,6 +312,14 @@ export default function LegacyImportPage() {
     });
   };
 
+  const toggleExpanded = (rowNum: number) => {
+    setExpandedRows((prev) => {
+      const next = new Set(prev);
+      if (next.has(rowNum)) next.delete(rowNum); else next.add(rowNum);
+      return next;
+    });
+  };
+
   const includedRows = rows.filter((r) => !excludedRows.has(r._rowNum));
 
   const handleSubmit = async () => {
@@ -197,7 +336,6 @@ export default function LegacyImportPage() {
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
           rows: includedRows.map(({ _rowNum, _issues, ...rest }) => rest),
-          default_status: defaultStatus,
         }),
       });
       const data = await res.json();
@@ -253,10 +391,13 @@ export default function LegacyImportPage() {
         </div>
 
         <p className="text-gray-500 dark:text-gray-400 mb-6 font-medium text-sm">
-          Upload the old paper-ledger .xlsx sheet (ACC NO ... remain, 28 columns). Each row becomes a full
-          customer profile — order, customer, purchaser + guarantor records, and installment history —
-          exactly like a normal completed sale. Photos and GPS location aren&apos;t in the sheet, so every
-          imported profile is queued under <strong>Pending Legacy Profiles</strong> for staff to finish.
+          Each row becomes a full customer profile — order, customer, purchaser + both guarantors&apos; full
+          profiles (address, employer/business info, relationship), and installment history — the same shape
+          as a profile built the normal way, right down to the fields on its Purchaser/Guarantor Details
+          sections. Only name, CNIC, contact, item price, tenure and installment are required; every other
+          column is optional — fill in whatever the source records have, leave the rest blank. Only photos
+          and GPS location can&apos;t come from a spreadsheet, so every imported profile is queued under{' '}
+          <strong>Pending Legacy Profiles</strong> for staff to add those.
         </p>
 
         <div
@@ -278,22 +419,12 @@ export default function LegacyImportPage() {
           )}
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center mb-2">
-          <label className="text-sm font-bold text-gray-700 dark:text-gray-200">Default order status for this batch:</label>
-          <select
-            value={defaultStatus}
-            onChange={(e) => setDefaultStatus(e.target.value)}
-            className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-2 text-sm font-medium"
-          >
-            {STATUS_OPTIONS.map((s) => (
-              <option key={s.value} value={s.value}>{s.label}</option>
-            ))}
-          </select>
-        </div>
         <p className="text-xs text-gray-400 mb-6">
-          Every legacy row is treated as an already-transacted sale — the full order gets built either way
-          (delivery, installment ledger, 1Bill/SmartPay numbers). &quot;Completed&quot; is for accounts that are
-          fully paid off; &quot;Delivered&quot; also marks the exact handover date.
+          Every row is imported as an already-delivered sale — the full order gets built (delivery,
+          installment ledger, 1Bill/SmartPay numbers, and the same Assignment/Status timeline a normal
+          order accumulates). Whether an account still has installments due or is fully paid off isn&apos;t a
+          choice you make here — it&apos;s read straight from the sheet&apos;s ADVANCE/INSTALLMENT/PAY/remain
+          columns, exactly like it would be for any other order.
         </p>
 
         {parsing && <p className="text-sm text-gray-500 flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Parsing file…</p>}
@@ -309,12 +440,18 @@ export default function LegacyImportPage() {
               <p className="text-xs text-amber-600 flex items-center gap-1"><AlertCircle className="w-4 h-4" /> Rows with issues are unchecked by default — review before including them.</p>
             )}
           </div>
+          <p className="text-xs text-gray-400 mb-3">
+            The table below shows the core fields. Click <strong>Details</strong> on any row to see every
+            single field that was read from the sheet for it — employer/business info, full addresses,
+            both guarantors&apos; complete profiles — before you import.
+          </p>
           <div className="max-h-[420px] overflow-auto rounded-xl border border-gray-100 dark:border-gray-800">
             <table className="w-full text-left text-xs">
               <thead className="bg-gray-50 dark:bg-gray-900/40 sticky top-0">
                 <tr className="border-b border-gray-100 dark:border-gray-800 text-gray-400 uppercase tracking-wider font-bold">
                   <th className="py-2 px-3">Include</th>
                   <th className="py-2 px-3">#</th>
+                  <th className="py-2 px-3">Details</th>
                   <th className="py-2 px-3">1Bill ID</th>
                   <th className="py-2 px-3">Name</th>
                   <th className="py-2 px-3">CNIC</th>
@@ -328,9 +465,11 @@ export default function LegacyImportPage() {
                   <th className="py-2 px-3 bg-red-50 dark:bg-red-900/10">Guarantor 1 — Name</th>
                   <th className="py-2 px-3 bg-red-50 dark:bg-red-900/10">Guarantor 1 — CNIC</th>
                   <th className="py-2 px-3 bg-red-50 dark:bg-red-900/10">Guarantor 1 — Contact</th>
+                  <th className="py-2 px-3 bg-red-50 dark:bg-red-900/10">Guarantor 1 — Relationship</th>
                   <th className="py-2 px-3 bg-red-50 dark:bg-red-900/10">Guarantor 2 — Name</th>
                   <th className="py-2 px-3 bg-red-50 dark:bg-red-900/10">Guarantor 2 — CNIC</th>
                   <th className="py-2 px-3 bg-red-50 dark:bg-red-900/10">Guarantor 2 — Contact</th>
+                  <th className="py-2 px-3 bg-red-50 dark:bg-red-900/10">Guarantor 2 — Relationship</th>
                   <th className="py-2 px-3">Pay 1</th>
                   <th className="py-2 px-3">Pay 2</th>
                   <th className="py-2 px-3">Pay 3</th>
@@ -340,36 +479,85 @@ export default function LegacyImportPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                {rows.map((r) => (
-                  <tr key={r._rowNum} className={excludedRows.has(r._rowNum) ? 'opacity-50' : ''}>
-                    <td className="py-2 px-3">
-                      <input type="checkbox" checked={!excludedRows.has(r._rowNum)} onChange={() => toggleExcluded(r._rowNum)} />
-                    </td>
-                    <td className="py-2 px-3 text-gray-400">{r._rowNum}</td>
-                    <td className="py-2 px-3 text-gray-500 dark:text-gray-400">{r.bill_id}</td>
-                    <td className="py-2 px-3 font-medium text-gray-700 dark:text-gray-200">{r.purchaser_name}</td>
-                    <td className="py-2 px-3 text-gray-700 dark:text-gray-200">{r.purchaser_cnic}</td>
-                    <td className="py-2 px-3 text-gray-700 dark:text-gray-200">{r.purchaser_phone}</td>
-                    <td className="py-2 px-3 text-gray-700 dark:text-gray-200">{r.item_model}</td>
-                    <td className="py-2 px-3 text-gray-700 dark:text-gray-200">{r.serial}</td>
-                    <td className="py-2 px-3 text-gray-700 dark:text-gray-200">{r.tenure_months}</td>
-                    <td className="py-2 px-3 text-gray-700 dark:text-gray-200">{r.item_price}</td>
-                    <td className="py-2 px-3 text-gray-700 dark:text-gray-200">{r.advance}</td>
-                    <td className="py-2 px-3 text-gray-700 dark:text-gray-200">{r.installment}</td>
-                    <td className="py-2 px-3 text-gray-700 dark:text-gray-200 bg-red-50/50 dark:bg-red-900/5">{r.grantor1_name}</td>
-                    <td className="py-2 px-3 text-gray-700 dark:text-gray-200 bg-red-50/50 dark:bg-red-900/5">{r.grantor1_cnic}</td>
-                    <td className="py-2 px-3 text-gray-700 dark:text-gray-200 bg-red-50/50 dark:bg-red-900/5">{r.grantor1_phone}</td>
-                    <td className="py-2 px-3 text-gray-700 dark:text-gray-200 bg-red-50/50 dark:bg-red-900/5">{r.grantor2_name}</td>
-                    <td className="py-2 px-3 text-gray-700 dark:text-gray-200 bg-red-50/50 dark:bg-red-900/5">{r.grantor2_cnic}</td>
-                    <td className="py-2 px-3 text-gray-700 dark:text-gray-200 bg-red-50/50 dark:bg-red-900/5">{r.grantor2_phone}</td>
-                    <td className="py-2 px-3 text-gray-700 dark:text-gray-200">{r.pay1}</td>
-                    <td className="py-2 px-3 text-gray-700 dark:text-gray-200">{r.pay2}</td>
-                    <td className="py-2 px-3 text-gray-700 dark:text-gray-200">{r.pay3}</td>
-                    <td className="py-2 px-3 text-gray-700 dark:text-gray-200">{r.pay4}</td>
-                    <td className="py-2 px-3 text-gray-700 dark:text-gray-200">{r.remain}</td>
-                    <td className="py-2 px-3 text-red-600">{r._issues.join(', ')}</td>
-                  </tr>
-                ))}
+                {rows.map((r, idx) => {
+                  const isExpanded = expandedRows.has(r._rowNum);
+                  return (
+                    <React.Fragment key={r._rowNum}>
+                      <tr className={excludedRows.has(r._rowNum) ? 'opacity-50' : ''}>
+                        <td className="py-2 px-3">
+                          <input type="checkbox" checked={!excludedRows.has(r._rowNum)} onChange={() => toggleExcluded(r._rowNum)} />
+                        </td>
+                        <td className="py-2 px-3 text-gray-400">{idx + 1}</td>
+                        <td className="py-2 px-3">
+                          <button
+                            type="button"
+                            onClick={() => toggleExpanded(r._rowNum)}
+                            className="text-red-600 font-semibold hover:underline whitespace-nowrap"
+                          >
+                            {isExpanded ? 'Hide' : 'View all fields'}
+                          </button>
+                        </td>
+                        <td className="py-2 px-3 text-gray-500 dark:text-gray-400">{r.bill_id}</td>
+                        <td className="py-2 px-3 font-medium text-gray-700 dark:text-gray-200">{r.purchaser_name}</td>
+                        <td className="py-2 px-3 text-gray-700 dark:text-gray-200">{r.purchaser_cnic}</td>
+                        <td className="py-2 px-3 text-gray-700 dark:text-gray-200">{r.purchaser_phone}</td>
+                        <td className="py-2 px-3 text-gray-700 dark:text-gray-200">{r.item_model}</td>
+                        <td className="py-2 px-3 text-gray-700 dark:text-gray-200">{r.serial}</td>
+                        <td className="py-2 px-3 text-gray-700 dark:text-gray-200">{r.tenure_months}</td>
+                        <td className="py-2 px-3 text-gray-700 dark:text-gray-200">{r.item_price}</td>
+                        <td className="py-2 px-3 text-gray-700 dark:text-gray-200">{r.advance}</td>
+                        <td className="py-2 px-3 text-gray-700 dark:text-gray-200">{r.installment}</td>
+                        <td className="py-2 px-3 text-gray-700 dark:text-gray-200 bg-red-50/50 dark:bg-red-900/5">{r.grantor1_name}</td>
+                        <td className="py-2 px-3 text-gray-700 dark:text-gray-200 bg-red-50/50 dark:bg-red-900/5">{r.grantor1_cnic}</td>
+                        <td className="py-2 px-3 text-gray-700 dark:text-gray-200 bg-red-50/50 dark:bg-red-900/5">{r.grantor1_phone}</td>
+                        <td className="py-2 px-3 text-gray-700 dark:text-gray-200 bg-red-50/50 dark:bg-red-900/5">{r.grantor1_relationship}</td>
+                        <td className="py-2 px-3 text-gray-700 dark:text-gray-200 bg-red-50/50 dark:bg-red-900/5">{r.grantor2_name}</td>
+                        <td className="py-2 px-3 text-gray-700 dark:text-gray-200 bg-red-50/50 dark:bg-red-900/5">{r.grantor2_cnic}</td>
+                        <td className="py-2 px-3 text-gray-700 dark:text-gray-200 bg-red-50/50 dark:bg-red-900/5">{r.grantor2_phone}</td>
+                        <td className="py-2 px-3 text-gray-700 dark:text-gray-200 bg-red-50/50 dark:bg-red-900/5">{r.grantor2_relationship}</td>
+                        <td className="py-2 px-3 text-gray-700 dark:text-gray-200">{r.pay1}</td>
+                        <td className="py-2 px-3 text-gray-700 dark:text-gray-200">{r.pay2}</td>
+                        <td className="py-2 px-3 text-gray-700 dark:text-gray-200">{r.pay3}</td>
+                        <td className="py-2 px-3 text-gray-700 dark:text-gray-200">{r.pay4}</td>
+                        <td className="py-2 px-3 text-gray-700 dark:text-gray-200">{r.remain}</td>
+                        <td className="py-2 px-3 text-red-600">{r._issues.join(', ')}</td>
+                      </tr>
+                      {isExpanded && (
+                        <tr>
+                          {/* This <td> spans every column of a very wide table, so its
+                              natural width can run to several thousand px — sticky-pin
+                              the actual content to the left edge of the scroll area
+                              and cap its width, otherwise the label/value pairs below
+                              end up stretched far apart (values scrolled off-screen). */}
+                          <td colSpan={27} className="bg-gray-50 dark:bg-gray-900/40 p-0">
+                            <div className="sticky left-0 w-[calc(100vw-320px)] max-w-[1100px] p-5">
+                              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+                                {FIELD_SECTIONS.map((section) => (
+                                  <div key={section.title} className="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 p-4">
+                                    <h5 className="text-xs font-bold uppercase tracking-wide text-red-600 mb-3">{section.title}</h5>
+                                    <dl className="grid grid-cols-[minmax(0,auto)_minmax(0,1fr)] gap-x-3 gap-y-1.5">
+                                      {section.fields.map((f) => {
+                                        const v = (r as unknown as Record<string, any>)[f];
+                                        return (
+                                          <React.Fragment key={f}>
+                                            <dt className="text-xs text-gray-400 whitespace-nowrap">{FIELD_LABELS[f] || f}</dt>
+                                            <dd className="text-xs text-gray-700 dark:text-gray-200 font-medium break-words">
+                                              {v !== undefined && v !== null && v !== '' ? String(v) : <span className="text-gray-300 dark:text-gray-600">—</span>}
+                                            </dd>
+                                          </React.Fragment>
+                                        );
+                                      })}
+                                    </dl>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  );
+                })}
               </tbody>
             </table>
           </div>

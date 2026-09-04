@@ -3,8 +3,9 @@
 import { useEffect, useState } from "react";
 import Cookies from "js-cookie";
 import toast from "react-hot-toast";
-import { Trophy, Store, TrendingUp, TrendingDown, Minus, RefreshCw, Medal, Award, Calendar } from "lucide-react";
+import { Trophy, Store, TrendingUp, TrendingDown, Minus, RefreshCw, Medal, Award, Calendar, Settings2 } from "lucide-react";
 import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
+import ScoringConfigModal from "@/components/Admin/ScoringConfigModal";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
 const authHeaders = () => ({ Authorization: `Bearer ${Cookies.get("auth_token")}`, "Content-Type": "application/json" });
@@ -29,6 +30,7 @@ export default function OutletRankingsPage() {
     const [outlets, setOutlets] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [currentUser, setCurrentUser] = useState<any>(null);
+    const [isScoringModalOpen, setIsScoringModalOpen] = useState(false);
 
     const now = new Date();
     // "YYYY-MM" for the native month input, defaulting to the current month.
@@ -61,10 +63,16 @@ export default function OutletRankingsPage() {
 
     const [selYear, selMonth] = selectedMonth.split("-").map(Number);
     const selectedMonthLabel = `${MONTH_NAMES[selMonth - 1]} ${selYear}`;
+    const isAdminOrSuper = ["super admin", "admin"].includes((currentUser?.role || "").toLowerCase());
 
     return (
         <>
             <Breadcrumb pageName="Outlet Rankings" />
+            <ScoringConfigModal
+                isOpen={isScoringModalOpen}
+                onClose={() => setIsScoringModalOpen(false)}
+                onSaved={() => fetchRankings()}
+            />
             <div className="mx-auto max-w-7xl space-y-8">
                 {/* Header */}
                 <div className="flex flex-wrap items-center justify-between gap-4">
@@ -76,6 +84,14 @@ export default function OutletRankingsPage() {
                         <p className="text-sm text-gray-400 mt-2 font-bold">Outlet performance leaderboard — {selectedMonthLabel}</p>
                     </div>
                     <div className="flex items-center gap-3">
+                        {isAdminOrSuper && (
+                            <button
+                                onClick={() => setIsScoringModalOpen(true)}
+                                className="flex items-center gap-2 bg-white dark:bg-boxdark border border-stroke dark:border-strokedark px-4 py-2.5 rounded-2xl text-sm font-bold text-gray-700 dark:text-gray-200 hover:bg-gray-50 transition-all"
+                            >
+                                <Settings2 size={16} className="text-primary" /> Scoring Rules
+                            </button>
+                        )}
                         <div className="relative">
                             <Calendar size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
                             <input
