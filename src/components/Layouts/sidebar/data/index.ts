@@ -239,6 +239,12 @@ export const NAV_DATA = [
         ],
       },
       {
+        title: "Recycle Bin",
+        icon: Icons.RotateCcwIcon,
+        url: "/admin/recycle-bin",
+        items: [],
+      },
+      {
         title: "Outlets Management",
         icon: Icons.StoreIcon,
         url: "/admin/outlets",
