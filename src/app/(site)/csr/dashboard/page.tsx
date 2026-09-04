@@ -420,11 +420,16 @@ export default function CsrDashboardPage() {
     stroke: { curve: 'smooth', width: 3, colors: ['#E31E24', '#94A3B8'] },
     fill: { type: 'gradient', gradient: { shadeIntensity: 1, opacityFrom: 0.4, opacityTo: 0.05, stops: [0, 90, 100] } },
     xaxis: { categories: stats?.graphData?.days || [], labels: { style: { colors: '#94A3B8', fontSize: '9px', fontWeight: 800 } }, axisBorder: { show: false } },
-    yaxis: { labels: { style: { colors: '#94A3B8', fontSize: '9px', fontWeight: 800 }, formatter: (v: any) => v ? `${(Number(v)/1000).toFixed(0)}k` : '0' } },
+    yaxis: { labels: { style: { colors: '#94A3B8', fontSize: '9px', fontWeight: 800 }, formatter: (v: any) => { const n = Number(v) || 0; return n >= 1000 ? `${(n/1000).toFixed(0)}k` : `${n}`; } } },
     grid: { borderColor: '#F1F5F9', strokeDashArray: 5 },
     legend: { show: false },
     colors: ['#E31E24', '#94A3B8'],
-    tooltip: { theme: 'light', x: { show: false }, marker: { show: true } }
+    tooltip: {
+      theme: 'light',
+      x: { show: false },
+      marker: { show: true },
+      y: { formatter: (v: any) => { const n = Number(v) || 0; return n >= 1000 ? `${(n/1000).toFixed(0)}k` : `${n}`; } }
+    }
   };
 
   const currentSalesTotal = stats?.graphData?.sales?.current?.reduce((a: number, b: number) => a + b, 0) || 0;
@@ -550,7 +555,23 @@ export default function CsrDashboardPage() {
                       </div>
                   </div>
               </div>
-              <Chart options={{...chartOptions, stroke: { ...chartOptions.stroke, colors: ['#10B981', '#94A3B8'] }, colors: ['#10B981', '#94A3B8']}} series={[{name: 'Current', data: stats.graphData?.customers?.current || []}, {name: 'Previous', data: stats.graphData?.customers?.previous || []}]} type="area" height={320} />
+              <Chart options={{
+                ...chartOptions,
+                stroke: { ...chartOptions.stroke, colors: ['#10B981', '#94A3B8'] },
+                colors: ['#10B981', '#94A3B8'],
+                yaxis: {
+                  labels: {
+                    style: { colors: '#94A3B8', fontSize: '9px', fontWeight: 800 },
+                    formatter: (v: any) => `${Math.round(Number(v) || 0)}`
+                  }
+                },
+                tooltip: {
+                  ...chartOptions.tooltip,
+                  y: {
+                    formatter: (v: any) => `${Math.round(Number(v) || 0)}`
+                  }
+                }
+              }} series={[{name: 'Current', data: stats.graphData?.customers?.current || []}, {name: 'Previous', data: stats.graphData?.customers?.previous || []}]} type="area" height={320} />
           </div>
           </div>
         </div>

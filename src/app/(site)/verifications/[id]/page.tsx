@@ -961,38 +961,73 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
   };
 
 
-  const [officers, setOfficers] = useState<{ id: number; full_name: string; username: string }[]>([]);
+  const [verificationOfficers, setVerificationOfficers] = useState<{ id: number; full_name: string; username: string }[]>([]);
+  const [deliveryOfficers, setDeliveryOfficers] = useState<{ id: number; full_name: string; username: string }[]>([]);
   const [outlets, setOutlets] = useState<{ id: number; name: string; code: string }[]>([]);
   const [updatingAssignment, setUpdatingAssignment] = useState(false);
 
+  const selectedOutletId = (data?.order as any)?.outlet_id || (data?.order as any)?.outlet?.id;
+
   useEffect(() => {
-    const fetchOptions = async () => {
+    const fetchOutlets = async () => {
+      const token = Cookies.get('auth_token');
+      if (!token) return;
+      try {
+        const res = await fetch(`${BACKEND_URL}/api/outlet/list/basic`, { headers: { Authorization: `Bearer ${token}` } });
+        const json = await res.json();
+        if (json.success && Array.isArray(json.data)) {
+          setOutlets(json.data);
+        }
+      } catch (err) {
+        console.error('Error fetching outlets:', err);
+      }
+    };
+    fetchOutlets();
+  }, []);
+
+  useEffect(() => {
+    const fetchOfficers = async () => {
       const token = Cookies.get('auth_token');
       if (!token) return;
 
+      if (!selectedOutletId) {
+        setVerificationOfficers([]);
+        setDeliveryOfficers([]);
+        return;
+      }
+
       try {
-        const [offRes, outRes] = await Promise.all([
-          fetch(`${BACKEND_URL}/api/officer/assignments/officers?role=verification&all=true`, { headers: { Authorization: `Bearer ${token}` } }),
-          fetch(`${BACKEND_URL}/api/outlet/list/basic`, { headers: { Authorization: `Bearer ${token}` } }),
+        const outletParam = `&outlet_id=${selectedOutletId}`;
+        const [voRes, doRes] = await Promise.all([
+          fetch(`${BACKEND_URL}/api/assignments/officers?role=verification${outletParam}`, { headers: { Authorization: `Bearer ${token}` } }),
+          fetch(`${BACKEND_URL}/api/assignments/officers?role=delivery${outletParam}`, { headers: { Authorization: `Bearer ${token}` } }),
         ]);
 
-        const offJson = await offRes.json();
-        const outJson = await outRes.json();
+        const voJson = await voRes.json();
+        const doJson = await doRes.json();
 
-        if (offJson.success && Array.isArray(offJson.data)) {
-          setOfficers(offJson.data);
+        if (voJson.success && Array.isArray(voJson.data)) {
+          setVerificationOfficers(voJson.data);
+        } else {
+          setVerificationOfficers([]);
         }
-        if (outJson.success && Array.isArray(outJson.data)) {
-          setOutlets(outJson.data);
+
+        if (doJson.success && Array.isArray(doJson.data)) {
+          setDeliveryOfficers(doJson.data);
+        } else {
+          setDeliveryOfficers([]);
         }
       } catch (err) {
-        console.error('Error fetching officer/outlet options:', err);
+        console.error('Error fetching officers for outlet:', err);
+        setVerificationOfficers([]);
+        setDeliveryOfficers([]);
       }
     };
-    fetchOptions();
-  }, []);
 
-  const handleAssignmentChange = async (newOfficerId?: number | null, newOutletId?: number | null) => {
+    fetchOfficers();
+  }, [selectedOutletId]);
+
+  const handleAssignmentChange = async (newOfficerId?: number | null, newOutletId?: number | null, newDeliveryOfficerId?: number | null) => {
     if (!data) return;
     const token = Cookies.get('auth_token');
     if (!token) {
@@ -1005,6 +1040,7 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
       const payload: any = {};
       if (newOfficerId !== undefined) payload.verification_officer_id = newOfficerId;
       if (newOutletId !== undefined) payload.outlet_id = newOutletId;
+      if (newDeliveryOfficerId !== undefined) payload.delivery_officer_id = newDeliveryOfficerId;
 
       const res = await fetch(`${BACKEND_URL}/api/verification/${data.id}/assignment`, {
         method: 'PUT',
@@ -1112,42 +1148,18 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
           <Field label="ID" value={data.id} />
           <Field label="Order ID" value={data.order_id} />
           {data.order?.status && <Field label="Order Status" value={data.order.status} />}
-          {/* Verification Officer Select */}
-          <div>
-            <label className="block text-sm font-medium text-gray-500 dark:text-gray-400">Verification Officer</label>
-            <div className="mt-1">
-              <select
-                value={data.verification_officer_id || ''}
-                onChange={(e) => handleAssignmentChange(e.target.value ? Number(e.target.value) : null, undefined)}
-                disabled={updatingAssignment}
-                className="w-full rounded-lg border border-stroke bg-gray-100 px-4 py-2.5 text-sm font-bold text-dark dark:border-dark-3 dark:bg-dark-3 dark:text-white transition focus:border-primary"
-              >
-                <option value="">Unassigned</option>
-                {data.verification_officer && !officers.some(o => o.id === data.verification_officer_id) && (
-                  <option value={data.verification_officer_id}>
-                    {data.verification_officer.full_name} ({data.verification_officer.username})
-                  </option>
-                )}
-                {officers.map((o) => (
-                  <option key={o.id} value={o.id}>
-                    {o.full_name} ({o.username})
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
 
-          {/* Assigned Outlet Select */}
+          {/* 1. Assigned Branch / Outlet Select FIRST */}
           <div>
-            <label className="block text-sm font-medium text-gray-500 dark:text-gray-400">Assigned Branch / Outlet</label>
+            <label className="block text-sm font-medium text-gray-500 dark:text-gray-400 font-bold">Assigned Branch / Outlet</label>
             <div className="mt-1">
               <select
-                value={(data.order as any)?.outlet_id || (data.order as any)?.outlet?.id || ''}
-                onChange={(e) => handleAssignmentChange(undefined, e.target.value ? Number(e.target.value) : null)}
+                value={selectedOutletId || ''}
+                onChange={(e) => handleAssignmentChange(undefined, e.target.value ? Number(e.target.value) : null, undefined)}
                 disabled={updatingAssignment}
-                className="w-full rounded-lg border border-stroke bg-gray-100 px-4 py-2.5 text-sm font-bold text-primary dark:border-dark-3 dark:bg-dark-3 dark:text-white transition focus:border-primary"
+                className="w-full rounded-lg border border-primary/40 bg-white px-4 py-2.5 text-sm font-bold text-primary dark:border-dark-3 dark:bg-dark-3 dark:text-white transition focus:border-primary shadow-xs"
               >
-                <option value="">Unassigned (Head Office)</option>
+                <option value="">-- Select Branch / Outlet First --</option>
                 {(data.order as any)?.outlet && !outlets.some(o => o.id === (data.order as any).outlet?.id) && (
                   <option value={(data.order as any).outlet.id}>
                     {(data.order as any).outlet.name}
@@ -1162,12 +1174,69 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
             </div>
           </div>
 
-          {data.order.delivery_officer && (
-            <Field
-              label="Delivery Officer"
-              value={`${data.order.delivery_officer.full_name} (${data.order.delivery_officer.username})`}
-            />
-          )}
+          {/* 2. Verification Officer Select */}
+          <div>
+            <label className="block text-sm font-medium text-gray-500 dark:text-gray-400 font-bold">Verification Officer</label>
+            <div className="mt-1">
+              <select
+                value={data.verification_officer_id || ''}
+                onChange={(e) => handleAssignmentChange(e.target.value ? Number(e.target.value) : null, undefined, undefined)}
+                disabled={updatingAssignment || !selectedOutletId}
+                className="w-full rounded-lg border border-stroke bg-gray-100 px-4 py-2.5 text-sm font-bold text-dark dark:border-dark-3 dark:bg-dark-3 dark:text-white transition focus:border-primary disabled:opacity-60"
+              >
+                {!selectedOutletId ? (
+                  <option value="">Select Branch / Outlet First</option>
+                ) : (
+                  <>
+                    <option value="">Unassigned</option>
+                    {data.verification_officer && !verificationOfficers.some(o => o.id === data.verification_officer_id) && (
+                      <option value={data.verification_officer_id}>
+                        {data.verification_officer.full_name} ({data.verification_officer.username})
+                      </option>
+                    )}
+                    {verificationOfficers.map((o) => (
+                      <option key={o.id} value={o.id}>
+                        {o.full_name} ({o.username})
+                      </option>
+                    ))}
+                  </>
+                )}
+              </select>
+            </div>
+          </div>
+
+          {/* 3. Delivery Officer Select */}
+          <div>
+            <label className="block text-sm font-medium text-gray-500 dark:text-gray-400 font-bold">Delivery Officer</label>
+            <div className="mt-1">
+              <select
+                value={(data.order as any)?.delivery_officer_id || (data.order as any)?.delivery_officer?.id || ''}
+                onChange={(e) => handleAssignmentChange(undefined, undefined, e.target.value ? Number(e.target.value) : null)}
+                disabled={updatingAssignment || !selectedOutletId}
+                className="w-full rounded-lg border border-stroke bg-gray-100 px-4 py-2.5 text-sm font-bold text-dark dark:border-dark-3 dark:bg-dark-3 dark:text-white transition focus:border-primary disabled:opacity-60"
+              >
+                {!selectedOutletId ? (
+                  <option value="">Select Branch / Outlet First</option>
+                ) : (
+                  <>
+                    <option value="">Unassigned</option>
+                    {(data.order as any)?.delivery_officer && !deliveryOfficers.some(o => o.id === (data.order as any).delivery_officer?.id) && (
+                      <option value={(data.order as any).delivery_officer.id}>
+                        {(data.order as any).delivery_officer.full_name} ({(data.order as any).delivery_officer.username})
+                      </option>
+                    )}
+                    {deliveryOfficers.map((o) => (
+                      <option key={o.id} value={o.id}>
+                        {o.full_name} ({o.username})
+                      </option>
+                    ))}
+                  </>
+                )}
+              </select>
+            </div>
+          </div>
+
+
           {data.status && (
             <div>
               <label className="block text-sm font-medium text-gray-500 dark:text-gray-400">Verification Status</label>

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
 import Cookies from "js-cookie";
 import toast from "react-hot-toast";
@@ -126,6 +126,7 @@ const FIELD_SECTIONS: { title: string; fields: string[] }[] = [
 ];
 
 type ImportResult = { row: number; success: boolean; order_id?: number; error?: string; reconciliation_warning?: string | null };
+type Officer = { id: number; full_name: string; username: string };
 
 function excelValueToIso(v: any): string | null {
   if (!v) return null;
@@ -156,6 +157,33 @@ export default function LegacyImportPage() {
   const [parsing, setParsing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [results, setResults] = useState<ImportResult[] | null>(null);
+  const [officers, setOfficers] = useState<Officer[]>([]);
+  const [officersLoading, setOfficersLoading] = useState(true);
+  const [officerId, setOfficerId] = useState<string>('');
+
+  // These profiles need a real Verification/Delivery Officer on record — the
+  // importing Super Admin isn't a stand-in for that (an admin approving a
+  // batch isn't the same as an officer having verified/delivered it), so
+  // this is a required choice, not something defaulted silently.
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const token = Cookies.get('auth_token');
+        const res = await fetch(`${BACKEND_URL}/api/users/verification-officers`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || 'Failed to load officers');
+        setOfficers(data.data?.users || []);
+      } catch (err: any) {
+        console.error(err);
+        toast.error('Failed to load Verification Officers list');
+      } finally {
+        setOfficersLoading(false);
+      }
+    };
+    load();
+  }, []);
 
   const downloadDemoSheet = () => {
     try {
@@ -327,6 +355,10 @@ export default function LegacyImportPage() {
       toast.error('No rows selected to import');
       return;
     }
+    if (!officerId) {
+      toast.error('Pick a Verification Officer to attribute these profiles to first');
+      return;
+    }
     setSubmitting(true);
     setResults(null);
     try {
@@ -336,6 +368,7 @@ export default function LegacyImportPage() {
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
           rows: includedRows.map(({ _rowNum, _issues, ...rest }) => rest),
+          officer_id: officerId,
         }),
       });
       const data = await res.json();
@@ -398,6 +431,29 @@ export default function LegacyImportPage() {
           column is optional — fill in whatever the source records have, leave the rest blank. Only photos
           and GPS location can&apos;t come from a spreadsheet, so every imported profile is queued under{' '}
           <strong>Pending Legacy Profiles</strong> for staff to add those.
+        </p>
+
+        <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center mb-6">
+          <label className="text-sm font-bold text-gray-700 dark:text-gray-200">Attribute these profiles to:</label>
+          <select
+            value={officerId}
+            onChange={(e) => setOfficerId(e.target.value)}
+            disabled={officersLoading}
+            className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-2 text-sm font-medium disabled:opacity-50 min-w-[260px]"
+          >
+            <option value="">
+              {officersLoading ? 'Loading officers…' : officers.length === 0 ? 'No active Verification Officers found' : 'Select a Verification Officer…'}
+            </option>
+            {officers.map((o) => (
+              <option key={o.id} value={o.id}>{o.full_name} (@{o.username})</option>
+            ))}
+          </select>
+        </div>
+        <p className="text-xs text-gray-400 mb-6">
+          Every imported profile&apos;s Verification Officer, Delivery Officer, and (where there&apos;s still a
+          balance due) Recovery Officer fields are set to whoever you pick here — never to your own admin
+          account, since an admin approving a batch isn&apos;t the same as an officer having verified or
+          delivered it.
         </p>
 
         <div
@@ -564,7 +620,7 @@ export default function LegacyImportPage() {
 
           <button
             onClick={handleSubmit}
-            disabled={submitting || includedRows.length === 0}
+            disabled={submitting || includedRows.length === 0 || !officerId}
             className="mt-6 w-full flex items-center justify-center gap-3 bg-red-600 text-white py-4 rounded-xl hover:bg-red-700 transition font-bold disabled:opacity-50"
           >
             {submitting ? (
