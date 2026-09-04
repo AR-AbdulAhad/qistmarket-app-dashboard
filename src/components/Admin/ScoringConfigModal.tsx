@@ -30,6 +30,7 @@ interface ScoringConfig {
     points_deducted_per_expired_order: number;
     points_per_completed_order: number;
     points_per_repeat_customer: number;
+    points_per_solved_complaint?: number;
   };
   delivery: {
     points_per_delivered_order: number;
@@ -255,7 +256,7 @@ export default function ScoringConfigModal({ isOpen, onClose, onSaved }: Scoring
                   </label>
                   <input
                     type="number"
-                    value={config.outlet.sales_divisor}
+                    value={config.outlet.sales_divisor ?? 1000}
                     onChange={(e) => updateVal("outlet", "sales_divisor", Number(e.target.value))}
                     className="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-boxdark px-3 py-2 text-sm font-semibold focus:outline-none focus:border-primary"
                   />
@@ -264,11 +265,24 @@ export default function ScoringConfigModal({ isOpen, onClose, onSaved }: Scoring
 
                 <div className="rounded-xl border border-gray-100 dark:border-gray-800 p-4 bg-gray-50/50 dark:bg-meta-4/20">
                   <label className="text-xs font-bold text-gray-700 dark:text-gray-200 block mb-1">
+                    Sales Multiplier
+                  </label>
+                  <input
+                    type="number"
+                    value={config.outlet.sales_multiplier ?? 1}
+                    onChange={(e) => updateVal("outlet", "sales_multiplier", Number(e.target.value))}
+                    className="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-boxdark px-3 py-2 text-sm font-semibold focus:outline-none focus:border-primary"
+                  />
+                  <p className="text-[11px] text-gray-500 mt-1">Multiplier for sales points after divisor</p>
+                </div>
+
+                <div className="rounded-xl border border-gray-100 dark:border-gray-800 p-4 bg-gray-50/50 dark:bg-meta-4/20">
+                  <label className="text-xs font-bold text-gray-700 dark:text-gray-200 block mb-1">
                     Recovery % Multiplier
                   </label>
                   <input
                     type="number"
-                    value={config.outlet.recovery_pct_multiplier}
+                    value={config.outlet.recovery_pct_multiplier ?? 5}
                     onChange={(e) => updateVal("outlet", "recovery_pct_multiplier", Number(e.target.value))}
                     className="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-boxdark px-3 py-2 text-sm font-semibold focus:outline-none focus:border-primary"
                   />
@@ -287,6 +301,42 @@ export default function ScoringConfigModal({ isOpen, onClose, onSaved }: Scoring
                     type="number"
                     value={config.csr.points_per_delivered_order}
                     onChange={(e) => updateVal("csr", "points_per_delivered_order", Number(e.target.value))}
+                    className="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-boxdark px-3 py-2 text-sm font-semibold focus:outline-none focus:border-primary"
+                  />
+                </div>
+
+                <div className="rounded-xl border border-gray-100 dark:border-gray-800 p-4 bg-gray-50/50 dark:bg-meta-4/20">
+                  <label className="text-xs font-bold text-gray-700 dark:text-gray-200 block mb-1">
+                    Points Per Completed/Approved Order (+)
+                  </label>
+                  <input
+                    type="number"
+                    value={config.csr.points_per_completed_order}
+                    onChange={(e) => updateVal("csr", "points_per_completed_order", Number(e.target.value))}
+                    className="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-boxdark px-3 py-2 text-sm font-semibold focus:outline-none focus:border-primary"
+                  />
+                </div>
+
+                <div className="rounded-xl border border-gray-100 dark:border-gray-800 p-4 bg-gray-50/50 dark:bg-meta-4/20">
+                  <label className="text-xs font-bold text-gray-700 dark:text-gray-200 block mb-1">
+                    Points Per Repeat Customer (+)
+                  </label>
+                  <input
+                    type="number"
+                    value={config.csr.points_per_repeat_customer}
+                    onChange={(e) => updateVal("csr", "points_per_repeat_customer", Number(e.target.value))}
+                    className="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-boxdark px-3 py-2 text-sm font-semibold focus:outline-none focus:border-primary"
+                  />
+                </div>
+
+                <div className="rounded-xl border border-gray-100 dark:border-gray-800 p-4 bg-gray-50/50 dark:bg-meta-4/20">
+                  <label className="text-xs font-bold text-gray-700 dark:text-gray-200 block mb-1">
+                    Points Per Solved Complaint (+)
+                  </label>
+                  <input
+                    type="number"
+                    value={config.csr.points_per_solved_complaint ?? 1}
+                    onChange={(e) => updateVal("csr", "points_per_solved_complaint", Number(e.target.value))}
                     className="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-boxdark px-3 py-2 text-sm font-semibold focus:outline-none focus:border-primary"
                   />
                 </div>
@@ -326,30 +376,6 @@ export default function ScoringConfigModal({ isOpen, onClose, onSaved }: Scoring
                     className="w-full rounded-lg border border-rose-200 dark:border-rose-800 bg-white dark:bg-boxdark px-3 py-2 text-sm font-semibold focus:outline-none focus:border-rose-500"
                   />
                 </div>
-
-                <div className="rounded-xl border border-gray-100 dark:border-gray-800 p-4 bg-gray-50/50 dark:bg-meta-4/20">
-                  <label className="text-xs font-bold text-gray-700 dark:text-gray-200 block mb-1">
-                    Points Per Completed/Approved Order (+)
-                  </label>
-                  <input
-                    type="number"
-                    value={config.csr.points_per_completed_order}
-                    onChange={(e) => updateVal("csr", "points_per_completed_order", Number(e.target.value))}
-                    className="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-boxdark px-3 py-2 text-sm font-semibold focus:outline-none focus:border-primary"
-                  />
-                </div>
-
-                <div className="rounded-xl border border-gray-100 dark:border-gray-800 p-4 bg-gray-50/50 dark:bg-meta-4/20">
-                  <label className="text-xs font-bold text-gray-700 dark:text-gray-200 block mb-1">
-                    Points Per Repeat Customer (+)
-                  </label>
-                  <input
-                    type="number"
-                    value={config.csr.points_per_repeat_customer}
-                    onChange={(e) => updateVal("csr", "points_per_repeat_customer", Number(e.target.value))}
-                    className="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-boxdark px-3 py-2 text-sm font-semibold focus:outline-none focus:border-primary"
-                  />
-                </div>
               </div>
             )}
 
@@ -363,6 +389,18 @@ export default function ScoringConfigModal({ isOpen, onClose, onSaved }: Scoring
                     type="number"
                     value={config.delivery.points_per_delivered_order}
                     onChange={(e) => updateVal("delivery", "points_per_delivered_order", Number(e.target.value))}
+                    className="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-boxdark px-3 py-2 text-sm font-semibold focus:outline-none focus:border-primary"
+                  />
+                </div>
+
+                <div className="rounded-xl border border-gray-100 dark:border-gray-800 p-4 bg-gray-50/50 dark:bg-meta-4/20">
+                  <label className="text-xs font-bold text-gray-700 dark:text-gray-200 block mb-1">
+                    Points Per Completed Order (+)
+                  </label>
+                  <input
+                    type="number"
+                    value={config.delivery.points_per_completed_order ?? 5}
+                    onChange={(e) => updateVal("delivery", "points_per_completed_order", Number(e.target.value))}
                     className="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-boxdark px-3 py-2 text-sm font-semibold focus:outline-none focus:border-primary"
                   />
                 </div>
@@ -419,6 +457,18 @@ export default function ScoringConfigModal({ isOpen, onClose, onSaved }: Scoring
                   />
                 </div>
 
+                <div className="rounded-xl border border-gray-100 dark:border-gray-800 p-4 bg-gray-50/50 dark:bg-meta-4/20">
+                  <label className="text-xs font-bold text-gray-700 dark:text-gray-200 block mb-1">
+                    Points Per Completed Order (+)
+                  </label>
+                  <input
+                    type="number"
+                    value={config.recovery.points_per_completed_order ?? 5}
+                    onChange={(e) => updateVal("recovery", "points_per_completed_order", Number(e.target.value))}
+                    className="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-boxdark px-3 py-2 text-sm font-semibold focus:outline-none focus:border-primary"
+                  />
+                </div>
+
                 <div className="rounded-xl border border-rose-100 dark:border-rose-900/30 p-4 bg-rose-50/30 dark:bg-rose-900/10">
                   <label className="text-xs font-bold text-rose-700 dark:text-rose-400 block mb-1">
                     Points Deducted Per Returned Order (-)
@@ -439,6 +489,18 @@ export default function ScoringConfigModal({ isOpen, onClose, onSaved }: Scoring
                     type="number"
                     value={config.recovery.points_deducted_per_cancelled_order}
                     onChange={(e) => updateVal("recovery", "points_deducted_per_cancelled_order", Number(e.target.value))}
+                    className="w-full rounded-lg border border-rose-200 dark:border-rose-800 bg-white dark:bg-boxdark px-3 py-2 text-sm font-semibold focus:outline-none focus:border-rose-500"
+                  />
+                </div>
+
+                <div className="rounded-xl border border-rose-100 dark:border-rose-900/30 p-4 bg-rose-50/30 dark:bg-rose-900/10">
+                  <label className="text-xs font-bold text-rose-700 dark:text-rose-400 block mb-1">
+                    Points Deducted Per Expired Order (-)
+                  </label>
+                  <input
+                    type="number"
+                    value={config.recovery.points_deducted_per_expired_order ?? 3}
+                    onChange={(e) => updateVal("recovery", "points_deducted_per_expired_order", Number(e.target.value))}
                     className="w-full rounded-lg border border-rose-200 dark:border-rose-800 bg-white dark:bg-boxdark px-3 py-2 text-sm font-semibold focus:outline-none focus:border-rose-500"
                   />
                 </div>
@@ -491,6 +553,18 @@ export default function ScoringConfigModal({ isOpen, onClose, onSaved }: Scoring
                     type="number"
                     value={config.verification.points_deducted_per_cancelled_order}
                     onChange={(e) => updateVal("verification", "points_deducted_per_cancelled_order", Number(e.target.value))}
+                    className="w-full rounded-lg border border-rose-200 dark:border-rose-800 bg-white dark:bg-boxdark px-3 py-2 text-sm font-semibold focus:outline-none focus:border-rose-500"
+                  />
+                </div>
+
+                <div className="rounded-xl border border-rose-100 dark:border-rose-900/30 p-4 bg-rose-50/30 dark:bg-rose-900/10">
+                  <label className="text-xs font-bold text-rose-700 dark:text-rose-400 block mb-1">
+                    Points Deducted Per Expired Order (-)
+                  </label>
+                  <input
+                    type="number"
+                    value={config.verification.points_deducted_per_expired_order ?? 3}
+                    onChange={(e) => updateVal("verification", "points_deducted_per_expired_order", Number(e.target.value))}
                     className="w-full rounded-lg border border-rose-200 dark:border-rose-800 bg-white dark:bg-boxdark px-3 py-2 text-sm font-semibold focus:outline-none focus:border-rose-500"
                   />
                 </div>
