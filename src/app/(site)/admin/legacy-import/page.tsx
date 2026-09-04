@@ -125,15 +125,6 @@ const FIELD_SECTIONS: { title: string; fields: string[] }[] = [
   { title: 'Payment History', fields: ['pay1', 'pay2', 'pay3', 'pay4', 'remain'] },
 ];
 
-// Mirrors legacyImportController.js's VALID_STATUSES exactly. Every legacy
-// row is an already-transacted historical sale, so these are the only two
-// statuses that make sense here — both build the full order (delivery,
-// installment ledger, 1Bill/SmartPay numbers).
-const STATUS_OPTIONS: { value: string; label: string }[] = [
-  { value: 'delivered', label: 'Delivered (recommended — already-sold stock)' },
-  { value: 'completed', label: 'Completed (fully paid off)' },
-];
-
 type ImportResult = { row: number; success: boolean; order_id?: number; error?: string; reconciliation_warning?: string | null };
 
 function excelValueToIso(v: any): string | null {
@@ -162,7 +153,6 @@ export default function LegacyImportPage() {
   const [rows, setRows] = useState<LegacyRow[]>([]);
   const [excludedRows, setExcludedRows] = useState<Set<number>>(new Set());
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
-  const [defaultStatus, setDefaultStatus] = useState<string>('delivered');
   const [parsing, setParsing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [results, setResults] = useState<ImportResult[] | null>(null);
@@ -346,7 +336,6 @@ export default function LegacyImportPage() {
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
           rows: includedRows.map(({ _rowNum, _issues, ...rest }) => rest),
-          default_status: defaultStatus,
         }),
       });
       const data = await res.json();
@@ -430,22 +419,12 @@ export default function LegacyImportPage() {
           )}
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center mb-2">
-          <label className="text-sm font-bold text-gray-700 dark:text-gray-200">Default order status for this batch:</label>
-          <select
-            value={defaultStatus}
-            onChange={(e) => setDefaultStatus(e.target.value)}
-            className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-2 text-sm font-medium"
-          >
-            {STATUS_OPTIONS.map((s) => (
-              <option key={s.value} value={s.value}>{s.label}</option>
-            ))}
-          </select>
-        </div>
         <p className="text-xs text-gray-400 mb-6">
-          Every legacy row is treated as an already-transacted sale — the full order gets built either way
-          (delivery, installment ledger, 1Bill/SmartPay numbers). &quot;Completed&quot; is for accounts that are
-          fully paid off; &quot;Delivered&quot; also marks the exact handover date.
+          Every row is imported as an already-delivered sale — the full order gets built (delivery,
+          installment ledger, 1Bill/SmartPay numbers, and the same Assignment/Status timeline a normal
+          order accumulates). Whether an account still has installments due or is fully paid off isn&apos;t a
+          choice you make here — it&apos;s read straight from the sheet&apos;s ADVANCE/INSTALLMENT/PAY/remain
+          columns, exactly like it would be for any other order.
         </p>
 
         {parsing && <p className="text-sm text-gray-500 flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Parsing file…</p>}
@@ -545,26 +524,33 @@ export default function LegacyImportPage() {
                       </tr>
                       {isExpanded && (
                         <tr>
-                          <td colSpan={27} className="bg-gray-50 dark:bg-gray-900/40 p-5">
-                            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-                              {FIELD_SECTIONS.map((section) => (
-                                <div key={section.title} className="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 p-4">
-                                  <h5 className="text-xs font-bold uppercase tracking-wide text-red-600 mb-3">{section.title}</h5>
-                                  <dl className="space-y-1.5">
-                                    {section.fields.map((f) => {
-                                      const v = (r as unknown as Record<string, any>)[f];
-                                      return (
-                                        <div key={f} className="flex justify-between gap-3 text-xs">
-                                          <dt className="text-gray-400">{FIELD_LABELS[f] || f}</dt>
-                                          <dd className="text-gray-700 dark:text-gray-200 font-medium text-right">
-                                            {v !== undefined && v !== null && v !== '' ? String(v) : <span className="text-gray-300 dark:text-gray-600">—</span>}
-                                          </dd>
-                                        </div>
-                                      );
-                                    })}
-                                  </dl>
-                                </div>
-                              ))}
+                          {/* This <td> spans every column of a very wide table, so its
+                              natural width can run to several thousand px — sticky-pin
+                              the actual content to the left edge of the scroll area
+                              and cap its width, otherwise the label/value pairs below
+                              end up stretched far apart (values scrolled off-screen). */}
+                          <td colSpan={27} className="bg-gray-50 dark:bg-gray-900/40 p-0">
+                            <div className="sticky left-0 w-[calc(100vw-320px)] max-w-[1100px] p-5">
+                              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+                                {FIELD_SECTIONS.map((section) => (
+                                  <div key={section.title} className="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 p-4">
+                                    <h5 className="text-xs font-bold uppercase tracking-wide text-red-600 mb-3">{section.title}</h5>
+                                    <dl className="grid grid-cols-[minmax(0,auto)_minmax(0,1fr)] gap-x-3 gap-y-1.5">
+                                      {section.fields.map((f) => {
+                                        const v = (r as unknown as Record<string, any>)[f];
+                                        return (
+                                          <React.Fragment key={f}>
+                                            <dt className="text-xs text-gray-400 whitespace-nowrap">{FIELD_LABELS[f] || f}</dt>
+                                            <dd className="text-xs text-gray-700 dark:text-gray-200 font-medium break-words">
+                                              {v !== undefined && v !== null && v !== '' ? String(v) : <span className="text-gray-300 dark:text-gray-600">—</span>}
+                                            </dd>
+                                          </React.Fragment>
+                                        );
+                                      })}
+                                    </dl>
+                                  </div>
+                                ))}
+                              </div>
                             </div>
                           </td>
                         </tr>

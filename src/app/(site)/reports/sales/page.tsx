@@ -20,6 +20,7 @@ interface Order {
   order_ref: string
   customer_name: string
   total_amount: number
+  sales_value?: number
   status: string
   created_at: string
   payments: any[]
@@ -124,7 +125,7 @@ export default function GlobalSalesReportPage() {
                           </span>
                         </td>
                         <td className="px-6 py-4 text-right font-bold text-dark dark:text-white">
-                          Rs. {o.total_amount.toLocaleString()}
+                          Rs. {(o.sales_value ?? o.total_amount ?? 0).toLocaleString()}
                         </td>
                       </tr>
                     ))}

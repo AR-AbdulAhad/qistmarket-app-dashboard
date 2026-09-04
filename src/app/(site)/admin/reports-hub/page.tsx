@@ -83,6 +83,7 @@ export default function AdminReportsHubPage() {
                 empty="No payments recorded for this period."
                 columns={[
                   { header: "Order", cell: (p: any) => p.order_ref || "—" },
+                  { header: "Purchaser / Customer", cell: (p: any) => p.purchaser_name || p.customer_name || "—" },
                   { header: "Type", cell: (p: any) => <span className="capitalize">{p.paymentType}</span> },
                   { header: "Amount", align: "right", cell: (p: any) => PKR(p.amount) },
                   { header: "Paid At", cell: (p: any) => new Date(p.paidAt).toLocaleString() },
@@ -103,7 +104,7 @@ export default function AdminReportsHubPage() {
                 empty="No delivered orders for this period."
                 columns={[
                   { header: "Order", cell: (o: any) => o.order_ref },
-                  { header: "Customer", cell: (o: any) => o.customer_name },
+                  { header: "Purchaser Name", cell: (o: any) => o.purchaser_name || o.customer_name },
                   { header: "Total", align: "right", cell: (o: any) => PKR(o.total_amount) },
                   { header: "Delivered", cell: (o: any) => new Date(o.updated_at).toLocaleDateString() },
                 ]}
@@ -159,7 +160,7 @@ export default function AdminReportsHubPage() {
                 empty="No installment recoveries for this period."
                 columns={[
                   { header: "Order", cell: (r: any) => r.order_ref },
-                  { header: "Customer", cell: (r: any) => r.customer_name },
+                  { header: "Purchaser Name", cell: (r: any) => r.purchaser_name || r.customer_name },
                   { header: "Installment", cell: (r: any) => r.label },
                   { header: "Amount", align: "right", cell: (r: any) => PKR(r.amount) },
                   { header: "Paid At", cell: (r: any) => new Date(r.paid_at).toLocaleString() },
