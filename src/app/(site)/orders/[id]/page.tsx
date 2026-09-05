@@ -15,6 +15,7 @@ import { MediaCard } from '@/components/common/MediaCard';
 import { formatExactDate } from "@/utils/dateUtils";
 import LinkedAccountsBadge from '@/components/common/LinkedAccountsBadge';
 import EditTimelineDatesModal from '@/components/Orders/EditTimelineDatesModal';
+import { Ban, AlertTriangle } from 'lucide-react';
 
 const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
 
@@ -687,7 +688,7 @@ export default function OrderDetailsPage() {
                         📤 Send Ledger
                     </button>
                 )}
-                {/* Edit Timeline Dates — only for legacy import orders */}
+                {/* Edit Timeline Dates — only for legacy import orders (Pending Legacy Profiles) */}
                 {order.channel === 'legacy_import' && (user?.role === 'Super Admin' || user?.role === 'Admin') && (
                     <button
                         onClick={() => setEditTimelineModalOpen(true)}
@@ -730,6 +731,61 @@ export default function OrderDetailsPage() {
                     >
                         Delete Order
                     </button>
+                )}
+
+                {/* Mark Blacklist button for authorized roles */}
+                {['admin', 'super admin', 'accountant'].includes(user?.role?.toLowerCase() || '') && (
+                    ((order as any).is_blacklisted || order.verification?.purchaser?.is_blacklisted || order.verification?.grantors?.some((g: any) => g.is_blacklisted)) ? (
+                        <span className="inline-flex items-center gap-2 rounded-md bg-red-100 px-6 py-2 font-bold text-red-600 border border-red-200 shadow-sm">
+                            <AlertTriangle className="h-4 w-4" /> Account Blacklisted
+                        </span>
+                    ) : (
+                        <button
+                            onClick={async () => {
+                                const cnic = order.verification?.purchaser?.cnic_number || (order as any).dummyCustomer?.cnic_number || (order as any).cnic_number || (order as any).cnic;
+                                if (!cnic) {
+                                    toast.error('No CNIC found for this account — cannot blacklist.');
+                                    return;
+                                }
+                                const reason = window.prompt(`Reason for blacklisting account (${order.customer_name || 'Customer'}):`, '');
+                                if (reason === null) return;
+                                if (!reason.trim()) {
+                                    toast.error('A reason is required to blacklist an account.');
+                                    return;
+                                }
+
+                                try {
+                                    const token = Cookies.get('auth_token');
+                                    const res = await fetch(`${API_BASE}/api/accounts/blacklist/action`, {
+                                        method: 'POST',
+                                        headers: {
+                                            'Content-Type': 'application/json',
+                                            Authorization: `Bearer ${token}`
+                                        },
+                                        body: JSON.stringify({
+                                            cnic,
+                                            action: 'blacklist',
+                                            targetType: 'all',
+                                            verificationId: order.verification?.id,
+                                            reason: reason.trim()
+                                        })
+                                    });
+                                    const json = await res.json();
+                                    if (!res.ok || json.success === false) throw new Error(json.message || 'Failed to blacklist account');
+
+                                    toast.success(json.message || 'Account blacklisted successfully.');
+                                    setOrder((prev: any) => prev ? { ...prev, is_blacklisted: true } : prev);
+                                    setVerification((prev: any) => prev ? { ...prev, purchaser: { ...prev.purchaser, is_blacklisted: true } } : prev);
+                                } catch (e: any) {
+                                    console.error(e);
+                                    toast.error(e.message || 'Error blacklisting account');
+                                }
+                            }}
+                            className="inline-flex items-center gap-2 rounded-md bg-red-600 px-6 py-2 font-bold text-white hover:bg-red-700 shadow-md transition-colors"
+                        >
+                            <Ban className="h-4 w-4" /> Mark Blacklist
+                        </button>
+                    )
                 )}
             </div>
 
@@ -1048,7 +1104,21 @@ export default function OrderDetailsPage() {
             {/* Assignment Timeline Card (Spans full width) */}
             <div className="mt-8 rounded-lg border border-stroke bg-white shadow-default dark:border-dark-3 dark:bg-gray-800 p-6">
                 <div className="flex items-center justify-between border-b pb-4 mb-6">
-                    <h3 className="text-xl font-bold dark:text-white">Assignment Timeline</h3>
+                    <div className="flex items-center gap-3">
+                        <h3 className="text-xl font-bold dark:text-white">Assignment Timeline</h3>
+                        {order.channel === 'legacy_import' && (user?.role === 'Super Admin' || user?.role === 'Admin') && (
+                            <button
+                                onClick={() => setEditTimelineModalOpen(true)}
+                                className="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg hover:bg-amber-100 dark:hover:bg-amber-900/40 transition-colors"
+                                title="Edit Assignment Timeline Dates & Events"
+                            >
+                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                </svg>
+                                Edit Timeline
+                            </button>
+                        )}
+                    </div>
                     <button
                         onClick={() => setIsAssignmentTimelineCollapsed(!isAssignmentTimelineCollapsed)}
                         className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-dark-2 transition-colors"
@@ -1203,7 +1273,21 @@ export default function OrderDetailsPage() {
             {order.statusHistories && order.statusHistories.length > 0 && (
                 <div className="mt-8 rounded-lg border border-stroke bg-white shadow-default dark:border-dark-3 dark:bg-gray-800 p-6">
                     <div className="flex items-center justify-between border-b pb-4 mb-6">
-                        <h3 className="text-xl font-bold dark:text-white">Order Status Timeline</h3>
+                        <div className="flex items-center gap-3">
+                            <h3 className="text-xl font-bold dark:text-white">Order Status Timeline</h3>
+                            {order.channel === 'legacy_import' && (user?.role === 'Super Admin' || user?.role === 'Admin') && (
+                                <button
+                                    onClick={() => setEditTimelineModalOpen(true)}
+                                    className="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-bold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg hover:bg-purple-100 dark:hover:bg-purple-900/40 transition-colors"
+                                    title="Edit Order Status Timeline Dates & Statuses"
+                                >
+                                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                    </svg>
+                                    Edit Statuses & Dates
+                                </button>
+                            )}
+                        </div>
                         <button
                             onClick={() => setIsStatusTimelineCollapsed(!isStatusTimelineCollapsed)}
                             className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-dark-2 transition-colors"

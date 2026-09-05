@@ -80,7 +80,7 @@ const BlacklistedCustomerList = () => {
       toast.error('This customer has no CNIC on file — cannot whitelist.')
       return
     }
-    const reason = window.prompt(`Reason for whitelisting ${customerGroup.customer.name}:`, '')
+    const reason = window.prompt(`Reason for whitelisting ${customerGroup.customer.name} and all linked guarantors:`, '')
     if (reason === null) return // cancelled
     if (!reason.trim()) {
       toast.error('A reason is required to whitelist a customer.')
@@ -90,18 +90,25 @@ const BlacklistedCustomerList = () => {
     setWhitelistingCnic(cnic)
     try {
       const token = Cookies.get('auth_token')
+      const verificationId = customerGroup.orders?.[0]?.verification?.id
       const res = await fetch(`${BACKEND_URL}/api/accounts/blacklist/action`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ cnic, action: 'whitelist', reason: reason.trim() }),
+        body: JSON.stringify({
+          cnic,
+          action: 'whitelist',
+          targetType: 'all',
+          verificationId,
+          reason: reason.trim()
+        }),
       })
       const json = await res.json()
       if (!res.ok || json.success === false) throw new Error(json.message || 'Failed to whitelist customer')
 
-      toast.success(json.message || 'Customer whitelisted.')
+      toast.success(json.message || 'Customer and guarantors whitelisted.')
       setCustomers(prev => prev.filter(c => c.customer.cnic_number !== cnic))
     } catch (err: any) {
       console.error(err)

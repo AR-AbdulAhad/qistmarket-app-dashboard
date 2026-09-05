@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Search, User, FileText, ClipboardList, Loader2, X, Hash, MapPin, Phone, ArrowRight, UserCheck, ExternalLink, PartyPopper } from "lucide-react";
+import { Search, User, FileText, ClipboardList, Loader2, X, Hash, MapPin, Phone, ArrowRight, UserCheck, ExternalLink, PartyPopper, Ban, ShieldCheck } from "lucide-react";
 import Cookies from "js-cookie";
+import toast from "react-hot-toast";
 import { useProfileModal } from "../../../contexts/ProfileModalContext";
 
 const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
@@ -276,6 +277,54 @@ function ResultItem({ item, openProfile, setIsOpen }: any) {
                                 href={`/convert-sale/${item.id}`}
                             />
                         )}
+                        {!isBlacklisted && (
+                            <ActionIconButton 
+                                icon={<Ban size={16} />} 
+                                label="Mark Blacklist"
+                                color="red"
+                                onClick={async () => {
+                                    const cnic = item.verification?.purchaser?.cnic_number || item.cnic_number || item.cnic;
+                                    if (!cnic) {
+                                        toast.error("No CNIC on file — cannot blacklist.");
+                                        return;
+                                    }
+                                    const reason = window.prompt(`Reason for blacklisting ${item.verification?.purchaser?.name || item.customer_name}:`, "");
+                                    if (reason === null) return;
+                                    if (!reason.trim()) {
+                                        toast.error("A reason is required to blacklist.");
+                                        return;
+                                    }
+
+                                    try {
+                                        const token = Cookies.get("auth_token");
+                                        const res = await fetch(`${API_BASE}/api/accounts/blacklist/action`, {
+                                            method: "POST",
+                                            headers: {
+                                                "Content-Type": "application/json",
+                                                Authorization: `Bearer ${token}`,
+                                            },
+                                            body: JSON.stringify({
+                                                cnic,
+                                                action: "blacklist",
+                                                targetType: "all",
+                                                verificationId: item.verification?.id,
+                                                reason: reason.trim(),
+                                            }),
+                                        });
+                                        const json = await res.json();
+                                        if (!res.ok || json.success === false) throw new Error(json.message || "Failed to blacklist account");
+
+                                        toast.success(json.message || "Account blacklisted successfully.");
+                                        item.is_blacklisted = true;
+                                        if (item.verification?.purchaser) item.verification.purchaser.is_blacklisted = true;
+                                        setIsOpen(false);
+                                    } catch (err: any) {
+                                        console.error(err);
+                                        toast.error(err.message || "Failed to blacklist account");
+                                    }
+                                }}
+                            />
+                        )}
                     </div>
                 </div>
             </div>
@@ -299,6 +348,7 @@ function ActionIconButton({ icon, label, color, href, onClick }: any) {
         blue: 'text-blue-600 bg-blue-50 hover:bg-blue-600 dark:bg-blue-900/20 dark:text-blue-400 dark:hover:bg-blue-600',
         emerald: 'text-emerald-600 bg-emerald-50 hover:bg-emerald-600 dark:bg-emerald-900/20 dark:text-emerald-400 dark:hover:bg-emerald-600',
         indigo: 'text-indigo-600 bg-indigo-50 hover:bg-indigo-600 dark:bg-indigo-900/20 dark:text-indigo-400 dark:hover:bg-indigo-600',
+        red: 'text-red-600 bg-red-50 hover:bg-red-600 dark:bg-red-900/20 dark:text-red-400 dark:hover:bg-red-600',
     };
 
     const content = (

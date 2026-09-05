@@ -1,13 +1,15 @@
 'use client';
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
 import Cookies from "js-cookie";
 import toast from "react-hot-toast";
 import * as XLSX from 'xlsx';
 import Link from 'next/link';
-import { Upload, FileText, CheckCircle2, AlertCircle, Loader2, XCircle, Download, ArrowRight } from 'lucide-react';
+import { Upload, FileText, CheckCircle2, AlertCircle, Loader2, XCircle, Download, ArrowRight, ChevronDown } from 'lucide-react';
 import { useAuth } from "../../../../../contexts/AuthContext";
+
+type PayoffStatus = 'completed' | 'delivered';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
 
@@ -129,7 +131,6 @@ const FIELD_SECTIONS: { title: string; fields: string[] }[] = [
 ];
 
 type ImportResult = { row: number; success: boolean; order_id?: number; error?: string; reconciliation_warning?: string | null };
-type Officer = { id: number; full_name: string; username: string };
 
 function excelValueToIso(v: any): string | null {
   if (!v) return null;
@@ -159,40 +160,49 @@ export default function LegacyImportPage() {
   const { user } = useAuth();
   const isSuperAdmin = (user?.role || "").toLowerCase() === "super admin";
 
+  const [payoffStatus, setPayoffStatus] = useState<PayoffStatus>('delivered');
   const [file, setFile] = useState<File | null>(null);
   const [rows, setRows] = useState<LegacyRow[]>([]);
   const [excludedRows, setExcludedRows] = useState<Set<number>>(new Set());
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
+  const [editingCell, setEditingCell] = useState<{ rowNum: number; field: string } | null>(null);
   const [parsing, setParsing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [results, setResults] = useState<ImportResult[] | null>(null);
-  const [officers, setOfficers] = useState<Officer[]>([]);
-  const [officersLoading, setOfficersLoading] = useState(true);
-  const [officerId, setOfficerId] = useState<string>('');
 
-  // These profiles need a real Verification/Delivery Officer on record — the
-  // importing Super Admin isn't a stand-in for that (an admin approving a
-  // batch isn't the same as an officer having verified/delivered it), so
-  // this is a required choice, not something defaulted silently.
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const token = Cookies.get('auth_token');
-        const res = await fetch(`${BACKEND_URL}/api/users/verification-officers`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.message || 'Failed to load officers');
-        setOfficers(data.data?.users || []);
-      } catch (err: any) {
-        console.error(err);
-        toast.error('Failed to load Verification Officers list');
-      } finally {
-        setOfficersLoading(false);
-      }
-    };
-    load();
-  }, []);
+  // Update a single cell value in the parsed rows
+  const updateCell = (rowNum: number, field: string, value: any) => {
+    setRows((prev) =>
+      prev.map((r) => {
+        if (r._rowNum !== rowNum) return r;
+        const updated = { ...r, [field]: value };
+        updated._issues = validateRow(updated as LegacyRow);
+        return updated as LegacyRow;
+      })
+    );
+  };
+
+  // Editable cell component for the preview table
+  const EditableCell = ({ rowNum, field, value, className }: { rowNum: number; field: string; value: any; className?: string }) => {
+    const isEditing = editingCell?.rowNum === rowNum && editingCell?.field === field;
+    return isEditing ? (
+      <input
+        autoFocus
+        defaultValue={value ?? ''}
+        onBlur={(e) => { updateCell(rowNum, field, e.target.value); setEditingCell(null); }}
+        onKeyDown={(e) => { if (e.key === 'Enter') { updateCell(rowNum, (e.target as HTMLInputElement).name || field, (e.target as HTMLInputElement).value); setEditingCell(null); } if (e.key === 'Escape') setEditingCell(null); }}
+        className={`w-full min-w-[80px] border border-red-400 rounded px-1 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-red-500 bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-100 ${className ?? ''}`}
+      />
+    ) : (
+      <span
+        title="Click to edit"
+        onClick={() => setEditingCell({ rowNum, field })}
+        className={`cursor-pointer hover:bg-red-50 dark:hover:bg-red-900/20 rounded px-0.5 block min-w-[40px] ${className ?? ''}`}
+      >
+        {value !== undefined && value !== null && value !== '' ? String(value) : <span className="text-gray-300 dark:text-gray-600 italic text-[10px]">click to edit</span>}
+      </span>
+    );
+  };
 
   const downloadDemoSheet = () => {
     try {
@@ -364,10 +374,6 @@ export default function LegacyImportPage() {
       toast.error('No rows selected to import');
       return;
     }
-    if (!officerId) {
-      toast.error('Pick a Verification Officer to attribute these profiles to first');
-      return;
-    }
     setSubmitting(true);
     setResults(null);
     try {
@@ -376,8 +382,8 @@ export default function LegacyImportPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
+          payoffStatus,
           rows: includedRows.map(({ _rowNum, _issues, ...rest }) => rest),
-          officer_id: officerId,
         }),
       });
       const data = await res.json();
@@ -432,6 +438,33 @@ export default function LegacyImportPage() {
           </div>
         </div>
 
+        {/* ── Payoff Status Dropdown ─────────────────────────────────── */}
+        <div className="mb-6">
+          <label className="block text-sm font-bold text-gray-700 dark:text-gray-200 mb-2">
+            Import Mode
+          </label>
+          <div className="relative inline-flex">
+            <select
+              id="payoff-status-select"
+              value={payoffStatus}
+              onChange={(e) => setPayoffStatus(e.target.value as PayoffStatus)}
+              className="appearance-none cursor-pointer pr-10 pl-4 py-2.5 rounded-xl border-2 font-semibold text-sm transition focus:outline-none focus:ring-2 focus:ring-red-400
+                bg-white dark:bg-gray-800
+                border-gray-200 dark:border-gray-700
+                text-gray-800 dark:text-gray-100"
+            >
+              <option value="delivered">📦 Delivered — Installments still running</option>
+              <option value="completed">✅ Completed — All installments fully paid</option>
+            </select>
+            <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          </div>
+          <p className="mt-2 text-xs text-gray-400 max-w-xl">
+            {payoffStatus === 'completed'
+              ? '✅ Completed: Every installment will be marked as paid regardless of PAY/remain columns — use this when the account is fully closed.'
+              : '📦 Delivered: Installment status is read from the sheet\'s PAY / remain columns — paid months are marked paid, remaining months stay pending.'}
+          </p>
+        </div>
+
         <p className="text-gray-500 dark:text-gray-400 mb-6 font-medium text-sm">
           Each row becomes a full customer profile — order, customer, purchaser + both guarantors&apos; full
           profiles (address, employer/business info, relationship), and installment history — the same shape
@@ -440,29 +473,6 @@ export default function LegacyImportPage() {
           column is optional — fill in whatever the source records have, leave the rest blank. Only photos
           and GPS location can&apos;t come from a spreadsheet, so every imported profile is queued under{' '}
           <strong>Pending Legacy Profiles</strong> for staff to add those.
-        </p>
-
-        <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center mb-6">
-          <label className="text-sm font-bold text-gray-700 dark:text-gray-200">Attribute these profiles to:</label>
-          <select
-            value={officerId}
-            onChange={(e) => setOfficerId(e.target.value)}
-            disabled={officersLoading}
-            className={`rounded-xl border bg-white dark:bg-gray-800 px-4 py-2 text-sm font-medium disabled:opacity-50 min-w-[260px] ${!officerId ? 'border-red-400 dark:border-red-500' : 'border-gray-200 dark:border-gray-700'}`}
-          >
-            <option value="">
-              {officersLoading ? 'Loading officers…' : officers.length === 0 ? 'No active Verification Officers found' : 'Select a Verification Officer…'}
-            </option>
-            {officers.map((o) => (
-              <option key={o.id} value={o.id}>{o.full_name} (@{o.username})</option>
-            ))}
-          </select>
-        </div>
-        <p className="text-xs text-gray-400 mb-6">
-          Every imported profile&apos;s Verification Officer, Delivery Officer, and (where there&apos;s still a
-          balance due) Recovery Officer fields are set to whoever you pick here — never to your own admin
-          account, since an admin approving a batch isn&apos;t the same as an officer having verified or
-          delivered it.
         </p>
 
         <div
@@ -485,11 +495,9 @@ export default function LegacyImportPage() {
         </div>
 
         <p className="text-xs text-gray-400 mb-6">
-          Every row is imported as an already-delivered sale — the full order gets built (delivery,
-          installment ledger, 1Bill/SmartPay numbers, and the same Assignment/Status timeline a normal
-          order accumulates). Whether an account still has installments due or is fully paid off isn&apos;t a
-          choice you make here — it&apos;s read straight from the sheet&apos;s ADVANCE/INSTALLMENT/PAY/remain
-          columns, exactly like it would be for any other order.
+          {payoffStatus === 'completed'
+            ? 'Every row will be imported as a fully-completed account — all installments marked paid. PAY/remain columns are ignored.'
+            : 'Every row is imported as a delivered sale — the full order gets built and installment status is read straight from the sheet\'s ADVANCE/INSTALLMENT/PAY/remain columns.'}
         </p>
 
         {parsing && <p className="text-sm text-gray-500 flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Parsing file…</p>}
@@ -498,17 +506,26 @@ export default function LegacyImportPage() {
       {rows.length > 0 && (
         <div className="bg-white dark:bg-gray-dark rounded-2xl shadow-sm p-8 mb-8">
           <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-            <h4 className="text-xl font-bold text-gray-800 dark:text-white">
-              Preview — {rows.length} row(s), {includedRows.length} selected for import
-            </h4>
+            <div>
+              <h4 className="text-xl font-bold text-gray-800 dark:text-white">
+                Preview — {rows.length} row(s), {includedRows.length} selected for import
+              </h4>
+              <span className={`inline-flex items-center gap-1.5 mt-1 text-xs font-semibold px-2.5 py-1 rounded-full ${
+                payoffStatus === 'completed'
+                  ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                  : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+              }`}>
+                {payoffStatus === 'completed' ? '✅ Completed — All installments paid' : '📦 Delivered — Installments ongoing'}
+              </span>
+            </div>
             {rows.some((r) => r._issues.length > 0) && (
               <p className="text-xs text-amber-600 flex items-center gap-1"><AlertCircle className="w-4 h-4" /> Rows with issues are unchecked by default — review before including them.</p>
             )}
           </div>
           <p className="text-xs text-gray-400 mb-3">
-            The table below shows the core fields. Click <strong>Details</strong> on any row to see every
-            single field that was read from the sheet for it — employer/business info, full addresses,
-            both guarantors&apos; complete profiles — before you import.
+            The table below shows the core fields. <strong>Click any cell to edit it inline</strong> before importing.
+            Click <strong>View all fields</strong> on any row to see every field read from the sheet — employer/business info, full addresses,
+            and both guarantors&apos; complete profiles.
           </p>
           <div className="max-h-[420px] overflow-auto rounded-xl border border-gray-100 dark:border-gray-800">
             <table className="w-full text-left text-xs">
@@ -562,29 +579,79 @@ export default function LegacyImportPage() {
                             {isExpanded ? 'Hide' : 'View all fields'}
                           </button>
                         </td>
-                        <td className="py-2 px-3 text-gray-500 dark:text-gray-400">{r.bill_id}</td>
-                        <td className="py-2 px-3 font-medium text-gray-700 dark:text-gray-200">{r.purchaser_name}</td>
-                        <td className="py-2 px-3 text-gray-700 dark:text-gray-200">{r.purchaser_cnic}</td>
-                        <td className="py-2 px-3 text-gray-700 dark:text-gray-200">{r.purchaser_phone}</td>
-                        <td className="py-2 px-3 text-gray-700 dark:text-gray-200">{r.item_model}</td>
-                        <td className="py-2 px-3 text-gray-700 dark:text-gray-200">{r.serial}</td>
-                        <td className="py-2 px-3 text-gray-700 dark:text-gray-200">{r.tenure_months}</td>
-                        <td className="py-2 px-3 text-gray-700 dark:text-gray-200">{r.item_price}</td>
-                        <td className="py-2 px-3 text-gray-700 dark:text-gray-200">{r.advance}</td>
-                        <td className="py-2 px-3 text-gray-700 dark:text-gray-200">{r.installment}</td>
-                        <td className="py-2 px-3 text-gray-700 dark:text-gray-200 bg-red-50/50 dark:bg-red-900/5">{r.grantor1_name}</td>
-                        <td className="py-2 px-3 text-gray-700 dark:text-gray-200 bg-red-50/50 dark:bg-red-900/5">{r.grantor1_cnic}</td>
-                        <td className="py-2 px-3 text-gray-700 dark:text-gray-200 bg-red-50/50 dark:bg-red-900/5">{r.grantor1_phone}</td>
-                        <td className="py-2 px-3 text-gray-700 dark:text-gray-200 bg-red-50/50 dark:bg-red-900/5">{r.grantor1_relationship}</td>
-                        <td className="py-2 px-3 text-gray-700 dark:text-gray-200 bg-red-50/50 dark:bg-red-900/5">{r.grantor2_name}</td>
-                        <td className="py-2 px-3 text-gray-700 dark:text-gray-200 bg-red-50/50 dark:bg-red-900/5">{r.grantor2_cnic}</td>
-                        <td className="py-2 px-3 text-gray-700 dark:text-gray-200 bg-red-50/50 dark:bg-red-900/5">{r.grantor2_phone}</td>
-                        <td className="py-2 px-3 text-gray-700 dark:text-gray-200 bg-red-50/50 dark:bg-red-900/5">{r.grantor2_relationship}</td>
-                        <td className="py-2 px-3 text-gray-700 dark:text-gray-200">{r.pay1}{r.pay1 && r.pay1_date && <span className="text-gray-400"> ({shortDate(r.pay1_date)})</span>}</td>
-                        <td className="py-2 px-3 text-gray-700 dark:text-gray-200">{r.pay2}{r.pay2 && r.pay2_date && <span className="text-gray-400"> ({shortDate(r.pay2_date)})</span>}</td>
-                        <td className="py-2 px-3 text-gray-700 dark:text-gray-200">{r.pay3}{r.pay3 && r.pay3_date && <span className="text-gray-400"> ({shortDate(r.pay3_date)})</span>}</td>
-                        <td className="py-2 px-3 text-gray-700 dark:text-gray-200">{r.pay4}{r.pay4 && r.pay4_date && <span className="text-gray-400"> ({shortDate(r.pay4_date)})</span>}</td>
-                        <td className="py-2 px-3 text-gray-700 dark:text-gray-200">{r.remain}</td>
+                        <td className="py-2 px-3 text-gray-500 dark:text-gray-400">
+                          <EditableCell rowNum={r._rowNum} field="bill_id" value={r.bill_id} />
+                        </td>
+                        <td className="py-2 px-3 font-medium text-gray-700 dark:text-gray-200">
+                          <EditableCell rowNum={r._rowNum} field="purchaser_name" value={r.purchaser_name} />
+                        </td>
+                        <td className="py-2 px-3 text-gray-700 dark:text-gray-200">
+                          <EditableCell rowNum={r._rowNum} field="purchaser_cnic" value={r.purchaser_cnic} />
+                        </td>
+                        <td className="py-2 px-3 text-gray-700 dark:text-gray-200">
+                          <EditableCell rowNum={r._rowNum} field="purchaser_phone" value={r.purchaser_phone} />
+                        </td>
+                        <td className="py-2 px-3 text-gray-700 dark:text-gray-200">
+                          <EditableCell rowNum={r._rowNum} field="item_model" value={r.item_model} />
+                        </td>
+                        <td className="py-2 px-3 text-gray-700 dark:text-gray-200">
+                          <EditableCell rowNum={r._rowNum} field="serial" value={r.serial} />
+                        </td>
+                        <td className="py-2 px-3 text-gray-700 dark:text-gray-200">
+                          <EditableCell rowNum={r._rowNum} field="tenure_months" value={r.tenure_months} />
+                        </td>
+                        <td className="py-2 px-3 text-gray-700 dark:text-gray-200">
+                          <EditableCell rowNum={r._rowNum} field="item_price" value={r.item_price} />
+                        </td>
+                        <td className="py-2 px-3 text-gray-700 dark:text-gray-200">
+                          <EditableCell rowNum={r._rowNum} field="advance" value={r.advance} />
+                        </td>
+                        <td className="py-2 px-3 text-gray-700 dark:text-gray-200">
+                          <EditableCell rowNum={r._rowNum} field="installment" value={r.installment} />
+                        </td>
+                        <td className="py-2 px-3 text-gray-700 dark:text-gray-200 bg-red-50/50 dark:bg-red-900/5">
+                          <EditableCell rowNum={r._rowNum} field="grantor1_name" value={r.grantor1_name} />
+                        </td>
+                        <td className="py-2 px-3 text-gray-700 dark:text-gray-200 bg-red-50/50 dark:bg-red-900/5">
+                          <EditableCell rowNum={r._rowNum} field="grantor1_cnic" value={r.grantor1_cnic} />
+                        </td>
+                        <td className="py-2 px-3 text-gray-700 dark:text-gray-200 bg-red-50/50 dark:bg-red-900/5">
+                          <EditableCell rowNum={r._rowNum} field="grantor1_phone" value={r.grantor1_phone} />
+                        </td>
+                        <td className="py-2 px-3 text-gray-700 dark:text-gray-200 bg-red-50/50 dark:bg-red-900/5">
+                          <EditableCell rowNum={r._rowNum} field="grantor1_relationship" value={r.grantor1_relationship} />
+                        </td>
+                        <td className="py-2 px-3 text-gray-700 dark:text-gray-200 bg-red-50/50 dark:bg-red-900/5">
+                          <EditableCell rowNum={r._rowNum} field="grantor2_name" value={r.grantor2_name} />
+                        </td>
+                        <td className="py-2 px-3 text-gray-700 dark:text-gray-200 bg-red-50/50 dark:bg-red-900/5">
+                          <EditableCell rowNum={r._rowNum} field="grantor2_cnic" value={r.grantor2_cnic} />
+                        </td>
+                        <td className="py-2 px-3 text-gray-700 dark:text-gray-200 bg-red-50/50 dark:bg-red-900/5">
+                          <EditableCell rowNum={r._rowNum} field="grantor2_phone" value={r.grantor2_phone} />
+                        </td>
+                        <td className="py-2 px-3 text-gray-700 dark:text-gray-200 bg-red-50/50 dark:bg-red-900/5">
+                          <EditableCell rowNum={r._rowNum} field="grantor2_relationship" value={r.grantor2_relationship} />
+                        </td>
+                        <td className="py-2 px-3 text-gray-700 dark:text-gray-200">
+                          <EditableCell rowNum={r._rowNum} field="pay1" value={r.pay1} />
+                          {r.pay1 && r.pay1_date && <span className="text-gray-400 text-[10px]"> ({shortDate(r.pay1_date)})</span>}
+                        </td>
+                        <td className="py-2 px-3 text-gray-700 dark:text-gray-200">
+                          <EditableCell rowNum={r._rowNum} field="pay2" value={r.pay2} />
+                          {r.pay2 && r.pay2_date && <span className="text-gray-400 text-[10px]"> ({shortDate(r.pay2_date)})</span>}
+                        </td>
+                        <td className="py-2 px-3 text-gray-700 dark:text-gray-200">
+                          <EditableCell rowNum={r._rowNum} field="pay3" value={r.pay3} />
+                          {r.pay3 && r.pay3_date && <span className="text-gray-400 text-[10px]"> ({shortDate(r.pay3_date)})</span>}
+                        </td>
+                        <td className="py-2 px-3 text-gray-700 dark:text-gray-200">
+                          <EditableCell rowNum={r._rowNum} field="pay4" value={r.pay4} />
+                          {r.pay4 && r.pay4_date && <span className="text-gray-400 text-[10px]"> ({shortDate(r.pay4_date)})</span>}
+                        </td>
+                        <td className="py-2 px-3 text-gray-700 dark:text-gray-200">
+                          <EditableCell rowNum={r._rowNum} field="remain" value={r.remain} />
+                        </td>
                         <td className="py-2 px-3 text-red-600">{r._issues.join(', ')}</td>
                       </tr>
                       {isExpanded && (
@@ -627,15 +694,9 @@ export default function LegacyImportPage() {
             </table>
           </div>
 
-          {!officerId && (
-            <p className="mt-4 text-sm font-semibold text-amber-600 flex items-center gap-1.5">
-              <AlertCircle className="w-4 h-4" /> Select a Verification Officer above (under &quot;Attribute these profiles to&quot;) before importing — the button stays disabled until then.
-            </p>
-          )}
-
           <button
             onClick={handleSubmit}
-            disabled={submitting || includedRows.length === 0 || !officerId}
+            disabled={submitting || includedRows.length === 0}
             className="mt-4 w-full flex items-center justify-center gap-3 bg-red-600 text-white py-4 rounded-xl hover:bg-red-700 transition font-bold disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {submitting ? (
