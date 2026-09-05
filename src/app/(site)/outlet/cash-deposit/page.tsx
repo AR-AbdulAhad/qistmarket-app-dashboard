@@ -515,7 +515,7 @@ export default function CashDepositPage() {
                                                                         <button onClick={() => copyText(dep.consumer_number!)} className="text-xs text-primary hover:underline">Copy</button>
                                                                     </div>
                                                                 )}
-                                                                {dep.payment_method === 'qr_payment' && dep.qr_image_base64 && (
+                                                                {dep.payment_method === 'qr_payment' && dep.qr_image_base64 && dep.status === 'pending' && (
                                                                     <img src={dep.qr_image_base64} alt="QR" className="h-40 w-40" />
                                                                 )}
                                                                 {dep.status === 'pending' && dep.expires_at && (

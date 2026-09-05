@@ -17,6 +17,7 @@ interface InventoryReportTabProps {
 export default function InventoryReportTab({ token, startDate, endDate, searchQuery }: InventoryReportTabProps) {
     const [loading, setLoading] = useState(true);
     const [data, setData] = useState<any[]>([]);
+    const [expandedProduct, setExpandedProduct] = useState<string | null>(null);
     const printRef = useRef(null);
 
     useEffect(() => {
@@ -55,7 +56,8 @@ export default function InventoryReportTab({ token, startDate, endDate, searchQu
             "Total In Stock": item.inStock,
             "Sold": item.sold,
             "Total Movement": item.total,
-            "Total Valuation": item.valuation
+            "Total Valuation": item.valuation,
+            "Serial Numbers": Array.isArray(item.serials) ? item.serials.join(", ") : ""
         }));
         const ws = XLSX.utils.json_to_sheet(rows);
         const wb = XLSX.utils.book_new();
@@ -63,9 +65,16 @@ export default function InventoryReportTab({ token, startDate, endDate, searchQu
         XLSX.writeFile(wb, "Inventory_Report.xlsx");
     };
 
-    const filteredData = data.filter((item: any) => 
-        item.product?.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    const filteredData = data
+        .filter((item: any) => item.product?.toLowerCase().includes(searchQuery.toLowerCase()))
+        // Items currently in stock float to the top (highest stock first); items
+        // with none in stock sink to the bottom, instead of appearing in whatever
+        // order the database happened to return them in.
+        .sort((a: any, b: any) => {
+            if ((b.inStock || 0) === 0 && (a.inStock || 0) > 0) return -1;
+            if ((a.inStock || 0) === 0 && (b.inStock || 0) > 0) return 1;
+            return (b.inStock || 0) - (a.inStock || 0);
+        });
 
     const totalStockValuation = filteredData.reduce((acc: number, item: any) => acc + (item.valuation || 0), 0);
     const totalItemsInStock = filteredData.reduce((acc: number, item: any) => acc + (item.inStock || 0), 0);
@@ -117,25 +126,60 @@ export default function InventoryReportTab({ token, startDate, endDate, searchQu
                         <table className="w-full text-left text-sm text-gray-600 dark:text-gray-400">
                             <thead className="bg-gray-50 text-gray-800 dark:bg-gray-900/50 dark:text-white">
                                 <tr>
+                                    <th className="px-4 py-3 font-medium print:hidden" />
                                     <th className="px-4 py-3 font-medium">Product Name</th>
                                     <th className="px-4 py-3 font-medium">Currently In Stock</th>
                                     <th className="px-4 py-3 font-medium">Sold</th>
                                     <th className="px-4 py-3 font-medium">Total Movement</th>
                                     <th className="px-4 py-3 font-medium">Calculated Valuation</th>
+                                    <th className="px-4 py-3 font-medium print:hidden">Serial Numbers</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-                                {filteredData.length > 0 ? filteredData.map((item: any, idx: number) => (
-                                    <tr key={idx} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                                        <td className="px-4 py-3 font-medium text-gray-800 dark:text-white">{item.product}</td>
-                                        <td className="px-4 py-3 font-medium text-green-600">{item.inStock}</td>
-                                        <td className="px-4 py-3 font-medium text-blue-600">{item.sold}</td>
-                                        <td className="px-4 py-3">{item.total}</td>
-                                        <td className="px-4 py-3">Rs {item.valuation?.toLocaleString()}</td>
-                                    </tr>
-                                )) : (
+                                {filteredData.length > 0 ? filteredData.map((item: any, idx: number) => {
+                                    const serials: string[] = Array.isArray(item.serials) ? item.serials : [];
+                                    const isExpanded = expandedProduct === item.product;
+                                    return (
+                                        <React.Fragment key={idx}>
+                                            <tr className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                                                <td className="px-4 py-3 print:hidden" />
+                                                <td className="px-4 py-3 font-medium text-gray-800 dark:text-white">{item.product}</td>
+                                                <td className="px-4 py-3 font-medium text-green-600">{item.inStock}</td>
+                                                <td className="px-4 py-3 font-medium text-blue-600">{item.sold}</td>
+                                                <td className="px-4 py-3">{item.total}</td>
+                                                <td className="px-4 py-3">Rs {item.valuation?.toLocaleString()}</td>
+                                                <td className="px-4 py-3 print:hidden">
+                                                    {serials.length > 0 ? (
+                                                        <button
+                                                            onClick={() => setExpandedProduct(isExpanded ? null : item.product)}
+                                                            className="text-primary hover:underline text-xs font-medium"
+                                                        >
+                                                            {isExpanded ? "Hide" : `${serials.length} serial${serials.length > 1 ? "s" : ""}`}
+                                                        </button>
+                                                    ) : (
+                                                        <span className="text-gray-400 text-xs">—</span>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                            {isExpanded && serials.length > 0 && (
+                                                <tr className="bg-gray-50 dark:bg-gray-900/30">
+                                                    <td />
+                                                    <td colSpan={6} className="px-4 py-3">
+                                                        <div className="flex flex-wrap gap-2">
+                                                            {serials.map((s) => (
+                                                                <span key={s} className="rounded-md border border-gray-200 bg-white px-2 py-1 font-mono text-xs text-gray-700 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200">
+                                                                    {s}
+                                                                </span>
+                                                            ))}
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            )}
+                                        </React.Fragment>
+                                    );
+                                }) : (
                                     <tr>
-                                        <td colSpan={5} className="px-4 py-8 text-center text-gray-500">No inventory data found.</td>
+                                        <td colSpan={7} className="px-4 py-8 text-center text-gray-500">No inventory data found.</td>
                                     </tr>
                                 )}
                             </tbody>

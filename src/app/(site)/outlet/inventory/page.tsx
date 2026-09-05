@@ -37,6 +37,7 @@ type GroupedItem = {
     category: string;
     color_variant?: string;
     purchase_price: number;
+    stockValue: number;   // true sum of purchase_price×quantity across in-stock children
     totalQty: number;     // sum of all child quantities
     inStockQty: number;
     children: InventoryItem[];
@@ -155,6 +156,7 @@ export default function OutletInventoryPage() {
                     category: item.category,
                     color_variant: undefined, // Multiple variants might exist
                     purchase_price: item.purchase_price,
+                    stockValue: 0,
                     totalQty: 0,
                     inStockQty: 0,
                     children: [],
@@ -162,7 +164,14 @@ export default function OutletInventoryPage() {
             }
             const grp = map.get(key)!;
             grp.totalQty += item.quantity;
-            if (item.status === "In Stock" || item.status === "Used Stock") grp.inStockQty += item.quantity;
+            // Sum each unit's actual purchase price rather than assuming every unit
+            // of this product/variant cost the same as the first one seen — units
+            // bought in different batches can have different prices, and using a
+            // single representative price × qty was under/over-stating stock value.
+            if (item.status === "In Stock" || item.status === "Used Stock") {
+                grp.inStockQty += item.quantity;
+                grp.stockValue += item.quantity * (item.purchase_price || 0);
+            }
             grp.children.push(item);
         }
 
@@ -521,10 +530,12 @@ export default function OutletInventoryPage() {
                                                     </span>
                                                 </td>
                                                 <td className="px-4 py-4" onClick={() => toggleExpand(grp.key)}>
-                                                    <span className="font-medium text-gray-700 dark:text-gray-200">PKR {grp.purchase_price?.toLocaleString() || 0}</span>
+                                                    <span className="font-medium text-gray-700 dark:text-gray-200">
+                                                        PKR {(grp.inStockQty > 0 ? Math.round(grp.stockValue / grp.inStockQty) : grp.purchase_price || 0).toLocaleString()}
+                                                    </span>
                                                 </td>
                                                 <td className="px-4 py-4" onClick={() => toggleExpand(grp.key)}>
-                                                    <span className="font-bold text-amber-600 dark:text-amber-400">PKR {(grp.inStockQty * (grp.purchase_price || 0)).toLocaleString()}</span>
+                                                    <span className="font-bold text-amber-600 dark:text-amber-400">PKR {grp.stockValue.toLocaleString()}</span>
                                                 </td>
                                                 <td className="px-4 py-4 text-center">
                                                     <div className="flex items-center justify-center gap-3">
