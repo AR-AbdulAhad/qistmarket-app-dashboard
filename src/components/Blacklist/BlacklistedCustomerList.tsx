@@ -208,19 +208,19 @@ const BlacklistedCustomerList = () => {
     },
   ]
 
-  const table = useReactTable({
-    data: customers,
-    columns,
-    getCoreRowModel: getCoreRowModel(),
-  })
-
   const filteredData = globalFilter
     ? customers.filter(c =>
-      c.customer.name.toLowerCase().includes(globalFilter.toLowerCase()) ||
-      c.customer.whatsapp_number.includes(globalFilter) ||
+      (c.customer.name || '').toLowerCase().includes(globalFilter.toLowerCase()) ||
+      (c.customer.whatsapp_number || '').includes(globalFilter) ||
       (c.customer.cnic_number && c.customer.cnic_number.includes(globalFilter))
     )
     : customers;
+
+  const table = useReactTable({
+    data: filteredData,
+    columns,
+    getCoreRowModel: getCoreRowModel(),
+  })
 
   return (
     <section className="rounded-[2.5rem] bg-white p-8">

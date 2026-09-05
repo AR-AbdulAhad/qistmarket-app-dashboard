@@ -46,8 +46,10 @@ const COLUMNS = [
   'grantor2_office_address', 'grantor2_company_name', 'grantor2_years_in_company', 'grantor2_monthly_income',
   'grantor2_business_name', 'grantor2_established_since', 'grantor2_business_address', 'grantor2_net_income',
   'grantor2_full_residential_address', 'grantor2_nearest_location',
-  // Payment history
-  'pay1', 'pay2', 'pay3', 'pay4', 'remain',
+  // Payment history — each PAY column paired with the date it was actually
+  // collected, so the installment ledger shows real payment dates and exact
+  // (possibly uneven) amounts instead of an assumed on-schedule full payment.
+  'pay1', 'pay1_date', 'pay2', 'pay2_date', 'pay3', 'pay3_date', 'pay4', 'pay4_date', 'remain',
 ] as const;
 
 type LegacyRow = Record<(typeof COLUMNS)[number], any> & { _rowNum: number; _issues: string[] };
@@ -70,7 +72,8 @@ const FIELD_LABELS: Record<string, string> = {
   purchaser_nearest_location: 'Nearest Location',
   item_price: 'Item Price', item_model: 'Item Model', serial: 'Serial', tenure_months: 'Tenure',
   advance: 'Advance', installment: 'Installment',
-  pay1: 'Pay 1', pay2: 'Pay 2', pay3: 'Pay 3', pay4: 'Pay 4', remain: 'Remain',
+  pay1: 'Pay 1', pay1_date: 'Pay 1 Date', pay2: 'Pay 2', pay2_date: 'Pay 2 Date',
+  pay3: 'Pay 3', pay3_date: 'Pay 3 Date', pay4: 'Pay 4', pay4_date: 'Pay 4 Date', remain: 'Remain',
 };
 for (const n of [1, 2] as const) {
   Object.assign(FIELD_LABELS, {
@@ -122,7 +125,7 @@ const FIELD_SECTIONS: { title: string; fields: string[] }[] = [
       'grantor2_full_residential_address', 'grantor2_nearest_location',
     ],
   },
-  { title: 'Payment History', fields: ['pay1', 'pay2', 'pay3', 'pay4', 'remain'] },
+  { title: 'Payment History', fields: ['pay1', 'pay1_date', 'pay2', 'pay2_date', 'pay3', 'pay3_date', 'pay4', 'pay4_date', 'remain'] },
 ];
 
 type ImportResult = { row: number; success: boolean; order_id?: number; error?: string; reconciliation_warning?: string | null };
@@ -133,6 +136,12 @@ function excelValueToIso(v: any): string | null {
   if (v instanceof Date) return v.toISOString();
   const d = new Date(v);
   return isNaN(d.getTime()) ? null : d.toISOString();
+}
+
+function shortDate(iso: string | null | undefined): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return isNaN(d.getTime()) ? '' : d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
 }
 
 function validateRow(row: LegacyRow): string[] {
@@ -206,7 +215,7 @@ export default function LegacyImportPage() {
         'Guarantor 2 Office Address', 'Guarantor 2 Company Name', 'Guarantor 2 Years in Company', 'Guarantor 2 Monthly Income',
         'Guarantor 2 Business Name', 'Guarantor 2 Established Since', 'Guarantor 2 Business Address', 'Guarantor 2 Net Income',
         'Guarantor 2 Full Residential Address', 'Guarantor 2 Nearest Location',
-        'PAY 1', 'PAY 2', 'PAY 3', 'PAY 4', 'remain',
+        'PAY 1', 'PAY 1 DATE', 'PAY 2', 'PAY 2 DATE', 'PAY 3', 'PAY 3 DATE', 'PAY 4', 'PAY 4 DATE', 'remain',
       ];
 
       const sampleRows = [
@@ -231,7 +240,7 @@ export default function LegacyImportPage() {
           '', '', '', '',
           '', '', '', '',
           '', '',
-          4600, 4600, '', '', 46000,
+          4600, '10/07/2026', 4600, '12/08/2026', '', '', '', '', 46000,
         ],
         // Row 2: Fully paid off (completed) — sparser row, showing that most
         // fields are optional and left blank falls back cleanly.
@@ -254,7 +263,7 @@ export default function LegacyImportPage() {
           '', '', '', '',
           '', '', '', '',
           '', '',
-          6750, 6750, 6750, 6750, 0,
+          6750, '10/02/2026', 6750, '09/03/2026', 6750, '11/04/2026', 6750, '10/05/2026', 0,
         ],
       ];
 
@@ -287,7 +296,7 @@ export default function LegacyImportPage() {
             const row: any = { _rowNum: idx + 2 }; // +2 = 1-indexed + header row
             COLUMNS.forEach((col, i) => {
               let v = r[i];
-              if (col === 'order_date') v = excelValueToIso(v);
+              if (col === 'order_date' || col === 'pay1_date' || col === 'pay2_date' || col === 'pay3_date' || col === 'pay4_date') v = excelValueToIso(v);
               row[col] = v;
             });
             row._issues = validateRow(row);
@@ -439,7 +448,7 @@ export default function LegacyImportPage() {
             value={officerId}
             onChange={(e) => setOfficerId(e.target.value)}
             disabled={officersLoading}
-            className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-2 text-sm font-medium disabled:opacity-50 min-w-[260px]"
+            className={`rounded-xl border bg-white dark:bg-gray-800 px-4 py-2 text-sm font-medium disabled:opacity-50 min-w-[260px] ${!officerId ? 'border-red-400 dark:border-red-500' : 'border-gray-200 dark:border-gray-700'}`}
           >
             <option value="">
               {officersLoading ? 'Loading officers…' : officers.length === 0 ? 'No active Verification Officers found' : 'Select a Verification Officer…'}
@@ -526,10 +535,10 @@ export default function LegacyImportPage() {
                   <th className="py-2 px-3 bg-red-50 dark:bg-red-900/10">Guarantor 2 — CNIC</th>
                   <th className="py-2 px-3 bg-red-50 dark:bg-red-900/10">Guarantor 2 — Contact</th>
                   <th className="py-2 px-3 bg-red-50 dark:bg-red-900/10">Guarantor 2 — Relationship</th>
-                  <th className="py-2 px-3">Pay 1</th>
-                  <th className="py-2 px-3">Pay 2</th>
-                  <th className="py-2 px-3">Pay 3</th>
-                  <th className="py-2 px-3">Pay 4</th>
+                  <th className="py-2 px-3">Pay 1 (date)</th>
+                  <th className="py-2 px-3">Pay 2 (date)</th>
+                  <th className="py-2 px-3">Pay 3 (date)</th>
+                  <th className="py-2 px-3">Pay 4 (date)</th>
                   <th className="py-2 px-3">Remain</th>
                   <th className="py-2 px-3">Issues</th>
                 </tr>
@@ -571,10 +580,10 @@ export default function LegacyImportPage() {
                         <td className="py-2 px-3 text-gray-700 dark:text-gray-200 bg-red-50/50 dark:bg-red-900/5">{r.grantor2_cnic}</td>
                         <td className="py-2 px-3 text-gray-700 dark:text-gray-200 bg-red-50/50 dark:bg-red-900/5">{r.grantor2_phone}</td>
                         <td className="py-2 px-3 text-gray-700 dark:text-gray-200 bg-red-50/50 dark:bg-red-900/5">{r.grantor2_relationship}</td>
-                        <td className="py-2 px-3 text-gray-700 dark:text-gray-200">{r.pay1}</td>
-                        <td className="py-2 px-3 text-gray-700 dark:text-gray-200">{r.pay2}</td>
-                        <td className="py-2 px-3 text-gray-700 dark:text-gray-200">{r.pay3}</td>
-                        <td className="py-2 px-3 text-gray-700 dark:text-gray-200">{r.pay4}</td>
+                        <td className="py-2 px-3 text-gray-700 dark:text-gray-200">{r.pay1}{r.pay1 && r.pay1_date && <span className="text-gray-400"> ({shortDate(r.pay1_date)})</span>}</td>
+                        <td className="py-2 px-3 text-gray-700 dark:text-gray-200">{r.pay2}{r.pay2 && r.pay2_date && <span className="text-gray-400"> ({shortDate(r.pay2_date)})</span>}</td>
+                        <td className="py-2 px-3 text-gray-700 dark:text-gray-200">{r.pay3}{r.pay3 && r.pay3_date && <span className="text-gray-400"> ({shortDate(r.pay3_date)})</span>}</td>
+                        <td className="py-2 px-3 text-gray-700 dark:text-gray-200">{r.pay4}{r.pay4 && r.pay4_date && <span className="text-gray-400"> ({shortDate(r.pay4_date)})</span>}</td>
                         <td className="py-2 px-3 text-gray-700 dark:text-gray-200">{r.remain}</td>
                         <td className="py-2 px-3 text-red-600">{r._issues.join(', ')}</td>
                       </tr>
@@ -618,10 +627,16 @@ export default function LegacyImportPage() {
             </table>
           </div>
 
+          {!officerId && (
+            <p className="mt-4 text-sm font-semibold text-amber-600 flex items-center gap-1.5">
+              <AlertCircle className="w-4 h-4" /> Select a Verification Officer above (under &quot;Attribute these profiles to&quot;) before importing — the button stays disabled until then.
+            </p>
+          )}
+
           <button
             onClick={handleSubmit}
             disabled={submitting || includedRows.length === 0 || !officerId}
-            className="mt-6 w-full flex items-center justify-center gap-3 bg-red-600 text-white py-4 rounded-xl hover:bg-red-700 transition font-bold disabled:opacity-50"
+            className="mt-4 w-full flex items-center justify-center gap-3 bg-red-600 text-white py-4 rounded-xl hover:bg-red-700 transition font-bold disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {submitting ? (
               <><Loader2 className="w-6 h-6 animate-spin" /> <span>Importing…</span></>

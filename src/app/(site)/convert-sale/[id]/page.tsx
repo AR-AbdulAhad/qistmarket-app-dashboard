@@ -3,10 +3,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { use } from 'react';
 import { 
-  ShoppingBag, Search, ChevronDown, Check, X, Phone, User as UserIcon, MapPin, 
+  ShoppingBag, Search, ChevronDown, Check, X, Phone, User as UserIcon, MapPin,
   AlertCircle, Send, ShieldCheck, ArrowRight,
   ClipboardList, UserCheck, Camera,
-  TrendingUp, RotateCcw
+  TrendingUp, RotateCcw, Lock
 } from 'lucide-react';
 import toast from "react-hot-toast";
 import Cookies from "js-cookie";
@@ -485,11 +485,22 @@ const ConvertSalePage = ({ params }: { params: Promise<{ id: string }> }) => {
                    <p className="text-gray-400 text-sm font-medium leading-relaxed">Teeno ki tasdeeq lazmi hay. (Sequential Verification Required)</p>
                 </div>
                 <div className="w-full md:w-72">
-                   <label className="text-[10px] font-black text-gray-500 uppercase tracking-[0.3em] mb-2 block">Fulfillment Branch</label>
-                   <select name="outlet_id" value={orderData.outlet_id} onChange={handleOrderChange} className="w-full bg-white/5 border-2 border-white/10 rounded-xl px-4 py-3 outline-none focus:border-blue-500 text-white font-bold appearance-none bg-[right_1rem_center] bg-no-repeat text-sm transition-all" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")` }}>
-                      <option value="" className="text-gray-900">Select Outlet</option>
-                      {outlets?.map(o => <option key={o.id} value={o.id} className="text-gray-900">{o.name} ({o.code})</option>)}
-                   </select>
+                   <label className="text-[10px] font-black text-gray-500 uppercase tracking-[0.3em] mb-2 block flex items-center gap-1.5">Fulfillment Branch <Lock size={10} className="text-gray-500" /></label>
+                   {orderData.outlet_id ? (
+                     <>
+                       <div className="w-full bg-white/5 border-2 border-white/10 rounded-xl px-4 py-3 text-white font-bold text-sm flex items-center justify-between cursor-not-allowed opacity-80">
+                          <span>{outlets?.find(o => String(o.id) === String(orderData.outlet_id))?.name || 'Outlet'} {outlets?.find(o => String(o.id) === String(orderData.outlet_id))?.code ? `(${outlets.find(o => String(o.id) === String(orderData.outlet_id))?.code})` : ''}</span>
+                          <Lock size={14} className="text-gray-500" />
+                       </div>
+                       <input type="hidden" name="outlet_id" value={orderData.outlet_id} />
+                       <p className="text-[10px] text-gray-500 font-medium mt-1.5">Locked to the branch this account's product was originally issued from.</p>
+                     </>
+                   ) : (
+                     <select name="outlet_id" value={orderData.outlet_id} onChange={handleOrderChange} className="w-full bg-white/5 border-2 border-white/10 rounded-xl px-4 py-3 outline-none focus:border-blue-500 text-white font-bold appearance-none bg-[right_1rem_center] bg-no-repeat text-sm transition-all" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")` }}>
+                        <option value="" className="text-gray-900">Select Outlet</option>
+                        {outlets?.map(o => <option key={o.id} value={o.id} className="text-gray-900">{o.name} ({o.code})</option>)}
+                     </select>
+                   )}
                 </div>
               </div>
 
