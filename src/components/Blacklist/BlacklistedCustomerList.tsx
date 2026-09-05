@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Loader from '@/components/common/Loader'
 import {
   ColumnDef,
@@ -26,6 +26,7 @@ const fmt = (n: number) => `Rs. ${Number(n).toLocaleString()}`
 
 const BlacklistedCustomerList = () => {
   const [customers, setCustomers] = useState<CustomerGroup[]>([])
+  const [searchInput, setSearchInput] = useState('')
   const [globalFilter, setGlobalFilter] = useState('')
   const [loading, setLoading] = useState(false)
   const [whitelistingCnic, setWhitelistingCnic] = useState<string | null>(null)
@@ -58,6 +59,11 @@ const BlacklistedCustomerList = () => {
   useEffect(() => {
     fetchBlacklist()
   }, [])
+
+  useEffect(() => {
+    const timer = setTimeout(() => setGlobalFilter(searchInput), 200)
+    return () => clearTimeout(timer)
+  }, [searchInput])
 
   const handleViewProfile = (customerGroup: CustomerGroup) => {
     if (customerGroup.orders && customerGroup.orders.length > 0) {
@@ -105,7 +111,7 @@ const BlacklistedCustomerList = () => {
     }
   }
 
-  const columns: ColumnDef<CustomerGroup>[] = [
+  const columns: ColumnDef<CustomerGroup>[] = useMemo(() => [
     {
       id: 'customer_name',
       accessorFn: (row) => row.customer.name,
@@ -206,15 +212,17 @@ const BlacklistedCustomerList = () => {
         )
       },
     },
-  ]
+  ], [canWhitelist, whitelistingCnic])
 
-  const filteredData = globalFilter
-    ? customers.filter(c =>
-      (c.customer.name || '').toLowerCase().includes(globalFilter.toLowerCase()) ||
+  const filteredData = useMemo(() => {
+    if (!globalFilter) return customers
+    const needle = globalFilter.toLowerCase()
+    return customers.filter(c =>
+      (c.customer.name || '').toLowerCase().includes(needle) ||
       (c.customer.whatsapp_number || '').includes(globalFilter) ||
-      (c.customer.cnic_number && c.customer.cnic_number.includes(globalFilter))
+      (c.customer.cnic_number && c.customer.cnic_number.toLowerCase().includes(needle))
     )
-    : customers;
+  }, [customers, globalFilter])
 
   const table = useReactTable({
     data: filteredData,
@@ -236,8 +244,8 @@ const BlacklistedCustomerList = () => {
         <div className="relative w-full max-w-md">
           <input
             type="text"
-            value={globalFilter}
-            onChange={(e) => setGlobalFilter(e.target.value)}
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
             className="w-full rounded-2xl border border-stroke bg-gray-50 px-6 py-4 outline-none focus:border-red-500 dark:border-strokedark dark:bg-meta-4 transition-all"
             placeholder="Search blacklisted customers..."
           />
