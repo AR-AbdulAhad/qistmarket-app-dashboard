@@ -86,6 +86,8 @@ export default function EditTimelineDatesModal({
         status_histories: statusHistories.map((h) => ({
           id: h.id,
           created_at: h.created_at ? new Date(h.created_at).toISOString() : null,
+          new_status: h.new_status,
+          old_status: h.old_status,
         })),
       };
 
@@ -100,7 +102,7 @@ export default function EditTimelineDatesModal({
 
       const json = await res.json();
       if (json.success) {
-        toast.success("Timeline dates updated successfully!");
+        toast.success("Timeline dates & status history updated successfully!");
         onSaved();
         onClose();
       } else {
@@ -119,6 +121,12 @@ export default function EditTimelineDatesModal({
     );
   };
 
+  const handleStatusHistoryFieldChange = (id: number, field: "new_status" | "old_status", val: string) => {
+    setStatusHistories((prev) =>
+      prev.map((h) => (h.id === id ? { ...h, [field]: val } : h))
+    );
+  };
+
   return (
     <div className="fixed inset-0 z-99999 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto">
       <div className="relative w-full max-w-3xl rounded-2xl bg-white p-6 shadow-2xl dark:bg-boxdark dark:text-white border border-gray-100 dark:border-gray-800 my-8">
@@ -131,10 +139,10 @@ export default function EditTimelineDatesModal({
             </div>
             <div>
               <h3 className="text-lg font-bold text-gray-900 dark:text-white">
-                Edit Timeline Dates ({order.order_ref})
+                Edit Timeline Dates & Statuses ({order.order_ref})
               </h3>
               <p className="text-xs text-gray-500 dark:text-gray-400">
-                Adjust historical assignment and status transition dates for this legacy record
+                Adjust historical assignment dates, delivery timestamps, and status transitions for this order profile
               </p>
             </div>
           </div>
@@ -154,7 +162,7 @@ export default function EditTimelineDatesModal({
             <div className="flex items-center gap-2 mb-3">
               <Clock className="size-4 text-blue-600" />
               <h4 className="text-sm font-bold text-gray-800 dark:text-white uppercase tracking-wider">
-                Assignment Timeline Dates
+                Assignment & Delivery Timeline Dates
               </h4>
             </div>
 
@@ -171,61 +179,53 @@ export default function EditTimelineDatesModal({
                 />
               </div>
 
-              {order.assigned_to && (
-                <div className="rounded-xl border border-gray-100 dark:border-gray-800 p-4 bg-indigo-50/30 dark:bg-indigo-900/10">
-                  <label className="text-xs font-bold text-indigo-800 dark:text-indigo-300 block mb-1">
-                    Verification Assigned Date & Time
-                  </label>
-                  <input
-                    type="datetime-local"
-                    value={verificationAssignedAt}
-                    onChange={(e) => setVerificationAssignedAt(e.target.value)}
-                    className="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-boxdark px-3 py-2 text-xs font-semibold focus:outline-none focus:border-indigo-500"
-                  />
-                </div>
-              )}
+              <div className="rounded-xl border border-gray-100 dark:border-gray-800 p-4 bg-indigo-50/30 dark:bg-indigo-900/10">
+                <label className="text-xs font-bold text-indigo-800 dark:text-indigo-300 block mb-1">
+                  Verification Assigned Date & Time
+                </label>
+                <input
+                  type="datetime-local"
+                  value={verificationAssignedAt}
+                  onChange={(e) => setVerificationAssignedAt(e.target.value)}
+                  className="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-boxdark px-3 py-2 text-xs font-semibold focus:outline-none focus:border-indigo-500"
+                />
+              </div>
 
-              {order.delivery_officer && (
-                <div className="rounded-xl border border-gray-100 dark:border-gray-800 p-4 bg-green-50/30 dark:bg-green-900/10">
-                  <label className="text-xs font-bold text-green-800 dark:text-green-300 block mb-1">
-                    Delivery Assigned Date & Time
-                  </label>
-                  <input
-                    type="datetime-local"
-                    value={deliveryAssignedAt}
-                    onChange={(e) => setDeliveryAssignedAt(e.target.value)}
-                    className="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-boxdark px-3 py-2 text-xs font-semibold focus:outline-none focus:border-green-500"
-                  />
-                </div>
-              )}
+              <div className="rounded-xl border border-gray-100 dark:border-gray-800 p-4 bg-green-50/30 dark:bg-green-900/10">
+                <label className="text-xs font-bold text-green-800 dark:text-green-300 block mb-1">
+                  Delivery Assigned Date & Time
+                </label>
+                <input
+                  type="datetime-local"
+                  value={deliveryAssignedAt}
+                  onChange={(e) => setDeliveryAssignedAt(e.target.value)}
+                  className="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-boxdark px-3 py-2 text-xs font-semibold focus:outline-none focus:border-green-500"
+                />
+              </div>
 
-              {order.recovery_officer && (
-                <div className="rounded-xl border border-gray-100 dark:border-gray-800 p-4 bg-orange-50/30 dark:bg-orange-900/10">
-                  <label className="text-xs font-bold text-orange-800 dark:text-orange-300 block mb-1">
-                    Recovery Assigned Date & Time
-                  </label>
-                  <input
-                    type="datetime-local"
-                    value={recoveryAssignedAt}
-                    onChange={(e) => setRecoveryAssignedAt(e.target.value)}
-                    className="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-boxdark px-3 py-2 text-xs font-semibold focus:outline-none focus:border-orange-500"
-                  />
-                </div>
-              )}
+              <div className="rounded-xl border border-gray-100 dark:border-gray-800 p-4 bg-orange-50/30 dark:bg-orange-900/10">
+                <label className="text-xs font-bold text-orange-800 dark:text-orange-300 block mb-1">
+                  Recovery Assigned Date & Time
+                </label>
+                <input
+                  type="datetime-local"
+                  value={recoveryAssignedAt}
+                  onChange={(e) => setRecoveryAssignedAt(e.target.value)}
+                  className="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-boxdark px-3 py-2 text-xs font-semibold focus:outline-none focus:border-orange-500"
+                />
+              </div>
 
-              {order.delivered_at && (
-                <div className="rounded-xl border border-gray-100 dark:border-gray-800 p-4 bg-emerald-50/30 dark:bg-emerald-900/10">
-                  <label className="text-xs font-bold text-emerald-800 dark:text-emerald-300 block mb-1">
-                    Order Delivered Date & Time
-                  </label>
-                  <input
-                    type="datetime-local"
-                    value={deliveredAt}
-                    onChange={(e) => setDeliveredAt(e.target.value)}
-                    className="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-boxdark px-3 py-2 text-xs font-semibold focus:outline-none focus:border-emerald-500"
-                  />
-                </div>
-              )}
+              <div className="rounded-xl border border-gray-100 dark:border-gray-800 p-4 bg-emerald-50/30 dark:bg-emerald-900/10 md:col-span-2">
+                <label className="text-xs font-bold text-emerald-800 dark:text-emerald-300 block mb-1">
+                  Order Delivered Date & Time
+                </label>
+                <input
+                  type="datetime-local"
+                  value={deliveredAt}
+                  onChange={(e) => setDeliveredAt(e.target.value)}
+                  className="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-boxdark px-3 py-2 text-xs font-semibold focus:outline-none focus:border-emerald-500"
+                />
+              </div>
             </div>
           </div>
 
@@ -243,24 +243,39 @@ export default function EditTimelineDatesModal({
                 {statusHistories.map((h) => (
                   <div
                     key={h.id}
-                    className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl border border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-meta-4/20"
+                    className="flex flex-col md:flex-row md:items-center justify-between gap-3 p-3.5 rounded-xl border border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-meta-4/20"
                   >
-                    <div>
-                      <span className="text-xs font-bold text-gray-800 dark:text-white uppercase">
-                        {h.new_status.replace(/_/g, " ")}
-                      </span>
-                      {h.old_status && (
-                        <span className="ml-2 text-[10px] text-gray-500">
-                          (from {h.old_status.replace(/_/g, " ")})
-                        </span>
-                      )}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 flex-1">
+                      <div>
+                        <label className="text-[10px] font-bold text-gray-500 uppercase block mb-0.5">Status</label>
+                        <input
+                          type="text"
+                          value={h.new_status || ""}
+                          onChange={(e) => handleStatusHistoryFieldChange(h.id, "new_status", e.target.value)}
+                          className="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-boxdark px-2.5 py-1.5 text-xs font-semibold focus:outline-none focus:border-primary uppercase"
+                          placeholder="e.g. DELIVERED"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold text-gray-500 uppercase block mb-0.5">Previous Status (Optional)</label>
+                        <input
+                          type="text"
+                          value={h.old_status || ""}
+                          onChange={(e) => handleStatusHistoryFieldChange(h.id, "old_status", e.target.value)}
+                          className="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-boxdark px-2.5 py-1.5 text-xs font-semibold focus:outline-none focus:border-primary uppercase"
+                          placeholder="e.g. IN_TRANSIT"
+                        />
+                      </div>
                     </div>
-                    <input
-                      type="datetime-local"
-                      value={h.created_at}
-                      onChange={(e) => handleStatusHistoryDateChange(h.id, e.target.value)}
-                      className="w-full sm:w-64 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-boxdark px-3 py-1.5 text-xs font-semibold focus:outline-none focus:border-primary"
-                    />
+                    <div>
+                      <label className="text-[10px] font-bold text-gray-500 uppercase block mb-0.5">Transition Date & Time</label>
+                      <input
+                        type="datetime-local"
+                        value={h.created_at}
+                        onChange={(e) => handleStatusHistoryDateChange(h.id, e.target.value)}
+                        className="w-full md:w-56 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-boxdark px-2.5 py-1.5 text-xs font-semibold focus:outline-none focus:border-primary"
+                      />
+                    </div>
                   </div>
                 ))}
               </div>

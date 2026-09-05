@@ -14,6 +14,8 @@ import { MediaCard } from '@/components/common/MediaCard'
 import { formatExactDate } from "@/utils/dateUtils";
 import LinkedAccountsBadge from '@/components/common/LinkedAccountsBadge';
 
+import EditTimelineDatesModal from '@/components/Orders/EditTimelineDatesModal';
+
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL
 
 interface VerificationData {
@@ -437,9 +439,10 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
   const [officerDetails, setOfficerDetails] = useState<any>(null)
   const [locationRequestPending, setLocationRequestPending] = useState(false)
   
-  // Timeline collapse states
+  // Timeline collapse states & edit modal
   const [isAssignmentTimelineCollapsed, setIsAssignmentTimelineCollapsed] = useState(true);
   const [isStatusTimelineCollapsed, setIsStatusTimelineCollapsed] = useState(true);
+  const [editTimelineModalOpen, setEditTimelineModalOpen] = useState(false);
 
   // CNIC -> other orders this same person (purchaser or grantor) is linked to,
   // so the verification officer can see all their connections in one glance.
@@ -463,60 +466,60 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
   }, [officerIdInput, modalOfficerType, modalOpen, data]);
 
   // Fetch data
-  useEffect(() => {
-    const fetchData = async () => {
+  const fetchData = async () => {
+    try {
+      const token = Cookies.get('auth_token')
+      if (!token) {
+        setError('Authentication required')
+        return
+      }
+
+      // Get current user info - FIXED ENDPOINT
       try {
-        const token = Cookies.get('auth_token')
-        if (!token) {
-          setError('Authentication required')
-          return
-        }
-
-        // Get current user info - FIXED ENDPOINT
-        try {
-          const userRes = await fetch(`${BACKEND_URL}/api/user/me`, {
-            headers: { Authorization: `Bearer ${token}` },
-          })
-          if (userRes.ok) {
-            const userJson = await userRes.json()
-            if (userJson.success && userJson.user) {
-              setCurrentUser({
-                id: userJson.user.id,
-                name: userJson.user.full_name,
-                username: userJson.user.username
-              })
-              console.log('Current user:', userJson.user)
-            }
-          }
-        } catch (userErr) {
-          console.error('Error fetching user:', userErr)
-        }
-
-        // Fetch verification data
-        console.log('Fetching verification for order:', id)
-        const res = await fetch(`${BACKEND_URL}/api/verification/order/${id}`, {
+        const userRes = await fetch(`${BACKEND_URL}/api/user/me`, {
           headers: { Authorization: `Bearer ${token}` },
         })
-
-        if (!res.ok) throw new Error('Failed to fetch verification details')
-
-        const json = await res.json()
-        console.log('API Response:', json)
-
-        if (json.success && json.data?.verification) {
-          setData(json.data.verification)
-          console.log('Verification data loaded:', json.data.verification)
-        } else {
-          setError('No verification data found')
+        if (userRes.ok) {
+          const userJson = await userRes.json()
+          if (userJson.success && userJson.user) {
+            setCurrentUser({
+              id: userJson.user.id,
+              name: userJson.user.full_name,
+              username: userJson.user.username
+            })
+            console.log('Current user:', userJson.user)
+          }
         }
-      } catch (err) {
-        console.error('Fetch error:', err)
-        setError((err as Error).message || 'An error occurred')
-      } finally {
-        setLoading(false)
+      } catch (userErr) {
+        console.error('Error fetching user:', userErr)
       }
-    }
 
+      // Fetch verification data
+      console.log('Fetching verification for order:', id)
+      const res = await fetch(`${BACKEND_URL}/api/verification/order/${id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+
+      if (!res.ok) throw new Error('Failed to fetch verification details')
+
+      const json = await res.json()
+      console.log('API Response:', json)
+
+      if (json.success && json.data?.verification) {
+        setData(json.data.verification)
+        console.log('Verification data loaded:', json.data.verification)
+      } else {
+        setError('No verification data found')
+      }
+    } catch (err) {
+      console.error('Fetch error:', err)
+      setError((err as Error).message || 'An error occurred')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
     fetchData()
   }, [id])
 
@@ -888,6 +891,9 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
         { key: 'cnic_front', title: `Grantor ${gNum} CNIC Front` },
         { key: 'cnic_back', title: `Grantor ${gNum} CNIC Back` },
         { key: 'utility_bill', title: `Grantor ${gNum} Utility Bill / Proof` },
+        { key: 'service_card', title: `Grantor ${gNum} Salary Slip / Service Card` },
+        { key: 'signature', title: `Grantor ${gNum} Signature` },
+        { key: 'photo', title: `Grantor ${gNum} Live Photo` },
       ];
     }
 
@@ -1291,7 +1297,21 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
       {/* Assignment Timeline Card (Spans full width) */}
       <div className="mb-12 rounded-lg border border-stroke bg-white shadow-default dark:border-dark-3 dark:bg-gray-800 p-6">
         <div className="flex items-center justify-between border-b pb-4 mb-6">
-          <h3 className="text-xl font-bold dark:text-white">Assignment Timeline</h3>
+          <div className="flex items-center gap-3">
+            <h3 className="text-xl font-bold dark:text-white">Assignment Timeline</h3>
+            {data.order?.channel === 'legacy_import' && (user?.role === 'Super Admin' || user?.role === 'Admin') && (
+              <button
+                onClick={() => setEditTimelineModalOpen(true)}
+                className="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg hover:bg-amber-100 dark:hover:bg-amber-900/40 transition-colors"
+                title="Edit Assignment Timeline Dates & Events"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+                Edit Timeline
+              </button>
+            )}
+          </div>
           <button
             onClick={() => setIsAssignmentTimelineCollapsed(!isAssignmentTimelineCollapsed)}
             className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-dark-2 transition-colors"
@@ -1446,7 +1466,21 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
       {data.order?.statusHistories && data.order.statusHistories.length > 0 && (
         <div className="mb-12 rounded-lg border border-stroke bg-white shadow-default dark:border-dark-3 dark:bg-gray-800 p-6">
           <div className="flex items-center justify-between border-b pb-4 mb-6">
-            <h3 className="text-xl font-bold dark:text-white">Order Status Timeline</h3>
+            <div className="flex items-center gap-3">
+              <h3 className="text-xl font-bold dark:text-white">Order Status Timeline</h3>
+              {data.order?.channel === 'legacy_import' && (user?.role === 'Super Admin' || user?.role === 'Admin') && (
+                <button
+                  onClick={() => setEditTimelineModalOpen(true)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-bold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg hover:bg-purple-100 dark:hover:bg-purple-900/40 transition-colors"
+                  title="Edit Order Status Timeline Dates & Statuses"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                  </svg>
+                  Edit Statuses & Dates
+                </button>
+              )}
+            </div>
             <button
               onClick={() => setIsStatusTimelineCollapsed(!isStatusTimelineCollapsed)}
               className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-dark-2 transition-colors"
@@ -1648,169 +1682,7 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
         </div>
       </Modal>
 
-      {/* Verification Reviews */}
-      <div className="mb-12">
-        <h2 className="mb-4 text-2xl font-semibold text-dark dark:text-white">
-          Verification Reviews
-        </h2>
 
-        {data.reviews.length === 0 ? (
-          <p className="text-gray-500 dark:text-gray-400">No reviews submitted yet.</p>
-        ) : (
-          <>
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-500 dark:text-gray-400">
-                Approval Percentage
-              </label>
-              <div className="mt-1 rounded-lg bg-gray-100 px-4 py-2.5 text-2xl font-bold dark:bg-dark-3 dark:text-gray-300">
-                {percentage}%
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 gap-4">
-              {data.reviews.map((review) => (
-                <div
-                  key={review.id}
-                  className="rounded-lg border border-stroke bg-gray-100 p-4 dark:border-dark-3 dark:bg-dark-3"
-                >
-                  {review.reviewer && (
-                    <p className="text-sm text-gray-700 dark:text-gray-300">
-                      Reviewer: {review.reviewer.full_name} ({review.reviewer.username})
-                    </p>
-                  )}
-                  <p className="text-sm text-gray-700 dark:text-gray-300">
-                    Approved: {review.approved ? 'Yes' : 'No'}
-                  </p>
-                  {shouldDisplay(review.remarks) && (
-                    <p className="text-sm text-gray-700 dark:text-gray-300">
-                      Remarks: {review.remarks}
-                    </p>
-                  )}
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
-                    Date: {formatDateTimeUTC(review.created_at)}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </>
-        )}
-
-        {/* Review Submission Form */}
-        {data.order.status === 'completed' && (
-          <div className="mt-10 rounded-lg border border-primary bg-primary/5 p-6 dark:border-blue-500/30 dark:bg-blue-950/20">
-            <h3 className="mb-6 text-2xl font-semibold text-primary dark:text-blue-400">
-              Submit Your Review
-            </h3>
-
-            <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-3">
-              <div className="rounded bg-white p-4 text-center shadow-sm dark:bg-gray-800">
-                <div className="text-sm text-gray-600 dark:text-gray-400">Reviews Submitted</div>
-                <div className="text-2xl font-bold">{data.reviews.length}/3</div>
-              </div>
-              <div className="rounded bg-white p-4 text-center shadow-sm dark:bg-gray-800">
-                <div className="text-sm text-gray-600 dark:text-gray-400">Approval Percentage</div>
-                <div className={cn(
-                  "text-2xl font-bold",
-                  percentage >= 60 ? "text-green-600" :
-                    percentage >= 30 ? "text-amber-600" : "text-red-600"
-                )}>
-                  {percentage}%
-                </div>
-              </div>
-              <div className="rounded bg-white p-4 text-center shadow-sm dark:bg-gray-800">
-                <div className="text-sm text-gray-600 dark:text-gray-400">Current Status</div>
-                <div className="flex flex-col">
-                  <div
-                    className={cn(
-                      "text-2xl font-bold tracking-wide",
-                      percentage === 0 ? "text-gray-500" :
-                        percentage >= 60 ? "text-green-600" :
-                          percentage < 30 ? "text-red-600" : "text-amber-600"
-                    )}
-                  >
-                    {percentage === 0 ? "Awaiting Review" :
-                      percentage >= 60 ? "APPROVED" :
-                        percentage < 30 ? "REJECTED" : "Pending Final Decision"}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {hasReviewed ? (
-              <div className="rounded bg-green-100 p-5 text-center text-green-800 dark:bg-green-950/40 dark:text-green-200">
-                You have already submitted your review for this verification.
-              </div>
-            ) : data.reviews.length >= 3 ? (
-              <div className="rounded bg-amber-100 p-5 text-center text-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
-                Maximum 3 reviews have been submitted.
-              </div>
-            ) : (
-              <form onSubmit={handleSubmitReview} className="space-y-6">
-                <div>
-                  <label className="mb-3 block font-medium text-gray-700 dark:text-gray-300">
-                    Your Decision
-                  </label>
-                  <div className="flex gap-10">
-                    <label className="flex items-center gap-3 cursor-pointer">
-                      <input
-                        type="radio"
-                        name="decision"
-                        value="approve"
-                        checked={decision === 'approve'}
-                        onChange={() => setDecision('approve')}
-                        className="h-5 w-5 accent-green-600"
-                        required
-                      />
-                      <span>Approve</span>
-                    </label>
-                    <label className="flex items-center gap-3 cursor-pointer">
-                      <input
-                        type="radio"
-                        name="decision"
-                        value="reject"
-                        checked={decision === 'reject'}
-                        onChange={() => setDecision('reject')}
-                        className="h-5 w-5 accent-red-600"
-                      />
-                      <span>Reject</span>
-                    </label>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="mb-3 block font-medium text-gray-700 dark:text-gray-300">
-                    Remarks / Feedback
-                    {decision === 'reject' && <span className="ml-1 text-red-600">*</span>}
-                  </label>
-                  <textarea
-                    className="w-full rounded-lg border border-gray-300 p-4 focus:border-primary focus:ring-1 focus:ring-primary dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
-                    rows={5}
-                    value={remarks}
-                    onChange={(e) => setRemarks(e.target.value)}
-                    placeholder={decision === 'reject'
-                      ? "Please explain why you are rejecting..."
-                      : "Optional remarks for approval"}
-                  />
-                </div>
-
-                <div className="flex justify-end">
-                  <button
-                    type="submit"
-                    disabled={submitting || !decision}
-                    className={cn(
-                      "rounded-lg px-10 py-3 font-medium text-white transition-colors",
-                      submitting || !decision ? "bg-gray-400 cursor-not-allowed" :
-                        decision === 'approve' ? "bg-green-600 hover:bg-green-700" : "bg-red-600 hover:bg-red-700"
-                    )}
-                  >
-                    {submitting ? 'Submitting...' : 'Submit Review'}
-                  </button>
-                </div>
-              </form>
-            )}
-          </div>
-        )}
-      </div>
 
       {/* Purchaser Details - EDITABLE */}
       {data.purchaser && Object.values(data.purchaser).some(val => shouldDisplay(val)) && (
@@ -2286,6 +2158,19 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
       )}
 
       <OrderCustomerInfo customerName={data.order.customer_name} whatsappNumber={data.order.whatsapp_number} address={data.order.address} city={data.order.city} area={data.order.area} block={data.order.block} houseNo={data.order.house_no} street={data.order.street} zone={data.order.zone} alternateContact={data.order.alternate_contact} />
+
+      {/* Edit Timeline Dates Modal */}
+      {data.order && (
+        <EditTimelineDatesModal
+          isOpen={editTimelineModalOpen}
+          onClose={() => setEditTimelineModalOpen(false)}
+          order={data.order}
+          onSaved={() => {
+            // Refetch verification details to reflect timeline changes
+            fetchData();
+          }}
+        />
+      )}
     </section>
   )
 }

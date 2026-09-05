@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { X, Settings2, Save, RefreshCw, CheckCircle2, AlertCircle } from "lucide-react";
+import { X, Settings2, Save, RefreshCw, Layers, RotateCcw, Sparkles } from "lucide-react";
 import { toast } from "react-hot-toast";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
@@ -55,6 +55,30 @@ interface ScoringConfig {
   };
 }
 
+interface OutletEntity {
+  id: number;
+  name: string;
+  code: string;
+}
+
+interface OfficerEntity {
+  id: number;
+  name: string;
+  username: string;
+  role: string;
+  outletName: string;
+}
+
+interface ScoringEntities {
+  outlets: OutletEntity[];
+  officers: OfficerEntity[];
+}
+
+interface OverridesData {
+  outlets?: Record<string, Record<string, any>>;
+  officers?: Record<string, Record<string, any>>;
+}
+
 interface ScoringConfigModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -63,54 +87,168 @@ interface ScoringConfigModalProps {
 
 export default function ScoringConfigModal({ isOpen, onClose, onSaved }: ScoringConfigModalProps) {
   const [activeTab, setActiveTab] = useState<"outlet" | "csr" | "delivery" | "recovery" | "verification">("outlet");
+  
+  // Master global config loaded from backend
+  const [globalConfig, setGlobalConfig] = useState<ScoringConfig | null>(null);
+  // Active config displayed & manipulated in form
   const [config, setConfig] = useState<ScoringConfig | null>(null);
+  
+  const [entities, setEntities] = useState<ScoringEntities | null>(null);
+  const [overrides, setOverrides] = useState<OverridesData>({});
+  const [selectedScope, setSelectedScope] = useState<string>("global");
+
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [recalculating, setRecalculating] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
-      fetchConfig();
+      loadInitialData();
     }
   }, [isOpen]);
 
-  const fetchConfig = async () => {
+  const loadInitialData = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${BACKEND_URL}/api/admin-panel/scoring-rules`, {
-        headers: authHeaders(),
-      });
-      const json = await res.json();
-      if (json.success) {
-        setConfig(json.data);
-      } else {
-        toast.error(json.message || "Failed to load scoring rules");
+      const [cfgRes, ovrRes, entRes] = await Promise.all([
+        fetch(`${BACKEND_URL}/api/admin-panel/scoring-rules`, { headers: authHeaders() }),
+        fetch(`${BACKEND_URL}/api/admin-panel/scoring-rules/overrides`, { headers: authHeaders() }),
+        fetch(`${BACKEND_URL}/api/admin-panel/scoring-rules/entities`, { headers: authHeaders() }),
+      ]);
+
+      const cfgJson = await cfgRes.json();
+      const ovrJson = await ovrRes.json();
+      const entJson = await entRes.json();
+
+      if (cfgJson.success) {
+        setGlobalConfig(cfgJson.data);
+        setConfig(JSON.parse(JSON.stringify(cfgJson.data)));
+      }
+      if (ovrJson.success) {
+        setOverrides(ovrJson.data || {});
+      }
+      if (entJson.success) {
+        setEntities(entJson.data || { outlets: [], officers: [] });
       }
     } catch (err: any) {
-      toast.error(err.message || "Network error fetching scoring rules");
+      toast.error(err.message || "Failed to load scoring configuration");
     } finally {
       setLoading(false);
     }
+  };
+
+  // Switch tabs & update scope accordingly
+  const handleTabChange = (tabId: "outlet" | "csr" | "delivery" | "recovery" | "verification") => {
+    setActiveTab(tabId);
+    setSelectedScope("global");
+    if (globalConfig) {
+      setConfig(JSON.parse(JSON.stringify(globalConfig)));
+    }
+  };
+
+  // Change scope selection (e.g. global -> outlet:2 or officer:15)
+  const handleScopeChange = (scope: string) => {
+    setSelectedScope(scope);
+    if (!globalConfig || !config) return;
+
+    if (scope === "global") {
+      setConfig((prev) => prev ? { ...prev, [activeTab]: { ...globalConfig[activeTab] } } : prev);
+      return;
+    }
+
+    const [type, idStr] = scope.split(":");
+    const targetGroup = type === "outlet" ? "outlets" : "officers";
+    const entityOverride = overrides[targetGroup]?.[idStr]?.[activeTab];
+
+    const effectiveSectionRules = {
+      ...globalConfig[activeTab],
+      ...(entityOverride || {}),
+    };
+
+    setConfig((prev) => prev ? { ...prev, [activeTab]: effectiveSectionRules } : prev);
+  };
+
+  // Check if current active tab has a custom override for selectedScope
+  const hasCurrentOverride = () => {
+    if (selectedScope === "global") return false;
+    const [type, idStr] = selectedScope.split(":");
+    const targetGroup = type === "outlet" ? "outlets" : "officers";
+    return !!overrides[targetGroup]?.[idStr]?.[activeTab];
   };
 
   const handleSave = async () => {
     if (!config) return;
     setSaving(true);
     try {
-      const res = await fetch(`${BACKEND_URL}/api/admin-panel/scoring-rules`, {
-        method: "POST",
-        headers: authHeaders(),
-        body: JSON.stringify(config),
-      });
-      const json = await res.json();
-      if (json.success) {
-        toast.success("Scoring rules saved successfully!");
-        if (onSaved) onSaved();
+      if (selectedScope === "global") {
+        const res = await fetch(`${BACKEND_URL}/api/admin-panel/scoring-rules`, {
+          method: "POST",
+          headers: authHeaders(),
+          body: JSON.stringify(config),
+        });
+        const json = await res.json();
+        if (json.success) {
+          toast.success("Global scoring rules saved successfully!");
+          setGlobalConfig(JSON.parse(JSON.stringify(config)));
+          if (onSaved) onSaved();
+        } else {
+          toast.error(json.message || "Failed to save global scoring rules");
+        }
       } else {
-        toast.error(json.message || "Failed to save scoring rules");
+        const [type, idStr] = selectedScope.split(":");
+        const res = await fetch(`${BACKEND_URL}/api/admin-panel/scoring-rules/overrides`, {
+          method: "POST",
+          headers: authHeaders(),
+          body: JSON.stringify({
+            type,
+            id: Number(idStr),
+            section: activeTab,
+            rules: config[activeTab],
+          }),
+        });
+        const json = await res.json();
+        if (json.success) {
+          toast.success("Specific custom scoring rules saved successfully!");
+          setOverrides(json.data || {});
+          if (onSaved) onSaved();
+        } else {
+          toast.error(json.message || "Failed to save custom scoring override");
+        }
       }
     } catch (err: any) {
       toast.error(err.message || "Error saving scoring rules");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleResetOverride = async () => {
+    if (selectedScope === "global") return;
+    const [type, idStr] = selectedScope.split(":");
+    setSaving(true);
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/admin-panel/scoring-rules/overrides`, {
+        method: "DELETE",
+        headers: authHeaders(),
+        body: JSON.stringify({
+          type,
+          id: Number(idStr),
+          section: activeTab,
+        }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        toast.success("Override removed! Reverted to global default.");
+        setOverrides(json.data || {});
+        if (globalConfig) {
+          setConfig((prev) => prev ? { ...prev, [activeTab]: { ...globalConfig[activeTab] } } : prev);
+        }
+        if (onSaved) onSaved();
+      } else {
+        toast.error(json.message || "Failed to remove override");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Error removing override");
     } finally {
       setSaving(false);
     }
@@ -158,6 +296,15 @@ export default function ScoringConfigModal({ isOpen, onClose, onSaved }: Scoring
     { id: "verification", label: "Verification Officers" },
   ] as const;
 
+  const getFilteredOfficers = (tab: string) => {
+    if (!entities?.officers) return [];
+    const keyword = tab.toLowerCase();
+    const filtered = entities.officers.filter((o) => o.role.toLowerCase().includes(keyword));
+    return filtered.length > 0 ? filtered : entities.officers;
+  };
+
+  const isOverrideActive = hasCurrentOverride();
+
   return (
     <div className="fixed inset-0 z-99999 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto">
       <div className="relative w-full max-w-3xl rounded-2xl bg-white p-6 shadow-2xl dark:bg-boxdark dark:text-white border border-gray-100 dark:border-gray-800 my-8">
@@ -169,11 +316,11 @@ export default function ScoringConfigModal({ isOpen, onClose, onSaved }: Scoring
               <Settings2 className="size-5" />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
                 Admin Scoring Rules Handover
               </h3>
               <p className="text-xs text-gray-500 dark:text-gray-400">
-                Configure custom score addition and deduction rules for each role
+                Configure global defaults or specific outlet/officer scoring rules
               </p>
             </div>
           </div>
@@ -190,7 +337,7 @@ export default function ScoringConfigModal({ isOpen, onClose, onSaved }: Scoring
           {tabs.map((tab) => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => handleTabChange(tab.id)}
               className={`rounded-xl px-4 py-2 text-xs font-semibold transition-all ${
                 activeTab === tab.id
                   ? "bg-primary text-white shadow-md shadow-primary/20"
@@ -209,6 +356,65 @@ export default function ScoringConfigModal({ isOpen, onClose, onSaved }: Scoring
           </div>
         ) : (
           <div className="py-6 space-y-4 max-h-[60vh] overflow-y-auto pr-1">
+
+            {/* Scope Selection Bar */}
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-slate-50 dark:bg-meta-4/30 p-3.5 border border-slate-200/80 dark:border-gray-700">
+              <div className="flex items-center gap-2">
+                <Layers className="size-4 text-primary" />
+                <span className="text-xs font-bold text-gray-700 dark:text-gray-200">
+                  Target Scope:
+                </span>
+                <select
+                  value={selectedScope}
+                  onChange={(e) => handleScopeChange(e.target.value)}
+                  className="rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-boxdark px-3 py-1.5 text-xs font-semibold focus:outline-none focus:border-primary text-gray-800 dark:text-white shadow-xs"
+                >
+                  <option value="global">🌐 Global (Default for all {activeTab === "outlet" ? "Outlets" : "Officers"})</option>
+                  {activeTab === "outlet" ? (
+                    <optgroup label="🏪 Specific Outlets">
+                      {entities?.outlets.map((o) => (
+                        <option key={o.id} value={`outlet:${o.id}`}>
+                          🏪 {o.name} ({o.code})
+                        </option>
+                      ))}
+                    </optgroup>
+                  ) : (
+                    <optgroup label={`👤 ${tabs.find((t) => t.id === activeTab)?.label}`}>
+                      {getFilteredOfficers(activeTab).map((off) => (
+                        <option key={off.id} value={`officer:${off.id}`}>
+                          👤 {off.name} (@{off.username}) - {off.outletName}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                </select>
+              </div>
+
+              <div className="flex items-center gap-2">
+                {isOverrideActive ? (
+                  <>
+                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 dark:bg-amber-900/40 px-2.5 py-1 text-[11px] font-bold text-amber-800 dark:text-amber-300 border border-amber-300/50">
+                      <Sparkles className="size-3 text-amber-500" />
+                      Specific Custom Override Active
+                    </span>
+                    <button
+                      onClick={handleResetOverride}
+                      disabled={saving}
+                      className="flex items-center gap-1 rounded-lg bg-rose-50 hover:bg-rose-100 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 px-2.5 py-1 text-[11px] font-bold border border-rose-200 dark:border-rose-800 transition-colors"
+                    >
+                      <RotateCcw className="size-3" />
+                      Reset to Global
+                    </button>
+                  </>
+                ) : selectedScope !== "global" ? (
+                  <span className="text-[11px] text-gray-400 font-medium italic">
+                    Using global defaults (Unchanged)
+                  </span>
+                ) : null}
+              </div>
+            </div>
+
+            {/* Fields Grid */}
             {activeTab === "outlet" && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="rounded-xl border border-gray-100 dark:border-gray-800 p-4 bg-gray-50/50 dark:bg-meta-4/20">
@@ -597,7 +803,7 @@ export default function ScoringConfigModal({ isOpen, onClose, onSaved }: Scoring
               className="flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-xs font-bold text-white shadow-md shadow-primary/30 hover:bg-opacity-90 transition-all disabled:opacity-50"
             >
               <Save className="size-4" />
-              {saving ? "Saving Rules..." : "Save Scoring Rules"}
+              {saving ? "Saving..." : selectedScope === "global" ? "Save Global Rules" : "Save Custom Override"}
             </button>
           </div>
         </div>
