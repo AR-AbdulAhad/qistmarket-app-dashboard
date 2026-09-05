@@ -14,6 +14,7 @@ import RecoveryVisitDetails from '@/components/common/RecoveryVisitDetails';
 import { MediaCard } from '@/components/common/MediaCard';
 import { formatExactDate } from "@/utils/dateUtils";
 import LinkedAccountsBadge from '@/components/common/LinkedAccountsBadge';
+import EditTimelineDatesModal from '@/components/Orders/EditTimelineDatesModal';
 
 const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
 
@@ -383,6 +384,9 @@ export default function OrderDetailsPage() {
     const [isAssignmentTimelineCollapsed, setIsAssignmentTimelineCollapsed] = useState(true);
     const [isStatusTimelineCollapsed, setIsStatusTimelineCollapsed] = useState(true);
 
+    // Edit Timeline Dates modal (legacy import orders)
+    const [editTimelineModalOpen, setEditTimelineModalOpen] = useState(false);
+
     // Product dynamic data
     const [products, setProducts] = useState<any[]>([]);
     const [categories, setCategories] = useState<string[]>([]);
@@ -683,6 +687,19 @@ export default function OrderDetailsPage() {
                         📤 Send Ledger
                     </button>
                 )}
+                {/* Edit Timeline Dates — only for legacy import orders */}
+                {order.channel === 'legacy_import' && (user?.role === 'Super Admin' || user?.role === 'Admin') && (
+                    <button
+                        onClick={() => setEditTimelineModalOpen(true)}
+                        className="inline-flex items-center gap-2 rounded-md bg-amber-500 px-6 py-2 font-bold text-white hover:bg-amber-600 shadow-md transition-colors"
+                    >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                        Edit Timeline Dates
+                    </button>
+                )}
+
                 {user?.role === 'Super Admin' && (
                     <button
                         onClick={async () => {
@@ -2012,6 +2029,14 @@ export default function OrderDetailsPage() {
                     </div>
                 </div>
             </Modal>
+
+            {/* Edit Timeline Dates Modal — Legacy Import Orders */}
+            <EditTimelineDatesModal
+                isOpen={editTimelineModalOpen}
+                onClose={() => setEditTimelineModalOpen(false)}
+                order={order}
+                onSaved={() => { fetchOrder(); }}
+            />
         </div>
     );
 }
