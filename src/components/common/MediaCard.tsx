@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { MediaReplaceModal } from './MediaReplaceModal';
+import { ConfirmModal } from '@/components/Modals/ConfirmModal';
 import { cn } from '@/lib/utils';
 import { formatExactDate } from "@/utils/dateUtils";
 
@@ -16,6 +17,7 @@ interface MediaCardProps {
     uploadedAt: string;
     isEditable?: boolean;
     onEdit?: (file: File) => Promise<void>;
+    onDelete?: () => Promise<void>;
     editHistory?: any[];
     historyFilter?: (history: any) => boolean;
 }
@@ -28,6 +30,7 @@ export function MediaCard({
     uploadedAt,
     isEditable = false,
     onEdit,
+    onDelete,
     editHistory = [],
     historyFilter
 }: MediaCardProps) {
@@ -36,7 +39,22 @@ export function MediaCard({
     const [showHistory, setShowHistory] = useState(false)
     const [selectedFile, setSelectedFile] = useState<File | null>(null)
     const [isUploading, setIsUploading] = useState(false)
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+    const [isDeleting, setIsDeleting] = useState(false)
     const fileInputRef = useRef<HTMLInputElement>(null)
+
+    const handleConfirmDelete = async () => {
+        if (!onDelete) return
+        setIsDeleting(true)
+        try {
+            await onDelete()
+            setShowDeleteConfirm(false)
+        } catch (err) {
+            console.error(err)
+        } finally {
+            setIsDeleting(false)
+        }
+    }
 
     const filteredHistory = historyFilter 
         ? editHistory.filter(historyFilter)
@@ -69,8 +87,8 @@ export function MediaCard({
             <div
                 className="group relative overflow-hidden rounded-lg border border-stroke bg-white p-4 shadow-sm transition-all hover:shadow-md dark:border-dark-3 dark:bg-gray-800"
             >
-                <div className="flex justify-between items-start mb-2">
-                    <div>
+                <div className="flex justify-between items-start mb-2 gap-2">
+                    <div className="min-w-0">
                         <h4 className="font-medium text-gray-800 dark:text-gray-200 line-clamp-2">
                             {title}
                         </h4>
@@ -85,7 +103,12 @@ export function MediaCard({
                             </button>
                         )}
                     </div>
-                    <div className="flex gap-1">
+                    {/* shrink-0: with 3 icon buttons now possible (edit, view,
+                        delete), this row must never be the one that gets
+                        squeezed — a long title should wrap/clamp instead,
+                        otherwise the last icon can end up compressed past
+                        visibility inside the card's overflow-hidden bounds. */}
+                    <div className="flex shrink-0 gap-1">
                         {isEditable && onEdit && (
                             <button
                                 onClick={() => fileInputRef.current?.click()}
@@ -113,6 +136,17 @@ export function MediaCard({
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
                             </svg>
                         </button>
+                        {onDelete && (
+                            <button
+                                onClick={() => setShowDeleteConfirm(true)}
+                                className="p-1.5 rounded-full bg-gray-100 hover:bg-red-600 hover:text-white dark:bg-gray-700 dark:hover:bg-red-600 transition-colors text-gray-500 dark:text-gray-400 shadow-sm"
+                                title="Delete"
+                            >
+                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                            </button>
+                        )}
                     </div>
                 </div>
                 <div className="mb-3 text-xs text-gray-500 dark:text-gray-400 space-y-1">
@@ -225,13 +259,24 @@ export function MediaCard({
                 </div>
             )}
 
-            <MediaReplaceModal 
+            <MediaReplaceModal
                 open={isReplaceModalOpen}
                 onClose={() => setIsReplaceModalOpen(false)}
                 file={selectedFile}
                 onConfirm={handleConfirmUpload}
                 isUploading={isUploading}
                 title={`Replace ${title}`}
+            />
+
+            <ConfirmModal
+                open={showDeleteConfirm}
+                onClose={() => setShowDeleteConfirm(false)}
+                onConfirm={handleConfirmDelete}
+                title={`Delete ${title}?`}
+                message="This photo will be permanently removed. This action cannot be undone."
+                confirmText="Delete"
+                variant="danger"
+                loading={isDeleting}
             />
         </>
     );

@@ -299,6 +299,8 @@ export default function DeliveredProductDetails({
                 <PaymentDetailsSection
                     paymentDetails={deliveredProduct.payment_details}
                     title="Payment Details (Current Delivery)"
+                    editable={user?.role === 'Super Admin'}
+                    onSaved={fetchDeliveredProductDetails}
                 />
 
                 {/* Return / Archived Delivery History */}

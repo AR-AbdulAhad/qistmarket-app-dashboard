@@ -58,7 +58,8 @@ export default function InstallmentRecoveriesTab({ token, startDate, endDate, se
             "Phone": `"${r.whatsapp_number}"`,
             "Installment Month": r.label,
             "Amount Recovered": r.amount,
-            "Payment Method": r.payment_method
+            "Payment Method": r.payment_method,
+            "Customer Arrears": r.arrears || 0
         }));
         const ws = XLSX.utils.json_to_sheet(rows);
         const wb = XLSX.utils.book_new();
@@ -118,6 +119,7 @@ export default function InstallmentRecoveriesTab({ token, startDate, endDate, se
                                     <th className="px-4 py-3 font-medium">Installment</th>
                                     <th className="px-4 py-3 font-medium">Method</th>
                                     <th className="px-4 py-3 font-medium text-right">Amount</th>
+                                    <th className="px-4 py-3 font-medium text-right">Arrears</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
@@ -136,10 +138,17 @@ export default function InstallmentRecoveriesTab({ token, startDate, endDate, se
                                             </span>
                                         </td>
                                         <td className="px-4 py-3 font-bold text-emerald-600 text-right">Rs {r.amount?.toLocaleString()}</td>
+                                        <td className="px-4 py-3 text-right">
+                                            {r.arrears > 0 ? (
+                                                <span className="font-bold text-red-600">Rs {r.arrears.toLocaleString()}</span>
+                                            ) : (
+                                                <span className="text-gray-300">—</span>
+                                            )}
+                                        </td>
                                     </tr>
                                 )) : (
                                     <tr>
-                                        <td colSpan={6} className="px-4 py-8 text-center text-gray-500">No recoveries found for this period.</td>
+                                        <td colSpan={7} className="px-4 py-8 text-center text-gray-500">No recoveries found for this period.</td>
                                     </tr>
                                 )}
                             </tbody>

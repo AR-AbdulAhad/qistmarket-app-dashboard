@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo } from 'react'
 import Cookies from 'js-cookie'
 import Breadcrumb from '@/components/Breadcrumbs/Breadcrumb'
 import Loader from '@/components/common/Loader'
-import { ClipboardCheck, DollarSign } from 'lucide-react'
+import { ClipboardCheck, DollarSign, ShoppingBag, TrendingUp } from 'lucide-react'
 import OutletSelector from '@/components/common/OutletSelector'
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
@@ -13,22 +13,24 @@ interface SalesSummary {
   totalOrders: number
   totalGrossAmount: number
   totalReceived: number
+  totalInstallmentsReceived: number
+  totalCashSalesReceived: number
 }
 
-interface Order {
-  id: number
+interface InstallmentCollection {
+  id: string
   order_ref: string
   customer_name: string
-  total_amount: number
-  sales_value?: number
-  status: string
-  created_at: string
-  payments: any[]
+  month_number: number
+  month_label: string
+  amount_collected: number
+  payment_date: string
+  payment_method: string
 }
 
 export default function GlobalSalesReportPage() {
   const [loading, setLoading] = useState(true)
-  const [data, setData] = useState<{ summary: SalesSummary; orders: Order[] } | null>(null)
+  const [data, setData] = useState<any | null>(null)
   const [dateRange, setDateRange] = useState({ start: '', end: '' })
   const [outletId, setOutletId] = useState('all')
   const token = useMemo(() => Cookies.get('auth_token'), [])
@@ -92,47 +94,148 @@ export default function GlobalSalesReportPage() {
       {loading && !data ? <Loader /> : (
         data && (
           <>
-            <div className="mb-6 grid gap-5 md:grid-cols-3">
-              <StatCard label="Total Orders" value={data.summary.totalOrders} icon={ClipboardCheck} color="blue" />
-              <StatCard label="Gross Sales" value={data.summary.totalGrossAmount} icon={DollarSign} color="emerald" isCurrency />
-              <StatCard label="Total Collected" value={data.summary.totalReceived} icon={DollarSign} color="orange" isCurrency />
-            </div>
+            {/* ─── STAT CARDS ─── */}
+            {(() => {
+              const summary: any = data.summary || {};
+              const installmentReceived: number = summary.totalInstallmentsReceived ?? 0;
+              const cashSalesReceived: number = summary.totalCashSalesReceived ?? 0;
+              const totalAmountReceive = installmentReceived + cashSalesReceived;
 
-            <div className="rounded-[10px] border border-stroke bg-white shadow-1 dark:border-dark-3 dark:bg-gray-dark overflow-hidden">
-              <div className="max-h-[600px] overflow-y-auto">
-                <table className="w-full text-left">
-                  <thead className="sticky top-0 bg-gray-50 dark:bg-dark-3 z-10">
-                    <tr className="text-[11px] uppercase text-gray-500">
-                      <th className="px-6 py-4">Order Details</th>
-                      <th className="px-6 py-4">Status</th>
-                      <th className="px-6 py-4 text-right">Value</th>
-                    </tr>
-                  </thead>
-                  <tbody className="text-sm">
-                    {data.orders.map((o) => (
-                      <tr key={o.id} className="border-b border-stroke last:border-0 dark:border-dark-3 hover:bg-gray-50/50 dark:hover:bg-dark-3/30 transition-colors">
-                        <td className="px-6 py-4">
-                          <div className="font-bold text-dark dark:text-white font-mono">{o.order_ref}</div>
-                          <div className="text-xs text-gray-500">{o.customer_name} • {new Date(o.created_at).toLocaleDateString()}</div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${
-                            o.status === 'Completed' ? 'bg-emerald-100 text-emerald-600' :
-                            o.status === 'Cancelled' ? 'bg-red-100 text-red-600' :
-                            'bg-blue-100 text-blue-600'
-                          }`}>
-                            {o.status}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 text-right font-bold text-dark dark:text-white">
-                          Rs. {(o.sales_value ?? o.total_amount ?? 0).toLocaleString()}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              return (
+                <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+                  <StatCard label="Total Orders" value={summary.totalOrders || data.orders.length} icon={ClipboardCheck} color="blue" />
+                  <StatCard label="Gross Sales" value={summary.totalGrossAmount || 0} icon={DollarSign} color="emerald" isCurrency />
+                  <StatCard label="Total Installment Receiving" value={installmentReceived} icon={TrendingUp} color="purple" isCurrency />
+                  <StatCard label="Total Cash Sale" value={cashSalesReceived} icon={ShoppingBag} color="orange" isCurrency />
+                  <StatCard label="Total Amount Receive" value={totalAmountReceive} icon={DollarSign} color="emerald" isCurrency />
+                </div>
+              );
+            })()}
+
+            {/* ─── TABLE 1: New Sales (Delivered in Range) ─── */}
+            <div className="mb-6">
+              <div className="mb-3 flex items-center gap-2">
+                <div className="h-4 w-1 rounded-full bg-blue-500" />
+                <h3 className="text-sm font-bold text-dark dark:text-white uppercase tracking-wider">
+                  New Sales — Delivered in Period
+                </h3>
+                <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-bold text-blue-600 dark:bg-blue-900/30 dark:text-blue-400">
+                  {data.orders.length} orders
+                </span>
+              </div>
+              <div className="rounded-[10px] border border-stroke bg-white shadow-1 dark:border-dark-3 dark:bg-gray-dark overflow-hidden">
+                {data.orders.length === 0 ? (
+                  <div className="py-10 text-center text-sm text-gray-400 dark:text-gray-500">
+                    No new sales found for the selected date range.
+                  </div>
+                ) : (
+                  <div className="max-h-[400px] overflow-y-auto">
+                    <table className="w-full text-left">
+                      <thead className="sticky top-0 bg-gray-50 dark:bg-dark-3 z-10">
+                        <tr className="text-[11px] uppercase text-gray-500">
+                          <th className="px-6 py-4">Order Details</th>
+                          <th className="px-6 py-4">Type</th>
+                          <th className="px-6 py-4 text-right">Sales Value</th>
+                          <th className="px-6 py-4 text-right">Down Payment</th>
+                        </tr>
+                      </thead>
+                      <tbody className="text-sm">
+                        {data.orders.map((o: any) => (
+                          <tr key={o.id} className="border-b border-stroke last:border-0 dark:border-dark-3 hover:bg-gray-50/50 dark:hover:bg-dark-3/30 transition-colors">
+                            <td className="px-6 py-4">
+                              <div className="font-bold text-dark dark:text-white font-mono">{o.order_ref}</div>
+                              <div className="text-xs text-gray-500">{o.customer_name} • {new Date(o.created_at).toLocaleDateString()}</div>
+                            </td>
+                            <td className="px-6 py-4">
+                              <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${
+                                o.sale_type === 'cash' ? 'bg-orange-100 text-orange-600' : 'bg-purple-100 text-purple-600'
+                              }`}>
+                                {o.sale_type === 'cash' ? 'Cash Sale' : 'Installment'}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 text-right font-bold text-dark dark:text-white">
+                              Rs. {(o.sales_value ?? o.total_amount ?? 0).toLocaleString()}
+                            </td>
+                            <td className="px-6 py-4 text-right text-emerald-600 font-bold">
+                              Rs. {(o.down_payment_amount ?? 0).toLocaleString()}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
             </div>
+
+            {/* ─── TABLE 2: Installment Collections (Payments received in Range) ─── */}
+            {(() => {
+              const collections: InstallmentCollection[] = data.installmentCollections || [];
+              if (collections.length === 0) return null;
+              const totalCollected = collections.reduce((s: number, c: InstallmentCollection) => s + c.amount_collected, 0);
+
+              return (
+                <div className="mb-6">
+                  <div className="mb-3 flex items-center gap-2">
+                    <div className="h-4 w-1 rounded-full bg-purple-500" />
+                    <h3 className="text-sm font-bold text-dark dark:text-white uppercase tracking-wider">
+                      Installment Collections — Payments Received in Period
+                    </h3>
+                    <span className="rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-bold text-purple-600 dark:bg-purple-900/30 dark:text-purple-400">
+                      {collections.length} payments • Rs. {totalCollected.toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="rounded-[10px] border border-purple-200 bg-white shadow-1 dark:border-purple-900/30 dark:bg-gray-dark overflow-hidden">
+                    <div className="max-h-[500px] overflow-y-auto">
+                      <table className="w-full text-left">
+                        <thead className="sticky top-0 bg-purple-50 dark:bg-purple-900/20 z-10">
+                          <tr className="text-[11px] uppercase text-purple-600 dark:text-purple-400">
+                            <th className="px-6 py-4">Order Ref</th>
+                            <th className="px-6 py-4">Customer</th>
+                            <th className="px-6 py-4">Installment</th>
+                            <th className="px-6 py-4">Method</th>
+                            <th className="px-6 py-4">Payment Date</th>
+                            <th className="px-6 py-4 text-right">Amount Received</th>
+                          </tr>
+                        </thead>
+                        <tbody className="text-sm divide-y divide-stroke dark:divide-dark-3">
+                          {collections.map((c: InstallmentCollection) => (
+                            <tr key={c.id} className="hover:bg-purple-50/40 dark:hover:bg-purple-900/10 transition-colors">
+                              <td className="px-6 py-3">
+                                <span className="font-mono font-bold text-dark dark:text-white text-xs">{c.order_ref}</span>
+                              </td>
+                              <td className="px-6 py-3 text-sm text-gray-700 dark:text-gray-300">{c.customer_name}</td>
+                              <td className="px-6 py-3">
+                                <span className="inline-flex rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-bold text-purple-700 dark:bg-purple-900/30 dark:text-purple-300">
+                                  {c.month_label}
+                                </span>
+                              </td>
+                              <td className="px-6 py-3 text-xs text-gray-500 capitalize">{c.payment_method}</td>
+                              <td className="px-6 py-3 text-xs text-gray-500">
+                                {new Date(c.payment_date).toLocaleDateString('en-PK', { day: '2-digit', month: 'short', year: 'numeric' })}
+                              </td>
+                              <td className="px-6 py-3 text-right font-bold text-emerald-600">
+                                Rs. {c.amount_collected.toLocaleString()}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        <tfoot className="bg-purple-50 dark:bg-purple-900/20 border-t-2 border-purple-200 dark:border-purple-700 sticky bottom-0">
+                          <tr>
+                            <td colSpan={5} className="px-6 py-3 text-xs font-black uppercase text-purple-700 dark:text-purple-300">
+                              Total Installment Receiving
+                            </td>
+                            <td className="px-6 py-3 text-right font-black text-emerald-600 text-sm">
+                              Rs. {totalCollected.toLocaleString()}
+                            </td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
           </>
         )
       )}
@@ -145,6 +248,7 @@ function StatCard({ label, value, icon: Icon, color, isCurrency = false }: any) 
     blue: 'bg-blue-50 text-blue-600 dark:bg-blue-900/20',
     emerald: 'bg-emerald-50 text-emerald-600 dark:bg-emerald-900/20',
     orange: 'bg-orange-50 text-orange-600 dark:bg-orange-900/20',
+    purple: 'bg-purple-50 text-purple-600 dark:bg-purple-900/20',
   }
 
   return (
@@ -156,7 +260,7 @@ function StatCard({ label, value, icon: Icon, color, isCurrency = false }: any) 
         <div>
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">{label}</p>
           <p className="text-xl font-bold text-dark dark:text-white mt-1">
-            {isCurrency ? 'Rs. ' : ''}{value.toLocaleString()}
+            {isCurrency ? 'Rs. ' : ''}{(value || 0).toLocaleString()}
           </p>
         </div>
       </div>

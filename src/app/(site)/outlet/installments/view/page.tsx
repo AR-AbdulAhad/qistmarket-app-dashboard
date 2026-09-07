@@ -20,7 +20,9 @@ import {
   X,
   FileDown,
   Maximize2,
-  Minimize2
+  Minimize2,
+  Receipt,
+  Wallet
 } from "lucide-react";
 import SmartPayQrModal from "@/components/Installments/SmartPayQrModal";
 import jsPDF from "jspdf";
@@ -104,6 +106,8 @@ function InstallmentsViewContent() {
     overallSystemPaid: 0,
     monthsDue: 0,
     monthsCollected: 0,
+    monthsCollectedAdvance: 0,
+    monthsCollectedTotal: 0,
     monthsRemainingAmount: 0,
     customerCount: 0
   });
@@ -135,6 +139,15 @@ function InstallmentsViewContent() {
   const [ptpRow, setPtpRow] = useState<any>(null);
   const [ptpDate, setPtpDate] = useState("");
   const [ptpLoading, setPtpLoading] = useState(false);
+
+  // Payment History Modal state
+  const [historyModalOpen, setHistoryModalOpen] = useState(false);
+  const [historyRow, setHistoryRow] = useState<any>(null);
+
+  const openHistoryModal = (inst: any) => {
+    setHistoryRow(inst);
+    setHistoryModalOpen(true);
+  };
 
   const tomorrowStr = (() => {
     const d = new Date();
@@ -248,6 +261,8 @@ function InstallmentsViewContent() {
           overallSystemPaid: 0,
           monthsDue: 0,
           monthsCollected: 0,
+          monthsCollectedAdvance: 0,
+          monthsCollectedTotal: 0,
           monthsRemainingAmount: 0,
           customerCount: 0
         });
@@ -319,8 +334,14 @@ function InstallmentsViewContent() {
     : stats.monthsDue;
 
   const displayedMonthsCollected = hasColFilters
-    ? filteredInstallments.reduce((sum, i) => sum + (i.partialPayment || 0), 0)
+    ? filteredInstallments.reduce((sum, i) => sum + (i.installmentCollectedInTargetMonth ?? i.partialPayment ?? 0), 0)
     : stats.monthsCollected;
+
+  const displayedMonthsCollectedAdvance = hasColFilters
+    ? filteredInstallments.reduce((sum, i) => sum + (i.advanceCollectedInTargetMonth || 0), 0)
+    : stats.monthsCollectedAdvance;
+
+  const displayedMonthsCollectedTotal = displayedMonthsCollected + displayedMonthsCollectedAdvance;
 
   const displayedMonthsRemaining = displayedMonthsDue - displayedMonthsCollected;
 
@@ -580,7 +601,7 @@ function InstallmentsViewContent() {
       </div>
 
       {/* STATISTICS CARDS SECTION */}
-      <div className="mb-8 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-6">
+      <div className="mb-8 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
 
         <div className="relative overflow-hidden rounded-2xl border border-gray-100 bg-white p-6 shadow-xl shadow-gray-100/50 dark:bg-boxdark dark:border-strokedark">
           <div className="flex justify-between items-start">
@@ -600,12 +621,41 @@ function InstallmentsViewContent() {
             <div>
               <p className="text-[9px] font-black uppercase tracking-widest text-gray-400">Months Collected</p>
               <h3 className="mt-2 text-xl font-black text-slate-800 dark:text-white">Rs. {displayedMonthsCollected.toLocaleString()}</h3>
+              <p className="mt-1 text-[9px] text-gray-400">Installments only, no down payment</p>
             </div>
             <div className="rounded-xl bg-emerald-50 p-2.5 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400">
               <CheckCircle2 className="h-5 w-5" />
             </div>
           </div>
           <div className="absolute bottom-0 left-0 h-1 w-full bg-emerald-500/20" />
+        </div>
+
+        <div className="relative overflow-hidden rounded-2xl border border-gray-100 bg-white p-6 shadow-xl shadow-gray-100/50 dark:bg-boxdark dark:border-strokedark">
+          <div className="flex justify-between items-start">
+            <div>
+              <p className="text-[9px] font-black uppercase tracking-widest text-gray-400">Down Payment Collected</p>
+              <h3 className="mt-2 text-xl font-black text-slate-800 dark:text-white">Rs. {displayedMonthsCollectedAdvance.toLocaleString()}</h3>
+              <p className="mt-1 text-[9px] text-gray-400">Advance/down payment only</p>
+            </div>
+            <div className="rounded-xl bg-purple-50 p-2.5 text-purple-600 dark:bg-purple-500/10 dark:text-purple-400">
+              <Receipt className="h-5 w-5" />
+            </div>
+          </div>
+          <div className="absolute bottom-0 left-0 h-1 w-full bg-purple-500/20" />
+        </div>
+
+        <div className="relative overflow-hidden rounded-2xl border border-gray-100 bg-white p-6 shadow-xl shadow-gray-100/50 dark:bg-boxdark dark:border-strokedark">
+          <div className="flex justify-between items-start">
+            <div>
+              <p className="text-[9px] font-black uppercase tracking-widest text-gray-400">Total Collected (This Month)</p>
+              <h3 className="mt-2 text-xl font-black text-slate-800 dark:text-white">Rs. {displayedMonthsCollectedTotal.toLocaleString()}</h3>
+              <p className="mt-1 text-[9px] text-gray-400">Down payment + installments</p>
+            </div>
+            <div className="rounded-xl bg-teal-50 p-2.5 text-teal-600 dark:bg-teal-500/10 dark:text-teal-400">
+              <Wallet className="h-5 w-5" />
+            </div>
+          </div>
+          <div className="absolute bottom-0 left-0 h-1 w-full bg-teal-500/20" />
         </div>
 
         <div className="relative overflow-hidden rounded-2xl border border-gray-100 bg-white p-6 shadow-xl shadow-gray-100/50 dark:bg-boxdark dark:border-strokedark">
@@ -1127,16 +1177,15 @@ function InstallmentsViewContent() {
                           ) : (
                             <span className="text-gray-300 font-black">-</span>
                           )}
-                          {inst.paymentHistory && inst.paymentHistory.length > 1 && (
-                            <span
-                              className="text-[10px] text-[#E31E24] cursor-help hover:underline italic font-black uppercase tracking-wider"
-                              title={inst.paymentHistory
-                                .map((h: any) => `Rs. ${h.amount.toLocaleString()} via ${h.method} on ${formatExactDate(h.date, 'DD MMM YYYY, hh:mm A')}`)
-                                .join("\n")
-                              }
+                          {inst.paymentHistory && inst.paymentHistory.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => openHistoryModal(inst)}
+                              className="text-[10px] text-[#E31E24] hover:text-red-700 hover:underline italic font-black uppercase tracking-wider text-left transition-colors cursor-pointer"
+                              title="Click to view detailed payment logs"
                             >
-                              ({inst.paymentHistory.length} logs)
-                            </span>
+                              ({inst.paymentHistory.length} {inst.paymentHistory.length === 1 ? 'log' : 'logs'})
+                            </button>
                           )}
                         </div>
                       </td>
@@ -1527,6 +1576,104 @@ function InstallmentsViewContent() {
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Payment History Logs Modal */}
+      {historyModalOpen && historyRow && (
+        <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fade-in">
+          <div className="bg-white dark:bg-boxdark rounded-3xl shadow-2xl max-w-xl w-full border border-gray-100 dark:border-strokedark overflow-hidden">
+            
+            {/* Modal Header */}
+            <div className="p-6 border-b border-gray-100 dark:border-strokedark bg-gradient-to-r from-red-50 to-slate-50 dark:from-red-950/20 dark:to-boxdark flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-[#E31E24]/10 text-[#E31E24] flex items-center justify-center font-black">
+                  <Receipt className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="font-black text-slate-800 dark:text-white text-base">Payment History Logs</h3>
+                  <p className="text-xs text-gray-500 font-medium">
+                    {historyRow.customer_name} &bull; <span className="font-bold">{historyRow.order_ref}</span>
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setHistoryModalOpen(false)}
+                className="text-gray-400 hover:text-red-500 p-2 rounded-xl transition-all cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-6 flex flex-col gap-4 max-h-[70vh] overflow-y-auto">
+              
+              {/* Info Banner */}
+              <div className="grid grid-cols-2 gap-3 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-gray-100 dark:border-strokedark">
+                <div>
+                  <p className="text-[10px] font-black uppercase text-gray-400">Product / Item</p>
+                  <p className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">{historyRow.product_name || 'N/A'}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-black uppercase text-gray-400">Total Partial Paid</p>
+                  <p className="text-xs font-black text-emerald-600">
+                    Rs. {historyRow.partialPayment ? historyRow.partialPayment.toLocaleString() : (historyRow.paymentHistory?.reduce((sum: number, h: any) => sum + Number(h.amount || 0), 0)?.toLocaleString() || '0')}
+                  </p>
+                </div>
+              </div>
+
+              {/* Logs Table / List */}
+              <div className="rounded-2xl border border-gray-100 dark:border-strokedark overflow-hidden">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-gray-100 dark:bg-gray-700/60 text-[10px] font-black text-gray-400 uppercase tracking-wider">
+                    <tr>
+                      <th className="px-4 py-2.5">#</th>
+                      <th className="px-4 py-2.5">Amount</th>
+                      <th className="px-4 py-2.5">Method</th>
+                      <th className="px-4 py-2.5 text-right">Date &amp; Time</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 dark:divide-strokedark/50">
+                    {historyRow.paymentHistory && historyRow.paymentHistory.length > 0 ? (
+                      historyRow.paymentHistory.map((h: any, idx: number) => (
+                        <tr key={idx} className="hover:bg-gray-50/50 dark:hover:bg-gray-800/30 transition-colors">
+                          <td className="px-4 py-3 font-bold text-gray-400">{idx + 1}</td>
+                          <td className="px-4 py-3 font-black text-emerald-600 dark:text-emerald-400 text-sm">
+                            Rs. {Number(h.amount || 0).toLocaleString()}
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-300">
+                              {h.method || 'Cash'}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-right font-medium text-slate-700 dark:text-slate-300">
+                            {formatExactDate(h.date, 'DD MMM YYYY, hh:mm A')}
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={4} className="px-4 py-6 text-center text-gray-400 italic">
+                          No payment history logs found
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 border-t border-gray-100 dark:border-strokedark bg-gray-50/50 dark:bg-gray-800/30 flex justify-end">
+              <button
+                onClick={() => setHistoryModalOpen(false)}
+                className="px-6 py-2.5 bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs rounded-xl transition-all shadow-md cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+
           </div>
         </div>
       )}

@@ -1593,6 +1593,37 @@ function enrollmentStatusLabel(status?: string) {
 
 function PaytriggerProcessingScreen({ order, delivery, onExit }: { order: any; delivery: any; onExit: () => void }) {
   const device = delivery?.paytrigger_devices?.[0];
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [isSubmittingPhoto, setIsSubmittingPhoto] = useState(false);
+
+  const handleManualLockSubmit = async () => {
+    if (!photoFile || !order?.id) return;
+    try {
+      setIsSubmittingPhoto(true);
+      const token = Cookies.get('auth_token');
+      const formData = new FormData();
+      formData.append('manual_lock_photo', photoFile);
+
+      const res = await fetch(`${BACKEND_URL}/api/paytrigger/order/${order.id}/manual-lock-photo`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      });
+
+      const data = await res.json();
+      if (!res.ok || data.success === false) {
+        throw new Error(data.message || 'Failed to submit lock photo');
+      }
+
+      toast.success(data.message || 'Lock screen photo submitted! Delivery completed.');
+      window.location.reload();
+    } catch (err: any) {
+      console.error('Submit manual lock photo error:', err);
+      toast.error(err.message || 'Failed to submit lock photo');
+    } finally {
+      setIsSubmittingPhoto(false);
+    }
+  };
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-16 min-h-screen flex items-center justify-center">
@@ -1625,6 +1656,32 @@ function PaytriggerProcessingScreen({ order, delivery, onExit }: { order: any; d
             <p className="text-xs text-indigo-600 font-mono">IMEI: {device.imei}</p>
           </div>
         )}
+
+        {/* Manual Lock Screen Photo Upload Option */}
+        <div className="p-5 bg-emerald-50/60 rounded-2xl border border-emerald-100 text-left space-y-3">
+          <div className="flex items-center gap-2">
+            <Camera className="w-5 h-5 text-emerald-600" />
+            <h3 className="text-sm font-black text-emerald-900">Manual Lock Photo Bypass</h3>
+          </div>
+          <p className="text-xs text-emerald-700 font-medium">
+            If this mobile cannot be enrolled via Software Activation, upload a photo of the manually locked screen to mark delivery as completed.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-3 items-stretch">
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) => setPhotoFile(e.target.files?.[0] || null)}
+              className="text-xs text-gray-600 border border-emerald-200 rounded-xl p-2 bg-white flex-1"
+            />
+            <button
+              onClick={handleManualLockSubmit}
+              disabled={isSubmittingPhoto || !photoFile}
+              className="px-4 py-2 bg-emerald-600 text-white font-bold rounded-xl text-xs hover:bg-emerald-700 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
+            >
+              {isSubmittingPhoto ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Submit & Complete'}
+            </button>
+          </div>
+        </div>
 
         <div className="flex items-center gap-3 p-4 bg-amber-50 rounded-2xl border border-amber-100 text-left">
           <AlertCircle className="w-6 h-6 text-amber-600 flex-shrink-0" />

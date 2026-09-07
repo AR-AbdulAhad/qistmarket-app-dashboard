@@ -11,6 +11,7 @@ import Loader from '@/components/common/Loader';
 import { useAuth } from '../../../../../contexts/AuthContext'
 import OrderCustomerInfo from '@/components/common/OrderCustomerInfo'
 import { MediaCard } from '@/components/common/MediaCard'
+import { ConfirmModal } from '@/components/Modals/ConfirmModal'
 import { formatExactDate } from "@/utils/dateUtils";
 import LinkedAccountsBadge from '@/components/common/LinkedAccountsBadge';
 
@@ -21,7 +22,8 @@ const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL
 interface VerificationData {
   id: number
   order_id: number
-  verification_officer_id: number
+  verification_officer_id: number | null
+  verification_officer_name_override?: string | null
   status: string
   start_time: string
   end_time: string | null
@@ -56,8 +58,17 @@ interface VerificationData {
     verification_assigned_at: string | null,
     created_by: { username: string, full_name: string } | null,
     assigned_to: { username: string, full_name: string } | null,
+    delivery_officer_id?: number | null,
+    delivery_officer_name_override?: string | null,
     delivery_officer: { username: string, full_name: string; id: number } | null,
     recovery_officer: { username: string, full_name: string; id: number } | null,
+    delivery?: {
+      id: number
+      self_pickup: boolean
+      delivery_agent_id: number
+      status: string
+      uploads: { id: number; upload_type: string; file_url: string | null; link: string | null; tag: string | null; uploaded_at: string }[]
+    } | null,
     statusHistories?: {
       id: number;
       old_status: string | null;
@@ -418,6 +429,18 @@ const Field = ({ label, value, className = "" }: { label: string; value: any; cl
   )
 }
 
+const LabeledInput = ({ label, value, onChange, type = 'text' }: { label: string; value: string; onChange: (v: string) => void; type?: string }) => (
+  <div>
+    <label className="block text-sm font-medium text-gray-500 dark:text-gray-400">{label}</label>
+    <input
+      type={type}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className="mt-1 w-full rounded-lg border border-stroke bg-white px-4 py-2.5 text-sm text-dark dark:border-dark-3 dark:bg-dark-3 dark:text-white transition focus:border-primary"
+    />
+  </div>
+)
+
 
 const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) => {
   const unwrappedParams = use(params)
@@ -454,9 +477,24 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
   // that flow uses, so the result is indistinguishable from a normal one
   // (home_location_verified flips true, etc.) other than location_type
   // being 'manual' instead of 'captured'.
-  const [addLocationFor, setAddLocationFor] = useState<'purchaser' | 'grantor1' | 'grantor2' | null>(null);
+  const [addLocationFor, setAddLocationFor] = useState<'purchaser' | 'grantor1' | 'grantor2' | 'delivery' | null>(null);
   const [locationForm, setLocationForm] = useState({ latitude: '', longitude: '', address: '', photo: null as File | null });
   const [savingLocation, setSavingLocation] = useState(false);
+  const [confirmDeleteLocationId, setConfirmDeleteLocationId] = useState<number | null>(null);
+  const [deletingLocation, setDeletingLocation] = useState(false);
+  const [addDeliveryPhotoOpen, setAddDeliveryPhotoOpen] = useState(false);
+  const [deliveryPhotoFile, setDeliveryPhotoFile] = useState<File | null>(null);
+  const [savingDeliveryPhoto, setSavingDeliveryPhoto] = useState(false);
+  const [editingProductFinancial, setEditingProductFinancial] = useState(false);
+  const [productFinancialForm, setProductFinancialForm] = useState({
+    product_name: '', imei_serial: '', total_amount: '', advance_amount: '', monthly_amount: '', months: '',
+  });
+  const [savingProductFinancial, setSavingProductFinancial] = useState(false);
+  const [editingVerificationDetails, setEditingVerificationDetails] = useState(false);
+  const [verificationDetailsForm, setVerificationDetailsForm] = useState({
+    status: '', start_time: '', end_time: '', created_at: '', updated_at: '',
+  });
+  const [savingVerificationDetails, setSavingVerificationDetails] = useState(false);
 
   const { user } = useAuth();
   // Set officer details from loaded data when officerIdInput changes
@@ -880,17 +918,18 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
     }
   };
 
-  const personIdFor = (personType: 'purchaser' | 'grantor1' | 'grantor2'): number | null => {
+  const personIdFor = (personType: 'purchaser' | 'grantor1' | 'grantor2' | 'delivery'): number | null => {
     if (!data) return null;
     if (personType === 'purchaser') return data.purchaser?.id ?? null;
+    if (personType === 'delivery') return null; // location tied to the delivery, not a person record
     const num = personType === 'grantor1' ? 1 : 2;
     return data.grantors.find((g) => g.grantor_number === num)?.id ?? null;
   };
 
-  const personLabelFor = (personType: 'purchaser' | 'grantor1' | 'grantor2') =>
-    personType === 'purchaser' ? 'Purchaser' : personType === 'grantor1' ? 'Grantor 1' : 'Grantor 2';
+  const personLabelFor = (personType: 'purchaser' | 'grantor1' | 'grantor2' | 'delivery') =>
+    personType === 'purchaser' ? 'Purchaser' : personType === 'grantor1' ? 'Grantor 1' : personType === 'delivery' ? 'Delivery' : 'Grantor 2';
 
-  const openAddLocation = (personType: 'purchaser' | 'grantor1' | 'grantor2') => {
+  const openAddLocation = (personType: 'purchaser' | 'grantor1' | 'grantor2' | 'delivery') => {
     setAddLocationFor(personType);
     setLocationForm({ latitude: '', longitude: '', address: '', photo: null });
   };
@@ -898,7 +937,7 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
   const handleSaveLocation = async () => {
     if (!data || !addLocationFor) return;
     const personId = personIdFor(addLocationFor);
-    if (!personId) {
+    if (!personId && addLocationFor !== 'delivery') {
       toast.error(`${personLabelFor(addLocationFor)} record not found`);
       return;
     }
@@ -921,7 +960,7 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
     formData.append('address', locationForm.address);
     formData.append('label', personLabelFor(addLocationFor));
     formData.append('person_type', addLocationFor);
-    formData.append('person_id', String(personId));
+    if (personId) formData.append('person_id', String(personId));
     if (locationForm.photo) formData.append('photos', locationForm.photo);
 
     setSavingLocation(true);
@@ -980,6 +1019,201 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
     }
   };
 
+  const handleDeleteDocument = async (documentId: number) => {
+    if (!data) return;
+    const token = Cookies.get('auth_token');
+    if (!token) {
+      toast.error('Authentication required');
+      return;
+    }
+    const res = await fetch(`${BACKEND_URL}/api/verification/document/${documentId}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.error?.message || json.message || 'Failed to delete document');
+
+    const refreshRes = await fetch(`${BACKEND_URL}/api/verification/order/${id}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const refreshJson = await refreshRes.json();
+    if (refreshJson.success && refreshJson.data?.verification) {
+      setData(refreshJson.data.verification);
+    }
+    toast.success('Document deleted');
+  };
+
+  // ISO string -> the "YYYY-MM-DDTHH:mm" shape <input type="datetime-local"> needs.
+  const toDateTimeLocalValue = (iso?: string | null) => {
+    if (!iso) return '';
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return '';
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  };
+
+  const openEditVerificationDetails = () => {
+    if (!data) return;
+    setVerificationDetailsForm({
+      status: data.status || '',
+      start_time: toDateTimeLocalValue(data.start_time),
+      end_time: toDateTimeLocalValue(data.end_time),
+      created_at: toDateTimeLocalValue(data.created_at),
+      updated_at: toDateTimeLocalValue(data.updated_at),
+    });
+    setEditingVerificationDetails(true);
+  };
+
+  const handleSaveVerificationDetails = async () => {
+    if (!data) return;
+    const token = Cookies.get('auth_token');
+    if (!token) {
+      toast.error('Authentication required');
+      return;
+    }
+    setSavingVerificationDetails(true);
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/verification/${data.id}/details`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          status: verificationDetailsForm.status,
+          start_time: verificationDetailsForm.start_time ? new Date(verificationDetailsForm.start_time).toISOString() : '',
+          end_time: verificationDetailsForm.end_time ? new Date(verificationDetailsForm.end_time).toISOString() : null,
+          created_at: verificationDetailsForm.created_at ? new Date(verificationDetailsForm.created_at).toISOString() : '',
+          updated_at: verificationDetailsForm.updated_at ? new Date(verificationDetailsForm.updated_at).toISOString() : '',
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) throw new Error(json.message || 'Failed to save changes');
+
+      const refreshRes = await fetch(`${BACKEND_URL}/api/verification/order/${id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const refreshJson = await refreshRes.json();
+      if (refreshJson.success && refreshJson.data?.verification) {
+        setData(refreshJson.data.verification);
+      }
+      toast.success('Verification details updated');
+      setEditingVerificationDetails(false);
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || 'Failed to save changes');
+    } finally {
+      setSavingVerificationDetails(false);
+    }
+  };
+
+  const openEditProductFinancial = () => {
+    if (!data?.order) return;
+    setProductFinancialForm({
+      product_name: data.order.product_name || '',
+      imei_serial: data.order.imei_serial || '',
+      total_amount: data.order.total_amount ? String(data.order.total_amount) : '',
+      advance_amount: data.order.advance_amount ? String(data.order.advance_amount) : '',
+      monthly_amount: data.order.monthly_amount ? String(data.order.monthly_amount) : '',
+      months: data.order.months ? String(data.order.months) : '',
+    });
+    setEditingProductFinancial(true);
+  };
+
+  const handleSaveProductFinancial = async () => {
+    if (!data?.order) return;
+    const token = Cookies.get('auth_token');
+    if (!token) {
+      toast.error('Authentication required');
+      return;
+    }
+    setSavingProductFinancial(true);
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/orders/${data.order.id}/update-item`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(productFinancialForm),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) throw new Error(json.message || 'Failed to save changes');
+
+      const refreshRes = await fetch(`${BACKEND_URL}/api/verification/order/${id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const refreshJson = await refreshRes.json();
+      if (refreshJson.success && refreshJson.data?.verification) {
+        setData(refreshJson.data.verification);
+      }
+      toast.success('Product & Financial details updated');
+      setEditingProductFinancial(false);
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || 'Failed to save changes');
+    } finally {
+      setSavingProductFinancial(false);
+    }
+  };
+
+  const handleAddDeliveryPhoto = async () => {
+    if (!data?.order?.delivery || !deliveryPhotoFile) return;
+    const token = Cookies.get('auth_token');
+    if (!token) {
+      toast.error('Authentication required');
+      return;
+    }
+    const formData = new FormData();
+    formData.append('photos', deliveryPhotoFile);
+    formData.append('upload_type', 'face_photo');
+
+    setSavingDeliveryPhoto(true);
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/delivery/${data.order.delivery.id}/upload-manual`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) throw new Error(json.message || 'Failed to add delivery photo');
+
+      const refreshRes = await fetch(`${BACKEND_URL}/api/verification/order/${id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const refreshJson = await refreshRes.json();
+      if (refreshJson.success && refreshJson.data?.verification) {
+        setData(refreshJson.data.verification);
+      }
+      toast.success('Delivery photo added');
+      setAddDeliveryPhotoOpen(false);
+      setDeliveryPhotoFile(null);
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || 'Failed to add delivery photo');
+    } finally {
+      setSavingDeliveryPhoto(false);
+    }
+  };
+
+  const handleDeleteDeliveryUpload = async (uploadId: number) => {
+    if (!data) return;
+    const token = Cookies.get('auth_token');
+    if (!token) {
+      toast.error('Authentication required');
+      return;
+    }
+    const res = await fetch(`${BACKEND_URL}/api/delivery/upload/${uploadId}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const json = await res.json();
+    if (!res.ok || !json.success) throw new Error(json.message || 'Failed to delete delivery photo');
+
+    const refreshRes = await fetch(`${BACKEND_URL}/api/verification/order/${id}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const refreshJson = await refreshRes.json();
+    if (refreshJson.success && refreshJson.data?.verification) {
+      setData(refreshJson.data.verification);
+    }
+    toast.success('Delivery photo deleted');
+  };
+
   const renderDocumentSlots = (personType: 'purchaser' | 'grantor1' | 'grantor2') => {
     if (!data) return null;
 
@@ -1028,6 +1262,7 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
                   uploadedAt={doc.uploaded_at}
                   isEditable={user?.role === 'Super Admin'}
                   onEdit={(file) => handleMediaSave(doc, file)}
+                  onDelete={user?.role === 'Super Admin' ? () => handleDeleteDocument(doc.id) : undefined}
                   editHistory={data.edit_history}
                   historyFilter={(h) => h.field_name === doc.document_type}
                 />
@@ -1071,6 +1306,7 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
               uploadedAt={doc.uploaded_at}
               isEditable={user?.role === 'Super Admin'}
               onEdit={(file) => handleMediaSave(doc, file)}
+              onDelete={user?.role === 'Super Admin' ? () => handleDeleteDocument(doc.id) : undefined}
               editHistory={data.edit_history}
               historyFilter={(h) => h.field_name === doc.document_type}
             />
@@ -1084,6 +1320,21 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
   const [deliveryOfficers, setDeliveryOfficers] = useState<{ id: number; full_name: string; username: string }[]>([]);
   const [outlets, setOutlets] = useState<{ id: number; name: string; code: string }[]>([]);
   const [updatingAssignment, setUpdatingAssignment] = useState(false);
+  // "Other — type name" fallback for VO/DO when the real officer who did the
+  // work isn't in the system as a User (mainly old/legacy orders). Each
+  // starts in "other" mode when a name override is already saved and no id
+  // is set, so a saved custom name doesn't look like it reverted to a dropdown.
+  const [voOtherMode, setVoOtherMode] = useState(false);
+  const [doOtherMode, setDoOtherMode] = useState(false);
+  const [voOtherName, setVoOtherName] = useState('');
+  const [doOtherName, setDoOtherName] = useState('');
+  useEffect(() => {
+    if (!data) return;
+    setVoOtherMode(!data.verification_officer_id && !!data.verification_officer_name_override);
+    setVoOtherName(data.verification_officer_name_override || '');
+    setDoOtherMode(!(data.order as any)?.delivery_officer_id && !!(data.order as any)?.delivery_officer_name_override);
+    setDoOtherName((data.order as any)?.delivery_officer_name_override || '');
+  }, [data?.id, data?.verification_officer_id, data?.verification_officer_name_override, (data?.order as any)?.delivery_officer_id, (data?.order as any)?.delivery_officer_name_override]);
 
   const selectedOutletId = (data?.order as any)?.outlet_id || (data?.order as any)?.outlet?.id;
 
@@ -1146,8 +1397,15 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
     fetchOfficers();
   }, [selectedOutletId]);
 
-  const handleAssignmentChange = async (newOfficerId?: number | null, newOutletId?: number | null, newDeliveryOfficerId?: number | null) => {
-    if (!data) return;
+  const handleAssignmentChange = async (
+    newOfficerId?: number | null,
+    newOutletId?: number | null,
+    newDeliveryOfficerId?: number | null,
+    newVoNameOverride?: string | null,
+    newDoNameOverride?: string | null,
+    newSelfPickup?: boolean
+  ) => {
+    if (!data || updatingAssignment) return;
     const token = Cookies.get('auth_token');
     if (!token) {
       toast.error('Authentication required');
@@ -1160,6 +1418,9 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
       if (newOfficerId !== undefined) payload.verification_officer_id = newOfficerId;
       if (newOutletId !== undefined) payload.outlet_id = newOutletId;
       if (newDeliveryOfficerId !== undefined) payload.delivery_officer_id = newDeliveryOfficerId;
+      if (newVoNameOverride !== undefined) payload.verification_officer_name_override = newVoNameOverride;
+      if (newDoNameOverride !== undefined) payload.delivery_officer_name_override = newDoNameOverride;
+      if (newSelfPickup !== undefined) payload.self_pickup = newSelfPickup;
 
       const res = await fetch(`${BACKEND_URL}/api/verification/${data.id}/assignment`, {
         method: 'PUT',
@@ -1180,11 +1441,13 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
       const refreshJson = await refreshRes.json();
       if (refreshJson.success && refreshJson.data?.verification) {
         setData(refreshJson.data.verification);
-        toast.success(json.message || 'Assignment updated successfully');
+        // Fixed id so rapid repeated changes (e.g. double-clicking a toggle)
+        // replace the same toast instead of stacking a new one each time.
+        toast.success(json.message || 'Assignment updated successfully', { id: 'assignment-update' });
       }
     } catch (err: any) {
       console.error(err);
-      toast.error(err.message || 'Failed to update assignment');
+      toast.error(err.message || 'Failed to update assignment', { id: 'assignment-update' });
     } finally {
       setUpdatingAssignment(false);
     }
@@ -1258,17 +1521,27 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
         </div>
       </div>
 
-      {/* Verification Information - NON-EDITABLE */}
+      {/* Verification Information */}
       <div className="mb-12">
-        <h2 className="mb-4 text-2xl font-semibold text-dark dark:text-white">
-          Verification Information
-        </h2>
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-2xl font-semibold text-dark dark:text-white">
+            Verification Information
+          </h2>
+          {user?.role === 'Super Admin' && !editingVerificationDetails && (
+            <button
+              onClick={openEditVerificationDetails}
+              className="text-xs font-bold text-primary hover:underline"
+            >
+              Edit Status / Times
+            </button>
+          )}
+        </div>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
           <Field label="ID" value={data.id} />
           <Field label="Order ID" value={data.order_id} />
           {data.order?.status && <Field label="Order Status" value={data.order.status} />}
 
-          {data.order?.channel === 'legacy_import' ? (
+          {user?.role === 'Super Admin' ? (
             <>
               {/* 1. Assigned Branch / Outlet Select FIRST */}
               <div>
@@ -1295,67 +1568,162 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
                 </div>
               </div>
 
-              {/* 2. Verification Officer Select */}
+              {/* 2. Verification Officer — pick from list, or type a name */}
               <div>
                 <label className="block text-sm font-medium text-gray-500 dark:text-gray-400 font-bold">Verification Officer</label>
                 <div className="mt-1">
-                  <select
-                    value={data.verification_officer_id || ''}
-                    onChange={(e) => handleAssignmentChange(e.target.value ? Number(e.target.value) : null, undefined, undefined)}
-                    disabled={updatingAssignment || !selectedOutletId}
-                    className="w-full rounded-lg border border-stroke bg-gray-100 px-4 py-2.5 text-sm font-bold text-dark dark:border-dark-3 dark:bg-dark-3 dark:text-white transition focus:border-primary disabled:opacity-60"
-                  >
-                    {!selectedOutletId ? (
-                      <option value="">Select Branch / Outlet First</option>
-                    ) : (
-                      <>
-                        <option value="">Unassigned</option>
-                        {data.verification_officer && !verificationOfficers.some(o => o.id === data.verification_officer_id) && (
-                          <option value={data.verification_officer_id}>
-                            {data.verification_officer.full_name} ({data.verification_officer.username})
-                          </option>
-                        )}
-                        {verificationOfficers.map((o) => (
-                          <option key={o.id} value={o.id}>
-                            {o.full_name} ({o.username})
-                          </option>
-                        ))}
-                      </>
-                    )}
-                  </select>
+                  {voOtherMode ? (
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={voOtherName}
+                        onChange={(e) => setVoOtherName(e.target.value)}
+                        placeholder="Type officer's name"
+                        disabled={updatingAssignment}
+                        className="w-full rounded-lg border border-stroke bg-gray-100 px-4 py-2.5 text-sm font-bold text-dark dark:border-dark-3 dark:bg-dark-3 dark:text-white transition focus:border-primary disabled:opacity-60"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleAssignmentChange(undefined, undefined, undefined, voOtherName.trim() || null)}
+                        disabled={updatingAssignment || !voOtherName.trim()}
+                        className="shrink-0 rounded-lg bg-primary px-3 py-2 text-xs font-bold text-white disabled:opacity-50"
+                      >
+                        Save
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setVoOtherMode(false); setVoOtherName(''); }}
+                        disabled={updatingAssignment}
+                        className="shrink-0 rounded-lg border border-stroke px-3 py-2 text-xs font-bold text-dark dark:text-white"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  ) : (
+                    <select
+                      value={data.verification_officer_id || ''}
+                      onChange={(e) => {
+                        if (e.target.value === '__other__') { setVoOtherMode(true); return; }
+                        handleAssignmentChange(e.target.value ? Number(e.target.value) : null, undefined, undefined, null);
+                      }}
+                      disabled={updatingAssignment || !selectedOutletId}
+                      className="w-full rounded-lg border border-stroke bg-gray-100 px-4 py-2.5 text-sm font-bold text-dark dark:border-dark-3 dark:bg-dark-3 dark:text-white transition focus:border-primary disabled:opacity-60"
+                    >
+                      {!selectedOutletId ? (
+                        <option value="">Select Branch / Outlet First</option>
+                      ) : (
+                        <>
+                          <option value="">Unassigned</option>
+                          {data.verification_officer && !verificationOfficers.some(o => o.id === data.verification_officer_id) && (
+                            <option value={data.verification_officer_id ?? ''}>
+                              {data.verification_officer.full_name} ({data.verification_officer.username})
+                            </option>
+                          )}
+                          {verificationOfficers.map((o) => (
+                            <option key={o.id} value={o.id}>
+                              {o.full_name} ({o.username})
+                            </option>
+                          ))}
+                          <option value="__other__">Other — type name manually</option>
+                        </>
+                      )}
+                    </select>
+                  )}
                 </div>
               </div>
 
-              {/* 3. Delivery Officer Select */}
+              {/* 3. Self Pickup vs Delivery Officer */}
               <div>
-                <label className="block text-sm font-medium text-gray-500 dark:text-gray-400 font-bold">Delivery Officer</label>
-                <div className="mt-1">
-                  <select
-                    value={(data.order as any)?.delivery_officer_id || (data.order as any)?.delivery_officer?.id || ''}
-                    onChange={(e) => handleAssignmentChange(undefined, undefined, e.target.value ? Number(e.target.value) : null)}
-                    disabled={updatingAssignment || !selectedOutletId}
-                    className="w-full rounded-lg border border-stroke bg-gray-100 px-4 py-2.5 text-sm font-bold text-dark dark:border-dark-3 dark:bg-dark-3 dark:text-white transition focus:border-primary disabled:opacity-60"
-                  >
-                    {!selectedOutletId ? (
-                      <option value="">Select Branch / Outlet First</option>
-                    ) : (
-                      <>
-                        <option value="">Unassigned</option>
-                        {(data.order as any)?.delivery_officer && !deliveryOfficers.some(o => o.id === (data.order as any).delivery_officer?.id) && (
-                          <option value={(data.order as any).delivery_officer.id}>
-                            {(data.order as any).delivery_officer.full_name} ({(data.order as any).delivery_officer.username})
-                          </option>
-                        )}
-                        {deliveryOfficers.map((o) => (
-                          <option key={o.id} value={o.id}>
-                            {o.full_name} ({o.username})
-                          </option>
-                        ))}
-                      </>
-                    )}
-                  </select>
+                <label className="block text-sm font-medium text-gray-500 dark:text-gray-400 font-bold">Self Pickup?</label>
+                <div className="mt-1 flex items-center gap-3 rounded-lg border border-stroke bg-gray-100 px-4 py-2.5 dark:border-dark-3 dark:bg-dark-3">
+                  {/* Same real-checkbox + peer-checked pattern as the app's
+                      existing Switch component (FormElements/switch.tsx) —
+                      a manually toggled className on a plain <button> here
+                      was rendering as a stretched/broken pill, so this
+                      reuses the pattern already proven to render correctly
+                      elsewhere in this app. */}
+                  <label className="relative inline-block h-6 w-11 shrink-0 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      className="peer sr-only"
+                      checked={!!data.order?.delivery?.self_pickup}
+                      disabled={updatingAssignment || !data.order?.delivery}
+                      onChange={() => handleAssignmentChange(undefined, undefined, undefined, undefined, undefined, !(data.order?.delivery?.self_pickup))}
+                    />
+                    <span className="absolute inset-0 rounded-full bg-gray-300 transition-colors peer-checked:bg-primary peer-disabled:opacity-50 dark:bg-gray-600" />
+                    <span className="absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform peer-checked:translate-x-5" />
+                  </label>
+                  <span className="min-w-0 flex-1 text-sm font-bold leading-snug text-dark dark:text-white">
+                    {!data.order?.delivery ? 'No delivery record yet' : data.order.delivery.self_pickup ? 'Yes — customer picked up' : 'No — delivered by officer'}
+                  </span>
                 </div>
               </div>
+
+              {/* 4. Delivery Officer — pick from list, or type a name (hidden for self-pickup) */}
+              {!data.order?.delivery?.self_pickup && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-500 dark:text-gray-400 font-bold">Delivery Officer</label>
+                  <div className="mt-1">
+                    {doOtherMode ? (
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={doOtherName}
+                          onChange={(e) => setDoOtherName(e.target.value)}
+                          placeholder="Type officer's name"
+                          disabled={updatingAssignment}
+                          className="w-full rounded-lg border border-stroke bg-gray-100 px-4 py-2.5 text-sm font-bold text-dark dark:border-dark-3 dark:bg-dark-3 dark:text-white transition focus:border-primary disabled:opacity-60"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleAssignmentChange(undefined, undefined, undefined, undefined, doOtherName.trim() || null)}
+                          disabled={updatingAssignment || !doOtherName.trim()}
+                          className="shrink-0 rounded-lg bg-primary px-3 py-2 text-xs font-bold text-white disabled:opacity-50"
+                        >
+                          Save
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => { setDoOtherMode(false); setDoOtherName(''); }}
+                          disabled={updatingAssignment}
+                          className="shrink-0 rounded-lg border border-stroke px-3 py-2 text-xs font-bold text-dark dark:text-white"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    ) : (
+                      <select
+                        value={(data.order as any)?.delivery_officer_id || (data.order as any)?.delivery_officer?.id || ''}
+                        onChange={(e) => {
+                          if (e.target.value === '__other__') { setDoOtherMode(true); return; }
+                          handleAssignmentChange(undefined, undefined, e.target.value ? Number(e.target.value) : null, undefined, null);
+                        }}
+                        disabled={updatingAssignment || !selectedOutletId}
+                        className="w-full rounded-lg border border-stroke bg-gray-100 px-4 py-2.5 text-sm font-bold text-dark dark:border-dark-3 dark:bg-dark-3 dark:text-white transition focus:border-primary disabled:opacity-60"
+                      >
+                        {!selectedOutletId ? (
+                          <option value="">Select Branch / Outlet First</option>
+                        ) : (
+                          <>
+                            <option value="">Unassigned</option>
+                            {(data.order as any)?.delivery_officer && !deliveryOfficers.some(o => o.id === (data.order as any).delivery_officer?.id) && (
+                              <option value={(data.order as any).delivery_officer.id}>
+                                {(data.order as any).delivery_officer.full_name} ({(data.order as any).delivery_officer.username})
+                              </option>
+                            )}
+                            {deliveryOfficers.map((o) => (
+                              <option key={o.id} value={o.id}>
+                                {o.full_name} ({o.username})
+                              </option>
+                            ))}
+                            <option value="__other__">Other — type name manually</option>
+                          </>
+                        )}
+                      </select>
+                    )}
+                  </div>
+                </div>
+              )}
             </>
           ) : (
             <>
@@ -1367,41 +1735,81 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
                   </div>
                 </div>
               )}
-              {data.verification_officer && (
+              {(data.verification_officer || data.verification_officer_name_override) && (
                 <Field
                   label="Verification Officer"
-                  value={`${data.verification_officer.full_name} (${data.verification_officer.username})`}
+                  value={data.verification_officer ? `${data.verification_officer.full_name} (${data.verification_officer.username})` : data.verification_officer_name_override}
                 />
               )}
-              {(data.order as any)?.delivery_officer && (
+              <Field label="Self Pickup?" value={!data.order?.delivery ? null : (data.order.delivery.self_pickup ? 'Yes' : 'No')} />
+              {!data.order?.delivery?.self_pickup && ((data.order as any)?.delivery_officer || (data.order as any)?.delivery_officer_name_override) && (
                 <Field
                   label="Delivery Officer"
-                  value={`${(data.order as any).delivery_officer.full_name} (${(data.order as any).delivery_officer.username})`}
+                  value={(data.order as any).delivery_officer ? `${(data.order as any).delivery_officer.full_name} (${(data.order as any).delivery_officer.username})` : (data.order as any).delivery_officer_name_override}
                 />
               )}
             </>
           )}
 
 
-          {data.status && (
-            <div>
-              <label className="block text-sm font-medium text-gray-500 dark:text-gray-400">Verification Status</label>
-              <div className="mt-1 rounded-lg bg-gray-100 px-4 py-2.5 dark:bg-dark-3">
-                <span className={cn(
-                  "inline-flex rounded-full px-2 py-1 text-xs font-medium",
-                  data.status === 'completed' ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" :
-                    data.status === 'in_progress' ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400" :
-                      "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400"
-                )}>
-                  {data.status}
-                </span>
+          {editingVerificationDetails ? (
+            <>
+              <div>
+                <label className="block text-sm font-medium text-gray-500 dark:text-gray-400">Verification Status</label>
+                <select
+                  value={verificationDetailsForm.status}
+                  onChange={(e) => setVerificationDetailsForm((f) => ({ ...f, status: e.target.value }))}
+                  className="mt-1 w-full rounded-lg border border-stroke bg-white px-4 py-2.5 text-sm text-dark dark:border-dark-3 dark:bg-dark-3 dark:text-white"
+                >
+                  <option value="in_progress">in_progress</option>
+                  <option value="completed">completed</option>
+                  <option value="location_captured">location_captured</option>
+                </select>
               </div>
-            </div>
+              <LabeledInput label="Start Time" type="datetime-local" value={verificationDetailsForm.start_time} onChange={(v) => setVerificationDetailsForm((f) => ({ ...f, start_time: v }))} />
+              <LabeledInput label="End Time" type="datetime-local" value={verificationDetailsForm.end_time} onChange={(v) => setVerificationDetailsForm((f) => ({ ...f, end_time: v }))} />
+              <LabeledInput label="Created At" type="datetime-local" value={verificationDetailsForm.created_at} onChange={(v) => setVerificationDetailsForm((f) => ({ ...f, created_at: v }))} />
+              <LabeledInput label="Updated At" type="datetime-local" value={verificationDetailsForm.updated_at} onChange={(v) => setVerificationDetailsForm((f) => ({ ...f, updated_at: v }))} />
+              <div className="flex items-end gap-3">
+                <button
+                  onClick={handleSaveVerificationDetails}
+                  disabled={savingVerificationDetails}
+                  className="rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
+                >
+                  {savingVerificationDetails ? 'Saving...' : 'Save Changes'}
+                </button>
+                <button
+                  onClick={() => setEditingVerificationDetails(false)}
+                  disabled={savingVerificationDetails}
+                  className="rounded-lg border border-stroke px-4 py-2 text-sm dark:border-dark-3 dark:text-gray-300"
+                >
+                  Cancel
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              {data.status && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-500 dark:text-gray-400">Verification Status</label>
+                  <div className="mt-1 rounded-lg bg-gray-100 px-4 py-2.5 dark:bg-dark-3">
+                    <span className={cn(
+                      "inline-flex rounded-full px-2 py-1 text-xs font-medium",
+                      data.status === 'completed' ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" :
+                        data.status === 'in_progress' ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400" :
+                          "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400"
+                    )}>
+                      {data.status}
+                    </span>
+                  </div>
+                </div>
+              )}
+              <Field label="Start Time" value={data.start_time ? formatDateTimeUTC(data.start_time) : null} />
+              <Field label="End Time" value={data.end_time ? formatDateTimeUTC(data.end_time) : null} />
+              <Field label="Created At" value={data.created_at ? formatDateTimeLocal(data.created_at) : null} />
+              <Field label="Updated At" value={data.updated_at ? formatDateTimeLocal(data.updated_at) : null} />
+            </>
           )}
-          <Field label="Start Time" value={data.start_time ? formatDateTimeUTC(data.start_time) : null} />
-          <Field label="End Time" value={data.end_time ? formatDateTimeUTC(data.end_time) : null} />
-          <Field label="Created At" value={data.created_at ? formatDateTimeLocal(data.created_at) : null} />
-          <Field label="Updated At" value={data.updated_at ? formatDateTimeLocal(data.updated_at) : null} />
           <Field label="Verification Feedback" value={(data as any).verification_feedback} />
         </div>
       </div>
@@ -1415,22 +1823,67 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
             </svg>
             Product & Financial Plan Details
           </h2>
-          {data.order?.status && (
-            <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-primary text-white capitalize">
-              {data.order.status}
-            </span>
-          )}
+          <div className="flex items-center gap-3">
+            {data.order?.status && (
+              <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-primary text-white capitalize">
+                {data.order.status}
+              </span>
+            )}
+            {user?.role === 'Super Admin' && !editingProductFinancial && (
+              <button
+                onClick={openEditProductFinancial}
+                className="text-xs font-bold text-primary hover:underline"
+              >
+                Edit
+              </button>
+            )}
+          </div>
         </div>
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          <Field label="Item / Product Name" value={data.order?.product_name} />
-          <Field label="IMEI / Serial Number" value={data.order?.imei_serial} />
-          <Field label="Total Item Price" value={data.order?.total_amount ? `PKR ${Number(data.order.total_amount).toLocaleString()}` : null} />
-          <Field label="Advance Payment" value={data.order?.advance_amount ? `PKR ${Number(data.order.advance_amount).toLocaleString()}` : null} />
-          <Field label="Monthly Installment" value={data.order?.monthly_amount ? `PKR ${Number(data.order.monthly_amount).toLocaleString()} / month` : null} />
-          <Field label="Tenure Duration" value={data.order?.months ? `${data.order.months} Months` : null} />
-          <Field label="Booking Channel" value={data.order?.channel} />
-          <Field label="Order Reference" value={data.order?.order_ref} />
-        </div>
+
+        {editingProductFinancial ? (
+          <div className="space-y-4">
+            <p className="text-xs text-amber-600 dark:text-amber-400 font-medium">
+              Note: changing these does not update the installment ledger below — edit the ledger separately if it also needs correcting.
+            </p>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              <LabeledInput label="Item / Product Name" value={productFinancialForm.product_name} onChange={(v) => setProductFinancialForm((f) => ({ ...f, product_name: v }))} />
+              <LabeledInput label="IMEI / Serial Number" value={productFinancialForm.imei_serial} onChange={(v) => setProductFinancialForm((f) => ({ ...f, imei_serial: v }))} />
+              <LabeledInput label="Total Item Price (PKR)" type="number" value={productFinancialForm.total_amount} onChange={(v) => setProductFinancialForm((f) => ({ ...f, total_amount: v }))} />
+              <LabeledInput label="Advance Payment (PKR)" type="number" value={productFinancialForm.advance_amount} onChange={(v) => setProductFinancialForm((f) => ({ ...f, advance_amount: v }))} />
+              <LabeledInput label="Monthly Installment (PKR)" type="number" value={productFinancialForm.monthly_amount} onChange={(v) => setProductFinancialForm((f) => ({ ...f, monthly_amount: v }))} />
+              <LabeledInput label="Tenure Duration (Months)" type="number" value={productFinancialForm.months} onChange={(v) => setProductFinancialForm((f) => ({ ...f, months: v }))} />
+              <Field label="Booking Channel" value={data.order?.channel} />
+              <Field label="Order Reference" value={data.order?.order_ref} />
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={handleSaveProductFinancial}
+                disabled={savingProductFinancial}
+                className="rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
+              >
+                {savingProductFinancial ? 'Saving...' : 'Save Changes'}
+              </button>
+              <button
+                onClick={() => setEditingProductFinancial(false)}
+                disabled={savingProductFinancial}
+                className="rounded-lg border border-stroke px-4 py-2 text-sm dark:border-dark-3 dark:text-gray-300"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            <Field label="Item / Product Name" value={data.order?.product_name} />
+            <Field label="IMEI / Serial Number" value={data.order?.imei_serial} />
+            <Field label="Total Item Price" value={data.order?.total_amount ? `PKR ${Number(data.order.total_amount).toLocaleString()}` : null} />
+            <Field label="Advance Payment" value={data.order?.advance_amount ? `PKR ${Number(data.order.advance_amount).toLocaleString()}` : null} />
+            <Field label="Monthly Installment" value={data.order?.monthly_amount ? `PKR ${Number(data.order.monthly_amount).toLocaleString()} / month` : null} />
+            <Field label="Tenure Duration" value={data.order?.months ? `${data.order.months} Months` : null} />
+            <Field label="Booking Channel" value={data.order?.channel} />
+            <Field label="Order Reference" value={data.order?.order_ref} />
+          </div>
+        )}
       </div>
 
 
@@ -2188,6 +2641,74 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
         </div>
       )}
 
+      {/* Delivery Photos — shown alongside purchaser/grantor documents so a
+          missing/wrong delivery photo can be fixed from the same screen.
+          Follows the same self_pickup rule as the Delivery Officer field —
+          a self-pickup order has no delivery officer to have taken one. */}
+      {data.order?.delivery && !data.order.delivery.self_pickup && (
+        <div className="mb-12">
+          <div className="mb-4 flex items-center justify-between">
+            <h3 className="text-xl font-semibold text-blue-700 dark:text-blue-400">
+              Delivery Photos
+            </h3>
+            {user?.role === 'Super Admin' && (
+              <button
+                onClick={() => setAddDeliveryPhotoOpen(true)}
+                className="text-xs font-bold text-primary hover:underline"
+              >
+                + Add Delivery Photo
+              </button>
+            )}
+          </div>
+          {data.order.delivery.uploads.length === 0 ? (
+            <p className="text-sm text-gray-400">No delivery photos on record yet.</p>
+          ) : (
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {data.order.delivery.uploads.filter((u) => u.file_url).map((upload, idx) => (
+                <MediaCard
+                  key={upload.id}
+                  id={upload.id}
+                  title={`Delivery Photo #${idx + 1}`}
+                  subtitle={upload.upload_type?.replace(/_/g, ' ')}
+                  fileUrl={upload.file_url as string}
+                  uploadedAt={upload.uploaded_at}
+                  isEditable={false}
+                  onDelete={user?.role === 'Super Admin' ? () => handleDeleteDeliveryUpload(upload.id) : undefined}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Add Delivery Photo Modal */}
+      <Modal open={addDeliveryPhotoOpen} onClose={() => setAddDeliveryPhotoOpen(false)}>
+        <div className="rounded-2xl bg-white p-8 shadow-xl dark:bg-gray-800">
+          <h2 className="mb-4 text-lg font-bold dark:text-white">Add Delivery Photo</h2>
+          <input
+            type="file"
+            accept="image/*"
+            onChange={(e) => setDeliveryPhotoFile(e.target.files?.[0] || null)}
+            className="mb-4 w-full text-sm text-gray-600 dark:text-gray-300"
+          />
+          <div className="flex justify-end gap-3">
+            <button
+              onClick={() => { setAddDeliveryPhotoOpen(false); setDeliveryPhotoFile(null); }}
+              className="rounded-lg border border-stroke px-4 py-2 text-sm dark:border-dark-3 dark:text-gray-300"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleAddDeliveryPhoto}
+              disabled={savingDeliveryPhoto || !deliveryPhotoFile}
+              className="rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
+            >
+              {savingDeliveryPhoto ? 'Uploading...' : 'Upload'}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
       {/* Grantors - EDITABLE & DOCUMENT UPLOADS */}
       {(() => {
         const grantorsList = [
@@ -2360,23 +2881,25 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
           flips home_location_verified — a manually-added location makes the
           profile indistinguishable from one verified the normal way. */}
       <div className="mb-12">
-        <h2 className="mb-4 text-2xl font-semibold text-dark dark:text-white">Purchaser & Guarantor Locations</h2>
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {(['purchaser', 'grantor1', 'grantor2'] as const)
-            .filter((pt) => personIdFor(pt) !== null)
+        <h2 className="mb-4 text-2xl font-semibold text-dark dark:text-white">Purchaser, Guarantor & Delivery Locations</h2>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {(['purchaser', 'grantor1', 'grantor2', 'delivery'] as const)
+            .filter((pt) => pt === 'delivery' ? !!data.order?.delivery : personIdFor(pt) !== null)
             .map((pt) => {
               const personId = personIdFor(pt);
-              const existing = data.verification_locations.filter((loc) => loc.person_type === pt && loc.person_id === personId);
+              const existing = data.verification_locations.filter((loc) => loc.person_type === pt && (pt === 'delivery' || loc.person_id === personId));
               return (
                 <div key={pt} className="rounded-lg border border-stroke p-4 dark:border-dark-3">
                   <div className="mb-3 flex items-center justify-between">
                     <span className="font-semibold text-dark dark:text-white">{personLabelFor(pt)}</span>
-                    <button
-                      onClick={() => openAddLocation(pt)}
-                      className="text-xs font-bold text-primary hover:underline"
-                    >
-                      + Add Location
-                    </button>
+                    {user?.role === 'Super Admin' && (
+                      <button
+                        onClick={() => openAddLocation(pt)}
+                        className="text-xs font-bold text-primary hover:underline"
+                      >
+                        + Add Location
+                      </button>
+                    )}
                   </div>
 
                   {existing.length === 0 ? (
@@ -2406,7 +2929,7 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
                             )}
                             {user?.role === 'Super Admin' && (
                               <button
-                                onClick={() => handleDeleteVerificationLocation(loc.id)}
+                                onClick={() => setConfirmDeleteLocationId(loc.id)}
                                 className="ml-auto text-xs font-bold text-red-600 hover:underline"
                               >
                                 Delete
@@ -2422,6 +2945,26 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
             })}
         </div>
       </div>
+
+      <ConfirmModal
+        open={confirmDeleteLocationId !== null}
+        onClose={() => setConfirmDeleteLocationId(null)}
+        onConfirm={async () => {
+          if (confirmDeleteLocationId === null) return;
+          setDeletingLocation(true);
+          try {
+            await handleDeleteVerificationLocation(confirmDeleteLocationId);
+            setConfirmDeleteLocationId(null);
+          } finally {
+            setDeletingLocation(false);
+          }
+        }}
+        title="Delete this location?"
+        message="This location (and any photos attached to it) will be permanently removed. This action cannot be undone."
+        confirmText="Delete"
+        variant="danger"
+        loading={deletingLocation}
+      />
 
       {/* Add Location Modal */}
       <Modal open={addLocationFor !== null} onClose={() => setAddLocationFor(null)}>
