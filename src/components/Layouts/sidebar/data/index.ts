@@ -59,7 +59,7 @@ export const NAV_DATA = [
             url: "/approved-orders",
           },
           {
-            title: "Waiting PayTrigger Approval",
+            title: "Waiting For Software Activation",
             url: "/paytrigger-pending-orders",
           },
           {
@@ -225,7 +225,7 @@ export const NAV_DATA = [
         ],
       },
       {
-        title: "PayTrigger",
+        title: "Software Activation",
         icon: Icons.LockIcon,
         url: "/admin/paytrigger",
         items: [],
@@ -392,7 +392,7 @@ export const NAV_DATA = [
             url: "/approved-orders",
           },
           {
-            title: "Waiting PayTrigger Approval",
+            title: "Waiting For Software Activation",
             url: "/paytrigger-pending-orders",
           },
           {
@@ -513,7 +513,7 @@ export const NAV_DATA = [
             url: "/approved-orders",
           },
           {
-            title: "Waiting PayTrigger Approval",
+            title: "Waiting For Software Activation",
             url: "/paytrigger-pending-orders",
           },
           {
@@ -797,7 +797,7 @@ export const NAV_DATA = [
         title: "Devices & Payments",
         icon: Icons.LockIcon,
         items: [
-          { title: "PayTrigger", url: "/accounts/paytrigger" },
+          { title: "Software Activation", url: "/accounts/paytrigger" },
           { title: "Online Payments", url: "/accounts/online-payments" },
         ],
       },

@@ -708,7 +708,7 @@ const OrderListContent = ({ forcedStatus, forcedChannel, apiEndpoint, hideAction
   }
 
   const handleCancelEnrollment = async (order: Order) => {
-    if (!confirm('Cancel PayTrigger enrollment for this order? It will move back to Approved Orders so delivery can be re-processed.')) return
+    if (!confirm('Cancel Software Activation enrollment for this order? It will move back to Approved Orders so delivery can be re-processed.')) return
     try {
       const token = Cookies.get('auth_token')
       const res = await fetch(`${BACKEND_URL}/api/paytrigger/order/${order.id}/cancel-enrollment`, {
@@ -964,7 +964,7 @@ const OrderListContent = ({ forcedStatus, forcedChannel, apiEndpoint, hideAction
             break;
 
           case 'awaiting_paytrigger_enrollment':
-            label = 'Waiting PayTrigger Approval';
+            label = 'Waiting For Software Activation';
             className += ' bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300';
             break;
 
