@@ -59,6 +59,19 @@ export default function DeliveredProductDetails({
         }
     };
 
+    const handleDeleteUpload = async (uploadId: number) => {
+        const token = Cookies.get('auth_token');
+        const res = await fetch(`${BACKEND_URL}/api/delivery/upload/${uploadId}`, {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${token}` },
+        });
+        const json = await res.json();
+        if (!res.ok || !json.success) throw new Error(json.message || 'Failed to delete upload');
+        toast.success('Delivery upload deleted');
+        await fetchDeliveredProductDetails();
+        if (onRefresh) await onRefresh();
+    };
+
     const fetchDeliveredProductDetails = async () => {
         if (!orderId) return;
         setLoading(true);
@@ -287,6 +300,7 @@ export default function DeliveredProductDetails({
                                     uploadedAt={upload.uploaded_at}
                                     isEditable={user?.role === 'Super Admin'}
                                     onEdit={(file) => handleReplaceMedia(file, upload.id)}
+                                    onDelete={user?.role === 'Super Admin' ? () => handleDeleteUpload(upload.id) : undefined}
                                     editHistory={editHistory}
                                     historyFilter={(h) => h.entity_type === 'delivery_upload' && h.entity_id === upload.id}
                                 />

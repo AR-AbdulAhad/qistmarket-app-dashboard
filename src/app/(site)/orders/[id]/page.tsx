@@ -479,6 +479,61 @@ export default function OrderDetailsPage() {
         await fetchVerification();
     };
 
+    const handleDeleteDocument = async (documentId: number) => {
+        const token = Cookies.get('auth_token');
+        const res = await fetch(`${BACKEND_URL}/api/verification/document/${documentId}`, {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${token}` },
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error?.message || json.message || 'Failed to delete document');
+        toast.success('Document deleted');
+        await fetchVerification();
+    };
+
+    const handleDeleteLocationPhoto = async (photoId: number) => {
+        const token = Cookies.get('auth_token');
+        const res = await fetch(`${BACKEND_URL}/api/location-photo/${photoId}`, {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${token}` },
+        });
+        const json = await res.json();
+        if (!res.ok || !json.success) throw new Error(json.message || 'Failed to delete photo');
+        toast.success('Photo deleted');
+        await fetchVerification();
+    };
+
+    // Upload into a currently-empty document slot — same endpoints the
+    // verification page's equivalent flow already uses (POST creates a new
+    // VerificationDocument; there's no existing row to "replace" here).
+    const handleNewDocumentUpload = async (file: File, documentType: string, personType: 'purchaser' | `grantor${number}`) => {
+        if (!verification) return;
+        const token = Cookies.get('auth_token');
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('document_type', documentType);
+
+        let url = `${BACKEND_URL}/api/verification/${verification.id}/purchaser/document`;
+        if (personType.startsWith('grantor')) {
+            const grantorNum = personType.replace('grantor', '');
+            url = `${BACKEND_URL}/api/verification/${verification.id}/grantor/${grantorNum}/document`;
+        }
+
+        try {
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${token}` },
+                body: formData,
+            });
+            const json = await res.json();
+            if (!res.ok) throw new Error(json.error || json.message || 'Failed to upload document');
+            toast.success('Document uploaded successfully!');
+            await fetchVerification();
+        } catch (err: any) {
+            toast.error(err.message || 'Failed to upload document');
+        }
+    };
+
     // Home location assignment action
     const handleLocationAction = async (action: 'send-to-vo' | 'send-to-do', officerId: string) => {
         if (!verification?.id) return;
@@ -1633,6 +1688,7 @@ export default function OrderDetailsPage() {
                                                             uploadedAt={doc.uploaded_at}
                                                             isEditable={user?.role === 'Super Admin' && order.status === 'delivered'}
                                                             onEdit={(file) => handleMediaReplace(file, doc.id, doc.document_type, doc.person_type, doc.person_id)}
+                                                            onDelete={user?.role === 'Super Admin' ? () => handleDeleteDocument(doc.id) : undefined}
                                                             editHistory={verification.edit_history || []}
                                                             historyFilter={(h) =>
                                                                 h.field_name === doc.document_type &&
@@ -1647,7 +1703,22 @@ export default function OrderDetailsPage() {
                                                                 </svg>
                                                             </div>
                                                             <p className="text-sm font-bold text-gray-600 dark:text-gray-400 mb-1">{slot.title}</p>
-                                                            <p className="text-xs text-gray-400">Not uploaded</p>
+                                                            <p className="text-xs text-gray-400 mb-3">Not uploaded</p>
+                                                            {user?.role === 'Super Admin' && (
+                                                                <label className="relative cursor-pointer inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-primary hover:bg-primary-dark text-white font-bold text-xs shadow-sm transition">
+                                                                    Upload {slot.title}
+                                                                    <input
+                                                                        type="file"
+                                                                        accept="image/*,.pdf"
+                                                                        onChange={(e) => {
+                                                                            const file = e.target.files?.[0];
+                                                                            if (file) handleNewDocumentUpload(file, slot.key, 'purchaser');
+                                                                            e.target.value = '';
+                                                                        }}
+                                                                        className="sr-only"
+                                                                    />
+                                                                </label>
+                                                            )}
                                                         </div>
                                                     );
                                                 })}
@@ -1661,6 +1732,7 @@ export default function OrderDetailsPage() {
                                                         uploadedAt={doc.uploaded_at}
                                                         isEditable={user?.role === 'Super Admin' && order.status === 'delivered'}
                                                         onEdit={(file) => handleMediaReplace(file, doc.id, doc.document_type, doc.person_type, doc.person_id)}
+                                                        onDelete={user?.role === 'Super Admin' ? () => handleDeleteDocument(doc.id) : undefined}
                                                         editHistory={verification.edit_history || []}
                                                         historyFilter={(h) =>
                                                             h.field_name === doc.document_type &&
@@ -1755,6 +1827,7 @@ export default function OrderDetailsPage() {
                                                                 uploadedAt={doc.uploaded_at}
                                                                 isEditable={isEditable}
                                                                 onEdit={(file) => handleMediaReplace(file, doc.id, doc.document_type, doc.person_type, doc.person_id)}
+                                                                onDelete={user?.role === 'Super Admin' ? () => handleDeleteDocument(doc.id) : undefined}
                                                                 editHistory={verification.edit_history || []}
                                                                 historyFilter={(h) =>
                                                                     h.field_name === doc.document_type &&
@@ -1769,7 +1842,22 @@ export default function OrderDetailsPage() {
                                                                     </svg>
                                                                 </div>
                                                                 <p className="text-sm font-bold text-gray-600 dark:text-gray-400 mb-1">{slot.title}</p>
-                                                                <p className="text-xs text-gray-400">Not uploaded</p>
+                                                                <p className="text-xs text-gray-400 mb-3">Not uploaded</p>
+                                                                {user?.role === 'Super Admin' && (
+                                                                    <label className="relative cursor-pointer inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-primary hover:bg-primary-dark text-white font-bold text-xs shadow-sm transition">
+                                                                        Upload {slot.title}
+                                                                        <input
+                                                                            type="file"
+                                                                            accept="image/*,.pdf"
+                                                                            onChange={(e) => {
+                                                                                const file = e.target.files?.[0];
+                                                                                if (file) handleNewDocumentUpload(file, slot.key, `grantor${gNum}` as `grantor${number}`);
+                                                                                e.target.value = '';
+                                                                            }}
+                                                                            className="sr-only"
+                                                                        />
+                                                                    </label>
+                                                                )}
                                                             </div>
                                                         );
                                                     })}
@@ -1784,6 +1872,7 @@ export default function OrderDetailsPage() {
                                                             uploadedAt={doc.uploaded_at}
                                                             isEditable={isEditable}
                                                             onEdit={(file) => handleMediaReplace(file, doc.id, doc.document_type, doc.person_type, doc.person_id)}
+                                                            onDelete={user?.role === 'Super Admin' ? () => handleDeleteDocument(doc.id) : undefined}
                                                             editHistory={verification.edit_history || []}
                                                             historyFilter={(h) =>
                                                                 h.field_name === doc.document_type &&
@@ -1902,10 +1991,10 @@ export default function OrderDetailsPage() {
                                                                         fileUrl={photo.file_url}
                                                                         uploadedAt={photo.uploaded_at}
                                                                         isEditable={user?.role === 'Super Admin' && order.status === 'delivered'}
-                                                                                                                                                 onEdit={(file) => handleLocationMediaReplace(file, photo.id)}
-                                                                         editHistory={verification?.edit_history}
-                                                                         historyFilter={(h) => h.entity_type === 'location_photo' && h.entity_id === photo.id}
-
+                                                                        onEdit={(file) => handleLocationMediaReplace(file, photo.id)}
+                                                                        onDelete={user?.role === 'Super Admin' ? () => handleDeleteLocationPhoto(photo.id) : undefined}
+                                                                        editHistory={verification?.edit_history}
+                                                                        historyFilter={(h) => h.entity_type === 'location_photo' && h.entity_id === photo.id}
                                                                     />
                                                                 ))}
                                                             </div>
