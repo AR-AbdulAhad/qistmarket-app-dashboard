@@ -29,6 +29,8 @@ type InstallmentRow = {
     paidAmount?: number;
     remainingAmount?: number;
     payment_history?: { amount: number; date: string; method: string }[];
+    month?: number;
+    due_date?: string | null;
 };
 
 type OrderInstallment = {
@@ -605,7 +607,7 @@ export default function InstallmentsTable({ data, onPay, selectedIds = [], onSel
                                                                                  <div>
                                                                                      <span className="text-sm font-black text-red-500">{pkr(remAmt + (inst.arrears || 0))}</span>
                                                                                      {hasArrears ? (
-                                                                                         <p className="text-[9px] text-gray-400">({pkr(remAmt)} + {pkr(inst.arrears)} arr.)</p>
+                                                                                         <p className="text-[9px] text-gray-400">({pkr(remAmt)} + {pkr(inst.arrears || 0)} arr.)</p>
                                                                                      ) : null}
                                                                                  </div>
                                                                              ) : isPaid ? (
