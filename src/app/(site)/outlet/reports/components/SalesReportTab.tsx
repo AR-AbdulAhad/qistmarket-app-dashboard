@@ -55,6 +55,7 @@ export default function SalesReportTab({ token, startDate, endDate, searchQuery 
             "Order ID": o.order_ref,
             "Customer Name": o.customer_name,
             "Product": o.product_name,
+            "Type": o.sale_type === 'cash' ? 'Cash' : 'Installment',
             "Sales Value": o.sales_value,
             "Down Payment": o.down_payment_amount,
             "Balance": o.balance,
@@ -124,6 +125,7 @@ export default function SalesReportTab({ token, startDate, endDate, searchQuery 
                                     <th className="px-4 py-3 font-medium">Order ID</th>
                                     <th className="px-4 py-3 font-medium">Customer Name</th>
                                     <th className="px-4 py-3 font-medium">Product</th>
+                                    <th className="px-4 py-3 font-medium">Type</th>
                                     <th className="px-4 py-3 font-medium">Sales Value</th>
                                     <th className="px-4 py-3 font-medium">Down Payment</th>
                                     <th className="px-4 py-3 font-medium">Balance</th>
@@ -141,15 +143,20 @@ export default function SalesReportTab({ token, startDate, endDate, searchQuery 
                                             <p className="text-xs text-gray-500">{order.whatsapp_number}</p>
                                         </td>
                                         <td className="px-4 py-3">{order.product_name}</td>
+                                        <td className="px-4 py-3">
+                                            <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${order.sale_type === 'cash' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'}`}>
+                                                {order.sale_type === 'cash' ? 'Cash' : 'Installment'}
+                                            </span>
+                                        </td>
                                         <td className="px-4 py-3 font-medium">Rs {(order.sales_value ?? 0).toLocaleString()}</td>
                                         <td className="px-4 py-3 font-medium">Rs {(order.down_payment_amount ?? 0).toLocaleString()}</td>
                                         <td className="px-4 py-3 font-medium">Rs {(order.balance ?? 0).toLocaleString()}</td>
-                                        <td className="px-4 py-3">{order.tenure ?? 0} months</td>
+                                        <td className="px-4 py-3">{order.sale_type === 'cash' ? '—' : `${order.tenure ?? 0} months`}</td>
                                         <td className="px-4 py-3 font-medium">Rs {(order.installment_amount ?? 0).toLocaleString()}</td>
                                     </tr>
                                 )) : (
                                     <tr>
-                                        <td colSpan={9} className="px-4 py-8 text-center text-gray-500">No sales data found for the selected range.</td>
+                                        <td colSpan={10} className="px-4 py-8 text-center text-gray-500">No sales data found for the selected range.</td>
                                     </tr>
                                 )}
                             </tbody>

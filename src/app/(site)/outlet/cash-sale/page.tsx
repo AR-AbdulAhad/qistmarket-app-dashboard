@@ -7,7 +7,7 @@ import toast from "react-hot-toast";
 import {
   Search, ShoppingBag, User, Phone, CreditCard, Smartphone,
   CheckCircle2, X, ChevronLeft, ChevronRight, Receipt,
-  Printer, Pencil, Trash2, ShoppingCart,
+  Printer, Pencil, Ban, ShoppingCart,
 } from "lucide-react";
 import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
 
@@ -89,6 +89,8 @@ interface CashSaleTxn {
   final_price: number;
   created_at: string;
   sold_by: { username: string; full_name: string } | null;
+  status: "active" | "cancelled";
+  cancelled_at: string | null;
 }
 
 function ProductSearchBox({
@@ -464,10 +466,10 @@ export default function CashSalePage() {
     }
   };
 
-  // ── Delete / cancel sale ────────────────────────────────────────────
-  const handleDelete = async (sale: CashSaleTxn) => {
+  // ── Cancel invoice ──────────────────────────────────────────────────
+  const handleCancel = async (sale: CashSaleTxn) => {
     const label = sale.item_count > 1 ? `${sale.item_count} items` : `"${sale.product_name}"`;
-    if (!confirm(`Cancel this sale of ${label} to ${sale.customer_name}? Every item will be restored to stock and the amount reversed from today's Cash Register.`)) return;
+    if (!confirm(`Cancel this invoice for ${label} sold to ${sale.customer_name}? Every item will be restored to stock and the amount reversed from today's Cash Register. The record will stay in history marked as Cancelled.`)) return;
     setDeletingId(sale.id);
     try {
       const res = await fetch(`${API_BASE}/api/outlet/cash-sale/${sale.id}`, {
@@ -477,7 +479,7 @@ export default function CashSalePage() {
       const data = await res.json();
       if (!res.ok || data.success === false) throw new Error(data.message || "Cancellation failed");
 
-      toast.success("Sale cancelled successfully!");
+      toast.success("Invoice cancelled successfully!");
       fetchHistory();
     } catch (err: any) {
       toast.error(err.message || "Cancellation failed");
@@ -620,21 +622,22 @@ export default function CashSalePage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-100 dark:border-dark-3">
-                {["Date", "Product", "IMEI", "Customer", "Phone", "Price", "Sold By", "Actions"].map((h) => (
+                {["Date", "Product", "IMEI", "Customer", "Phone", "Price", "Sold By", "Status", "Actions"].map((h) => (
                   <th key={h} className="text-left py-3 px-3 text-[10px] font-black text-gray-400 uppercase tracking-widest whitespace-nowrap">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {historyLoading ? (
-                <tr><td colSpan={8} className="py-12 text-center text-gray-400 font-medium">Loading...</td></tr>
+                <tr><td colSpan={9} className="py-12 text-center text-gray-400 font-medium">Loading...</td></tr>
               ) : history.length === 0 ? (
-                <tr><td colSpan={8} className="py-12 text-center text-gray-400 font-medium">No cash sales yet</td></tr>
+                <tr><td colSpan={9} className="py-12 text-center text-gray-400 font-medium">No cash sales yet</td></tr>
               ) : (
                 history.map((sale) => {
-                  const editable = isWithinEditWindow(sale.created_at);
+                  const isCancelled = sale.status === "cancelled";
+                  const editable = isWithinEditWindow(sale.created_at) && !isCancelled;
                   return (
-                    <tr key={sale.id} className="border-b border-gray-50 dark:border-dark-3 hover:bg-gray-50/50 dark:hover:bg-dark-2/50 transition-colors">
+                    <tr key={sale.id} className={`border-b border-gray-50 dark:border-dark-3 hover:bg-gray-50/50 dark:hover:bg-dark-2/50 transition-colors ${isCancelled ? "opacity-60" : ""}`}>
                       <td className="py-3.5 px-3 whitespace-nowrap text-gray-500 dark:text-dark-6 font-medium">
                         {new Date(sale.created_at).toLocaleDateString("en-PK", { day: "2-digit", month: "short", year: "numeric" })}
                         <div className="text-[10px] text-gray-400">{new Date(sale.created_at).toLocaleTimeString("en-PK", { hour: "2-digit", minute: "2-digit" })}</div>
@@ -653,6 +656,13 @@ export default function CashSalePage() {
                       <td className="py-3.5 px-3 font-black text-emerald-600 whitespace-nowrap">{PKR(sale.final_price)}</td>
                       <td className="py-3.5 px-3 text-gray-500 dark:text-dark-6 whitespace-nowrap">{sale.sold_by?.full_name || sale.sold_by?.username || "—"}</td>
                       <td className="py-3.5 px-3 whitespace-nowrap">
+                        {isCancelled ? (
+                          <span className="inline-flex items-center text-[10px] font-black uppercase tracking-wider text-red-600 bg-red-50 dark:bg-red-900/20 px-2 py-1 rounded-lg">Cancelled</span>
+                        ) : (
+                          <span className="inline-flex items-center text-[10px] font-black uppercase tracking-wider text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-1 rounded-lg">Active</span>
+                        )}
+                      </td>
+                      <td className="py-3.5 px-3 whitespace-nowrap">
                         <div className="flex items-center gap-1.5">
                           <button
                             type="button"
@@ -664,7 +674,7 @@ export default function CashSalePage() {
                           </button>
                           <button
                             type="button"
-                            title={editable ? "Edit sale" : "Older than 3 days — can no longer be edited"}
+                            title={isCancelled ? "This invoice is cancelled" : editable ? "Edit sale" : "Older than 3 days — can no longer be edited"}
                             onClick={() => editable && openEdit(sale)}
                             disabled={!editable}
                             className="p-2 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/10 transition-colors disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent"
@@ -673,15 +683,15 @@ export default function CashSalePage() {
                           </button>
                           <button
                             type="button"
-                            title={editable ? "Cancel sale" : "Older than 3 days — can no longer be cancelled"}
-                            onClick={() => editable && handleDelete(sale)}
+                            title={isCancelled ? "This invoice is already cancelled" : editable ? "Cancel Invoice" : "Older than 3 days — can no longer be cancelled"}
+                            onClick={() => editable && handleCancel(sale)}
                             disabled={!editable || deletingId === sale.id}
                             className="p-2 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent"
                           >
                             {deletingId === sale.id ? (
                               <div className="w-4 h-4 border-2 border-red-300 border-t-red-600 rounded-full animate-spin" />
                             ) : (
-                              <Trash2 className="w-4 h-4" />
+                              <Ban className="w-4 h-4" />
                             )}
                           </button>
                         </div>
