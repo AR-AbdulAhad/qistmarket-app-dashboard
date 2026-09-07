@@ -165,6 +165,7 @@ export default function AccountsCashDepositsPage() {
                                 <th className="min-w-[120px] py-4 px-4 font-medium text-black dark:text-white">Date</th>
                                 <th className="min-w-[150px] py-4 px-4 font-medium text-black dark:text-white">Outlet / User</th>
                                 <th className="min-w-[150px] py-4 px-4 font-medium text-black dark:text-white">Amount / Method</th>
+                                <th className="min-w-[130px] py-4 px-4 font-medium text-black dark:text-white">Consumer No.</th>
                                 <th className="min-w-[150px] py-4 px-4 font-medium text-black dark:text-white">Destination Bank</th>
                                 <th className="min-w-[120px] py-4 px-4 font-medium text-black dark:text-white">Proof</th>
                                 <th className="min-w-[120px] py-4 px-4 font-medium text-black dark:text-white">Status</th>
@@ -174,9 +175,9 @@ export default function AccountsCashDepositsPage() {
                         </thead>
                         <tbody>
                             {loading ? (
-                                <tr><td colSpan={8} className="text-center py-4">Loading...</td></tr>
+                                <tr><td colSpan={9} className="text-center py-4">Loading...</td></tr>
                             ) : visibleDeposits.length === 0 ? (
-                                <tr><td colSpan={8} className="text-center py-4">No requests found.</td></tr>
+                                <tr><td colSpan={9} className="text-center py-4">No requests found.</td></tr>
                             ) : (
                                 visibleDeposits.map((deposit) => {
                                     const hasExtra = deposit.payment_method === '1bill' || deposit.payment_method === 'qr_payment';
@@ -197,6 +198,16 @@ export default function AccountsCashDepositsPage() {
                                             <p className="text-xs text-primary">{deposit.payment_method}</p>
                                             {hasExtra && expired && deposit.status === 'pending' && (
                                                 <span className="mt-1 inline-flex rounded-full bg-danger bg-opacity-10 py-0.5 px-2 text-xs font-medium text-danger">Expired</span>
+                                            )}
+                                        </td>
+                                        <td className="border-b border-[#eee] py-5 px-4 dark:border-strokedark">
+                                            {deposit.consumer_number ? (
+                                                <div className="flex flex-col gap-0.5">
+                                                    <span className="font-mono font-semibold text-blue-600 dark:text-blue-400">{deposit.consumer_number}</span>
+                                                    <button onClick={() => copyText(deposit.consumer_number!)} className="text-xs text-primary hover:underline text-left">Copy</button>
+                                                </div>
+                                            ) : (
+                                                <span className="text-body-color italic text-sm">—</span>
                                             )}
                                         </td>
                                         <td className="border-b border-[#eee] py-5 px-4 dark:border-strokedark">
@@ -258,9 +269,19 @@ export default function AccountsCashDepositsPage() {
                                     </tr>
                                     {hasExtra && expandedId === deposit.id && (
                                         <tr>
-                                            <td colSpan={8} className="border-b border-[#eee] bg-gray-50 py-4 px-4 dark:border-strokedark dark:bg-meta-4">
+                                            <td colSpan={9} className="border-b border-[#eee] bg-gray-50 py-4 px-4 dark:border-strokedark dark:bg-meta-4">
                                                 <div className="flex flex-col gap-2 text-sm">
                                                     <p><span className="text-body-color">Outlet / Submitted By:</span> {deposit.outlet?.name || deposit.submitted_by?.full_name || '—'}</p>
+                                                    {deposit.consumer_number && (
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-body-color">{deposit.payment_method === 'qr_payment' ? 'SmartPay Consumer Number:' : '1Bill Consumer Number:'}</span>
+                                                            <span className="font-mono font-semibold text-blue-600 dark:text-blue-400">{deposit.consumer_number}</span>
+                                                            <button onClick={() => copyText(deposit.consumer_number!)} className="text-xs text-primary hover:underline">Copy</button>
+                                                        </div>
+                                                    )}
+                                                    {deposit.payment_method === 'qr_payment' && deposit.qr_image_base64 && deposit.status === 'pending' && (
+                                                        <img src={deposit.qr_image_base64} alt="QR" className="h-40 w-40" />
+                                                    )}
                                                     {deposit.status === 'pending' && deposit.expires_at && (
                                                         <p className={expired ? "text-danger" : "text-body-color"}>
                                                             {expired ? 'Expired at' : 'Valid until'} {new Date(deposit.expires_at).toLocaleString()}

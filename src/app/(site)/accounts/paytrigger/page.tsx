@@ -124,8 +124,8 @@ export default function PayTriggerPage() {
 
   return (
     <>
-      <Breadcrumb pageName="PayTrigger" />
-      <PageHeader icon={Smartphone} title="PayTrigger" subtitle="Device lock status, unpaid unlocked devices, and promise-to-pay tracking." />
+      <Breadcrumb pageName="Software Activation" />
+      <PageHeader icon={Smartphone} title="Software Activation" subtitle="Device lock status, unpaid unlocked devices, and promise-to-pay tracking." />
 
       <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
         {loadingSummary ? (

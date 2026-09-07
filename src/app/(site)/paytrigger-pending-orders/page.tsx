@@ -5,7 +5,7 @@ import OrderList from "@/components/OrderList/OrderList";
 export default function PaytriggerPendingOrdersPage() {
     return (
         <div>
-            <Breadcrumb pageName="Waiting PayTrigger Approval" />
+            <Breadcrumb pageName="Waiting For Software Activation" />
             <Suspense fallback={<div>Loading orders...</div>}>
                 <OrderList forcedStatus="awaiting_paytrigger_enrollment" hideSelection />
             </Suspense>

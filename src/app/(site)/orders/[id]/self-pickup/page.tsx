@@ -912,9 +912,9 @@ export default function SelfPickupPage() {
                         <Smartphone className="w-5 h-5 text-white" />
                       </div>
                       <div>
-                        <p className="font-black text-gray-900 text-sm">Enroll in PayTrigger?</p>
+                        <p className="font-black text-gray-900 text-sm">Enroll in Software Activation?</p>
                         <p className="text-xs text-gray-500 font-medium mt-0.5">
-                          {isLicenseExceeded ? "PayTrigger toggle is disabled because license limit is reached." : "Activate installment lock enforcement for this device"}
+                          {isLicenseExceeded ? "Software Activation toggle is disabled because license limit is reached." : "Activate installment lock enforcement for this device"}
                         </p>
                         {isLicenseExceeded ? (
                           <span className="inline-block mt-1 text-[9px] font-black text-red-600 bg-red-100 px-2 py-0.5 rounded-full uppercase tracking-wider">
@@ -922,7 +922,7 @@ export default function SelfPickupPage() {
                           </span>
                         ) : (
                           <span className="inline-block mt-1 text-[9px] font-black text-blue-600 bg-blue-100 px-2 py-0.5 rounded-full uppercase tracking-wider">
-                            {selectedInventory.product_name?.split(' ')[0] || 'Supported'} — PayTrigger Compatible
+                            {selectedInventory.product_name?.split(' ')[0] || 'Supported'} — Software Activation Compatible
                           </span>
                         )}
                       </div>
@@ -939,7 +939,7 @@ export default function SelfPickupPage() {
                           ? "bg-blue-600 focus:ring-blue-500"
                           : "bg-gray-200 focus:ring-gray-400"
                       )}
-                      aria-label={enrollPaytrigger ? 'PayTrigger enrollment ON' : 'PayTrigger enrollment OFF'}
+                      aria-label={enrollPaytrigger ? 'Software Activation enrollment ON' : 'Software Activation enrollment OFF'}
                     >
                       <span className={cn(
                         "absolute top-0.5 left-0.5 w-6 h-6 bg-white rounded-full shadow-md transition-transform duration-300",
@@ -1604,7 +1604,7 @@ function PaytriggerProcessingScreen({ order, delivery, onExit }: { order: any; d
         <div className="space-y-2">
           <h2 className="text-2xl font-black text-gray-900 tracking-tight">Delivery Initiated</h2>
           <p className="text-gray-500 font-bold">Your delivery process has started.</p>
-          <p className="text-gray-400 text-sm">Waiting for the device to be enrolled and activated in PayTrigger.</p>
+          <p className="text-gray-400 text-sm">Waiting for the device to be enrolled and activated via Software Activation.</p>
         </div>
 
         <div className="grid grid-cols-2 gap-4 text-left">
@@ -1613,7 +1613,7 @@ function PaytriggerProcessingScreen({ order, delivery, onExit }: { order: any; d
             <p className="font-black text-amber-600 flex items-center gap-2"><Clock className="w-4 h-4" /> Processing</p>
           </div>
           <div className="p-5 bg-gray-50 rounded-2xl border border-gray-100">
-            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">PayTrigger Status</p>
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Software Activation Status</p>
             <p className="font-black text-blue-600 flex items-center gap-2"><Wifi className="w-4 h-4" /> {enrollmentStatusLabel(device?.enrollment_status)}</p>
           </div>
         </div>
@@ -1629,7 +1629,7 @@ function PaytriggerProcessingScreen({ order, delivery, onExit }: { order: any; d
         <div className="flex items-center gap-3 p-4 bg-amber-50 rounded-2xl border border-amber-100 text-left">
           <AlertCircle className="w-6 h-6 text-amber-600 flex-shrink-0" />
           <p className="text-xs text-amber-800 font-bold leading-relaxed">
-            Do not initiate this delivery again. This screen updates automatically once PayTrigger confirms the device is active — you can safely leave and come back.
+            Do not initiate this delivery again. This screen updates automatically once Software Activation confirms the device is active — you can safely leave and come back.
           </p>
         </div>
 
@@ -1655,7 +1655,7 @@ function AlreadyDeliveredScreen({ order, delivery, onExit }: { order: any; deliv
           <h2 className="text-2xl font-black text-gray-900 tracking-tight">Delivery Completed</h2>
           <p className="text-gray-500 font-bold">
             {delivery?.paytrigger_devices?.[0]
-              ? 'Device successfully enrolled and activated in PayTrigger.'
+              ? 'Device successfully enrolled and activated via Software Activation.'
               : 'This order has already been picked up.'}
           </p>
           <p className="text-gray-400 text-sm">Order #{order?.order_ref}</p>

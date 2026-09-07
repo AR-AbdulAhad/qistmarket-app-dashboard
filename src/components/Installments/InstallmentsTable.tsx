@@ -135,7 +135,7 @@ export default function InstallmentsTable({ data, onPay, selectedIds = [], onSel
             }
         } catch (e) {
             console.error(e);
-            alert("Error communicating with PayTrigger");
+            alert("Error communicating with Software Activation");
         } finally {
             setPtpLoading(false);
         }
@@ -176,7 +176,7 @@ export default function InstallmentsTable({ data, onPay, selectedIds = [], onSel
                             <th className="px-6 py-4">Next Due</th>
                             <th className="px-6 py-4">Installments</th>
                             <th className="px-6 py-4">Progress</th>
-                            <th className="px-6 py-4 text-center">PayTrigger</th>
+                            <th className="px-6 py-4 text-center">Software Activation</th>
                             <th className="px-6 py-4 text-center">Details</th>
                         </tr>
                     </thead>

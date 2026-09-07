@@ -254,7 +254,7 @@ export default function PayTriggerAdminPage() {
 
   return (
     <div className="mx-auto max-w-7xl">
-      <Breadcrumb pageName="PayTrigger Device Management" />
+      <Breadcrumb pageName="Software Activation Device Management" />
 
       {/* Tabs */}
       <div className="flex gap-4 mb-6 border-b border-gray-200 dark:border-gray-700">
@@ -296,7 +296,7 @@ export default function PayTriggerAdminPage() {
           {searching && (
             <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-16 text-center">
               <Loader2 className="w-12 h-12 animate-spin mx-auto mb-4 text-blue-500" />
-              <p className="text-gray-500 font-medium">Communicating with PayTrigger Servers...</p>
+              <p className="text-gray-500 font-medium">Communicating with Software Activation Servers...</p>
             </div>
           )}
 
