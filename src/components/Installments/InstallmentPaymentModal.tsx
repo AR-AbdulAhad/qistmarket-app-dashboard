@@ -18,6 +18,8 @@ type InstallmentRow = {
     status: string;
     paidAt: string | null;
     paidAmount?: number;
+    arrears?: number;
+    remainingAmount?: number;
 };
 
 type PaymentModalProps = {
@@ -57,9 +59,10 @@ export default function InstallmentPaymentModal({ open, onClose, onSuccess, orde
             setPaymentMethod("Cash");
             setFuelCharge(0);
             
-            // Default to remaining balance
-            const remaining = (installment?.dueAmount || 0) - (installment?.paidAmount || 0);
-            setPaymentAmount(remaining > 0 ? remaining : 0);
+            // Default to remaining balance + arrears
+            const rem = installment?.remainingAmount ?? Math.max(0, (installment?.dueAmount || 0) - (installment?.paidAmount || 0));
+            const totalPayable = rem + (installment?.arrears || 0);
+            setPaymentAmount(totalPayable > 0 ? totalPayable : 0);
             
             setQrData(null);
         }

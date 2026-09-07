@@ -4,6 +4,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import Loader from '@/components/common/Loader';
 import { useReactToPrint } from 'react-to-print';
 import * as XLSX from 'xlsx';
+import { formatExactDate } from '@/utils/dateUtils';
 
 const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000';
 
@@ -52,6 +53,7 @@ export default function SalesReportTab({ token, startDate, endDate, searchQuery 
         if (!data.orders || data.orders.length === 0) return;
         const rows = data.orders.map((o: any, index: number) => ({
             "Serial No": index + 1,
+            "Date": formatExactDate(o.delivered_at || o.updated_at || o.created_at, 'DD MMM YYYY, hh:mm A'),
             "Order ID": o.order_ref,
             "Customer Name": o.customer_name,
             "Product": o.product_name,
@@ -100,20 +102,55 @@ export default function SalesReportTab({ token, startDate, endDate, searchQuery 
                 </div>
 
                 {/* Summary Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800">
-                        <p className="text-sm text-gray-500 dark:text-gray-400">Total Orders</p>
-                        <p className="text-2xl font-bold text-gray-800 dark:text-white">{data.summary.totalOrders || 0}</p>
-                    </div>
-                    <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800">
-                        <p className="text-sm text-gray-500 dark:text-gray-400">Gross Sales Value</p>
-                        <p className="text-2xl font-bold text-blue-600">Rs {data.summary.totalGrossAmount?.toLocaleString() || 0}</p>
-                    </div>
-                    <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800">
-                        <p className="text-sm text-gray-500 dark:text-gray-400">Total Amount Received</p>
-                        <p className="text-2xl font-bold text-green-600">Rs {(data.summary.totalDownPaymentsReceived ?? data.summary.totalReceived ?? 0).toLocaleString()}</p>
-                    </div>
-                </div>
+                {(() => {
+                    // Pure installment recovery only - no down payment mixed in.
+                    const installmentReceived = data.summary.totalInstallmentsReceived ?? (
+                        filteredOrders.filter((o: any) => o.sale_type === 'installment').reduce((sum: number, o: any) => sum + (o.down_payment_amount || 0), 0)
+                    );
+                    const cashSalesReceived = data.summary.totalCashSalesReceived ?? (
+                        filteredOrders.filter((o: any) => o.sale_type === 'cash').reduce((sum: number, o: any) => sum + (o.down_payment_amount || o.sales_value || 0), 0)
+                    );
+                    // Down payment / advance cash collected in this date range.
+                    const downPaymentReceived = data.summary.totalAdvanceReceived ?? 0;
+                    // Down payment + installment combined.
+                    const totalCollected = data.summary.totalCollectedInRange ?? (downPaymentReceived + installmentReceived);
+
+                    return (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                            <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+                                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Total Orders</p>
+                                <p className="text-2xl font-bold text-gray-800 dark:text-white">{data.summary.totalOrders || filteredOrders.length}</p>
+                            </div>
+                            <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+                                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Gross Sales Value</p>
+                                <p className="text-2xl font-bold text-blue-600">Rs {(data.summary.totalGrossAmount ?? 0).toLocaleString()}</p>
+                            </div>
+                            <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+                                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Total Cash Sale</p>
+                                <p className="text-2xl font-bold text-amber-600">Rs {cashSalesReceived.toLocaleString()}</p>
+                            </div>
+                            <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+                                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Total Amount Received</p>
+                                <p className="text-2xl font-bold text-green-600">Rs {(data.summary.totalDownPaymentsReceived ?? data.summary.totalReceived ?? (installmentReceived + cashSalesReceived)).toLocaleString()}</p>
+                            </div>
+                            <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+                                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Installment Recovery</p>
+                                <p className="text-2xl font-bold text-indigo-600">Rs {installmentReceived.toLocaleString()}</p>
+                                <p className="text-xs text-gray-400 mt-1">Installments only, no down payment</p>
+                            </div>
+                            <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+                                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Down Payment Received</p>
+                                <p className="text-2xl font-bold text-purple-600">Rs {downPaymentReceived.toLocaleString()}</p>
+                                <p className="text-xs text-gray-400 mt-1">Advance/down payment only</p>
+                            </div>
+                            <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+                                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Total Collected</p>
+                                <p className="text-2xl font-bold text-teal-600">Rs {totalCollected.toLocaleString()}</p>
+                                <p className="text-xs text-gray-400 mt-1">Down payment + installments</p>
+                            </div>
+                        </div>
+                    );
+                })()}
 
                 {/* Table */}
                 <div className="rounded-xl border border-gray-100 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800 overflow-hidden">
@@ -122,6 +159,7 @@ export default function SalesReportTab({ token, startDate, endDate, searchQuery 
                             <thead className="bg-gray-50 text-gray-800 dark:bg-gray-900/50 dark:text-white">
                                 <tr>
                                     <th className="px-4 py-3 font-medium">Sr #</th>
+                                    <th className="px-4 py-3 font-medium">Date</th>
                                     <th className="px-4 py-3 font-medium">Order ID</th>
                                     <th className="px-4 py-3 font-medium">Customer Name</th>
                                     <th className="px-4 py-3 font-medium">Product</th>
@@ -137,6 +175,7 @@ export default function SalesReportTab({ token, startDate, endDate, searchQuery 
                                 {filteredOrders.length > 0 ? filteredOrders.map((order: any, index: number) => (
                                     <tr key={order.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
                                         <td className="px-4 py-3">{index + 1}</td>
+                                        <td className="px-4 py-3 whitespace-nowrap">{formatExactDate(order.delivered_at || order.updated_at || order.created_at, 'DD MMM YYYY, hh:mm A')}</td>
                                         <td className="px-4 py-3 font-medium text-blue-600">{order.order_ref}</td>
                                         <td className="px-4 py-3">
                                             <p className="font-medium text-gray-800 dark:text-white">{order.customer_name}</p>
@@ -156,7 +195,7 @@ export default function SalesReportTab({ token, startDate, endDate, searchQuery 
                                     </tr>
                                 )) : (
                                     <tr>
-                                        <td colSpan={10} className="px-4 py-8 text-center text-gray-500">No sales data found for the selected range.</td>
+                                        <td colSpan={11} className="px-4 py-8 text-center text-gray-500">No sales data found for the selected range.</td>
                                     </tr>
                                 )}
                             </tbody>

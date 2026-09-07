@@ -220,6 +220,56 @@ const OrderListContent = ({ forcedStatus, forcedChannel, apiEndpoint, hideAction
   const [selectedProduct, setSelectedProduct] = useState<any>(null)
   const [selectedPlan, setSelectedPlan] = useState<any>(null)
 
+  // Manual Lock Photo Modal State
+  const [manualLockModalOpen, setManualLockModalOpen] = useState(false)
+  const [selectedOrderForManualLock, setSelectedOrderForManualLock] = useState<Order | null>(null)
+  const [manualLockPhotoFile, setManualLockPhotoFile] = useState<File | null>(null)
+  const [isUploadingManualLock, setIsUploadingManualLock] = useState(false)
+
+  const handleOpenManualLockModal = (order: Order) => {
+    setSelectedOrderForManualLock(order)
+    setManualLockPhotoFile(null)
+    setManualLockModalOpen(true)
+  }
+
+  const handleManualLockPhotoSubmit = async () => {
+    if (!selectedOrderForManualLock || !manualLockPhotoFile) {
+      toast.error('Please select a lock screen photo to upload.')
+      return
+    }
+
+    try {
+      setIsUploadingManualLock(true)
+      const token = Cookies.get('auth_token')
+      const formData = new FormData()
+      formData.append('manual_lock_photo', manualLockPhotoFile)
+
+      const res = await fetch(`${BACKEND_URL}/api/paytrigger/order/${selectedOrderForManualLock.id}/manual-lock-photo`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: formData,
+      })
+
+      const data = await res.json()
+      if (!res.ok || data.success === false) {
+        throw new Error(data.message || 'Failed to submit lock photo')
+      }
+
+      toast.success(data.message || 'Lock screen photo submitted successfully. Order is now delivered!')
+      setManualLockModalOpen(false)
+      setSelectedOrderForManualLock(null)
+      setManualLockPhotoFile(null)
+      await fetchOrders()
+    } catch (err: any) {
+      console.error('Submit manual lock photo error:', err)
+      toast.error(err.message || 'Failed to submit lock photo')
+    } finally {
+      setIsUploadingManualLock(false)
+    }
+  }
+
   // ── Data Fetching ──────────────────────────────────────────────────────────
   const fetchOrders = async () => {
     setLoading(true)
@@ -1246,19 +1296,32 @@ const OrderListContent = ({ forcedStatus, forcedChannel, apiEndpoint, hideAction
                   return null;
                 })()}
 
-                {/* Cancel Enrollment — order is stuck waiting on PayTrigger device enrollment */}
+                {/* Software Activation / Manual Lock Screen Photo actions for awaiting_paytrigger_enrollment */}
                 {!hideActions && orderStatus === 'awaiting_paytrigger_enrollment' && (
-                  <li>
-                    <button
-                      onClick={() => {
-                        handleCancelEnrollment(order)
-                        setIsOpen(false)
-                      }}
-                      className="block w-full px-4 py-2.5 text-left hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/30 dark:hover:text-red-400"
-                    >
-                      Cancel Enrollment
-                    </button>
-                  </li>
+                  <>
+                    <li>
+                      <button
+                        onClick={() => {
+                          handleOpenManualLockModal(order)
+                          setIsOpen(false)
+                        }}
+                        className="block w-full px-4 py-2.5 text-left font-semibold text-emerald-700 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-900/30"
+                      >
+                        📷 Submit Lock Screen Photo
+                      </button>
+                    </li>
+                    <li>
+                      <button
+                        onClick={() => {
+                          handleCancelEnrollment(order)
+                          setIsOpen(false)
+                        }}
+                        className="block w-full px-4 py-2.5 text-left hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/30 dark:hover:text-red-400"
+                      >
+                        Cancel Enrollment
+                      </button>
+                    </li>
+                  </>
                 )}
 
                 {/* Assignment/Transfer Actions */}
@@ -2172,6 +2235,52 @@ const OrderListContent = ({ forcedStatus, forcedChannel, apiEndpoint, hideAction
             className="rounded bg-orange-600 px-6 py-2.5 text-white hover:bg-orange-700 disabled:opacity-50"
           >
             {isSubmitting ? 'Processing...' : 'Take Back Selected'}
+          </button>
+        </div>
+      </Modal>
+
+      {/* Submit Manual Lock Screen Photo Modal */}
+      <Modal
+        open={manualLockModalOpen}
+        onClose={() => setManualLockModalOpen(false)}
+        className="max-w-lg rounded-2xl bg-white p-8 shadow-xl dark:bg-gray-800"
+      >
+        <h2 className="mb-2 text-xl font-bold text-dark dark:text-white">Submit Manual Lock Screen Photo</h2>
+        <p className="mb-4 text-sm text-gray-600 dark:text-gray-300">
+          Upload a photo of the manually locked screen for Order <strong>#{selectedOrderForManualLock?.order_ref}</strong> to complete delivery and set order status to Delivered.
+        </p>
+
+        <div className="mb-6">
+          <label className="mb-2 block text-sm font-medium text-dark dark:text-white">
+            Lock Screen Photo <span className="text-red-500">*</span>
+          </label>
+          <input
+            type="file"
+            accept="image/*"
+            onChange={(e) => setManualLockPhotoFile(e.target.files?.[0] || null)}
+            className="w-full rounded-lg border border-stroke p-3 text-sm focus:border-primary dark:border-dark-3 dark:bg-gray-700 dark:text-white"
+          />
+          {manualLockPhotoFile && (
+            <p className="mt-2 text-xs font-semibold text-emerald-600">
+              Selected: {manualLockPhotoFile.name} ({(manualLockPhotoFile.size / 1024).toFixed(1)} KB)
+            </p>
+          )}
+        </div>
+
+        <div className="flex justify-end gap-3">
+          <button
+            onClick={() => setManualLockModalOpen(false)}
+            className="rounded-lg border border-stroke px-5 py-2.5 text-sm font-medium text-dark hover:bg-gray-100 dark:border-dark-3 dark:text-white dark:hover:bg-dark-3 disabled:opacity-50"
+            disabled={isUploadingManualLock}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleManualLockPhotoSubmit}
+            disabled={isUploadingManualLock || !manualLockPhotoFile}
+            className="rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+          >
+            {isUploadingManualLock ? 'Submitting...' : 'Submit & Complete Delivery'}
           </button>
         </div>
       </Modal>

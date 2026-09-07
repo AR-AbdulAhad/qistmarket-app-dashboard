@@ -234,15 +234,37 @@ function GlobalInstallmentSearch({ onPay, onGenerateQR }: { onPay: (order: any, 
                                                     </div>
                                                 </div>
                                             )}
-                                            {/* Monthly Installment Rows */}
-                                            {order.installmentLedger?.map((inst: any, idx: number) => {
-                                                const firstUnpaidIndex = order.installmentLedger?.findIndex((r: any) => r.status !== 'paid' && r.status !== 'Paid') ?? -1;
-                                                const isPayable = idx === firstUnpaidIndex;
+                                            {(() => {
+                                                const ledger = order.installmentLedger || [];
+                                                let activePayableIndex = ledger.findIndex((r: any) => {
+                                                    if (r.status === 'paid' || r.status === 'Paid') return false;
+                                                    const m = r.monthNumber ?? r.month ?? 0;
+                                                    if (m <= 0) return false;
+                                                    const dueDate = r.dueDate || r.due_date;
+                                                    if (!dueDate) return true;
+                                                    const d = new Date(dueDate);
+                                                    if (isNaN(d.getTime())) return true;
+                                                    d.setHours(0, 0, 0, 0);
+                                                    return d >= today;
+                                                });
+                                                const unpaidIndices = ledger
+                                                    .map((r: any, i: number) => ((r.monthNumber ?? r.month ?? 0) > 0 && r.status !== 'paid' && r.status !== 'Paid') ? i : -1)
+                                                    .filter((i: number) => i !== -1);
+                                                if (activePayableIndex === -1 && unpaidIndices.length > 0) {
+                                                    activePayableIndex = unpaidIndices[unpaidIndices.length - 1];
+                                                }
+                                                // The final unpaid installment must never stay locked once it's due -
+                                                // otherwise the customer has no way left to finish paying off the loan.
+                                                const lastUnpaidIndex = unpaidIndices.length > 0 ? unpaidIndices[unpaidIndices.length - 1] : -1;
+
+                                                return ledger.map((inst: any, idx: number) => {
                                                 const isPaid = inst.status === 'paid' || inst.status === 'Paid';
                                                 const isPartial = inst.status === 'partial';
                                                 const instDueDate = inst.dueDate ? new Date(inst.dueDate) : null;
                                                 instDueDate?.setHours(0, 0, 0, 0);
                                                 const isOverdue = !isPaid && instDueDate && instDueDate < today;
+                                                const isFinalDueUnlock = idx === lastUnpaidIndex && !isPaid && instDueDate !== null && instDueDate <= today;
+                                                const isPayable = idx === activePayableIndex || isFinalDueUnlock;
                                                 const hasArrears = (inst.arrears || 0) > 0;
 
                                                 return (
@@ -332,22 +354,44 @@ function GlobalInstallmentSearch({ onPay, onGenerateQR }: { onPay: (order: any, 
                                                         </div>
                                                     </div>
                                                 );
-                                            })}
+                                            });
+                                            })()}
                                         </div>
                                         
 
                                         {/* ─── Quick Pay Next Due Button ─── */}
                                         {(() => {
-                                            const nextPending = order.installmentLedger?.find((r: any) => r.status !== 'paid' && r.status !== 'Paid');
-                                            return nextPending ? (
+                                            const ledger = order.installmentLedger || [];
+                                            let actIdx = ledger.findIndex((r: any) => {
+                                                if (r.status === 'paid' || r.status === 'Paid') return false;
+                                                const m = r.monthNumber ?? r.month ?? 0;
+                                                if (m <= 0) return false;
+                                                const dueDate = r.dueDate || r.due_date;
+                                                if (!dueDate) return true;
+                                                const d = new Date(dueDate);
+                                                if (isNaN(d.getTime())) return true;
+                                                d.setHours(0, 0, 0, 0);
+                                                return d >= today;
+                                            });
+                                            if (actIdx === -1) {
+                                                const unpaid = ledger.map((r: any, i: number) => ((r.monthNumber ?? r.month ?? 0) > 0 && r.status !== 'paid' && r.status !== 'Paid') ? i : -1).filter((i: number) => i !== -1);
+                                                if (unpaid.length > 0) actIdx = unpaid[unpaid.length - 1];
+                                            }
+                                            const nextPending = actIdx !== -1 ? ledger[actIdx] : null;
+                                            if (!nextPending) return null;
+
+                                            const rem = nextPending.remainingAmount ?? (nextPending.dueAmount - (nextPending.paidAmount || 0));
+                                            const totalNext = rem + (nextPending.arrears || 0);
+
+                                            return (
                                                 <button
                                                     onClick={() => { onPay(order, nextPending); setShowPanel(false); }}
                                                     className="w-full py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl font-bold text-xs shadow-sm hover:opacity-90 transition-opacity"
                                                 >
-                                                    Collect Next Due · {pkr(nextPending.remainingAmount ?? nextPending.dueAmount)}
-                                                    {(nextPending.arrears || 0) > 0 && ` (incl. ${pkr(nextPending.arrears)} arrears)`}
+                                                    Collect Next Due · {pkr(totalNext)}
+                                                    {(nextPending.arrears || 0) > 0 && ` (Base ${pkr(rem)} + ${pkr(nextPending.arrears)} arr.)`}
                                                 </button>
-                                            ) : null;
+                                            );
                                         })()}
                                     </div>
                                 );
@@ -631,7 +675,7 @@ function InstallmentsContent() {
                 </div>
                 
                 {/* Global Metrics Row */}
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
                     <div className="bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 hover:shadow-md transition-shadow">
                         <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Months Due</p>
                         <p className="text-xl font-black text-gray-900 dark:text-white">{pkr(stats.months_due || 0)}</p>
@@ -639,6 +683,11 @@ function InstallmentsContent() {
                     <div className="bg-blue-50/50 dark:bg-blue-900/10 p-4 rounded-2xl shadow-sm border border-blue-100 dark:border-blue-800 hover:shadow-md transition-shadow">
                         <p className="text-[10px] font-bold text-blue-500 uppercase tracking-widest mb-1.5">Months Collected</p>
                         <p className="text-xl font-black text-blue-600 dark:text-blue-400">{pkr(stats.months_collected || 0)}</p>
+                        <p className="text-[9px] text-gray-400 mt-1">Installments only</p>
+                    </div>
+                    <div className="bg-purple-50/50 dark:bg-purple-900/10 p-4 rounded-2xl shadow-sm border border-purple-100 dark:border-purple-800 hover:shadow-md transition-shadow">
+                        <p className="text-[10px] font-bold text-purple-500 uppercase tracking-widest mb-1.5">Down Payment Collected</p>
+                        <p className="text-xl font-black text-purple-600 dark:text-purple-400">{pkr(stats.months_collected_advance || 0)}</p>
                     </div>
                     <div className="bg-red-50/50 dark:bg-red-900/10 p-4 rounded-2xl shadow-sm border border-red-100 dark:border-red-800 hover:shadow-md transition-shadow">
                         <p className="text-[10px] font-bold text-red-500 uppercase tracking-widest mb-1.5">Months Remaining</p>

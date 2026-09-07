@@ -51,10 +51,10 @@ const COLUMNS = [
   // Next of Kin — optional, matches the order detail page's Next of Kin
   // Details section (a distinct, single record, not per-guarantor).
   'next_of_kin_name', 'next_of_kin_cnic', 'next_of_kin_relation', 'next_of_kin_phone',
-  // Payment history — each PAY column paired with the date it was actually
-  // collected, so the installment ledger shows real payment dates and exact
-  // (possibly uneven) amounts instead of an assumed on-schedule full payment.
-  'pay1', 'pay1_date', 'pay2', 'pay2_date', 'pay3', 'pay3_date', 'pay4', 'pay4_date', 'remain',
+  // PAY1-4 columns were dropped — the paper ledgers kept them inconsistently
+  // (often blank even when the running balance was accurate), so `remain`
+  // is now the sole basis for working out how many months are paid.
+  'remain',
 ] as const;
 
 type LegacyRow = Record<(typeof COLUMNS)[number], any> & { _rowNum: number; _issues: string[] };
@@ -78,8 +78,7 @@ const FIELD_LABELS: Record<string, string> = {
   item_price: 'Item Price', item_model: 'Item Model', serial: 'Serial', tenure_months: 'Tenure',
   advance: 'Advance', installment: 'Installment',
   next_of_kin_name: 'Name', next_of_kin_cnic: 'CNIC', next_of_kin_relation: 'Relation', next_of_kin_phone: 'Phone Number',
-  pay1: 'Pay 1', pay1_date: 'Pay 1 Date', pay2: 'Pay 2', pay2_date: 'Pay 2 Date',
-  pay3: 'Pay 3', pay3_date: 'Pay 3 Date', pay4: 'Pay 4', pay4_date: 'Pay 4 Date', remain: 'Remain',
+  remain: 'Remain',
 };
 for (const n of [1, 2] as const) {
   Object.assign(FIELD_LABELS, {
@@ -132,7 +131,7 @@ const FIELD_SECTIONS: { title: string; fields: string[] }[] = [
     ],
   },
   { title: 'Next of Kin', fields: ['next_of_kin_name', 'next_of_kin_cnic', 'next_of_kin_relation', 'next_of_kin_phone'] },
-  { title: 'Payment History', fields: ['pay1', 'pay1_date', 'pay2', 'pay2_date', 'pay3', 'pay3_date', 'pay4', 'pay4_date', 'remain'] },
+  { title: 'Remaining Balance', fields: ['remain'] },
 ];
 
 type ImportResult = { row: number; success: boolean; order_id?: number; error?: string; reconciliation_warning?: string | null };
@@ -142,12 +141,6 @@ function excelValueToIso(v: any): string | null {
   if (v instanceof Date) return v.toISOString();
   const d = new Date(v);
   return isNaN(d.getTime()) ? null : d.toISOString();
-}
-
-function shortDate(iso: string | null | undefined): string {
-  if (!iso) return '';
-  const d = new Date(iso);
-  return isNaN(d.getTime()) ? '' : d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
 }
 
 function validateRow(row: LegacyRow): string[] {
@@ -231,7 +224,7 @@ export default function LegacyImportPage() {
         'Guarantor 2 Business Name', 'Guarantor 2 Established Since', 'Guarantor 2 Business Address', 'Guarantor 2 Net Income',
         'Guarantor 2 Full Residential Address', 'Guarantor 2 Nearest Location',
         'Next of Kin Name', 'Next of Kin CNIC', 'Next of Kin Relation', 'Next of Kin Phone',
-        'PAY 1', 'PAY 1 DATE', 'PAY 2', 'PAY 2 DATE', 'PAY 3', 'PAY 3 DATE', 'PAY 4', 'PAY 4 DATE', 'remain',
+        'remain',
       ];
 
       const sampleRows = [
@@ -257,7 +250,7 @@ export default function LegacyImportPage() {
           '', '', '', '',
           '', '',
           'MUHAMMAD AHSAN SR', '42101-1111111-1', 'Father', '03001112222',
-          4600, '10/07/2026', 4600, '12/08/2026', '', '', '', '', 46000,
+          46000,
         ],
         // Row 2: Fully paid off (completed) — sparser row, showing that most
         // fields are optional and left blank falls back cleanly.
@@ -281,7 +274,7 @@ export default function LegacyImportPage() {
           '', '', '', '',
           '', '',
           '', '', '', '',
-          6750, '10/02/2026', 6750, '09/03/2026', 6750, '11/04/2026', 6750, '10/05/2026', 0,
+          0,
         ],
       ];
 
@@ -314,7 +307,7 @@ export default function LegacyImportPage() {
             const row: any = { _rowNum: idx + 2 }; // +2 = 1-indexed + header row
             COLUMNS.forEach((col, i) => {
               let v = r[i];
-              if (col === 'order_date' || col === 'pay1_date' || col === 'pay2_date' || col === 'pay3_date' || col === 'pay4_date') v = excelValueToIso(v);
+              if (col === 'order_date') v = excelValueToIso(v);
               row[col] = v;
             });
             row._issues = validateRow(row);
@@ -560,10 +553,6 @@ export default function LegacyImportPage() {
                   <th className="py-2 px-3 bg-red-50 dark:bg-red-900/10">Guarantor 2 — CNIC</th>
                   <th className="py-2 px-3 bg-red-50 dark:bg-red-900/10">Guarantor 2 — Contact</th>
                   <th className="py-2 px-3 bg-red-50 dark:bg-red-900/10">Guarantor 2 — Relationship</th>
-                  <th className="py-2 px-3">Pay 1 (date)</th>
-                  <th className="py-2 px-3">Pay 2 (date)</th>
-                  <th className="py-2 px-3">Pay 3 (date)</th>
-                  <th className="py-2 px-3">Pay 4 (date)</th>
                   <th className="py-2 px-3">Remain</th>
                   <th className="py-2 px-3">Issues</th>
                 </tr>
@@ -642,22 +631,6 @@ export default function LegacyImportPage() {
                           <EditableCell rowNum={r._rowNum} field="grantor2_relationship" value={r.grantor2_relationship} />
                         </td>
                         <td className="py-2 px-3 text-gray-700 dark:text-gray-200">
-                          <EditableCell rowNum={r._rowNum} field="pay1" value={r.pay1} />
-                          {r.pay1 && r.pay1_date && <span className="text-gray-400 text-[10px]"> ({shortDate(r.pay1_date)})</span>}
-                        </td>
-                        <td className="py-2 px-3 text-gray-700 dark:text-gray-200">
-                          <EditableCell rowNum={r._rowNum} field="pay2" value={r.pay2} />
-                          {r.pay2 && r.pay2_date && <span className="text-gray-400 text-[10px]"> ({shortDate(r.pay2_date)})</span>}
-                        </td>
-                        <td className="py-2 px-3 text-gray-700 dark:text-gray-200">
-                          <EditableCell rowNum={r._rowNum} field="pay3" value={r.pay3} />
-                          {r.pay3 && r.pay3_date && <span className="text-gray-400 text-[10px]"> ({shortDate(r.pay3_date)})</span>}
-                        </td>
-                        <td className="py-2 px-3 text-gray-700 dark:text-gray-200">
-                          <EditableCell rowNum={r._rowNum} field="pay4" value={r.pay4} />
-                          {r.pay4 && r.pay4_date && <span className="text-gray-400 text-[10px]"> ({shortDate(r.pay4_date)})</span>}
-                        </td>
-                        <td className="py-2 px-3 text-gray-700 dark:text-gray-200">
                           <EditableCell rowNum={r._rowNum} field="remain" value={r.remain} />
                         </td>
                         <td className="py-2 px-3 text-red-600">{r._issues.join(', ')}</td>
@@ -669,7 +642,7 @@ export default function LegacyImportPage() {
                               the actual content to the left edge of the scroll area
                               and cap its width, otherwise the label/value pairs below
                               end up stretched far apart (values scrolled off-screen). */}
-                          <td colSpan={27} className="bg-gray-50 dark:bg-gray-900/40 p-0">
+                          <td colSpan={23} className="bg-gray-50 dark:bg-gray-900/40 p-0">
                             <div className="sticky left-0 w-[calc(100vw-320px)] max-w-[1100px] p-5">
                               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
                                 {FIELD_SECTIONS.map((section) => (

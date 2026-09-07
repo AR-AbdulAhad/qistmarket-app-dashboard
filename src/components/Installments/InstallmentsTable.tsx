@@ -228,28 +228,51 @@ export default function InstallmentsTable({ data, onPay, selectedIds = [], onSel
                                             <p className="text-[10px] text-gray-400">IMEI: {order.imei_serial || 'N/A'}</p>
                                         </td>
                                         <td className="px-6 py-4">
-                                            {nextPending ? (
-                                                <div>
-                                                    <p className={`text-sm font-semibold ${nextPending.paidAmount && nextPending.paidAmount > 0 ? 'text-blue-600' : 'text-gray-700 dark:text-gray-300'}`}>
-                                                        {pkr(nextPending.remainingAmount || nextPending.dueAmount)}
-                                                    </p>
-                                                    {nextPending.paidAmount && nextPending.paidAmount > 0 ? (
-                                                        <p className="text-[10px] text-emerald-500 font-bold uppercase tracking-tight">
-                                                            Partial: {pkr(nextPending.paidAmount)}
+                                            {(() => {
+                                                const ledgerRows = order.installmentLedger || [];
+                                                const today = new Date(); today.setHours(0, 0, 0, 0);
+                                                let actIdx = ledgerRows.findIndex(r => {
+                                                    if (r.status === 'paid') return false;
+                                                    const m = r.monthNumber ?? r.month ?? 0;
+                                                    if (m <= 0) return false;
+                                                    const dueDate = r.dueDate || r.due_date;
+                                                    if (!dueDate) return true;
+                                                    const d = new Date(dueDate);
+                                                    if (isNaN(d.getTime())) return true;
+                                                    d.setHours(0, 0, 0, 0);
+                                                    return d >= today;
+                                                });
+                                                if (actIdx === -1) {
+                                                    const unpaid = ledgerRows.map((r, i) => ((r.monthNumber ?? r.month ?? 0) > 0 && r.status !== 'paid') ? i : -1).filter(i => i !== -1);
+                                                    if (unpaid.length > 0) actIdx = unpaid[unpaid.length - 1];
+                                                }
+                                                const activeNext = actIdx !== -1 ? ledgerRows[actIdx] : null;
+                                                if (!activeNext) return <span className="text-xs text-green-500 font-semibold">✓ Fully Paid</span>;
+
+                                                const rem = activeNext.remainingAmount ?? (activeNext.dueAmount - (activeNext.paidAmount || 0));
+                                                const totalPayable = rem + (activeNext.arrears || 0);
+
+                                                return (
+                                                    <div>
+                                                        <p className={`text-sm font-black ${activeNext.paidAmount && activeNext.paidAmount > 0 ? 'text-blue-600' : 'text-gray-800 dark:text-gray-200'}`}>
+                                                            {pkr(totalPayable)}
                                                         </p>
-                                                    ) : null}
-                                                    {nextPending.arrears ? (
-                                                        <p className="text-[10px] text-red-500 font-medium mt-0.5">
-                                                            Included Arrears: {pkr(nextPending.arrears)}
+                                                        {activeNext.paidAmount && activeNext.paidAmount > 0 ? (
+                                                            <p className="text-[10px] text-emerald-500 font-bold uppercase tracking-tight">
+                                                                Partial: {pkr(activeNext.paidAmount)}
+                                                            </p>
+                                                        ) : null}
+                                                        {activeNext.arrears ? (
+                                                            <p className="text-[10px] text-red-500 font-medium mt-0.5">
+                                                                (Base {pkr(rem)} + {pkr(activeNext.arrears)} arrears)
+                                                            </p>
+                                                        ) : null}
+                                                        <p className="text-[10px] text-gray-500 mt-1">
+                                                            {activeNext.label} · {activeNext.dueDate ? new Date(activeNext.dueDate).toLocaleDateString('en-PK') : 'N/A'}
                                                         </p>
-                                                    ) : null}
-                                                    <p className="text-[10px] text-gray-500 mt-1">
-                                                        {nextPending.label} · {nextPending.dueDate ? new Date(nextPending.dueDate).toLocaleDateString('en-PK') : 'N/A'}
-                                                    </p>
-                                                </div>
-                                            ) : (
-                                                <span className="text-xs text-green-500 font-semibold">✓ Fully Paid</span>
-                                            )}
+                                                    </div>
+                                                );
+                                            })()}
                                         </td>
                                         <td className="px-6 py-4">
                                             <p className={`text-sm font-bold ${totalRemaining > 0 ? 'text-red-500' : 'text-green-500'}`}>
@@ -455,9 +478,33 @@ export default function InstallmentsTable({ data, onPay, selectedIds = [], onSel
                                                             </div>
                                                             {(() => {
                                                                 const ledgerRows = order.installmentLedger || [];
-                                                                const firstUnpaidIndex = ledgerRows.findIndex(r => r.status !== 'paid');
+                                                                const today = new Date(); today.setHours(0, 0, 0, 0);
+
+                                                                // Active open/payable index: first unpaid month whose due date is TODAY or in FUTURE.
+                                                                // If past due dates have passed, they lock and roll arrears forward to the active month.
+                                                                let activePayableIndex = ledgerRows.findIndex(r => {
+                                                                    if (r.status === 'paid') return false;
+                                                                    const m = r.monthNumber ?? r.month ?? 0;
+                                                                    if (m <= 0) return false;
+                                                                    const dueDate = r.dueDate || r.due_date;
+                                                                    if (!dueDate) return true;
+                                                                    const d = new Date(dueDate);
+                                                                    if (isNaN(d.getTime())) return true;
+                                                                    d.setHours(0, 0, 0, 0);
+                                                                    return d >= today;
+                                                                });
+
+                                                                const unpaidIndices = ledgerRows
+                                                                    .map((r, i) => ((r.monthNumber ?? r.month ?? 0) > 0 && r.status !== 'paid') ? i : -1)
+                                                                    .filter(i => i !== -1);
+                                                                if (activePayableIndex === -1 && unpaidIndices.length > 0) {
+                                                                    activePayableIndex = unpaidIndices[unpaidIndices.length - 1];
+                                                                }
+                                                                // The final unpaid installment must never stay locked once it's due -
+                                                                // otherwise the customer has no way left to finish paying off the loan.
+                                                                const lastUnpaidIndex = unpaidIndices.length > 0 ? unpaidIndices[unpaidIndices.length - 1] : -1;
+
                                                                 return ledgerRows.map((inst, idx) => {
-                                                                const isPayable = idx === firstUnpaidIndex;
                                                                 const isPaid = inst.status === 'paid';
                                                                 const isPartial = inst.status === 'partial' || (!isPaid && (inst.paidAmount || 0) > 0);
                                                                 const isNext = !isPaid && !isPartial && (order.installmentLedger || [])
@@ -467,6 +514,8 @@ export default function InstallmentsTable({ data, onPay, selectedIds = [], onSel
                                                                 instDueDate?.setHours(0, 0, 0, 0);
                                                                 const today = new Date(); today.setHours(0, 0, 0, 0);
                                                                 const isOverdue = !isPaid && instDueDate && instDueDate < today;
+                                                                const isFinalDueUnlock = idx === lastUnpaidIndex && !isPaid && instDueDate !== null && instDueDate <= today;
+                                                                const isPayable = idx === activePayableIndex || isFinalDueUnlock;
                                                                 const hasArrears = (inst.arrears || 0) > 0;
                                                                 const paidAmt = inst.paidAmount || 0;
                                                                 const remAmt = inst.remainingAmount ?? (inst.dueAmount - paidAmt);
@@ -551,15 +600,20 @@ export default function InstallmentsTable({ data, onPay, selectedIds = [], onSel
                                                                         </div>
 
                                                                         {/* Remaining */}
-                                                                        <div className="text-right">
-                                                                            {!isPaid && remAmt > 0 ? (
-                                                                                <span className="text-sm font-black text-red-500">{pkr(remAmt)}</span>
-                                                                            ) : isPaid ? (
-                                                                                <span className="text-[10px] text-green-500 font-bold">✓ Done</span>
-                                                                            ) : (
-                                                                                <span className="text-[10px] text-gray-300">—</span>
-                                                                            )}
-                                                                        </div>
+                                                                         <div className="text-right">
+                                                                             {!isPaid && (remAmt + (inst.arrears || 0)) > 0 ? (
+                                                                                 <div>
+                                                                                     <span className="text-sm font-black text-red-500">{pkr(remAmt + (inst.arrears || 0))}</span>
+                                                                                     {hasArrears ? (
+                                                                                         <p className="text-[9px] text-gray-400">({pkr(remAmt)} + {pkr(inst.arrears)} arr.)</p>
+                                                                                     ) : null}
+                                                                                 </div>
+                                                                             ) : isPaid ? (
+                                                                                 <span className="text-[10px] text-green-500 font-bold">✓ Done</span>
+                                                                             ) : (
+                                                                                 <span className="text-[10px] text-gray-300">—</span>
+                                                                             )}
+                                                                         </div>
 
                                                                         {/* Action */}
                                                                         <div className="flex justify-center gap-2 items-center">
@@ -579,7 +633,7 @@ export default function InstallmentsTable({ data, onPay, selectedIds = [], onSel
                                                                                         onClick={() => {
                                                                                             setQrOrderId(order.order_id);
                                                                                             setQrMonthNumber(inst.monthNumber);
-                                                                                            setQrDefaultAmount(remAmt);
+                                                                                            setQrDefaultAmount(remAmt + (inst.arrears || 0));
                                                                                             setQrCustomerName(order.customer_name);
                                                                                             setQrModalOpen(true);
                                                                                         }}
