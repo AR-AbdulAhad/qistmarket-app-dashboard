@@ -29,6 +29,8 @@ type InstallmentRow = {
     paidAmount?: number;
     remainingAmount?: number;
     payment_history?: { amount: number; date: string; method: string }[];
+    month?: number;
+    due_date?: string | null;
 };
 
 type OrderInstallment = {
