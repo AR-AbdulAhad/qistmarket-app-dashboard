@@ -1008,12 +1008,15 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
     }
 
     const matchedKeys = new Set<string>();
+    const isLegacyImport = data.order?.channel === 'legacy_import';
 
     return (
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {standardSlots.map((slot) => {
           const doc = personDocs.find((d) => d.document_type === slot.key);
           if (doc) matchedKeys.add(doc.document_type);
+
+          if (!doc && !isLegacyImport) return null;
 
           return (
             <div key={slot.key}>
@@ -1265,92 +1268,119 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
           <Field label="Order ID" value={data.order_id} />
           {data.order?.status && <Field label="Order Status" value={data.order.status} />}
 
-          {/* 1. Assigned Branch / Outlet Select FIRST */}
-          <div>
-            <label className="block text-sm font-medium text-gray-500 dark:text-gray-400 font-bold">Assigned Branch / Outlet</label>
-            <div className="mt-1">
-              <select
-                value={selectedOutletId || ''}
-                onChange={(e) => handleAssignmentChange(undefined, e.target.value ? Number(e.target.value) : null, undefined)}
-                disabled={updatingAssignment}
-                className="w-full rounded-lg border border-primary/40 bg-white px-4 py-2.5 text-sm font-bold text-primary dark:border-dark-3 dark:bg-dark-3 dark:text-white transition focus:border-primary shadow-xs"
-              >
-                <option value="">-- Select Branch / Outlet First --</option>
-                {(data.order as any)?.outlet && !outlets.some(o => o.id === (data.order as any).outlet?.id) && (
-                  <option value={(data.order as any).outlet.id}>
-                    {(data.order as any).outlet.name}
-                  </option>
-                )}
-                {outlets.map((o) => (
-                  <option key={o.id} value={o.id}>
-                    {o.name} {o.code ? `(${o.code})` : ''}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {/* 2. Verification Officer Select */}
-          <div>
-            <label className="block text-sm font-medium text-gray-500 dark:text-gray-400 font-bold">Verification Officer</label>
-            <div className="mt-1">
-              <select
-                value={data.verification_officer_id || ''}
-                onChange={(e) => handleAssignmentChange(e.target.value ? Number(e.target.value) : null, undefined, undefined)}
-                disabled={updatingAssignment || !selectedOutletId}
-                className="w-full rounded-lg border border-stroke bg-gray-100 px-4 py-2.5 text-sm font-bold text-dark dark:border-dark-3 dark:bg-dark-3 dark:text-white transition focus:border-primary disabled:opacity-60"
-              >
-                {!selectedOutletId ? (
-                  <option value="">Select Branch / Outlet First</option>
-                ) : (
-                  <>
-                    <option value="">Unassigned</option>
-                    {data.verification_officer && !verificationOfficers.some(o => o.id === data.verification_officer_id) && (
-                      <option value={data.verification_officer_id}>
-                        {data.verification_officer.full_name} ({data.verification_officer.username})
+          {data.order?.channel === 'legacy_import' ? (
+            <>
+              {/* 1. Assigned Branch / Outlet Select FIRST */}
+              <div>
+                <label className="block text-sm font-medium text-gray-500 dark:text-gray-400 font-bold">Assigned Branch / Outlet</label>
+                <div className="mt-1">
+                  <select
+                    value={selectedOutletId || ''}
+                    onChange={(e) => handleAssignmentChange(undefined, e.target.value ? Number(e.target.value) : null, undefined)}
+                    disabled={updatingAssignment}
+                    className="w-full rounded-lg border border-primary/40 bg-white px-4 py-2.5 text-sm font-bold text-primary dark:border-dark-3 dark:bg-dark-3 dark:text-white transition focus:border-primary shadow-xs"
+                  >
+                    <option value="">-- Select Branch / Outlet First --</option>
+                    {(data.order as any)?.outlet && !outlets.some(o => o.id === (data.order as any).outlet?.id) && (
+                      <option value={(data.order as any).outlet.id}>
+                        {(data.order as any).outlet.name}
                       </option>
                     )}
-                    {verificationOfficers.map((o) => (
+                    {outlets.map((o) => (
                       <option key={o.id} value={o.id}>
-                        {o.full_name} ({o.username})
+                        {o.name} {o.code ? `(${o.code})` : ''}
                       </option>
                     ))}
-                  </>
-                )}
-              </select>
-            </div>
-          </div>
+                  </select>
+                </div>
+              </div>
 
-          {/* 3. Delivery Officer Select */}
-          <div>
-            <label className="block text-sm font-medium text-gray-500 dark:text-gray-400 font-bold">Delivery Officer</label>
-            <div className="mt-1">
-              <select
-                value={(data.order as any)?.delivery_officer_id || (data.order as any)?.delivery_officer?.id || ''}
-                onChange={(e) => handleAssignmentChange(undefined, undefined, e.target.value ? Number(e.target.value) : null)}
-                disabled={updatingAssignment || !selectedOutletId}
-                className="w-full rounded-lg border border-stroke bg-gray-100 px-4 py-2.5 text-sm font-bold text-dark dark:border-dark-3 dark:bg-dark-3 dark:text-white transition focus:border-primary disabled:opacity-60"
-              >
-                {!selectedOutletId ? (
-                  <option value="">Select Branch / Outlet First</option>
-                ) : (
-                  <>
-                    <option value="">Unassigned</option>
-                    {(data.order as any)?.delivery_officer && !deliveryOfficers.some(o => o.id === (data.order as any).delivery_officer?.id) && (
-                      <option value={(data.order as any).delivery_officer.id}>
-                        {(data.order as any).delivery_officer.full_name} ({(data.order as any).delivery_officer.username})
-                      </option>
+              {/* 2. Verification Officer Select */}
+              <div>
+                <label className="block text-sm font-medium text-gray-500 dark:text-gray-400 font-bold">Verification Officer</label>
+                <div className="mt-1">
+                  <select
+                    value={data.verification_officer_id || ''}
+                    onChange={(e) => handleAssignmentChange(e.target.value ? Number(e.target.value) : null, undefined, undefined)}
+                    disabled={updatingAssignment || !selectedOutletId}
+                    className="w-full rounded-lg border border-stroke bg-gray-100 px-4 py-2.5 text-sm font-bold text-dark dark:border-dark-3 dark:bg-dark-3 dark:text-white transition focus:border-primary disabled:opacity-60"
+                  >
+                    {!selectedOutletId ? (
+                      <option value="">Select Branch / Outlet First</option>
+                    ) : (
+                      <>
+                        <option value="">Unassigned</option>
+                        {data.verification_officer && !verificationOfficers.some(o => o.id === data.verification_officer_id) && (
+                          <option value={data.verification_officer_id}>
+                            {data.verification_officer.full_name} ({data.verification_officer.username})
+                          </option>
+                        )}
+                        {verificationOfficers.map((o) => (
+                          <option key={o.id} value={o.id}>
+                            {o.full_name} ({o.username})
+                          </option>
+                        ))}
+                      </>
                     )}
-                    {deliveryOfficers.map((o) => (
-                      <option key={o.id} value={o.id}>
-                        {o.full_name} ({o.username})
-                      </option>
-                    ))}
-                  </>
-                )}
-              </select>
-            </div>
-          </div>
+                  </select>
+                </div>
+              </div>
+
+              {/* 3. Delivery Officer Select */}
+              <div>
+                <label className="block text-sm font-medium text-gray-500 dark:text-gray-400 font-bold">Delivery Officer</label>
+                <div className="mt-1">
+                  <select
+                    value={(data.order as any)?.delivery_officer_id || (data.order as any)?.delivery_officer?.id || ''}
+                    onChange={(e) => handleAssignmentChange(undefined, undefined, e.target.value ? Number(e.target.value) : null)}
+                    disabled={updatingAssignment || !selectedOutletId}
+                    className="w-full rounded-lg border border-stroke bg-gray-100 px-4 py-2.5 text-sm font-bold text-dark dark:border-dark-3 dark:bg-dark-3 dark:text-white transition focus:border-primary disabled:opacity-60"
+                  >
+                    {!selectedOutletId ? (
+                      <option value="">Select Branch / Outlet First</option>
+                    ) : (
+                      <>
+                        <option value="">Unassigned</option>
+                        {(data.order as any)?.delivery_officer && !deliveryOfficers.some(o => o.id === (data.order as any).delivery_officer?.id) && (
+                          <option value={(data.order as any).delivery_officer.id}>
+                            {(data.order as any).delivery_officer.full_name} ({(data.order as any).delivery_officer.username})
+                          </option>
+                        )}
+                        {deliveryOfficers.map((o) => (
+                          <option key={o.id} value={o.id}>
+                            {o.full_name} ({o.username})
+                          </option>
+                        ))}
+                      </>
+                    )}
+                  </select>
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              {(data.order as any)?.outlet && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-500 dark:text-gray-400 font-bold">Assigned Branch / Outlet</label>
+                  <div className="mt-1 rounded-lg border border-primary/40 bg-white px-4 py-2.5 text-sm font-bold text-primary dark:border-dark-3 dark:bg-dark-3 dark:text-white">
+                    {(data.order as any).outlet.name} {(data.order as any).outlet.code ? `(${(data.order as any).outlet.code})` : ''}
+                  </div>
+                </div>
+              )}
+              {data.verification_officer && (
+                <Field
+                  label="Verification Officer"
+                  value={`${data.verification_officer.full_name} (${data.verification_officer.username})`}
+                />
+              )}
+              {(data.order as any)?.delivery_officer && (
+                <Field
+                  label="Delivery Officer"
+                  value={`${(data.order as any).delivery_officer.full_name} (${(data.order as any).delivery_officer.username})`}
+                />
+              )}
+            </>
+          )}
 
 
           {data.status && (
@@ -1792,7 +1822,169 @@ const VerificationDetails = ({ params }: { params: Promise<{ id: string }> }) =>
         </div>
       </Modal>
 
+      {/* Verification Reviews */}
+      <div className="mb-12">
+        <h2 className="mb-4 text-2xl font-semibold text-dark dark:text-white">
+          Verification Reviews
+        </h2>
 
+        {data.reviews.length === 0 ? (
+          <p className="text-gray-500 dark:text-gray-400">No reviews submitted yet.</p>
+        ) : (
+          <>
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-500 dark:text-gray-400">
+                Approval Percentage
+              </label>
+              <div className="mt-1 rounded-lg bg-gray-100 px-4 py-2.5 text-2xl font-bold dark:bg-dark-3 dark:text-gray-300">
+                {percentage}%
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4">
+              {data.reviews.map((review) => (
+                <div
+                  key={review.id}
+                  className="rounded-lg border border-stroke bg-gray-100 p-4 dark:border-dark-3 dark:bg-dark-3"
+                >
+                  {review.reviewer && (
+                    <p className="text-sm text-gray-700 dark:text-gray-300">
+                      Reviewer: {review.reviewer.full_name} ({review.reviewer.username})
+                    </p>
+                  )}
+                  <p className="text-sm text-gray-700 dark:text-gray-300">
+                    Approved: {review.approved ? 'Yes' : 'No'}
+                  </p>
+                  {shouldDisplay(review.remarks) && (
+                    <p className="text-sm text-gray-700 dark:text-gray-300">
+                      Remarks: {review.remarks}
+                    </p>
+                  )}
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    Date: {formatDateTimeUTC(review.created_at)}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+
+        {/* Review Submission Form */}
+        {data.order.status === 'completed' && (
+          <div className="mt-10 rounded-lg border border-primary bg-primary/5 p-6 dark:border-blue-500/30 dark:bg-blue-950/20">
+            <h3 className="mb-6 text-2xl font-semibold text-primary dark:text-blue-400">
+              Submit Your Review
+            </h3>
+
+            <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-3">
+              <div className="rounded bg-white p-4 text-center shadow-sm dark:bg-gray-800">
+                <div className="text-sm text-gray-600 dark:text-gray-400">Reviews Submitted</div>
+                <div className="text-2xl font-bold">{data.reviews.length}/3</div>
+              </div>
+              <div className="rounded bg-white p-4 text-center shadow-sm dark:bg-gray-800">
+                <div className="text-sm text-gray-600 dark:text-gray-400">Approval Percentage</div>
+                <div className={cn(
+                  "text-2xl font-bold",
+                  percentage >= 60 ? "text-green-600" :
+                    percentage >= 30 ? "text-amber-600" : "text-red-600"
+                )}>
+                  {percentage}%
+                </div>
+              </div>
+              <div className="rounded bg-white p-4 text-center shadow-sm dark:bg-gray-800">
+                <div className="text-sm text-gray-600 dark:text-gray-400">Current Status</div>
+                <div className="flex flex-col">
+                  <div
+                    className={cn(
+                      "text-2xl font-bold tracking-wide",
+                      percentage === 0 ? "text-gray-500" :
+                        percentage >= 60 ? "text-green-600" :
+                          percentage < 30 ? "text-red-600" : "text-amber-600"
+                    )}
+                  >
+                    {percentage === 0 ? "Awaiting Review" :
+                      percentage >= 60 ? "APPROVED" :
+                        percentage < 30 ? "REJECTED" : "Pending Final Decision"}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {hasReviewed ? (
+              <div className="rounded bg-green-100 p-5 text-center text-green-800 dark:bg-green-950/40 dark:text-green-200">
+                You have already submitted your review for this verification.
+              </div>
+            ) : data.reviews.length >= 3 ? (
+              <div className="rounded bg-amber-100 p-5 text-center text-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+                Maximum 3 reviews have been submitted.
+              </div>
+            ) : (
+              <form onSubmit={handleSubmitReview} className="space-y-6">
+                <div>
+                  <label className="mb-3 block font-medium text-gray-700 dark:text-gray-300">
+                    Your Decision
+                  </label>
+                  <div className="flex gap-10">
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="decision"
+                        value="approve"
+                        checked={decision === 'approve'}
+                        onChange={() => setDecision('approve')}
+                        className="h-5 w-5 accent-green-600"
+                        required
+                      />
+                      <span>Approve</span>
+                    </label>
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="decision"
+                        value="reject"
+                        checked={decision === 'reject'}
+                        onChange={() => setDecision('reject')}
+                        className="h-5 w-5 accent-red-600"
+                      />
+                      <span>Reject</span>
+                    </label>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="mb-3 block font-medium text-gray-700 dark:text-gray-300">
+                    Remarks / Feedback
+                    {decision === 'reject' && <span className="ml-1 text-red-600">*</span>}
+                  </label>
+                  <textarea
+                    className="w-full rounded-lg border border-gray-300 p-4 focus:border-primary focus:ring-1 focus:ring-primary dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+                    rows={5}
+                    value={remarks}
+                    onChange={(e) => setRemarks(e.target.value)}
+                    placeholder={decision === 'reject'
+                      ? "Please explain why you are rejecting..."
+                      : "Optional remarks for approval"}
+                  />
+                </div>
+
+                <div className="flex justify-end">
+                  <button
+                    type="submit"
+                    disabled={submitting || !decision}
+                    className={cn(
+                      "rounded-lg px-10 py-3 font-medium text-white transition-colors",
+                      submitting || !decision ? "bg-gray-400 cursor-not-allowed" :
+                        decision === 'approve' ? "bg-green-600 hover:bg-green-700" : "bg-red-600 hover:bg-red-700"
+                    )}
+                  >
+                    {submitting ? 'Submitting...' : 'Submit Review'}
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Purchaser Details - EDITABLE */}
       {data.purchaser && Object.values(data.purchaser).some(val => shouldDisplay(val)) && (
