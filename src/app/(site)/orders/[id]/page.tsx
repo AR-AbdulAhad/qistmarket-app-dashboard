@@ -230,6 +230,18 @@ const Field = ({ label, value, className = "" }: { label: string; value: any; cl
         </div>
     );
 };
+
+const LabeledInput = ({ label, value, onChange, type = 'text' }: { label: string; value: string; onChange: (v: string) => void; type?: string }) => (
+    <div>
+        <label className="block text-sm font-medium text-gray-500 dark:text-gray-400">{label}</label>
+        <input
+            type={type}
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            className="mt-1 w-full rounded-lg border border-stroke bg-white px-4 py-2.5 text-sm text-dark dark:border-dark-3 dark:bg-dark-3 dark:text-white transition focus:border-primary"
+        />
+    </div>
+);
 // --- Main Component ---
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
@@ -334,6 +346,27 @@ export default function OrderDetailsPage() {
     const [statusModalOpen, setStatusModalOpen] = useState(false);
     const [pendingStatus, setPendingStatus] = useState<string | null>(null);
     const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+    const [editingLocationId, setEditingLocationId] = useState<number | null>(null);
+    const [locationEditForm, setLocationEditForm] = useState({
+        location_type: '', label: '', person_type: '', address: '', latitude: '', longitude: '',
+    });
+    const [savingLocationEdit, setSavingLocationEdit] = useState(false);
+    const [editingCustomerInfo, setEditingCustomerInfo] = useState(false);
+    const [customerInfoForm, setCustomerInfoForm] = useState({
+        customer_name: '', whatsapp_number: '', alternate_contact: '', address: '', city: '', area: '', zone: '', block: '', house_no: '', street: '', gender: '', residential_type: '', order_notes: '',
+    });
+    const [savingCustomerInfo, setSavingCustomerInfo] = useState(false);
+    const [editingVerificationDetails, setEditingVerificationDetails] = useState(false);
+    const [verificationDetailsForm, setVerificationDetailsForm] = useState({
+        status: '', start_time: '', end_time: '',
+    });
+    const [savingVerificationDetails, setSavingVerificationDetails] = useState(false);
+    const [verificationOfficers, setVerificationOfficers] = useState<{ id: number; full_name: string; username: string }[]>([]);
+    const [orderDeliveryOfficers, setOrderDeliveryOfficers] = useState<{ id: number; full_name: string; username: string }[]>([]);
+    const [editingReviewId, setEditingReviewId] = useState<number | null>(null);
+    const [reviewEditForm, setReviewEditForm] = useState({ approved: true, remarks: '' });
+    const [savingReview, setSavingReview] = useState(false);
+    const [deletingReviewId, setDeletingReviewId] = useState<number | null>(null);
     const { user } = useAuth();
     // Fetch verification data for this order
     const fetchVerification = async () => {
@@ -501,6 +534,224 @@ export default function OrderDetailsPage() {
         if (!res.ok || !json.success) throw new Error(json.message || 'Failed to delete photo');
         toast.success('Photo deleted');
         await fetchVerification();
+    };
+
+    const openEditLocation = (loc: any) => {
+        setLocationEditForm({
+            location_type: loc.location_type || '',
+            label: loc.label || '',
+            person_type: loc.person_type || '',
+            address: loc.address || '',
+            latitude: loc.latitude != null ? String(loc.latitude) : '',
+            longitude: loc.longitude != null ? String(loc.longitude) : '',
+        });
+        setEditingLocationId(loc.id);
+    };
+
+    const handleSaveLocationEdit = async () => {
+        if (editingLocationId === null) return;
+        const token = Cookies.get('auth_token');
+        setSavingLocationEdit(true);
+        try {
+            const res = await fetch(`${BACKEND_URL}/api/verification/location/${editingLocationId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                body: JSON.stringify(locationEditForm),
+            });
+            const json = await res.json();
+            if (!res.ok || !json.success) throw new Error(json.error?.message || json.message || 'Failed to save location');
+            toast.success('Location updated');
+            setEditingLocationId(null);
+            await fetchVerification();
+        } catch (err: any) {
+            toast.error(err.message || 'Failed to save location');
+        } finally {
+            setSavingLocationEdit(false);
+        }
+    };
+
+    const openEditCustomerInfo = () => {
+        if (!order) return;
+        setCustomerInfoForm({
+            customer_name: order.customer_name || '',
+            whatsapp_number: order.whatsapp_number || '',
+            alternate_contact: order.alternate_contact || '',
+            address: order.address || '',
+            city: order.city || '',
+            area: order.area || '',
+            zone: order.zone || '',
+            block: order.block || '',
+            house_no: order.house_no || '',
+            street: order.street || '',
+            gender: order.gender || '',
+            residential_type: order.residential_type || '',
+            order_notes: order.order_notes || '',
+        });
+        setEditingCustomerInfo(true);
+    };
+
+    const handleSaveCustomerInfo = async () => {
+        if (!order) return;
+        const token = Cookies.get('auth_token');
+        setSavingCustomerInfo(true);
+        try {
+            const res = await fetch(`${BACKEND_URL}/api/orders/${order.id}/update-item`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                body: JSON.stringify(customerInfoForm),
+            });
+            const json = await res.json();
+            if (!res.ok || !json.success) throw new Error(json.message || 'Failed to save changes');
+            toast.success('Customer information updated');
+            setEditingCustomerInfo(false);
+            await fetchOrder();
+        } catch (err: any) {
+            toast.error(err.message || 'Failed to save changes');
+        } finally {
+            setSavingCustomerInfo(false);
+        }
+    };
+
+    const toDateTimeLocalValue = (iso?: string | null) => {
+        if (!iso) return '';
+        const d = new Date(iso);
+        if (isNaN(d.getTime())) return '';
+        const pad = (n: number) => String(n).padStart(2, '0');
+        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    };
+
+    const openEditVerificationDetails = async () => {
+        if (!verification) return;
+        setVerificationDetailsForm({
+            status: verification.status || '',
+            start_time: toDateTimeLocalValue(verification.start_time),
+            end_time: toDateTimeLocalValue(verification.end_time),
+        });
+        setEditingVerificationDetails(true);
+        if (verificationOfficers.length === 0) {
+            try {
+                const token = Cookies.get('auth_token');
+                const [voRes, doRes] = await Promise.all([
+                    fetch(`${BACKEND_URL}/api/assignments/officers?role=verification&all=true`, { headers: { Authorization: `Bearer ${token}` } }),
+                    fetch(`${BACKEND_URL}/api/assignments/officers?role=delivery&all=true&include_admins=true`, { headers: { Authorization: `Bearer ${token}` } }),
+                ]);
+                const voJson = await voRes.json();
+                const doJson = await doRes.json();
+                if (voJson.success && Array.isArray(voJson.data)) setVerificationOfficers(voJson.data);
+                if (doJson.success && Array.isArray(doJson.data)) setOrderDeliveryOfficers(doJson.data);
+            } catch (err) {
+                console.error('Error fetching officers:', err);
+            }
+        }
+    };
+
+    const handleSaveVerificationDetails = async () => {
+        if (!verification) return;
+        const token = Cookies.get('auth_token');
+        setSavingVerificationDetails(true);
+        try {
+            const res = await fetch(`${BACKEND_URL}/api/verification/${verification.id}/details`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                body: JSON.stringify({
+                    status: verificationDetailsForm.status,
+                    start_time: verificationDetailsForm.start_time ? new Date(verificationDetailsForm.start_time).toISOString() : '',
+                    end_time: verificationDetailsForm.end_time ? new Date(verificationDetailsForm.end_time).toISOString() : null,
+                }),
+            });
+            const json = await res.json();
+            if (!res.ok || !json.success) throw new Error(json.message || 'Failed to save changes');
+            toast.success('Verification details updated');
+            setEditingVerificationDetails(false);
+            await fetchVerification();
+        } catch (err: any) {
+            toast.error(err.message || 'Failed to save changes');
+        } finally {
+            setSavingVerificationDetails(false);
+        }
+    };
+
+    const handleVerificationOfficerChange = async (officerId: number | null) => {
+        if (!verification) return;
+        const token = Cookies.get('auth_token');
+        try {
+            const res = await fetch(`${BACKEND_URL}/api/verification/${verification.id}/assignment`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ verification_officer_id: officerId, verification_officer_name_override: null }),
+            });
+            const json = await res.json();
+            if (!res.ok || !json.success) throw new Error(json.message || 'Failed to update officer');
+            toast.success('Verification Officer updated', { id: 'assignment-update' });
+            await fetchVerification();
+        } catch (err: any) {
+            toast.error(err.message || 'Failed to update officer', { id: 'assignment-update' });
+        }
+    };
+
+    const handleDeliveryOfficerChange = async (officerId: number | null) => {
+        if (!verification) return;
+        const token = Cookies.get('auth_token');
+        try {
+            const res = await fetch(`${BACKEND_URL}/api/verification/${verification.id}/assignment`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ delivery_officer_id: officerId, delivery_officer_name_override: null }),
+            });
+            const json = await res.json();
+            if (!res.ok || !json.success) throw new Error(json.message || 'Failed to update officer');
+            toast.success('Delivery Officer updated', { id: 'assignment-update' });
+            await fetchVerification();
+        } catch (err: any) {
+            toast.error(err.message || 'Failed to update officer', { id: 'assignment-update' });
+        }
+    };
+
+    const openEditReview = (review: any) => {
+        setReviewEditForm({ approved: !!review.approved, remarks: review.remarks || '' });
+        setEditingReviewId(review.id);
+    };
+
+    const handleSaveReview = async () => {
+        if (editingReviewId === null) return;
+        const token = Cookies.get('auth_token');
+        setSavingReview(true);
+        try {
+            const res = await fetch(`${BACKEND_URL}/api/verification/review/${editingReviewId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                body: JSON.stringify(reviewEditForm),
+            });
+            const json = await res.json();
+            if (!res.ok || !json.success) throw new Error(json.message || 'Failed to save review');
+            toast.success('Review updated');
+            setEditingReviewId(null);
+            await fetchVerification();
+        } catch (err: any) {
+            toast.error(err.message || 'Failed to save review');
+        } finally {
+            setSavingReview(false);
+        }
+    };
+
+    const handleDeleteReview = async (reviewId: number) => {
+        if (!confirm('Delete this review? This cannot be undone.')) return;
+        const token = Cookies.get('auth_token');
+        setDeletingReviewId(reviewId);
+        try {
+            const res = await fetch(`${BACKEND_URL}/api/verification/review/${reviewId}`, {
+                method: 'DELETE',
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            const json = await res.json();
+            if (!res.ok || !json.success) throw new Error(json.message || 'Failed to delete review');
+            toast.success('Review deleted');
+            await fetchVerification();
+        } catch (err: any) {
+            toast.error(err.message || 'Failed to delete review');
+        } finally {
+            setDeletingReviewId(null);
+        }
     };
 
     // Upload into a currently-empty document slot — same endpoints the
@@ -900,7 +1151,43 @@ export default function OrderDetailsPage() {
             <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
                 {/* Customer Info Card */}
                 <div className="rounded-lg border border-stroke bg-white shadow-default dark:border-dark-3 dark:bg-gray-800 p-6">
-                    <h3 className="text-xl font-bold border-b pb-4 mb-4 dark:text-white">Customer Information</h3>
+                    <div className="flex items-center justify-between border-b pb-4 mb-4">
+                        <h3 className="text-xl font-bold dark:text-white">Customer Information</h3>
+                        {user?.role === 'Super Admin' && !editingCustomerInfo && (
+                            <button onClick={openEditCustomerInfo} className="text-xs font-bold text-primary hover:underline">Edit</button>
+                        )}
+                    </div>
+                    {editingCustomerInfo ? (
+                        <div className="space-y-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <LabeledInput label="Full Name" value={customerInfoForm.customer_name} onChange={(v) => setCustomerInfoForm((f) => ({ ...f, customer_name: v }))} />
+                                <LabeledInput label="WhatsApp Number" value={customerInfoForm.whatsapp_number} onChange={(v) => setCustomerInfoForm((f) => ({ ...f, whatsapp_number: v }))} />
+                                <LabeledInput label="Alternate Contact" value={customerInfoForm.alternate_contact} onChange={(v) => setCustomerInfoForm((f) => ({ ...f, alternate_contact: v }))} />
+                                <LabeledInput label="Gender" value={customerInfoForm.gender} onChange={(v) => setCustomerInfoForm((f) => ({ ...f, gender: v }))} />
+                                <LabeledInput label="Residential Type" value={customerInfoForm.residential_type} onChange={(v) => setCustomerInfoForm((f) => ({ ...f, residential_type: v }))} />
+                                <div className="sm:col-span-2">
+                                    <LabeledInput label="Full Address" value={customerInfoForm.address} onChange={(v) => setCustomerInfoForm((f) => ({ ...f, address: v }))} />
+                                </div>
+                                <LabeledInput label="City" value={customerInfoForm.city} onChange={(v) => setCustomerInfoForm((f) => ({ ...f, city: v }))} />
+                                <LabeledInput label="Area" value={customerInfoForm.area} onChange={(v) => setCustomerInfoForm((f) => ({ ...f, area: v }))} />
+                                <LabeledInput label="Zone" value={customerInfoForm.zone} onChange={(v) => setCustomerInfoForm((f) => ({ ...f, zone: v }))} />
+                                <LabeledInput label="Block" value={customerInfoForm.block} onChange={(v) => setCustomerInfoForm((f) => ({ ...f, block: v }))} />
+                                <LabeledInput label="House No" value={customerInfoForm.house_no} onChange={(v) => setCustomerInfoForm((f) => ({ ...f, house_no: v }))} />
+                                <LabeledInput label="Street" value={customerInfoForm.street} onChange={(v) => setCustomerInfoForm((f) => ({ ...f, street: v }))} />
+                                <div className="sm:col-span-2">
+                                    <LabeledInput label="Order Notes" value={customerInfoForm.order_notes} onChange={(v) => setCustomerInfoForm((f) => ({ ...f, order_notes: v }))} />
+                                </div>
+                            </div>
+                            <div className="flex gap-3">
+                                <button onClick={handleSaveCustomerInfo} disabled={savingCustomerInfo} className="rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white disabled:opacity-50">
+                                    {savingCustomerInfo ? 'Saving...' : 'Save Changes'}
+                                </button>
+                                <button onClick={() => setEditingCustomerInfo(false)} disabled={savingCustomerInfo} className="rounded-lg border border-stroke px-4 py-2 text-sm dark:border-dark-3 dark:text-gray-300">
+                                    Cancel
+                                </button>
+                            </div>
+                        </div>
+                    ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-4 gap-x-6">
                         <div>
                             <p className="text-sm text-gray-500 dark:text-gray-400">Full Name</p>
@@ -964,6 +1251,7 @@ export default function OrderDetailsPage() {
                             <p className="font-semibold whitespace-pre-wrap">{order.order_notes || 'N/A'}</p>
                         </div>
                     </div>
+                    )}
                 </div>
 
                 {/* Order Info Card */}
@@ -1096,30 +1384,78 @@ export default function OrderDetailsPage() {
                                                 </p>
                                             </div>
                                         </div>
-                                        <span className={cn(
-                                            "px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider",
-                                            review.approved 
-                                                ? "bg-green-500 text-white" 
-                                                : "bg-red-500 text-white"
-                                        )}>
-                                            {review.approved ? 'Approved' : 'Rejected'}
-                                        </span>
-                                    </div>
-                                    
-                                    {review.remarks && (
-                                        <div className="bg-white/50 dark:bg-black/20 rounded-lg p-3 mt-2">
-                                            <p className="text-sm text-gray-700 dark:text-gray-300 italic leading-relaxed">
-                                                "{review.remarks}"
-                                            </p>
+                                        <div className="flex items-center gap-2">
+                                            {editingReviewId !== review.id && (
+                                                <span className={cn(
+                                                    "px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider",
+                                                    review.approved
+                                                        ? "bg-green-500 text-white"
+                                                        : "bg-red-500 text-white"
+                                                )}>
+                                                    {review.approved ? 'Approved' : 'Rejected'}
+                                                </span>
+                                            )}
+                                            {user?.role === 'Super Admin' && editingReviewId !== review.id && (
+                                                <>
+                                                    <button onClick={() => openEditReview(review)} className="text-[10px] font-bold text-primary hover:underline">Edit</button>
+                                                    <button
+                                                        onClick={() => handleDeleteReview(review.id)}
+                                                        disabled={deletingReviewId === review.id}
+                                                        className="text-[10px] font-bold text-red-600 hover:underline disabled:opacity-50"
+                                                    >
+                                                        {deletingReviewId === review.id ? 'Deleting...' : 'Delete'}
+                                                    </button>
+                                                </>
+                                            )}
                                         </div>
-                                    )}
-                                    
-                                    <div className="mt-3 text-[10px] text-gray-400 font-medium flex items-center gap-1.5">
-                                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                        </svg>
-                                        {formatExactDate(review.created_at)}
                                     </div>
+
+                                    {editingReviewId === review.id ? (
+                                        <div className="space-y-3">
+                                            <div className="flex gap-4">
+                                                <label className="flex items-center gap-1.5 text-sm">
+                                                    <input type="radio" checked={reviewEditForm.approved} onChange={() => setReviewEditForm((f) => ({ ...f, approved: true }))} />
+                                                    Approved
+                                                </label>
+                                                <label className="flex items-center gap-1.5 text-sm">
+                                                    <input type="radio" checked={!reviewEditForm.approved} onChange={() => setReviewEditForm((f) => ({ ...f, approved: false }))} />
+                                                    Rejected
+                                                </label>
+                                            </div>
+                                            <textarea
+                                                value={reviewEditForm.remarks}
+                                                onChange={(e) => setReviewEditForm((f) => ({ ...f, remarks: e.target.value }))}
+                                                placeholder="Remarks"
+                                                rows={2}
+                                                className="w-full rounded-lg border border-stroke bg-white px-3 py-2 text-sm text-dark dark:border-dark-3 dark:bg-dark-2 dark:text-white"
+                                            />
+                                            <div className="flex gap-2">
+                                                <button onClick={handleSaveReview} disabled={savingReview} className="rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-white disabled:opacity-50">
+                                                    {savingReview ? 'Saving...' : 'Save'}
+                                                </button>
+                                                <button onClick={() => setEditingReviewId(null)} disabled={savingReview} className="rounded-lg border border-stroke px-3 py-1.5 text-xs dark:border-dark-3 dark:text-gray-300">
+                                                    Cancel
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <>
+                                            {review.remarks && (
+                                                <div className="bg-white/50 dark:bg-black/20 rounded-lg p-3 mt-2">
+                                                    <p className="text-sm text-gray-700 dark:text-gray-300 italic leading-relaxed">
+                                                        "{review.remarks}"
+                                                    </p>
+                                                </div>
+                                            )}
+
+                                            <div className="mt-3 text-[10px] text-gray-400 font-medium flex items-center gap-1.5">
+                                                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                </svg>
+                                                {formatExactDate(review.created_at)}
+                                            </div>
+                                        </>
+                                    )}
                                 </div>
                             ))}
                         </div>
@@ -1161,7 +1497,7 @@ export default function OrderDetailsPage() {
                 <div className="flex items-center justify-between border-b pb-4 mb-6">
                     <div className="flex items-center gap-3">
                         <h3 className="text-xl font-bold dark:text-white">Assignment Timeline</h3>
-                        {order.channel === 'legacy_import' && (user?.role === 'Super Admin' || user?.role === 'Admin') && (
+                        {(user?.role === 'Super Admin' || user?.role === 'Admin') && (
                             <button
                                 onClick={() => setEditTimelineModalOpen(true)}
                                 className="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg hover:bg-amber-100 dark:hover:bg-amber-900/40 transition-colors"
@@ -1330,7 +1666,7 @@ export default function OrderDetailsPage() {
                     <div className="flex items-center justify-between border-b pb-4 mb-6">
                         <div className="flex items-center gap-3">
                             <h3 className="text-xl font-bold dark:text-white">Order Status Timeline</h3>
-                            {order.channel === 'legacy_import' && (user?.role === 'Super Admin' || user?.role === 'Admin') && (
+                            {(user?.role === 'Super Admin' || user?.role === 'Admin') && (
                                 <button
                                     onClick={() => setEditTimelineModalOpen(true)}
                                     className="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-bold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg hover:bg-purple-100 dark:hover:bg-purple-900/40 transition-colors"
@@ -1485,6 +1821,72 @@ export default function OrderDetailsPage() {
                 ) : (
                     <div className="rounded-lg border border-stroke bg-white shadow-default dark:border-dark-3 dark:bg-gray-800 p-6">
                         {/* Basic Info */}
+                        <div className="mb-4 flex items-center justify-between">
+                            <span className="text-xs font-bold uppercase tracking-wide text-gray-400">Verification Details</span>
+                            {user?.role === 'Super Admin' && !editingVerificationDetails && (
+                                <button onClick={openEditVerificationDetails} className="text-xs font-bold text-primary hover:underline">Edit</button>
+                            )}
+                        </div>
+                        {editingVerificationDetails ? (
+                            <div className="mb-6 space-y-4 rounded-lg border border-stroke bg-gray-50 p-4 dark:border-dark-3 dark:bg-dark-3">
+                                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                                    <div>
+                                        <label className="block text-xs font-medium text-gray-500 dark:text-gray-400">Status</label>
+                                        <select
+                                            value={verificationDetailsForm.status}
+                                            onChange={(e) => setVerificationDetailsForm((f) => ({ ...f, status: e.target.value }))}
+                                            className="mt-1 w-full rounded-lg border border-stroke bg-white px-3 py-2 text-sm text-dark dark:border-dark-3 dark:bg-dark-2 dark:text-white"
+                                        >
+                                            <option value="in_progress">in_progress</option>
+                                            <option value="completed">completed</option>
+                                            <option value="location_captured">location_captured</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-medium text-gray-500 dark:text-gray-400">Verification Officer</label>
+                                        <select
+                                            defaultValue={order.assigned_to_user_id || ''}
+                                            onChange={(e) => handleVerificationOfficerChange(e.target.value ? Number(e.target.value) : null)}
+                                            className="mt-1 w-full rounded-lg border border-stroke bg-white px-3 py-2 text-sm text-dark dark:border-dark-3 dark:bg-dark-2 dark:text-white"
+                                        >
+                                            <option value="">Unassigned</option>
+                                            {order.assigned_to && !verificationOfficers.some((o) => o.id === order.assigned_to_user_id) && (
+                                                <option value={order.assigned_to_user_id ?? ''}>{order.assigned_to.full_name} ({order.assigned_to.username})</option>
+                                            )}
+                                            {verificationOfficers.map((o) => (
+                                                <option key={o.id} value={o.id}>{o.full_name} ({o.username})</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-medium text-gray-500 dark:text-gray-400">Delivery Officer</label>
+                                        <select
+                                            defaultValue={order.delivery_officer?.id || ''}
+                                            onChange={(e) => handleDeliveryOfficerChange(e.target.value ? Number(e.target.value) : null)}
+                                            className="mt-1 w-full rounded-lg border border-stroke bg-white px-3 py-2 text-sm text-dark dark:border-dark-3 dark:bg-dark-2 dark:text-white"
+                                        >
+                                            <option value="">Unassigned</option>
+                                            {order.delivery_officer && !orderDeliveryOfficers.some((o) => o.id === order.delivery_officer?.id) && (
+                                                <option value={order.delivery_officer.id}>{order.delivery_officer.full_name} ({order.delivery_officer.username})</option>
+                                            )}
+                                            {orderDeliveryOfficers.map((o) => (
+                                                <option key={o.id} value={o.id}>{o.full_name} ({o.username})</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <LabeledInput label="Start Time" type="datetime-local" value={verificationDetailsForm.start_time} onChange={(v) => setVerificationDetailsForm((f) => ({ ...f, start_time: v }))} />
+                                    <LabeledInput label="End Time" type="datetime-local" value={verificationDetailsForm.end_time} onChange={(v) => setVerificationDetailsForm((f) => ({ ...f, end_time: v }))} />
+                                </div>
+                                <div className="flex gap-3">
+                                    <button onClick={handleSaveVerificationDetails} disabled={savingVerificationDetails} className="rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white disabled:opacity-50">
+                                        {savingVerificationDetails ? 'Saving...' : 'Save Changes'}
+                                    </button>
+                                    <button onClick={() => setEditingVerificationDetails(false)} disabled={savingVerificationDetails} className="rounded-lg border border-stroke px-4 py-2 text-sm dark:border-dark-3 dark:text-gray-300">
+                                        Cancel
+                                    </button>
+                                </div>
+                            </div>
+                        ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                             <Field label="Verification ID" value={verification.id} />
                             <Field label="Order ID" value={verification.order_id} />
@@ -1499,6 +1901,7 @@ export default function OrderDetailsPage() {
                             <Field label="End Time" value={verification.end_time ? formatExactDate(verification.end_time) : null} />
                             <Field label="Verification Feedback" value={verification.verification_feedback} />
                         </div>
+                        )}
                         {verification.home_location_required && (
                             <div className={cn(
                                 "flex items-center gap-2 rounded-lg p-4 font-bold border-2 mb-4",
@@ -1953,31 +2356,72 @@ export default function OrderDetailsPage() {
                                         <div className="space-y-6">
                                             {verification.verification_locations.map((loc) => (
                                                 <div key={loc.id} className="rounded-lg border border-stroke p-4 dark:border-dark-3">
-                                                    <div className="mb-4 grid grid-cols-1 gap-4 md:grid-cols-2">
-                                                        <Field label="Location Type" value={loc.location_type} />
-                                                        <Field label="Label" value={loc.label} />
-                                                        <Field label="Person Type" value={loc.person_type} />
-                                                        <div className="flex flex-col">
-                                                            <label className="block text-sm font-medium text-gray-500 dark:text-gray-400">Coordinates</label>
-                                                            <div className="mt-1 flex items-center gap-3 rounded-lg bg-gray-100 px-4 py-2.5 dark:bg-dark-3">
-                                                                <span className="dark:text-gray-300">
-                                                                    {loc.latitude && loc.longitude ? `${loc.latitude}, ${loc.longitude}` : '—'}
-                                                                </span>
-                                                                {loc.latitude && loc.longitude && (
-                                                                    <a
-                                                                        href={`https://www.google.com/maps/search/?api=1&query=${loc.latitude},${loc.longitude}`}
-                                                                        target="_blank"
-                                                                        rel="noopener noreferrer"
-                                                                        className="text-xs font-bold text-primary hover:underline ml-auto"
-                                                                    >
-                                                                        VIEW ON GOOGLE MAP
-                                                                    </a>
-                                                                )}
+                                                    <div className="mb-4 flex items-center justify-between">
+                                                        <span className="text-xs font-bold uppercase tracking-wide text-gray-400">Location #{loc.id}</span>
+                                                        {user?.role === 'Super Admin' && editingLocationId !== loc.id && (
+                                                            <button
+                                                                onClick={() => openEditLocation(loc)}
+                                                                className="text-xs font-bold text-primary hover:underline"
+                                                            >
+                                                                Edit
+                                                            </button>
+                                                        )}
+                                                    </div>
+
+                                                    {editingLocationId === loc.id ? (
+                                                        <div className="mb-4 space-y-4">
+                                                            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                                                                <LabeledInput label="Location Type" value={locationEditForm.location_type} onChange={(v) => setLocationEditForm((f) => ({ ...f, location_type: v }))} />
+                                                                <LabeledInput label="Label" value={locationEditForm.label} onChange={(v) => setLocationEditForm((f) => ({ ...f, label: v }))} />
+                                                                <LabeledInput label="Person Type" value={locationEditForm.person_type} onChange={(v) => setLocationEditForm((f) => ({ ...f, person_type: v }))} />
+                                                                <LabeledInput label="Address" value={locationEditForm.address} onChange={(v) => setLocationEditForm((f) => ({ ...f, address: v }))} />
+                                                                <LabeledInput label="Latitude" value={locationEditForm.latitude} onChange={(v) => setLocationEditForm((f) => ({ ...f, latitude: v }))} />
+                                                                <LabeledInput label="Longitude" value={locationEditForm.longitude} onChange={(v) => setLocationEditForm((f) => ({ ...f, longitude: v }))} />
+                                                            </div>
+                                                            <div className="flex gap-3">
+                                                                <button
+                                                                    onClick={handleSaveLocationEdit}
+                                                                    disabled={savingLocationEdit}
+                                                                    className="rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
+                                                                >
+                                                                    {savingLocationEdit ? 'Saving...' : 'Save Changes'}
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => setEditingLocationId(null)}
+                                                                    disabled={savingLocationEdit}
+                                                                    className="rounded-lg border border-stroke px-4 py-2 text-sm dark:border-dark-3 dark:text-gray-300"
+                                                                >
+                                                                    Cancel
+                                                                </button>
                                                             </div>
                                                         </div>
-                                                        <Field label="Address" value={loc.address} />
-                                                        <Field label="Captured At" value={loc.created_at ? formatExactDate(loc.created_at) : null} />
-                                                    </div>
+                                                    ) : (
+                                                        <div className="mb-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+                                                            <Field label="Location Type" value={loc.location_type} />
+                                                            <Field label="Label" value={loc.label} />
+                                                            <Field label="Person Type" value={loc.person_type} />
+                                                            <div className="flex flex-col">
+                                                                <label className="block text-sm font-medium text-gray-500 dark:text-gray-400">Coordinates</label>
+                                                                <div className="mt-1 flex items-center gap-3 rounded-lg bg-gray-100 px-4 py-2.5 dark:bg-dark-3">
+                                                                    <span className="dark:text-gray-300">
+                                                                        {loc.latitude && loc.longitude ? `${loc.latitude}, ${loc.longitude}` : '—'}
+                                                                    </span>
+                                                                    {loc.latitude && loc.longitude && (
+                                                                        <a
+                                                                            href={`https://www.google.com/maps/search/?api=1&query=${loc.latitude},${loc.longitude}`}
+                                                                            target="_blank"
+                                                                            rel="noopener noreferrer"
+                                                                            className="text-xs font-bold text-primary hover:underline ml-auto"
+                                                                        >
+                                                                            VIEW ON GOOGLE MAP
+                                                                        </a>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                            <Field label="Address" value={loc.address} />
+                                                            <Field label="Captured At" value={loc.created_at ? formatExactDate(loc.created_at) : null} />
+                                                        </div>
+                                                    )}
 
                                                     {loc.photos && loc.photos.length > 0 && (
                                                         <div>

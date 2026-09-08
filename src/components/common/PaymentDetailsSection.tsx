@@ -34,6 +34,9 @@ export const PaymentDetailsSection = ({
     const [monthsInput, setMonthsInput] = useState('');
     const [confirmMonthsOpen, setConfirmMonthsOpen] = useState(false);
     const [savingMonths, setSavingMonths] = useState(false);
+    const [isEditingAdvance, setIsEditingAdvance] = useState(false);
+    const [advanceForm, setAdvanceForm] = useState({ amount: '', paid_amount: '', payment_method: '' });
+    const [savingAdvance, setSavingAdvance] = useState(false);
 
     if (!paymentDetails) return null;
 
@@ -92,6 +95,50 @@ export const PaymentDetailsSection = ({
         }
     };
 
+    const startEditAdvance = () => {
+        setAdvanceForm({
+            amount: String(paymentDetails.advance_payment?.amount ?? 0),
+            paid_amount: paymentDetails.advance_payment?.status === 'paid' || paymentDetails.advance_payment?.status === 'partial'
+                ? String(paymentDetails.advance_payment?.amount ?? 0)
+                : '0',
+            payment_method: paymentDetails.advance_payment?.payment_method || '',
+        });
+        setIsEditingAdvance(true);
+    };
+
+    const handleSaveAdvance = async () => {
+        if (!ledgerId) return;
+        const token = Cookies.get('auth_token');
+        if (!token) {
+            toast.error('Authentication required');
+            return;
+        }
+        setSavingAdvance(true);
+        try {
+            const res = await fetch(`${BACKEND_URL}/api/ledger/${ledgerId}/edit`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                body: JSON.stringify({
+                    advance_payment: {
+                        amount: parseFloat(advanceForm.amount) || 0,
+                        paid_amount: parseFloat(advanceForm.paid_amount) || 0,
+                        payment_method: advanceForm.payment_method || null,
+                    },
+                }),
+            });
+            const json = await res.json();
+            if (!res.ok || !json.success) throw new Error(json.message || 'Failed to save advance payment');
+            toast.success('Advance payment updated');
+            setIsEditingAdvance(false);
+            if (onSaved) await onSaved();
+        } catch (err: any) {
+            console.error(err);
+            toast.error(err.message || 'Failed to save advance payment');
+        } finally {
+            setSavingAdvance(false);
+        }
+    };
+
     const openMonthsConfirm = () => {
         setMonthsInput(String(paymentDetails.installment_plan?.summary?.total_installments || installments.length));
         setConfirmMonthsOpen(true);
@@ -145,34 +192,93 @@ export const PaymentDetailsSection = ({
             {/* Advance Payment */}
             {paymentDetails.advance_payment && (
                 <div className="mb-4 rounded-lg border border-stroke bg-gray-50 p-4 dark:border-dark-3 dark:bg-dark-3">
-                    <h4 className="mb-3 font-medium text-dark dark:text-white">Advance Payment</h4>
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                        <div>
-                            <label className="block text-xs font-medium text-gray-500 dark:text-gray-400">Amount</label>
-                            <p className="mt-1 text-lg font-semibold text-green-600 dark:text-green-400">
-                                Rs. {paymentDetails.advance_payment.amount?.toLocaleString()}
-                            </p>
-                        </div>
-                        <div>
-                            <label className="block text-xs font-medium text-gray-500 dark:text-gray-400">Payment Method</label>
-                            <p className="mt-1 text-dark dark:text-white">{paymentDetails.advance_payment.payment_method || 'Cash'}</p>
-                        </div>
-                        <div>
-                            <label className="block text-xs font-medium text-gray-500 dark:text-gray-400">Status</label>
-                            <span className={cn(
-                                "mt-1 inline-block rounded-full px-2 py-0.5 text-xs font-medium",
-                                paymentDetails.advance_payment.status === 'paid' ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
-                            )}>
-                                {paymentDetails.advance_payment.status}
-                            </span>
-                        </div>
-                        <div>
-                            <label className="block text-xs font-medium text-gray-500 dark:text-gray-400">Payment Date</label>
-                            <p className="mt-1 text-sm text-dark dark:text-white">
-                                {paymentDetails.advance_payment.paid_at ? formatExactDate(paymentDetails.advance_payment.paid_at) : 'N/A'}
-                            </p>
-                        </div>
+                    <div className="mb-3 flex items-center justify-between">
+                        <h4 className="font-medium text-dark dark:text-white">Advance Payment</h4>
+                        {editable && ledgerId && !isEditingAdvance && (
+                            <button onClick={startEditAdvance} className="text-xs font-bold text-primary hover:underline">
+                                Edit
+                            </button>
+                        )}
                     </div>
+                    {!isEditingAdvance ? (
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                            <div>
+                                <label className="block text-xs font-medium text-gray-500 dark:text-gray-400">Amount</label>
+                                <p className="mt-1 text-lg font-semibold text-green-600 dark:text-green-400">
+                                    Rs. {paymentDetails.advance_payment.amount?.toLocaleString()}
+                                </p>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium text-gray-500 dark:text-gray-400">Payment Method</label>
+                                <p className="mt-1 text-dark dark:text-white">{paymentDetails.advance_payment.payment_method || 'Cash'}</p>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium text-gray-500 dark:text-gray-400">Status</label>
+                                <span className={cn(
+                                    "mt-1 inline-block rounded-full px-2 py-0.5 text-xs font-medium",
+                                    paymentDetails.advance_payment.status === 'paid' ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+                                )}>
+                                    {paymentDetails.advance_payment.status}
+                                </span>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium text-gray-500 dark:text-gray-400">Payment Date</label>
+                                <p className="mt-1 text-sm text-dark dark:text-white">
+                                    {paymentDetails.advance_payment.paid_at ? formatExactDate(paymentDetails.advance_payment.paid_at) : 'N/A'}
+                                </p>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="space-y-3">
+                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400">Amount</label>
+                                    <input
+                                        type="number"
+                                        value={advanceForm.amount}
+                                        onChange={(e) => setAdvanceForm((f) => ({ ...f, amount: e.target.value }))}
+                                        className="mt-1 w-full rounded-lg border border-stroke bg-white px-3 py-2 text-sm dark:border-dark-3 dark:bg-dark-2 dark:text-white"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400">Paid Amount</label>
+                                    <input
+                                        type="number"
+                                        value={advanceForm.paid_amount}
+                                        onChange={(e) => setAdvanceForm((f) => ({ ...f, paid_amount: e.target.value }))}
+                                        className="mt-1 w-full rounded-lg border border-stroke bg-white px-3 py-2 text-sm dark:border-dark-3 dark:bg-dark-2 dark:text-white"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400">Payment Method</label>
+                                    <input
+                                        type="text"
+                                        value={advanceForm.payment_method}
+                                        onChange={(e) => setAdvanceForm((f) => ({ ...f, payment_method: e.target.value }))}
+                                        placeholder="Cash"
+                                        className="mt-1 w-full rounded-lg border border-stroke bg-white px-3 py-2 text-sm dark:border-dark-3 dark:bg-dark-2 dark:text-white"
+                                    />
+                                </div>
+                            </div>
+                            <p className="text-xs text-gray-400">Status &amp; Payment Date are recalculated automatically from Amount vs Paid Amount.</p>
+                            <div className="flex items-center gap-3">
+                                <button
+                                    onClick={handleSaveAdvance}
+                                    disabled={savingAdvance}
+                                    className="rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
+                                >
+                                    {savingAdvance ? 'Saving...' : 'Save Advance Payment'}
+                                </button>
+                                <button
+                                    onClick={() => setIsEditingAdvance(false)}
+                                    disabled={savingAdvance}
+                                    className="rounded-lg border border-stroke px-4 py-2 text-sm dark:border-dark-3 dark:text-gray-300"
+                                >
+                                    Cancel
+                                </button>
+                            </div>
+                        </div>
+                    )}
                 </div>
             )}
 

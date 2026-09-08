@@ -5,8 +5,22 @@ import { MediaCard } from "./MediaCard";
 import toast from "react-hot-toast";
 import { useAuth } from "../../../contexts/AuthContext";
 import { formatExactDate } from "@/utils/dateUtils";
+import { Modal } from "@/components/Modal/Modal";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
+
+const emptyVisitForm = {
+    officer_id: '', visit_time: '', customer_feedback: '', visit_notes: '',
+    payment_collected: false, amount_collected: '', fuel_charges: '', promised_date: '', latitude: '', longitude: '',
+};
+
+const toDateTimeLocalValue = (iso?: string | null) => {
+    if (!iso) return '';
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return '';
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};
 
 // RecoveryPhotoCard Component - Now replaced by shared MediaCard
 
@@ -24,6 +38,13 @@ export default function RecoveryVisitDetails({
     const [error, setError] = useState<string | null>(null);
     const [expandedVisit, setExpandedVisit] = useState<number | null>(null);
     const { user } = useAuth();
+
+    const [visitModalOpen, setVisitModalOpen] = useState(false);
+    const [editingVisitId, setEditingVisitId] = useState<number | null>(null);
+    const [visitForm, setVisitForm] = useState(emptyVisitForm);
+    const [savingVisit, setSavingVisit] = useState(false);
+    const [recoveryOfficers, setRecoveryOfficers] = useState<{ id: number; full_name: string; username: string }[]>([]);
+    const [deletingVisitId, setDeletingVisitId] = useState<number | null>(null);
 
     useEffect(() => {
         if (orderId) {
@@ -50,6 +71,116 @@ export default function RecoveryVisitDetails({
         } catch (err: any) {
             console.error(err);
             toast.error(err.message || 'Failed to replace media');
+        }
+    };
+
+    const handleDeletePhoto = async (photoId: number) => {
+        const token = Cookies.get('auth_token');
+        const res = await fetch(`${BACKEND_URL}/api/recovery/visit-photo/${photoId}`, {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${token}` },
+        });
+        const json = await res.json();
+        if (!res.ok || !json.success) throw new Error(json.message || 'Failed to delete photo');
+        toast.success('Recovery visit photo deleted');
+        await fetchRecoveryVisits();
+        if (onRefresh) await onRefresh();
+    };
+
+    const openAddVisit = async () => {
+        setVisitForm({ ...emptyVisitForm, visit_time: toDateTimeLocalValue(new Date().toISOString()) });
+        setEditingVisitId(null);
+        setVisitModalOpen(true);
+        await ensureRecoveryOfficersLoaded();
+    };
+
+    const openEditVisit = async (visit: any) => {
+        setVisitForm({
+            officer_id: visit.officer_id != null ? String(visit.officer_id) : '',
+            visit_time: toDateTimeLocalValue(visit.visit_time),
+            customer_feedback: visit.customer_feedback || '',
+            visit_notes: visit.visit_notes || '',
+            payment_collected: !!visit.payment_collected,
+            amount_collected: visit.amount_collected != null ? String(visit.amount_collected) : '',
+            fuel_charges: visit.fuel_charges != null ? String(visit.fuel_charges) : '',
+            promised_date: toDateTimeLocalValue(visit.promised_date),
+            latitude: visit.latitude != null ? String(visit.latitude) : '',
+            longitude: visit.longitude != null ? String(visit.longitude) : '',
+        });
+        setEditingVisitId(visit.id);
+        setVisitModalOpen(true);
+        await ensureRecoveryOfficersLoaded();
+    };
+
+    const ensureRecoveryOfficersLoaded = async () => {
+        if (recoveryOfficers.length > 0) return;
+        try {
+            const token = Cookies.get('auth_token');
+            const res = await fetch(`${BACKEND_URL}/api/assignments/officers?role=recovery&all=true&include_admins=true`, {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            const json = await res.json();
+            if (json.success && Array.isArray(json.data)) setRecoveryOfficers(json.data);
+        } catch (err) {
+            console.error('Error fetching recovery officers:', err);
+        }
+    };
+
+    const handleSaveVisit = async () => {
+        const token = Cookies.get('auth_token');
+        setSavingVisit(true);
+        try {
+            const body = {
+                officer_id: visitForm.officer_id || undefined,
+                visit_time: visitForm.visit_time ? new Date(visitForm.visit_time).toISOString() : undefined,
+                customer_feedback: visitForm.customer_feedback,
+                visit_notes: visitForm.visit_notes,
+                payment_collected: visitForm.payment_collected,
+                amount_collected: visitForm.amount_collected,
+                fuel_charges: visitForm.fuel_charges,
+                promised_date: visitForm.promised_date ? new Date(visitForm.promised_date).toISOString() : null,
+                latitude: visitForm.latitude,
+                longitude: visitForm.longitude,
+            };
+            const url = editingVisitId !== null
+                ? `${BACKEND_URL}/api/recovery/visit/${editingVisitId}`
+                : `${BACKEND_URL}/api/recovery/order/${orderId}/visit-manual`;
+            const res = await fetch(url, {
+                method: editingVisitId !== null ? 'PATCH' : 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                body: JSON.stringify(body),
+            });
+            const json = await res.json();
+            if (!res.ok || !json.success) throw new Error(json.message || 'Failed to save recovery visit');
+            toast.success(editingVisitId !== null ? 'Recovery visit updated' : 'Recovery visit added');
+            setVisitModalOpen(false);
+            await fetchRecoveryVisits();
+            if (onRefresh) await onRefresh();
+        } catch (err: any) {
+            toast.error(err.message || 'Failed to save recovery visit');
+        } finally {
+            setSavingVisit(false);
+        }
+    };
+
+    const handleDeleteVisit = async (visitId: number) => {
+        if (!confirm('Delete this recovery visit (and its photos)? This cannot be undone.')) return;
+        const token = Cookies.get('auth_token');
+        setDeletingVisitId(visitId);
+        try {
+            const res = await fetch(`${BACKEND_URL}/api/recovery/visit/${visitId}`, {
+                method: 'DELETE',
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            const json = await res.json();
+            if (!res.ok || !json.success) throw new Error(json.message || 'Failed to delete recovery visit');
+            toast.success('Recovery visit deleted');
+            await fetchRecoveryVisits();
+            if (onRefresh) await onRefresh();
+        } catch (err: any) {
+            toast.error(err.message || 'Failed to delete recovery visit');
+        } finally {
+            setDeletingVisitId(null);
         }
     };
 
@@ -112,7 +243,22 @@ export default function RecoveryVisitDetails({
                 <div className="text-center">
                     <span className="text-4xl">🔍</span>
                     <p className="mt-2 text-gray-500 dark:text-gray-400">No recovery visits recorded for this order</p>
+                    {user?.role === 'Super Admin' && (
+                        <button onClick={openAddVisit} className="mt-4 rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white">
+                            + Add Recovery Visit
+                        </button>
+                    )}
                 </div>
+                <RecoveryVisitModal
+                    open={visitModalOpen}
+                    onClose={() => setVisitModalOpen(false)}
+                    isEditing={editingVisitId !== null}
+                    form={visitForm}
+                    setForm={setVisitForm}
+                    onSave={handleSaveVisit}
+                    saving={savingVisit}
+                    officers={recoveryOfficers}
+                />
             </div>
         );
     }
@@ -137,9 +283,16 @@ export default function RecoveryVisitDetails({
                             </span>
                             <h2 className="text-xl font-bold text-dark dark:text-white">Recovery Visits</h2>
                         </div>
-                        <span className="rounded-full bg-blue-100 px-3 py-1 text-sm font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
-                            {totalVisits} Visit{totalVisits !== 1 ? 's' : ''}
-                        </span>
+                        <div className="flex items-center gap-3">
+                            <span className="rounded-full bg-blue-100 px-3 py-1 text-sm font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+                                {totalVisits} Visit{totalVisits !== 1 ? 's' : ''}
+                            </span>
+                            {user?.role === 'Super Admin' && (
+                                <button onClick={openAddVisit} className="text-xs font-bold text-primary hover:underline">
+                                    + Add Visit
+                                </button>
+                            )}
+                        </div>
                     </div>
                 </div>
 
@@ -220,7 +373,24 @@ export default function RecoveryVisitDetails({
                                         Payment Collected: {formatCurrency(visit.amount_collected)}
                                     </span>
                                 )}
-                                <svg 
+                                {user?.role === 'Super Admin' && (
+                                    <>
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); openEditVisit(visit); }}
+                                            className="text-xs font-bold text-primary hover:underline"
+                                        >
+                                            Edit
+                                        </button>
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); handleDeleteVisit(visit.id); }}
+                                            disabled={deletingVisitId === visit.id}
+                                            className="text-xs font-bold text-red-600 hover:underline disabled:opacity-50"
+                                        >
+                                            {deletingVisitId === visit.id ? 'Deleting...' : 'Delete'}
+                                        </button>
+                                    </>
+                                )}
+                                <svg
                                     className={cn("h-5 w-5 text-gray-500 transition-transform", expandedVisit === index && "rotate-180")}
                                     fill="none" viewBox="0 0 24 24" stroke="currentColor"
                                 >
@@ -382,6 +552,7 @@ export default function RecoveryVisitDetails({
                                                 uploadedAt={photo.uploaded_at}
                                                 isEditable={user?.role === 'Super Admin'}
                                                 onEdit={(file) => handleReplaceMedia(file, photo.id)}
+                                                onDelete={user?.role === 'Super Admin' ? () => handleDeletePhoto(photo.id) : undefined}
                                                 editHistory={editHistory}
                                                 historyFilter={(h) => h.entity_type === 'recovery_visit_photo' && h.entity_id === photo.id}
                                             />
@@ -393,6 +564,147 @@ export default function RecoveryVisitDetails({
                     )}
                 </div>
             ))}
+
+            <RecoveryVisitModal
+                open={visitModalOpen}
+                onClose={() => setVisitModalOpen(false)}
+                isEditing={editingVisitId !== null}
+                form={visitForm}
+                setForm={setVisitForm}
+                onSave={handleSaveVisit}
+                saving={savingVisit}
+                officers={recoveryOfficers}
+            />
         </div>
     );
 };
+
+type VisitForm = typeof emptyVisitForm;
+
+function RecoveryVisitModal({
+    open, onClose, isEditing, form, setForm, onSave, saving, officers,
+}: {
+    open: boolean;
+    onClose: () => void;
+    isEditing: boolean;
+    form: VisitForm;
+    setForm: React.Dispatch<React.SetStateAction<VisitForm>>;
+    onSave: () => void;
+    saving: boolean;
+    officers: { id: number; full_name: string; username: string }[];
+}) {
+    return (
+        <Modal open={open} onClose={onClose}>
+            <div className="rounded-2xl bg-white p-8 shadow-xl dark:bg-gray-800 max-h-[85vh] overflow-y-auto">
+                <h2 className="mb-4 text-lg font-bold dark:text-white">{isEditing ? 'Edit Recovery Visit' : 'Add Recovery Visit'}</h2>
+                <div className="space-y-4">
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <div>
+                            <label className="block text-xs font-medium text-gray-500 dark:text-gray-400">Recovery Officer</label>
+                            <select
+                                value={form.officer_id}
+                                onChange={(e) => setForm((f) => ({ ...f, officer_id: e.target.value }))}
+                                className="mt-1 w-full rounded-lg border border-stroke bg-white px-3 py-2 text-sm text-dark dark:border-dark-3 dark:bg-dark-2 dark:text-white"
+                            >
+                                <option value="">-- Select --</option>
+                                {officers.map((o) => (
+                                    <option key={o.id} value={o.id}>{o.full_name} ({o.username})</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-xs font-medium text-gray-500 dark:text-gray-400">Visit Time</label>
+                            <input
+                                type="datetime-local"
+                                value={form.visit_time}
+                                onChange={(e) => setForm((f) => ({ ...f, visit_time: e.target.value }))}
+                                className="mt-1 w-full rounded-lg border border-stroke bg-white px-3 py-2 text-sm text-dark dark:border-dark-3 dark:bg-dark-2 dark:text-white"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-medium text-gray-500 dark:text-gray-400">Latitude</label>
+                            <input
+                                type="text"
+                                value={form.latitude}
+                                onChange={(e) => setForm((f) => ({ ...f, latitude: e.target.value }))}
+                                className="mt-1 w-full rounded-lg border border-stroke bg-white px-3 py-2 text-sm text-dark dark:border-dark-3 dark:bg-dark-2 dark:text-white"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-medium text-gray-500 dark:text-gray-400">Longitude</label>
+                            <input
+                                type="text"
+                                value={form.longitude}
+                                onChange={(e) => setForm((f) => ({ ...f, longitude: e.target.value }))}
+                                className="mt-1 w-full rounded-lg border border-stroke bg-white px-3 py-2 text-sm text-dark dark:border-dark-3 dark:bg-dark-2 dark:text-white"
+                            />
+                        </div>
+                    </div>
+                    <div>
+                        <label className="block text-xs font-medium text-gray-500 dark:text-gray-400">Customer Feedback</label>
+                        <textarea
+                            value={form.customer_feedback}
+                            onChange={(e) => setForm((f) => ({ ...f, customer_feedback: e.target.value }))}
+                            rows={2}
+                            className="mt-1 w-full rounded-lg border border-stroke bg-white px-3 py-2 text-sm text-dark dark:border-dark-3 dark:bg-dark-2 dark:text-white"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-xs font-medium text-gray-500 dark:text-gray-400">Officer Notes</label>
+                        <textarea
+                            value={form.visit_notes}
+                            onChange={(e) => setForm((f) => ({ ...f, visit_notes: e.target.value }))}
+                            rows={2}
+                            className="mt-1 w-full rounded-lg border border-stroke bg-white px-3 py-2 text-sm text-dark dark:border-dark-3 dark:bg-dark-2 dark:text-white"
+                        />
+                    </div>
+                    <label className="flex items-center gap-2 text-sm text-dark dark:text-white">
+                        <input
+                            type="checkbox"
+                            checked={form.payment_collected}
+                            onChange={(e) => setForm((f) => ({ ...f, payment_collected: e.target.checked }))}
+                        />
+                        Payment Collected
+                    </label>
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <div>
+                            <label className="block text-xs font-medium text-gray-500 dark:text-gray-400">Amount Collected</label>
+                            <input
+                                type="number"
+                                value={form.amount_collected}
+                                onChange={(e) => setForm((f) => ({ ...f, amount_collected: e.target.value }))}
+                                className="mt-1 w-full rounded-lg border border-stroke bg-white px-3 py-2 text-sm text-dark dark:border-dark-3 dark:bg-dark-2 dark:text-white"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-medium text-gray-500 dark:text-gray-400">Fuel Charges</label>
+                            <input
+                                type="number"
+                                value={form.fuel_charges}
+                                onChange={(e) => setForm((f) => ({ ...f, fuel_charges: e.target.value }))}
+                                className="mt-1 w-full rounded-lg border border-stroke bg-white px-3 py-2 text-sm text-dark dark:border-dark-3 dark:bg-dark-2 dark:text-white"
+                            />
+                        </div>
+                        <div className="sm:col-span-2">
+                            <label className="block text-xs font-medium text-gray-500 dark:text-gray-400">Promise to Pay Date</label>
+                            <input
+                                type="datetime-local"
+                                value={form.promised_date}
+                                onChange={(e) => setForm((f) => ({ ...f, promised_date: e.target.value }))}
+                                className="mt-1 w-full rounded-lg border border-stroke bg-white px-3 py-2 text-sm text-dark dark:border-dark-3 dark:bg-dark-2 dark:text-white"
+                            />
+                        </div>
+                    </div>
+                    <div className="flex justify-end gap-3">
+                        <button onClick={onClose} disabled={saving} className="rounded-lg border border-stroke px-4 py-2 text-sm dark:border-dark-3 dark:text-gray-300">
+                            Cancel
+                        </button>
+                        <button onClick={onSave} disabled={saving} className="rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white disabled:opacity-50">
+                            {saving ? 'Saving...' : 'Save'}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </Modal>
+    );
+}
