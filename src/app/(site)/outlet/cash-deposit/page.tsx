@@ -158,6 +158,7 @@ export default function CashDepositPage() {
         const socket = io(API_BASE, { auth: { token }, reconnection: true });
         socket.on("bank_deposit_updated", () => {
             fetchDepositHistory();
+            fetchCashInHand();
         });
         return () => { socket.disconnect(); };
     }, []);
