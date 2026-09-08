@@ -13,6 +13,7 @@ import {
 import Papa from "papaparse";
 import Loader from "@/components/common/Loader";
 import SearchableSelect from "@/components/common/SearchableSelect";
+import SerialOrEngineChassisInput from "@/components/VendorPurchase/SerialOrEngineChassisInput";
 
 const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
 const getAuthHeaders = () => ({
@@ -571,12 +572,12 @@ export default function EditVendorPurchasePage() {
                                                     <div className="space-y-1.5">
                                                         {item.imei_serials.map((imei, idx) => (
                                                             <div key={idx} className="relative">
-                                                                <input 
-                                                                    type="text" 
+                                                                <SerialOrEngineChassisInput
+                                                                    category={item.category}
                                                                     value={imei}
-                                                                    onChange={(e) => updateImei(item.tempId, idx, e.target.value)}
-                                                                    placeholder={`Scan IMEI ${idx + 1}...`}
-                                                                    className="w-full bg-white dark:bg-boxdark border border-stroke dark:border-strokedark rounded-lg px-2 py-1 outline-none focus:border-primary font-mono text-gray-600 dark:text-gray-400 placeholder:text-gray-300 text-xs shadow-sm"
+                                                                    onChange={(val) => updateImei(item.tempId, idx, val)}
+                                                                    index={idx}
+                                                                    compact
                                                                 />
                                                             </div>
                                                         ))}
@@ -741,12 +742,11 @@ export default function EditVendorPurchasePage() {
                                                 {item.imei_serials.map((imei, idx) => (
                                                     <div key={idx} className="relative">
                                                         {item.quantity > 1 && <span className="absolute -left-5 top-3.5 text-[9px] text-gray-400 font-bold">{idx + 1}.</span>}
-                                                        <input 
-                                                            type="text" 
+                                                        <SerialOrEngineChassisInput
+                                                            category={item.category}
                                                             value={imei}
-                                                            onChange={(e) => updateImei(item.tempId, idx, e.target.value)}
-                                                            placeholder={`Scan Serial / IMEI ${idx + 1}...`}
-                                                            className="w-full bg-gray-50 dark:bg-meta-4 border border-stroke dark:border-strokedark rounded-xl px-4 py-3 outline-none focus:border-primary text-sm font-bold text-gray-600 dark:text-gray-400 focus:shadow-md transition-all"
+                                                            onChange={(val) => updateImei(item.tempId, idx, val)}
+                                                            index={idx}
                                                         />
                                                     </div>
                                                 ))}
