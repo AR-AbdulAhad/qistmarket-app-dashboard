@@ -47,6 +47,13 @@ export default function InventoryReportTab({ token, startDate, endDate, searchQu
     const handlePrint = useReactToPrint({
         contentRef: printRef,
         documentTitle: 'Inventory_Report',
+        // This table has 6 data columns plus a full Serial Numbers list per
+        // row — in portrait with the on-screen font size, everything past
+        // "Product Name" overflowed the page width and was silently clipped
+        // (the on-screen overflow-x-auto scrollbar has nothing to scroll on
+        // a printed page). Landscape + smaller print-only text/padding
+        // (applied on the table below) keeps every column on the page.
+        pageStyle: `@page { size: landscape; margin: 10mm; }`,
     });
 
     const handleExportCSV = () => {
@@ -121,8 +128,17 @@ export default function InventoryReportTab({ token, startDate, endDate, searchQu
                 </div>
 
                 {/* Table */}
+                <style jsx>{`
+                    @media print {
+                        table th,
+                        table td {
+                            padding: 4px 6px !important;
+                            font-size: 10px !important;
+                        }
+                    }
+                `}</style>
                 <div className="rounded-xl border border-gray-100 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800 overflow-hidden">
-                    <div className="overflow-x-auto">
+                    <div className="overflow-x-auto print:overflow-visible">
                         <table className="w-full text-left text-sm text-gray-600 dark:text-gray-400">
                             <thead className="bg-gray-50 text-gray-800 dark:bg-gray-900/50 dark:text-white">
                                 <tr>
