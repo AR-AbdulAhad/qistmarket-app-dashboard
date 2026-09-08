@@ -142,7 +142,7 @@ export default function InventoryReportTab({ token, startDate, endDate, searchQu
                         <table className="w-full text-left text-sm text-gray-600 dark:text-gray-400">
                             <thead className="bg-gray-50 text-gray-800 dark:bg-gray-900/50 dark:text-white">
                                 <tr>
-                                    <th className="px-4 py-3 font-medium print:hidden" />
+                                    <th className="px-4 py-3 font-medium">S.No</th>
                                     <th className="px-4 py-3 font-medium">Product Name</th>
                                     <th className="px-4 py-3 font-medium">Currently In Stock</th>
                                     <th className="px-4 py-3 font-medium">Sold</th>
@@ -158,7 +158,7 @@ export default function InventoryReportTab({ token, startDate, endDate, searchQu
                                     return (
                                         <React.Fragment key={idx}>
                                             <tr className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                                                <td className="px-4 py-3 print:hidden" />
+                                                <td className="px-4 py-3 text-gray-500 dark:text-gray-400">{idx + 1}</td>
                                                 <td className="px-4 py-3 font-medium text-gray-800 dark:text-white">{item.product}</td>
                                                 <td className="px-4 py-3 font-medium text-green-600">{item.inStock}</td>
                                                 <td className="px-4 py-3 font-medium text-blue-600">{item.sold}</td>
