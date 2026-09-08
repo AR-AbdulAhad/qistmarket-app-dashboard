@@ -169,7 +169,14 @@ export default function PendingLegacyProfilesPage() {
                     </td>
                     <td className="py-2 px-3">
                       <div className="flex items-center gap-3">
-                        <Link href={`/verifications/${o.id}`} className="text-blue-600 font-semibold hover:underline">
+                        {/* The Installment Plan / ledger only renders on the Order
+                            Details page (via PaymentDetailsSection) — the
+                            Verification Details page never had that section, so
+                            linking there left admins unable to see/fix the ledger
+                            from this list. Order Details also already has the
+                            documents + location editing this list is meant to
+                            drive completion of. */}
+                        <Link href={`/orders/${o.id}`} className="text-blue-600 font-semibold hover:underline">
                           Open Profile
                         </Link>
                         <button
