@@ -132,7 +132,7 @@ export default function InventoryReportTab({ token, startDate, endDate, searchQu
                                     <th className="px-4 py-3 font-medium">Sold</th>
                                     <th className="px-4 py-3 font-medium">Total Movement</th>
                                     <th className="px-4 py-3 font-medium">Calculated Valuation</th>
-                                    <th className="px-4 py-3 font-medium print:hidden">Serial Numbers</th>
+                                    <th className="px-4 py-3 font-medium">Serial Numbers</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
@@ -148,21 +148,29 @@ export default function InventoryReportTab({ token, startDate, endDate, searchQu
                                                 <td className="px-4 py-3 font-medium text-blue-600">{item.sold}</td>
                                                 <td className="px-4 py-3">{item.total}</td>
                                                 <td className="px-4 py-3">Rs {item.valuation?.toLocaleString()}</td>
-                                                <td className="px-4 py-3 print:hidden">
+                                                <td className="px-4 py-3">
                                                     {serials.length > 0 ? (
-                                                        <button
-                                                            onClick={() => setExpandedProduct(isExpanded ? null : item.product)}
-                                                            className="text-primary hover:underline text-xs font-medium"
-                                                        >
-                                                            {isExpanded ? "Hide" : `${serials.length} serial${serials.length > 1 ? "s" : ""}`}
-                                                        </button>
+                                                        <>
+                                                            <button
+                                                                onClick={() => setExpandedProduct(isExpanded ? null : item.product)}
+                                                                className="text-primary hover:underline text-xs font-medium print:hidden"
+                                                            >
+                                                                {isExpanded ? "Hide" : `${serials.length} serial${serials.length > 1 ? "s" : ""}`}
+                                                            </button>
+                                                            {/* Print/PDF has no click interaction, so list serials
+                                                                out directly here instead of relying on the expand
+                                                                toggle above (which stays screen-only). */}
+                                                            <span className="hidden print:inline font-mono text-xs">
+                                                                {serials.join(", ")}
+                                                            </span>
+                                                        </>
                                                     ) : (
                                                         <span className="text-gray-400 text-xs">—</span>
                                                     )}
                                                 </td>
                                             </tr>
                                             {isExpanded && serials.length > 0 && (
-                                                <tr className="bg-gray-50 dark:bg-gray-900/30">
+                                                <tr className="bg-gray-50 dark:bg-gray-900/30 print:hidden">
                                                     <td />
                                                     <td colSpan={6} className="px-4 py-3">
                                                         <div className="flex flex-wrap gap-2">
