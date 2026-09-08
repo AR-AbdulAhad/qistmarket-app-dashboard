@@ -802,14 +802,14 @@ export default function InstallmentsTable({ data, onPay, selectedIds = [], onSel
                                                         <button
                                                             onClick={async () => {
                                                                 try {
-                                                                    const res = await fetch(`${API_BASE}/api/paytrigger/manual-lock`, {
+                                                                    const res = await fetch(`${API_BASE}/api/paytrigger/device/${encodeURIComponent(order.imei_serial)}/lock`, {
                                                                         method: 'POST',
                                                                         headers: getAuthHeaders(),
-                                                                        body: JSON.stringify({ imei: order.imei_serial, order_ref: order.order_ref }),
+                                                                        body: JSON.stringify({ order_ref: order.order_ref }),
                                                                     });
                                                                     const d = await res.json();
                                                                     alert(d.message || (d.success ? 'Lock sent' : 'Failed'));
-                                                                } catch (e) { console.error(e); }
+                                                                } catch (e) { console.error(e); alert('Error communicating with PayTrigger'); }
                                                             }}
                                                             className="text-[9px] font-black px-2.5 py-1.5 rounded-lg bg-red-500 text-white hover:bg-red-600 transition-colors disabled:opacity-40"
                                                             disabled={!order.imei_serial}
@@ -819,14 +819,14 @@ export default function InstallmentsTable({ data, onPay, selectedIds = [], onSel
                                                         <button
                                                             onClick={async () => {
                                                                 try {
-                                                                    const res = await fetch(`${API_BASE}/api/paytrigger/manual-unlock`, {
+                                                                    const res = await fetch(`${API_BASE}/api/paytrigger/device/${encodeURIComponent(order.imei_serial)}/unlock`, {
                                                                         method: 'POST',
                                                                         headers: getAuthHeaders(),
-                                                                        body: JSON.stringify({ imei: order.imei_serial, order_ref: order.order_ref }),
+                                                                        body: JSON.stringify({ order_ref: order.order_ref }),
                                                                     });
                                                                     const d = await res.json();
                                                                     alert(d.message || (d.success ? 'Unlock sent' : 'Failed'));
-                                                                } catch (e) { console.error(e); }
+                                                                } catch (e) { console.error(e); alert('Error communicating with PayTrigger'); }
                                                             }}
                                                             className="text-[9px] font-black px-2.5 py-1.5 rounded-lg bg-emerald-500 text-white hover:bg-emerald-600 transition-colors disabled:opacity-40"
                                                             disabled={!order.imei_serial}
