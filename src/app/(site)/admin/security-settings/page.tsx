@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Cookies from "js-cookie";
 import toast from "react-hot-toast";
-import { ShieldCheck, ShieldOff, KeyRound, MessageSquare, PhoneCall, Save, Loader2, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { ShieldCheck, ShieldOff, KeyRound, MessageSquare, PhoneCall, Save, Loader2, AlertTriangle, CheckCircle2, Link as LinkIcon } from "lucide-react";
 import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
 import PageHeader from "@/components/Accounts/PageHeader";
 
@@ -24,6 +24,11 @@ export default function AdminSecuritySettingsPage() {
   const [jazzEnabled, setJazzEnabled] = useState(true);
   const [otpLoading, setOtpLoading] = useState(true);
   const [otpSaving, setOtpSaving] = useState(false);
+
+  // Payment Instructions Link ("Payment Karne ka Tareeqa" button on the customer ledger page)
+  const [paymentInstructionsUrl, setPaymentInstructionsUrl] = useState("");
+  const [paymentLinkLoading, setPaymentLinkLoading] = useState(true);
+  const [paymentLinkSaving, setPaymentLinkSaving] = useState(false);
 
   const loadStatus = () => {
     setLoading(true);
@@ -48,9 +53,23 @@ export default function AdminSecuritySettingsPage() {
       .finally(() => setOtpLoading(false));
   };
 
+  const loadPaymentInstructionsLink = () => {
+    setPaymentLinkLoading(true);
+    fetch(`${BACKEND_URL}/api/admin-panel/settings/payment-instructions`, { headers: authHeaders() })
+      .then((r) => r.json())
+      .then((json) => {
+        if (json.success && json.settings) {
+          setPaymentInstructionsUrl(json.settings.payment_instructions_url || "");
+        }
+      })
+      .catch((err) => console.error("Failed to load payment instructions link:", err))
+      .finally(() => setPaymentLinkLoading(false));
+  };
+
   useEffect(() => {
     loadStatus();
     loadOtpSettings();
+    loadPaymentInstructionsLink();
   }, []);
 
   const handleSaveOtpSettings = async () => {
@@ -75,6 +94,25 @@ export default function AdminSecuritySettingsPage() {
       toast.error(err.message || "Failed to save OTP settings");
     } finally {
       setOtpSaving(false);
+    }
+  };
+
+  const handleSavePaymentInstructionsLink = async () => {
+    setPaymentLinkSaving(true);
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/admin-panel/settings/payment-instructions`, {
+        method: "POST",
+        headers: authHeaders(),
+        body: JSON.stringify({ payment_instructions_url: paymentInstructionsUrl.trim() }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) throw new Error(json.message || "Failed to update payment instructions link");
+      toast.success(json.message || "Payment instructions link updated");
+      if (json.settings) setPaymentInstructionsUrl(json.settings.payment_instructions_url || "");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to save payment instructions link");
+    } finally {
+      setPaymentLinkSaving(false);
     }
   };
 
@@ -274,6 +312,41 @@ export default function AdminSecuritySettingsPage() {
                   <><Loader2 className="w-4 h-4 animate-spin" /> Saving Settings…</>
                 ) : (
                   <><Save className="w-4 h-4" /> Save OTP Channel Settings</>
+                )}
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Payment Instructions Link Card */}
+        <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-boxdark">
+          <h3 className="text-lg font-bold text-dark dark:text-white mb-4 flex items-center gap-2">
+            <LinkIcon className="w-5 h-5 text-blue-600" /> Payment Karne ka Tareeqa — Link
+          </h3>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+            Ye link customer ledger page ke "Payment Karne ka Tareeqa" button par set hota hai. Khali chhorne par button disabled rahega.
+          </p>
+
+          {paymentLinkLoading ? (
+            <div className="text-sm text-gray-400 py-4 flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Loading...</div>
+          ) : (
+            <div className="space-y-4">
+              <input
+                type="url"
+                value={paymentInstructionsUrl}
+                onChange={(e) => setPaymentInstructionsUrl(e.target.value)}
+                placeholder="https://example.com/payment-tareeqa"
+                className="w-full rounded-xl border border-stroke bg-white px-4 py-2.5 text-sm outline-none transition focus:border-blue-500 dark:border-dark-3 dark:bg-gray-dark dark:text-white"
+              />
+              <button
+                onClick={handleSavePaymentInstructionsLink}
+                disabled={paymentLinkSaving}
+                className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm py-3 rounded-xl transition shadow-sm disabled:opacity-50"
+              >
+                {paymentLinkSaving ? (
+                  <><Loader2 className="w-4 h-4 animate-spin" /> Saving…</>
+                ) : (
+                  <><Save className="w-4 h-4" /> Save Link</>
                 )}
               </button>
             </div>
