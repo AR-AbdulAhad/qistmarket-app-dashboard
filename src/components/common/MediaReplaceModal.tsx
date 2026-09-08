@@ -20,7 +20,7 @@ export function MediaReplaceModal({
     description = "Crop, zoom, rotate, or flip your image below, then click confirm to replace."
 }: MediaReplaceModalProps) {
     const [preview, setPreview] = useState<string | null>(null)
-    
+
     // Image editing states
     const [zoom, setZoom] = useState<number>(1)
     const [rotation, setRotation] = useState<number>(0)
@@ -28,15 +28,39 @@ export function MediaReplaceModal({
     const [flipV, setFlipV] = useState<boolean>(false)
     const [offsetX, setOffsetX] = useState<number>(0)
     const [offsetY, setOffsetY] = useState<number>(0)
-    
+
     const [isDragging, setIsDragging] = useState<boolean>(false)
     const [dragStart, setDragStart] = useState<{ x: number; y: number }>({ x: 0, y: 0 })
+
+    // The crop viewport used to be a fixed 280x210 (4:3 landscape) box with a
+    // fixed 800x600 output canvas — any non-4:3 photo (e.g. a portrait selfie)
+    // got squeezed to fit that shape, cutting off real content even at the
+    // default zoom. The viewport now matches each photo's own aspect ratio
+    // (capped to a max box) so at zoom=1 the whole image shows with nothing
+    // cropped; zooming/panning crops only what the user deliberately chooses.
+    const MAX_VIEWPORT_W = 320
+    const MAX_VIEWPORT_H = 320
+    const [viewport, setViewport] = useState<{ width: number; height: number }>({ width: MAX_VIEWPORT_W, height: MAX_VIEWPORT_W * 0.75 })
 
     useEffect(() => {
         if (file) {
             const objectUrl = URL.createObjectURL(file)
             setPreview(objectUrl)
             handleReset()
+
+            const img = new Image()
+            img.onload = () => {
+                const aspect = img.naturalWidth / img.naturalHeight
+                let width = MAX_VIEWPORT_W
+                let height = width / aspect
+                if (height > MAX_VIEWPORT_H) {
+                    height = MAX_VIEWPORT_H
+                    width = height * aspect
+                }
+                setViewport({ width, height })
+            }
+            img.src = objectUrl
+
             return () => URL.revokeObjectURL(objectUrl)
         } else {
             setPreview(null)
@@ -94,11 +118,17 @@ export function MediaReplaceModal({
             img.crossOrigin = "anonymous";
             img.onload = () => {
                 const canvas = document.createElement('canvas');
-                const cropWidth = 800;
-                const cropHeight = 600;
+                // Output canvas keeps the same aspect ratio as the viewport
+                // (which itself matches the source photo at zoom=1 — see the
+                // viewport-sizing effect above), scaled up to a decent
+                // resolution instead of forcing a fixed 800x600 landscape
+                // frame that cropped non-4:3 photos.
+                const scaleFactor = 1000 / Math.max(viewport.width, viewport.height);
+                const cropWidth = Math.round(viewport.width * scaleFactor);
+                const cropHeight = Math.round(viewport.height * scaleFactor);
                 canvas.width = cropWidth;
                 canvas.height = cropHeight;
-                
+
                 const ctx = canvas.getContext('2d');
                 if (!ctx) {
                     resolve(null);
@@ -109,30 +139,31 @@ export function MediaReplaceModal({
                 ctx.fillStyle = "#ffffff";
                 ctx.fillRect(0, 0, cropWidth, cropHeight);
 
-                // Scale factor between viewport (280x210) and canvas (800x600)
-                const scaleFactor = cropWidth / 280;
-
                 ctx.save();
                 // Move origin to canvas center
                 ctx.translate(cropWidth / 2, cropHeight / 2);
-                
+
                 // Apply flip and rotation around the center
                 ctx.rotate((rotation * Math.PI) / 180);
                 ctx.scale(flipH ? -1 : 1, flipV ? -1 : 1);
-                
+
                 // Translate panned offsets scaled to canvas dimensions
                 ctx.translate(offsetX * scaleFactor, offsetY * scaleFactor);
 
-                // Centered aspect-ratio calculation
+                // Centered aspect-ratio calculation — with the viewport now
+                // matching the image's own aspect, this fills the frame
+                // exactly (initWidth === viewport.width, initHeight ===
+                // viewport.height) at zoom=1, so nothing is cropped unless
+                // the user deliberately zooms/pans.
                 const imgAspect = img.width / img.height;
-                const viewAspect = 280 / 210;
+                const viewAspect = viewport.width / viewport.height;
                 let initWidth, initHeight;
                 if (imgAspect > viewAspect) {
-                    initWidth = 280;
-                    initHeight = 280 / imgAspect;
+                    initWidth = viewport.width;
+                    initHeight = viewport.width / imgAspect;
                 } else {
-                    initWidth = 210 * imgAspect;
-                    initHeight = 210;
+                    initWidth = viewport.height * imgAspect;
+                    initHeight = viewport.height;
                 }
 
                 const drawWidth = initWidth * scaleFactor * zoom;
@@ -186,8 +217,9 @@ export function MediaReplaceModal({
                     Interactive Image Crop/Pan & Zoom Viewport
                 ──────────────────────────────────────────────── */}
                 <div className="flex flex-col md:flex-row gap-6 mb-8 items-center justify-center">
-                    {/* Viewport: acts as crop frame */}
-                    <div className="relative overflow-hidden w-[280px] h-[210px] rounded-xl border border-gray-300 dark:border-gray-600 bg-gray-900 shadow-inner flex items-center justify-center cursor-move select-none"
+                    {/* Viewport: acts as crop frame — sized to the photo's own aspect ratio so it shows fully by default */}
+                    <div className="relative overflow-hidden rounded-xl border border-gray-300 dark:border-gray-600 bg-gray-900 shadow-inner flex items-center justify-center cursor-move select-none"
+                         style={{ width: viewport.width, height: viewport.height }}
                          onMouseDown={handleMouseDown}
                          onMouseMove={handleMouseMove}
                          onMouseUp={handleMouseUp}

@@ -8,7 +8,7 @@ import {
   CreditCard, Calendar, ArrowRight, PackageOpen,
   MessageSquare, ShieldCheck, ArrowLeft, ChevronRight,
   Info, Smartphone, QrCode, Camera, UserCheck, ImageIcon,
-  RefreshCcw, FlipHorizontal, Scissors, Maximize, CheckCircle, RotateCcw,
+  RefreshCcw, FlipHorizontal, Maximize, CheckCircle, RotateCcw,
   Clock, Loader2, Wifi
 } from 'lucide-react';
 import { InstallmentLedgerEditor } from '@/components/Installments/InstallmentLedgerEditor';
@@ -70,7 +70,6 @@ export default function SelfPickupPage() {
   const [ledger, setLedger] = useState<any[]>([]);
   const [feedback, setFeedback] = useState('');
   const [faceImage, setFaceImage] = useState<string | null>(null);
-  const [isEditing, setIsEditing] = useState(false);
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
   const [isMirrored, setIsMirrored] = useState(true);
@@ -555,45 +554,6 @@ export default function SelfPickupPage() {
     }
   };
 
-  const autoCrop = (dataUrl: string): Promise<string> => {
-    return new Promise((resolve) => {
-      const img = new Image();
-      img.onload = () => {
-        try {
-          const canvas = document.createElement('canvas');
-          const size = Math.min(img.width, img.height);
-          canvas.width = size;
-          canvas.height = size;
-          const ctx = canvas.getContext('2d');
-          if (ctx) {
-            ctx.drawImage(
-              img,
-              (img.width - size) / 2,
-              (img.height - size) / 2,
-              size,
-              size,
-              0,
-              0,
-              size,
-              size
-            );
-            resolve(canvas.toDataURL('image/jpeg', 0.9));
-          } else {
-            resolve(dataUrl);
-          }
-        } catch (e) {
-          console.error("Crop error:", e);
-          resolve(dataUrl);
-        }
-      };
-      img.onerror = () => {
-        console.error("Image load error for cropping");
-        resolve(dataUrl);
-      };
-      img.src = dataUrl;
-    });
-  };
-
   const captureImage = async () => {
     if (videoRef.current && canvasRef.current) {
       const video = videoRef.current;
@@ -615,40 +575,13 @@ export default function SelfPickupPage() {
           ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
           ctx.setTransform(1, 0, 0, 1, 0, 0);
 
-          const rawData = canvas.toDataURL('image/jpeg', 0.95);
-          setFaceImage(rawData);
-          setIsEditing(true);
+          setFaceImage(canvas.toDataURL('image/jpeg', 0.95));
           stopCamera();
-
-          // Perform "Advanced Optimization" (Auto-Crop)
-          const cropped = await autoCrop(rawData);
-          setFaceImage(cropped);
-
-          // Small delay for visual feedback before hiding the loader
-          setTimeout(() => {
-            setIsEditing(false);
-          }, 800);
         }
       } catch (err) {
         console.error("Capture error:", err);
-        setIsEditing(false);
         toast.error("Failed to capture image correctly.");
       }
-    }
-  };
-
-  const handleManualOptimize = async () => {
-    if (!faceImage) return;
-    setIsEditing(true);
-    try {
-      const cropped = await autoCrop(faceImage);
-      setFaceImage(cropped);
-      setTimeout(() => {
-        setIsEditing(false);
-      }, 1000);
-    } catch (err) {
-      console.error("Manual optimize error:", err);
-      setIsEditing(false);
     }
   };
 
@@ -1237,33 +1170,8 @@ export default function SelfPickupPage() {
                         <img
                           src={faceImage}
                           alt="Captured"
-                          className={cn(
-                            "max-w-full max-h-full object-contain transition-all",
-                            isEditing ? "opacity-50 blur-sm" : ""
-                          )}
+                          className="max-w-full max-h-full object-contain transition-all"
                         />
-
-                        {isEditing && (
-                          <div className="absolute inset-0 flex flex-col items-center justify-center animate-in fade-in zoom-in duration-300">
-                            <div className="w-64 h-64 border-4 border-dashed border-red-500 rounded-full flex items-center justify-center relative">
-                              <div className="absolute inset-0 bg-red-500/10 rounded-full" />
-                              <Scissors className="w-8 h-8 text-red-500 animate-bounce" />
-                            </div>
-                            <p className="text-red-600 font-black text-sm mt-6 bg-white px-4 py-1.5 rounded-full shadow-lg uppercase tracking-widest">Applying Optimization...</p>
-                          </div>
-                        )}
-
-                        {!isEditing && (
-                          <div className="absolute top-6 right-6 flex gap-2">
-                            <button
-                              onClick={handleManualOptimize}
-                              className="p-3 bg-white/20 backdrop-blur-md border border-white/30 rounded-2xl text-white hover:bg-white/40 transition-all shadow-xl"
-                              title="Enhance Photo"
-                            >
-                              <Maximize className="w-5 h-5" />
-                            </button>
-                          </div>
-                        )}
                       </div>
                     ) : (
                       <>
@@ -1340,7 +1248,6 @@ export default function SelfPickupPage() {
                         <button
                           onClick={() => {
                             setFaceImage(null);
-                            setIsEditing(false);
                             startCamera(selectedDeviceId);
                           }}
                           className="flex-1 py-5 bg-white border-2 border-gray-100 text-gray-500 rounded-[2rem] font-black uppercase tracking-widest text-sm hover:bg-gray-50 transition-all flex items-center justify-center gap-3 shadow-lg shadow-gray-100/50"
@@ -1350,20 +1257,10 @@ export default function SelfPickupPage() {
                         </button>
                         <button
                           onClick={() => setActiveStep(5)}
-                          disabled={isEditing}
                           className="flex-[1.5] py-5 bg-gray-900 text-white rounded-[2rem] font-black uppercase tracking-widest text-sm shadow-2xl shadow-gray-200 hover:bg-black disabled:opacity-50 transition-all flex items-center justify-center gap-3"
                         >
-                          {isEditing ? (
-                            <>
-                              <RefreshCcw className="w-5 h-5 animate-spin" />
-                              Optimizing...
-                            </>
-                          ) : (
-                            <>
-                              Next Step
-                              <ArrowRight className="w-5 h-5" />
-                            </>
-                          )}
+                          Next Step
+                          <ArrowRight className="w-5 h-5" />
                         </button>
                       </>
                     ) : (
@@ -1390,22 +1287,9 @@ export default function SelfPickupPage() {
                               const file = e.target.files?.[0];
                               if (file) {
                                 const reader = new FileReader();
-                                reader.onloadend = async () => {
-                                  try {
-                                    const rawData = reader.result as string;
-                                    setFaceImage(rawData);
-                                    setIsEditing(true);
-                                    stopCamera();
-
-                                    const cropped = await autoCrop(rawData);
-                                    setFaceImage(cropped);
-                                    setTimeout(() => {
-                                      setIsEditing(false);
-                                    }, 800);
-                                  } catch (err) {
-                                    setIsEditing(false);
-                                    toast.error("Failed to process uploaded image.");
-                                  }
+                                reader.onloadend = () => {
+                                  setFaceImage(reader.result as string);
+                                  stopCamera();
                                 };
                                 reader.readAsDataURL(file);
                               }
@@ -1421,7 +1305,7 @@ export default function SelfPickupPage() {
                       <div className="w-10 h-10 bg-indigo-100 rounded-2xl flex items-center justify-center text-indigo-600">
                         <Maximize className="w-5 h-5" />
                       </div>
-                      <p className="text-[10px] text-indigo-800 font-black uppercase">Auto-Crop</p>
+                      <p className="text-[10px] text-indigo-800 font-black uppercase">Full Frame</p>
                     </div>
                     <div className="p-4 bg-emerald-50/50 rounded-3xl border border-emerald-100 flex flex-col items-center text-center gap-2">
                       <div className="w-10 h-10 bg-emerald-100 rounded-2xl flex items-center justify-center text-emerald-600">

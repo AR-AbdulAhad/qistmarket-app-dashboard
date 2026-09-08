@@ -225,7 +225,7 @@ export const NAV_DATA = [
         ],
       },
       {
-        title: "Software Activation",
+        title: "Paytrigger Activation",
         icon: Icons.LockIcon,
         url: "/admin/paytrigger",
         items: [],
