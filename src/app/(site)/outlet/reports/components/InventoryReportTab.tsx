@@ -63,7 +63,7 @@ export default function InventoryReportTab({ token, startDate, endDate, searchQu
             "Total In Stock": item.inStock,
             "Sold": item.sold,
             "Total Movement": item.total,
-            "Total Valuation": item.valuation,
+            "Stock Value (Cost)": item.valuation,
             "Serial Numbers": Array.isArray(item.serials) ? item.serials.join(", ") : ""
         }));
         const ws = XLSX.utils.json_to_sheet(rows);
@@ -122,8 +122,9 @@ export default function InventoryReportTab({ token, startDate, endDate, searchQu
                         <p className="text-2xl font-bold text-blue-600">{totalItemsSold}</p>
                     </div>
                     <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800">
-                        <p className="text-sm text-gray-500 dark:text-gray-400">Total Capital Valuation</p>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">Current Stock Value (Cost Price)</p>
                         <p className="text-2xl font-bold text-gray-800 dark:text-white">Rs {totalStockValuation.toLocaleString()}</p>
+                        <p className="text-xs text-gray-400 mt-1">Sum of purchase price × qty for items in stock today</p>
                     </div>
                 </div>
 
@@ -147,7 +148,7 @@ export default function InventoryReportTab({ token, startDate, endDate, searchQu
                                     <th className="px-4 py-3 font-medium">Currently In Stock</th>
                                     <th className="px-4 py-3 font-medium">Sold</th>
                                     <th className="px-4 py-3 font-medium">Total Movement</th>
-                                    <th className="px-4 py-3 font-medium">Calculated Valuation</th>
+                                    <th className="px-4 py-3 font-medium">Stock Value (Cost)</th>
                                     <th className="px-4 py-3 font-medium">Serial Numbers</th>
                                 </tr>
                             </thead>
