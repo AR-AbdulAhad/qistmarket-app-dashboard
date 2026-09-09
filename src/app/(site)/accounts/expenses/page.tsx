@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Cookies from "js-cookie";
 import toast from "react-hot-toast";
-import { CreditCard, Receipt, Tags, Store, Plus, ClipboardCheck, Users2, Trash2, Check, X } from "lucide-react";
+import { CreditCard, Receipt, Tags, Store, Plus, ClipboardCheck, Users2, Trash2, Check, X, Upload, ExternalLink, Loader2 } from "lucide-react";
 import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
 import OutletSelector from "@/components/common/OutletSelector";
 import PageHeader from "@/components/Accounts/PageHeader";
@@ -50,6 +50,8 @@ export default function AccountsExpensesPage() {
 
   const [approvals, setApprovals] = useState<ExpenseVoucher[]>([]);
   const [approvalsLoading, setApprovalsLoading] = useState(false);
+  const [uploadingInvoiceId, setUploadingInvoiceId] = useState<number | null>(null);
+  const invoiceInputRefs = useRef<Record<number, HTMLInputElement | null>>({});
 
   const [salaryMonths, setSalaryMonths] = useState<SalaryMonth[]>([]);
   const [salaryLoading, setSalaryLoading] = useState(false);
@@ -110,6 +112,30 @@ export default function AccountsExpensesPage() {
       toast.error(err.message);
     } finally {
       setCreating(false);
+    }
+  };
+
+  const handleInvoiceUpload = async (id: number, e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingInvoiceId(id);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch(`${BACKEND_URL}/api/accounts/expenses/${id}/invoice`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${Cookies.get("auth_token")}` },
+        body: fd,
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) throw new Error(json.message || "Failed to upload invoice.");
+      toast.success("Invoice uploaded.");
+      setApprovals((prev) => prev.map((v) => (v.id === id ? { ...v, invoice_url: json.data.invoice_url } : v)));
+    } catch (err: any) {
+      toast.error(err.message || "Failed to upload invoice.");
+    } finally {
+      setUploadingInvoiceId(null);
+      e.target.value = "";
     }
   };
 
@@ -251,9 +277,32 @@ export default function AccountsExpensesPage() {
                 <div className="mb-3 space-y-1 text-sm text-gray-600 dark:text-gray-300">
                   {v.items.map((it, i) => <div key={i} className="flex justify-between"><span>{it.category}{it.description ? ` — ${it.description}` : ""}</span><span className="tabular-nums">{PKR(it.amount)}</span></div>)}
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   <button onClick={() => handleDecision(v.id, "approved")} className="flex items-center gap-1.5 rounded-lg bg-emerald-50 px-4 py-2 text-xs font-bold text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-400"><Check className="size-3.5" /> Approve</button>
                   <button onClick={() => handleDecision(v.id, "rejected")} className="flex items-center gap-1.5 rounded-lg bg-rose-50 px-4 py-2 text-xs font-bold text-rose-700 hover:bg-rose-100 dark:bg-rose-500/10 dark:text-rose-400"><X className="size-3.5" /> Reject</button>
+
+                  <input
+                    ref={(el) => { invoiceInputRefs.current[v.id] = el; }}
+                    type="file"
+                    accept="image/*,.pdf"
+                    className="hidden"
+                    onChange={(e) => handleInvoiceUpload(v.id, e)}
+                  />
+                  {v.invoice_url ? (
+                    <a href={`${BACKEND_URL}${v.invoice_url}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 rounded-lg bg-slate-50 px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-100 dark:bg-white/5 dark:text-gray-300">
+                      <ExternalLink className="size-3.5" /> View Invoice
+                    </a>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={uploadingInvoiceId === v.id}
+                      onClick={() => invoiceInputRefs.current[v.id]?.click()}
+                      className="flex items-center gap-1.5 rounded-lg bg-[#ff3d3d]/10 px-4 py-2 text-xs font-bold text-[#ff3d3d] hover:bg-[#ff3d3d]/20 disabled:opacity-50"
+                    >
+                      {uploadingInvoiceId === v.id ? <Loader2 className="size-3.5 animate-spin" /> : <Upload className="size-3.5" />}
+                      {uploadingInvoiceId === v.id ? "Uploading..." : "Upload Invoice"}
+                    </button>
+                  )}
                 </div>
               </div>
             ))}

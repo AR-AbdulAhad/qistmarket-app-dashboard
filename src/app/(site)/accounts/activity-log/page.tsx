@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Cookies from "js-cookie";
-import { ShieldAlert, Search, ChevronLeft, ChevronRight, LogIn, AlertTriangle, CheckCircle2, XCircle, Info } from "lucide-react";
+import { ShieldAlert, Search, ChevronLeft, ChevronRight, LogIn, AlertTriangle, CheckCircle2, XCircle, Info, Users, TrendingDown, UserX } from "lucide-react";
 import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
 import PageHeader from "@/components/Accounts/PageHeader";
 import EmptyState from "@/components/Accounts/EmptyState";
@@ -13,6 +13,9 @@ const authHeaders = () => ({ Authorization: `Bearer ${Cookies.get("auth_token")}
 
 interface LogEntry { id: number; action: string; details: string; created_at: string; ip_address: string | null; device_info: string | null; user: { username: string; full_name: string } | null; outlet: { name: string; code: string } | null }
 interface FraudAlert { severity: string; type: string; title: string; message: string }
+interface DuplicateCnicOrder { order_ref: string; status: string; customer_name: string; role: string }
+interface DuplicateCnicAlert extends FraudAlert { cnic: string; orders: DuplicateCnicOrder[] }
+interface UnassignedOrder { id: number; order_ref: string; customer_name: string }
 
 const ACTION_COLORS: Record<string, string> = {
   BANK_TRANSACTION: "bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10",
@@ -40,6 +43,13 @@ const TABS = [
   { key: "fraud" as const, label: "Fraud Alerts", icon: AlertTriangle },
 ];
 
+const FRAUD_SUBTABS = [
+  { key: "summary" as const, label: "Summary", icon: AlertTriangle },
+  { key: "duplicate-cnic" as const, label: "Duplicate CNIC", icon: Users },
+  { key: "low-recovery" as const, label: "Low Recovery", icon: TrendingDown },
+  { key: "unassigned-recovery" as const, label: "Unassigned Recovery", icon: UserX },
+];
+
 export default function ActivityLogPage() {
   const [tab, setTab] = useState<(typeof TABS)[number]["key"]>("all");
   const [logs, setLogs] = useState<LogEntry[]>([]);
@@ -54,6 +64,17 @@ export default function ActivityLogPage() {
 
   const [fraudAlerts, setFraudAlerts] = useState<FraudAlert[]>([]);
   const [fraudLoading, setFraudLoading] = useState(false);
+  const [fraudSubTab, setFraudSubTab] = useState<(typeof FRAUD_SUBTABS)[number]["key"]>("summary");
+
+  const [duplicateCnicAlerts, setDuplicateCnicAlerts] = useState<DuplicateCnicAlert[]>([]);
+  const [duplicateCnicLoading, setDuplicateCnicLoading] = useState(false);
+
+  const [lowRecoveryAlerts, setLowRecoveryAlerts] = useState<FraudAlert[]>([]);
+  const [lowRecoveryLoading, setLowRecoveryLoading] = useState(false);
+
+  const [unassignedAlerts, setUnassignedAlerts] = useState<FraudAlert[]>([]);
+  const [unassignedOrders, setUnassignedOrders] = useState<UnassignedOrder[]>([]);
+  const [unassignedLoading, setUnassignedLoading] = useState(false);
 
   useEffect(() => {
     if (tab !== "all") return;
@@ -77,14 +98,35 @@ export default function ActivityLogPage() {
         .then((json) => { if (json.success) setLogins(json.data); })
         .finally(() => setLoginsLoading(false));
     }
-    if (tab === "fraud") {
+    if (tab === "fraud" && fraudSubTab === "summary") {
       setFraudLoading(true);
       fetch(`${BACKEND_URL}/api/accounts/audit/fraud-alerts`, { headers: authHeaders() })
         .then((res) => res.json())
         .then((json) => { if (json.success) setFraudAlerts(json.data.alerts); })
         .finally(() => setFraudLoading(false));
     }
-  }, [tab, loginStatus]);
+    if (tab === "fraud" && fraudSubTab === "duplicate-cnic") {
+      setDuplicateCnicLoading(true);
+      fetch(`${BACKEND_URL}/api/accounts/audit/duplicate-cnic`, { headers: authHeaders() })
+        .then((res) => res.json())
+        .then((json) => { if (json.success) setDuplicateCnicAlerts(json.data.alerts); })
+        .finally(() => setDuplicateCnicLoading(false));
+    }
+    if (tab === "fraud" && fraudSubTab === "low-recovery") {
+      setLowRecoveryLoading(true);
+      fetch(`${BACKEND_URL}/api/accounts/audit/low-recovery`, { headers: authHeaders() })
+        .then((res) => res.json())
+        .then((json) => { if (json.success) setLowRecoveryAlerts(json.data.alerts); })
+        .finally(() => setLowRecoveryLoading(false));
+    }
+    if (tab === "fraud" && fraudSubTab === "unassigned-recovery") {
+      setUnassignedLoading(true);
+      fetch(`${BACKEND_URL}/api/accounts/audit/unassigned-recovery`, { headers: authHeaders() })
+        .then((res) => res.json())
+        .then((json) => { if (json.success) { setUnassignedAlerts(json.data.alerts); setUnassignedOrders(json.data.orders); } })
+        .finally(() => setUnassignedLoading(false));
+    }
+  }, [tab, loginStatus, fraudSubTab]);
 
   return (
     <>
@@ -175,19 +217,113 @@ export default function ActivityLogPage() {
       )}
 
       {tab === "fraud" && (
-        fraudLoading ? <TableSkeleton /> : fraudAlerts.length > 0 ? (
-          <div className="space-y-2">
-            {fraudAlerts.map((a, i) => {
-              const Icon = SEVERITY_ICON[a.severity] || Info;
-              return (
-                <div key={i} className={`flex items-start gap-3 rounded-xl border px-4 py-3 text-sm ${SEVERITY_STYLE[a.severity] || SEVERITY_STYLE.warning}`}>
-                  <Icon className="mt-0.5 size-4 shrink-0" />
-                  <div><strong className="font-bold">{a.title}</strong><p className="mt-0.5">{a.message}</p></div>
-                </div>
-              );
-            })}
+        <>
+          <div className="mb-4 flex flex-wrap gap-1 rounded-xl bg-gray-100 p-1 dark:bg-dark-3 w-fit">
+            {FRAUD_SUBTABS.map((s) => (
+              <button key={s.key} onClick={() => setFraudSubTab(s.key)} className={`flex items-center gap-1.5 rounded-lg px-4 py-1.5 text-sm font-semibold transition ${fraudSubTab === s.key ? "bg-white text-[#ff3d3d] shadow-sm dark:bg-boxdark" : "text-gray-500 hover:text-gray-700 dark:text-gray-400"}`}>
+                <s.icon className="size-3.5" /> {s.label}
+              </button>
+            ))}
           </div>
-        ) : <div className="rounded-2xl border border-slate-100 bg-white shadow-sm dark:border-white/10 dark:bg-boxdark"><EmptyState icon={CheckCircle2} title="No fraud signals detected" description="All login patterns, blacklist activity, and cash submissions look normal." /></div>
+
+          {fraudSubTab === "summary" && (
+            fraudLoading ? <TableSkeleton /> : fraudAlerts.length > 0 ? (
+              <div className="space-y-2">
+                {fraudAlerts.map((a, i) => {
+                  const Icon = SEVERITY_ICON[a.severity] || Info;
+                  return (
+                    <div key={i} className={`flex items-start gap-3 rounded-xl border px-4 py-3 text-sm ${SEVERITY_STYLE[a.severity] || SEVERITY_STYLE.warning}`}>
+                      <Icon className="mt-0.5 size-4 shrink-0" />
+                      <div><strong className="font-bold">{a.title}</strong><p className="mt-0.5">{a.message}</p></div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : <div className="rounded-2xl border border-slate-100 bg-white shadow-sm dark:border-white/10 dark:bg-boxdark"><EmptyState icon={CheckCircle2} title="No fraud signals detected" description="All login patterns, blacklist activity, and cash submissions look normal." /></div>
+          )}
+
+          {fraudSubTab === "duplicate-cnic" && (
+            duplicateCnicLoading ? <TableSkeleton /> : duplicateCnicAlerts.length > 0 ? (
+              <div className="space-y-3">
+                {duplicateCnicAlerts.map((a, i) => (
+                  <div key={i} className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm dark:border-white/10 dark:bg-boxdark">
+                    <div className={`flex items-start gap-3 border-b border-slate-100 px-4 py-3 text-sm dark:border-white/5 ${SEVERITY_STYLE[a.severity] || SEVERITY_STYLE.serious}`}>
+                      <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+                      <div>
+                        <strong className="font-bold">CNIC {a.cnic}</strong>
+                        <p className="mt-0.5">{a.message}</p>
+                      </div>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-sm">
+                        <thead className="bg-gray-50 text-[11px] uppercase tracking-wide text-gray-500 dark:bg-dark-2 dark:text-gray-400">
+                          <tr><th className="px-4 py-2.5 font-bold">Order Ref</th><th className="px-4 py-2.5 font-bold">Role</th><th className="px-4 py-2.5 font-bold">Customer</th><th className="px-4 py-2.5 font-bold">Status</th></tr>
+                        </thead>
+                        <tbody>
+                          {a.orders.map((o, j) => (
+                            <tr key={j} className="border-t border-slate-50 dark:border-white/5">
+                              <td className="px-4 py-2.5 font-medium text-dark dark:text-white">{o.order_ref}</td>
+                              <td className="px-4 py-2.5 text-gray-600 dark:text-gray-300">{o.role}</td>
+                              <td className="px-4 py-2.5 text-gray-600 dark:text-gray-300">{o.customer_name || "—"}</td>
+                              <td className="px-4 py-2.5 text-gray-500">{o.status}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : <div className="rounded-2xl border border-slate-100 bg-white shadow-sm dark:border-white/10 dark:bg-boxdark"><EmptyState icon={CheckCircle2} title="No duplicate CNIC signals" description="No CNIC appears on 2+ currently-active orders." /></div>
+          )}
+
+          {fraudSubTab === "low-recovery" && (
+            lowRecoveryLoading ? <TableSkeleton /> : lowRecoveryAlerts.length > 0 ? (
+              <div className="space-y-2">
+                {lowRecoveryAlerts.map((a, i) => {
+                  const Icon = SEVERITY_ICON[a.severity] || Info;
+                  return (
+                    <div key={i} className={`flex items-start gap-3 rounded-xl border px-4 py-3 text-sm ${SEVERITY_STYLE[a.severity] || SEVERITY_STYLE.warning}`}>
+                      <Icon className="mt-0.5 size-4 shrink-0" />
+                      <div><strong className="font-bold">{a.title}</strong><p className="mt-0.5">{a.message}</p></div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : <div className="rounded-2xl border border-slate-100 bg-white shadow-sm dark:border-white/10 dark:bg-boxdark"><EmptyState icon={CheckCircle2} title="No low-recovery outlets" description="Every outlet is at or above the 50% recovery threshold this month." /></div>
+          )}
+
+          {fraudSubTab === "unassigned-recovery" && (
+            unassignedLoading ? <TableSkeleton /> : unassignedOrders.length > 0 ? (
+              <div className="space-y-3">
+                {unassignedAlerts.map((a, i) => {
+                  const Icon = SEVERITY_ICON[a.severity] || Info;
+                  return (
+                    <div key={i} className={`flex items-start gap-3 rounded-xl border px-4 py-3 text-sm ${SEVERITY_STYLE[a.severity] || SEVERITY_STYLE.serious}`}>
+                      <Icon className="mt-0.5 size-4 shrink-0" />
+                      <div><strong className="font-bold">{a.title}</strong><p className="mt-0.5">{a.message}</p></div>
+                    </div>
+                  );
+                })}
+                <div className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm dark:border-white/10 dark:bg-boxdark">
+                  <table className="w-full text-left text-sm">
+                    <thead className="bg-gray-50 text-[11px] uppercase tracking-wide text-gray-500 dark:bg-dark-2 dark:text-gray-400">
+                      <tr><th className="px-4 py-3 font-bold">Order Ref</th><th className="px-4 py-3 font-bold">Customer</th></tr>
+                    </thead>
+                    <tbody>
+                      {unassignedOrders.map((o) => (
+                        <tr key={o.id} className="border-t border-slate-50 dark:border-white/5">
+                          <td className="px-4 py-3.5 font-medium text-dark dark:text-white">{o.order_ref}</td>
+                          <td className="px-4 py-3.5 text-gray-600 dark:text-gray-300">{o.customer_name || "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : <div className="rounded-2xl border border-slate-100 bg-white shadow-sm dark:border-white/10 dark:bg-boxdark"><EmptyState icon={CheckCircle2} title="No unassigned recovery orders" description="Every delivered order has a recovery officer assigned." /></div>
+          )}
+        </>
       )}
     </>
   );

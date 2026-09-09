@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Cookies from "js-cookie";
 import dynamic from "next/dynamic";
 import type { ApexOptions } from "apexcharts";
-import { BarChart3, Store, UserRound, TrendingUp } from "lucide-react";
+import { BarChart3, Store, UserRound, TrendingUp, Wallet } from "lucide-react";
 import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
 import PageHeader from "@/components/Accounts/PageHeader";
 import EmptyState from "@/components/Accounts/EmptyState";
@@ -23,12 +23,20 @@ interface RecoveryAnalyticsData {
   officerWise: { officer_id: number | null; officer_name: string; due: number; recovered: number; recoveryPercentage: number }[];
 }
 
+interface ChannelData {
+  overallRecoveryPercentage: number;
+  byChannel: { channel: string; amount: number; percentageOfDue: number }[];
+}
+
 const RANGES = ["Day", "Week", "Month", "Quarter", "Year"] as const;
 
 export default function RecoveryAnalyticsPage() {
   const [data, setData] = useState<RecoveryAnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [range, setRange] = useState<(typeof RANGES)[number]>("Month");
+
+  const [channelData, setChannelData] = useState<ChannelData | null>(null);
+  const [channelLoading, setChannelLoading] = useState(true);
 
   useEffect(() => {
     const token = Cookies.get("auth_token");
@@ -42,6 +50,15 @@ export default function RecoveryAnalyticsPage() {
       })
       .catch((err) => console.error("Failed to load recovery analytics:", err))
       .finally(() => setLoading(false));
+
+    setChannelLoading(true);
+    fetch(`${BACKEND_URL}/api/accounts/recovery-analytics/channel-wise?range=${range}`, { headers: { Authorization: `Bearer ${token}` } })
+      .then((res) => res.json())
+      .then((json) => {
+        if (json.success) setChannelData(json.data);
+      })
+      .catch((err) => console.error("Failed to load channel-wise recovery:", err))
+      .finally(() => setChannelLoading(false));
   }, [range]);
 
   const gridColor = "#e1e0d9";
@@ -150,6 +167,35 @@ export default function RecoveryAnalyticsPage() {
           </div>
         </div>
       )}
+
+      <div className="mt-6 rounded-2xl border border-slate-100 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-boxdark">
+        <div className="mb-4 flex items-center gap-2.5">
+          <div className="flex size-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10"><Wallet className="size-4" /></div>
+          <h2 className="text-sm font-bold text-dark dark:text-white">Recovery By Payment Channel</h2>
+        </div>
+        {channelLoading ? (
+          <ChartSkeleton />
+        ) : channelData && channelData.byChannel.some((c) => c.amount > 0) ? (
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_auto]">
+            <Chart
+              options={horizontalBarOptions(channelData.byChannel.map((c) => c.channel), "#2f9e6f")}
+              series={[{ name: "% of Due Recovered", data: channelData.byChannel.map((c) => c.percentageOfDue) }]}
+              type="bar"
+              height={chartHeight(channelData.byChannel.length)}
+            />
+            <div className="flex flex-col justify-center gap-3 lg:min-w-[220px]">
+              {channelData.byChannel.map((c) => (
+                <div key={c.channel} className="flex items-center justify-between gap-4 rounded-xl bg-gray-50 px-3.5 py-2.5 dark:bg-dark-2">
+                  <span className="text-xs font-bold text-gray-600 dark:text-gray-300">{c.channel}</span>
+                  <span className="text-sm font-black text-dark dark:text-white">{PKR(c.amount)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <EmptyState icon={Wallet} title="No recovered payments this period" description="Nothing was collected via any channel in the selected range yet." />
+        )}
+      </div>
     </>
   );
 }
