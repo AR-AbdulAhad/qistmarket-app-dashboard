@@ -124,7 +124,7 @@ export default function InventoryReportTab({ token, startDate, endDate, searchQu
                     <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800">
                         <p className="text-sm text-gray-500 dark:text-gray-400">Current Stock Value (Cost Price)</p>
                         <p className="text-2xl font-bold text-gray-800 dark:text-white">Rs {totalStockValuation.toLocaleString()}</p>
-                        <p className="text-xs text-gray-400 mt-1">Sum of purchase price × qty for items in stock today</p>
+                        {/* <p className="text-xs text-gray-400 mt-1">Sum of purchase price × qty for items in stock today</p> */}
                     </div>
                 </div>
 
