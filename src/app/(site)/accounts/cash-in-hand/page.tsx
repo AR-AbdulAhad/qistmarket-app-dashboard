@@ -60,6 +60,9 @@ export default function CashInHandPage() {
 
   const [history, setHistory] = useState<HistoryRow[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyPage, setHistoryPage] = useState(1);
+  const [historyTotalPages, setHistoryTotalPages] = useState(1);
+  const [historyLoadingMore, setHistoryLoadingMore] = useState(false);
 
   const [limits, setLimits] = useState<LimitRow[]>([]);
   const [limitsLoading, setLimitsLoading] = useState(false);
@@ -83,15 +86,36 @@ export default function CashInHandPage() {
     }
     if (view === "history") {
       setHistoryLoading(true);
-      fetch(`${BACKEND_URL}/api/accounts/cash/submission-history`, { headers: authHeaders() })
+      setHistoryPage(1);
+      fetch(`${BACKEND_URL}/api/accounts/cash/submission-history?page=1&limit=25`, { headers: authHeaders() })
         .then((res) => res.json())
-        .then((json) => { if (json.success) setHistory(json.data); })
+        .then((json) => {
+          if (json.success) {
+            setHistory(json.data);
+            setHistoryTotalPages(json.pagination?.totalPages || 1);
+          }
+        })
         .finally(() => setHistoryLoading(false));
     }
     if (view === "limits") {
       fetchLimits();
     }
   }, [view, reportPeriod]);
+
+  const loadMoreHistory = () => {
+    const nextPage = historyPage + 1;
+    setHistoryLoadingMore(true);
+    fetch(`${BACKEND_URL}/api/accounts/cash/submission-history?page=${nextPage}&limit=25`, { headers: authHeaders() })
+      .then((res) => res.json())
+      .then((json) => {
+        if (json.success) {
+          setHistory((prev) => [...prev, ...json.data]);
+          setHistoryPage(nextPage);
+          setHistoryTotalPages(json.pagination?.totalPages || 1);
+        }
+      })
+      .finally(() => setHistoryLoadingMore(false));
+  };
 
   const fetchLimits = () => {
     setLimitsLoading(true);
@@ -330,6 +354,17 @@ export default function CashInHandPage() {
                   ))}
                 </tbody>
               </table>
+              {historyPage < historyTotalPages && (
+                <div className="flex justify-center border-t border-slate-50 p-4 dark:border-white/5">
+                  <button
+                    onClick={loadMoreHistory}
+                    disabled={historyLoadingMore}
+                    className="rounded-xl border border-stroke px-5 py-2 text-sm font-semibold text-gray-600 transition hover:border-[#ff3d3d] hover:text-[#ff3d3d] disabled:opacity-50 dark:border-dark-3 dark:text-gray-300"
+                  >
+                    {historyLoadingMore ? "Loading..." : `Load More (page ${historyPage + 1} of ${historyTotalPages})`}
+                  </button>
+                </div>
+              )}
             </div>
           ) : <div className="rounded-2xl border border-slate-100 bg-white shadow-sm dark:border-white/10 dark:bg-boxdark"><EmptyState icon={History} title="No submission history yet" /></div>}
         </div>

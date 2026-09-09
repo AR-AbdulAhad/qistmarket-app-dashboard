@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import Cookies from "js-cookie";
 import toast from "react-hot-toast";
 import { HandCoins, Store, Handshake, Clock, AlertTriangle, CalendarClock, Plus, Wallet, Search } from "lucide-react";
@@ -19,6 +19,8 @@ interface VendorPayables { totalPayable: number; vendorWise: { vendor_name: stri
 interface AgingData { buckets: Record<string, number>; total: number; vendorWise: any[]; items: { purchase_id: number; invoice_number: string; vendor_name: string; daysOverdue: number; bucket: string; balance: number }[] }
 interface DueAlert { purchase_id: number; invoice_number: string; vendor_name: string; outlet_name: string; due_date: string; balance: number; isOverdue: boolean }
 interface ScheduledPayment { id: number; amount: number; scheduled_date: string; status: string; notes: string | null; vendor: { name: string } }
+interface VendorListItem { id: number; name: string; phone: string | null; email: string | null; balance: number; cash_in_hand_balance: number; outlet: { id: number; name: string } | null }
+interface VendorLedgerTxn { id: number; type: "credit" | "debit"; amount: number; balance_after: number; description: string | null; created_at: string; created_by: { full_name: string } | null }
 
 const TABS = [
   { key: "payables" as const, label: "Payables", icon: HandCoins },
@@ -49,6 +51,13 @@ export default function AccountsVendorsPage() {
   const [creatingVendor, setCreatingVendor] = useState(false);
   const [cashForm, setCashForm] = useState({ vendor_id: "", type: "credit" as "credit" | "debit", amount: "", description: "" });
 
+  const [vendorList, setVendorList] = useState<VendorListItem[]>([]);
+  const [vendorListLoading, setVendorListLoading] = useState(false);
+  const [vendorDirSearch, setVendorDirSearch] = useState("");
+  const [expandedVendorId, setExpandedVendorId] = useState<number | null>(null);
+  const [ledgerLoading, setLedgerLoading] = useState<number | null>(null);
+  const [ledgerByVendor, setLedgerByVendor] = useState<Record<number, VendorLedgerTxn[]>>({});
+
   useEffect(() => {
     fetch(`${BACKEND_URL}/api/accounts/vendors/payables`, { headers: authHeaders() })
       .then((res) => res.json())
@@ -67,7 +76,43 @@ export default function AccountsVendorsPage() {
       fetch(`${BACKEND_URL}/api/accounts/vendors/due-alerts`, { headers: authHeaders() }).then((res) => res.json()).then((json) => { if (json.success) setAlerts(json.data); }).finally(() => setAlertsLoading(false));
     }
     if (tab === "scheduled") fetchScheduled();
+    if (tab === "manage") fetchVendorList();
   }, [tab]);
+
+  const fetchVendorList = () => {
+    setVendorListLoading(true);
+    fetch(`${BACKEND_URL}/api/accounts/vendors`, { headers: authHeaders() })
+      .then((res) => res.json())
+      .then((json) => { if (json.success) setVendorList(json.data); })
+      .catch((err) => console.error("Failed to load vendor directory:", err))
+      .finally(() => setVendorListLoading(false));
+  };
+
+  const toggleLedger = async (vendorId: number) => {
+    if (expandedVendorId === vendorId) { setExpandedVendorId(null); return; }
+    setExpandedVendorId(vendorId);
+    if (ledgerByVendor[vendorId]) return;
+    setLedgerLoading(vendorId);
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/accounts/vendors/${vendorId}/cash-ledger`, { headers: authHeaders() });
+      const json = await res.json();
+      if (json.success) setLedgerByVendor((prev) => ({ ...prev, [vendorId]: json.data.transactions }));
+    } catch (err) {
+      toast.error("Failed to load vendor ledger.");
+    } finally {
+      setLedgerLoading(null);
+    }
+  };
+
+  const selectVendorForForms = (v: VendorListItem) => {
+    setCashForm((f) => ({ ...f, vendor_id: String(v.id) }));
+    setScheduleForm((f) => ({ ...f, vendor_id: String(v.id) }));
+    toast.success(`${v.name} selected — ID filled into the forms below.`);
+  };
+
+  const filteredVendorList = vendorList.filter((v) =>
+    v.name.toLowerCase().includes(vendorDirSearch.toLowerCase()) || (v.phone || "").includes(vendorDirSearch)
+  );
 
   const fetchScheduled = () => {
     setScheduledLoading(true);
@@ -83,6 +128,7 @@ export default function AccountsVendorsPage() {
       if (!res.ok) throw new Error("Failed to create vendor.");
       toast.success("Vendor created.");
       setVendorForm({ name: "", phone: "", email: "", address: "" });
+      fetchVendorList();
     } catch (err: any) {
       toast.error(err.message);
     } finally {
@@ -97,7 +143,12 @@ export default function AccountsVendorsPage() {
       const res = await fetch(`${BACKEND_URL}/api/accounts/vendors/cash-transactions`, { method: "POST", headers: authHeaders(), body: JSON.stringify({ ...cashForm, amount: parseFloat(cashForm.amount) }) });
       if (!res.ok) throw new Error("Transaction failed.");
       toast.success("Vendor cash transaction recorded.");
+      const affectedVendorId = parseInt(cashForm.vendor_id);
       setCashForm({ vendor_id: "", type: "credit", amount: "", description: "" });
+      fetchVendorList();
+      if (ledgerByVendor[affectedVendorId]) {
+        setLedgerByVendor((prev) => { const next = { ...prev }; delete next[affectedVendorId]; return next; });
+      }
     } catch (err: any) {
       toast.error(err.message);
     }
@@ -278,7 +329,71 @@ export default function AccountsVendorsPage() {
       )}
 
       {tab === "manage" && (
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <div className="space-y-6">
+          <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-boxdark">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5"><div className="flex size-8 items-center justify-center rounded-lg bg-blue-50 text-blue-600 dark:bg-blue-500/10"><Handshake className="size-4" /></div><h2 className="text-sm font-bold text-dark dark:text-white">Vendor Directory</h2></div>
+              <div className="relative max-w-xs flex-1">
+                <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-gray-400" />
+                <input value={vendorDirSearch} onChange={(e) => setVendorDirSearch(e.target.value)} placeholder="Search name or phone..." className="w-full rounded-xl border border-stroke bg-white py-2 pl-9 pr-4 text-sm outline-none transition focus:border-[#ff3d3d] dark:border-dark-3 dark:bg-gray-dark dark:text-white" />
+              </div>
+            </div>
+            {vendorListLoading ? <TableSkeleton /> : filteredVendorList.length > 0 ? (
+              <div className="overflow-hidden rounded-xl border border-slate-100 dark:border-white/10">
+                <table className="w-full text-left text-sm">
+                  <thead className="bg-gray-50 text-[11px] uppercase tracking-wide text-gray-500 dark:bg-dark-2 dark:text-gray-400">
+                    <tr><th className="px-4 py-3 font-bold">Vendor</th><th className="px-4 py-3 font-bold">Outlet</th><th className="px-4 py-3 font-bold">Phone</th><th className="px-4 py-3 text-right font-bold">Purchase Balance</th><th className="px-4 py-3 text-right font-bold">Cash-In-Hand</th><th className="px-4 py-3"></th></tr>
+                  </thead>
+                  <tbody>
+                    {filteredVendorList.map((v) => (
+                      <React.Fragment key={v.id}>
+                        <tr className="border-t border-slate-50 dark:border-white/5">
+                          <td className="px-4 py-3.5 font-medium text-dark dark:text-white">{v.name} <span className="text-xs font-normal text-gray-400">#{v.id}</span></td>
+                          <td className="px-4 py-3.5 text-gray-600 dark:text-gray-300">{v.outlet?.name || "Head Office"}</td>
+                          <td className="px-4 py-3.5 text-gray-600 dark:text-gray-300">{v.phone || "—"}</td>
+                          <td className="px-4 py-3.5 text-right tabular-nums font-bold text-orange-600">{PKR(v.balance)}</td>
+                          <td className="px-4 py-3.5 text-right tabular-nums font-semibold text-dark dark:text-white">{PKR(v.cash_in_hand_balance)}</td>
+                          <td className="px-4 py-3.5 text-right">
+                            <div className="flex justify-end gap-3">
+                              <button onClick={() => selectVendorForForms(v)} className="text-xs font-bold text-[#ff3d3d] hover:underline">Select</button>
+                              <button onClick={() => toggleLedger(v.id)} className="text-xs font-bold text-blue-600 hover:underline">{expandedVendorId === v.id ? "Hide Ledger" : "View Ledger"}</button>
+                            </div>
+                          </td>
+                        </tr>
+                        {expandedVendorId === v.id && (
+                          <tr className="bg-gray-50 dark:bg-gray-900/30">
+                            <td colSpan={6} className="px-4 py-3">
+                              {ledgerLoading === v.id ? (
+                                <p className="text-xs text-gray-500">Loading ledger...</p>
+                              ) : (ledgerByVendor[v.id]?.length || 0) > 0 ? (
+                                <div className="space-y-1.5">
+                                  {ledgerByVendor[v.id].slice(0, 20).map((t) => (
+                                    <div key={t.id} className="flex items-center justify-between rounded-lg bg-white px-3 py-2 text-xs dark:bg-boxdark">
+                                      <div className="flex items-center gap-2">
+                                        <span className={`rounded-full px-2 py-0.5 font-bold ${t.type === "credit" ? "bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10" : "bg-rose-50 text-rose-600 dark:bg-rose-500/10"}`}>{t.type}</span>
+                                        <span className="text-gray-500">{new Date(t.created_at).toLocaleString()}</span>
+                                        {t.description && <span className="text-gray-400">— {t.description}</span>}
+                                      </div>
+                                      <div className="flex items-center gap-3 tabular-nums">
+                                        <span className={`font-bold ${t.type === "credit" ? "text-emerald-600" : "text-rose-600"}`}>{t.type === "credit" ? "+" : "-"}{PKR(t.amount)}</span>
+                                        <span className="text-gray-400">bal {PKR(t.balance_after)}</span>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : <p className="text-xs text-gray-500">No cash-in-hand transactions for this vendor yet.</p>}
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : <EmptyState icon={Store} title={vendorDirSearch ? "No matching vendors" : "No vendors yet — add one below"} />}
+          </div>
+
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-boxdark">
             <div className="mb-4 flex items-center gap-2.5"><div className="flex size-8 items-center justify-center rounded-lg bg-orange-50 text-orange-600 dark:bg-orange-500/10"><Store className="size-4" /></div><h2 className="text-sm font-bold text-dark dark:text-white">Add Head Office Vendor</h2></div>
             <form onSubmit={handleCreateVendor} className="space-y-3">
@@ -302,6 +417,7 @@ export default function AccountsVendorsPage() {
               <Field label="Description" value={cashForm.description} onChange={(v) => setCashForm({ ...cashForm, description: v })} />
               <button type="submit" className="w-full rounded-xl bg-[#ff3d3d] py-2.5 text-sm font-semibold text-white hover:bg-opacity-90">Record Transaction</button>
             </form>
+          </div>
           </div>
         </div>
       )}
