@@ -18,6 +18,19 @@ import toast from 'react-hot-toast'
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL
 
+// How the backend arrived at the Area value: a stored area column, a name
+// parsed out of the free-text address, or only the district it could identify.
+type AreaSource = 'field' | 'address' | 'zone' | null
+
+// 'recorded' comes from a real BlacklistAction audit row. 'auto-estimated' is
+// the 90-day rule replayed for accounts flagged before that logging existed.
+type BlacklistDateSource = 'recorded' | 'auto-estimated' | null
+
+const AREA_SOURCE_HINT: Record<string, string> = {
+  address: 'from address',
+  zone: 'district only',
+}
+
 interface Guarantor {
   id: number
   name: string
@@ -26,11 +39,13 @@ interface Guarantor {
   relationship: string | null
   grantor_number: number
   area: string | null
+  area_source: AreaSource
   present_address: string | null
   permanent_address: string | null
   is_blacklisted: boolean
   blacklist_reason: string | null
   blacklist_date: string | null
+  blacklist_date_source: BlacklistDateSource
   blacklist_status: string | null
   blacklisted_by_name: string | null
 }
@@ -303,6 +318,19 @@ const BlacklistedCustomerList = () => {
       id: 'area',
       accessorFn: (row) => row.customer.area || '-',
       header: 'Area',
+      cell: ({ row, getValue }) => {
+        const area = getValue() as string
+        if (area === '-') return <span className="text-gray-400">-</span>
+        const hint = AREA_SOURCE_HINT[row.original.customer.area_source as string]
+        return (
+          <div className="flex flex-col">
+            <span className="font-semibold text-gray-700 dark:text-gray-200">{area}</span>
+            {hint && (
+              <span className="text-[10px] font-bold uppercase tracking-wide text-gray-400">{hint}</span>
+            )}
+          </div>
+        )
+      },
     },
     {
       id: 'recovery_officer',
@@ -334,15 +362,31 @@ const BlacklistedCustomerList = () => {
       id: 'blacklist_date',
       accessorFn: (row) => row.customer.blacklist_date,
       header: 'Blacklist Date',
-      cell: ({ getValue }) => {
+      cell: ({ row, getValue }) => {
         const val = getValue() as string | null
-        if (!val) return <span className="text-gray-400">Not recorded</span>
-        const date = new Date(val)
-        if (isNaN(date.getTime())) return '-'
+        const date = val ? new Date(val) : null
+        if (!date || isNaN(date.getTime())) return <span className="text-gray-400">Not recorded</span>
+        // Estimated dates carry no meaningful clock time — showing one would
+        // imply a precision the replayed 90-day rule doesn't have.
+        const estimated = (row.original.customer.blacklist_date_source as BlacklistDateSource) === 'auto-estimated'
         return (
-          <span className="text-xs font-semibold text-gray-600 dark:text-gray-300">
-            {date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
-          </span>
+          <div className="flex flex-col">
+            <span className="text-xs font-bold text-gray-600 dark:text-gray-300">
+              {date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+            </span>
+            {estimated ? (
+              <span
+                title="No audit record exists for this account. Date reconstructed from the 90-day auto-blacklist rule."
+                className="w-fit rounded bg-amber-50 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wide text-amber-600 dark:bg-amber-500/10"
+              >
+                Auto · Est.
+              </span>
+            ) : (
+              <span className="text-[10px] font-bold uppercase text-gray-400">
+                {date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}
+              </span>
+            )}
+          </div>
         )
       },
     },
@@ -669,6 +713,11 @@ const BlacklistedCustomerList = () => {
                                     <div>
                                       <span className="block text-[10px] font-bold uppercase text-gray-400">Area</span>
                                       <span className="font-semibold text-gray-700 dark:text-gray-200">{g.area || '-'}</span>
+                                      {g.area && AREA_SOURCE_HINT[g.area_source as string] && (
+                                        <span className="ml-1 text-[9px] font-bold uppercase tracking-wide text-gray-400">
+                                          ({AREA_SOURCE_HINT[g.area_source as string]})
+                                        </span>
+                                      )}
                                     </div>
                                     <div className="col-span-2">
                                       <span className="block text-[10px] font-bold uppercase text-gray-400">Address</span>
@@ -681,7 +730,15 @@ const BlacklistedCustomerList = () => {
                                     <div className="border-t border-dashed border-stroke dark:border-strokedark pt-2.5 mt-2.5 grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
                                       <div>
                                         <span className="flex items-center gap-1 text-[10px] font-bold uppercase text-gray-400"><Calendar size={10} /> Blacklist Date</span>
-                                        <span className="font-semibold text-gray-700 dark:text-gray-200">{fmtDate(g.blacklist_date) || '-'}</span>
+                                        <span className="font-semibold text-gray-700 dark:text-gray-200">{fmtDate(g.blacklist_date) || 'Not recorded'}</span>
+                                        {g.blacklist_date && g.blacklist_date_source === 'auto-estimated' && (
+                                          <span
+                                            title="No audit record exists. Date reconstructed from the 90-day auto-blacklist rule."
+                                            className="ml-1 rounded bg-amber-50 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wide text-amber-600 dark:bg-amber-500/10"
+                                          >
+                                            Auto · Est.
+                                          </span>
+                                        )}
                                       </div>
                                       <div>
                                         <span className="flex items-center gap-1 text-[10px] font-bold uppercase text-gray-400"><UserCog size={10} /> Blacklisted By</span>

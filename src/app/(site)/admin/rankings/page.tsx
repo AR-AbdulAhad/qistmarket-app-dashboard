@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Cookies from "js-cookie";
 import toast from "react-hot-toast";
-import { Trophy, Headset, ShieldCheck, Truck, RotateCcw, TrendingUp, TrendingDown, Minus, Award, RefreshCw, Store, Settings2 } from "lucide-react";
+import { Trophy, Headset, ShieldCheck, Truck, RotateCcw, TrendingUp, TrendingDown, Minus, Award, RefreshCw, Store, Settings2, ChevronDown, ChevronUp } from "lucide-react";
 import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
 import PageHeader from "@/components/Accounts/PageHeader";
 import EmptyState from "@/components/Accounts/EmptyState";
@@ -24,6 +24,15 @@ interface BadgeRow {
   month: number;
   year: number;
   awarded_at: string;
+}
+
+// One entry per month present in the badges table, sent alongside the rows so
+// the month filter lists every period on record rather than only the ones the
+// current page of rows happens to cover.
+interface BadgePeriod {
+  month: number;
+  year: number;
+  count: number;
 }
 
 const BADGE_LABEL: Record<string, string> = { champion: "🏆 Champion", top_performer: "⭐ Top Performer" };
@@ -159,13 +168,46 @@ const OFFICER_TABS: Record<string, Tab[]> = {
   ],
 };
 
+/**
+ * Collapses a long board down to `limit` rows behind a "See more" toggle.
+ * The all-time boards list every officer on record, which ran to hundreds of
+ * rows and buried everything below them on the page.
+ */
+function useCollapsibleRows<T>(sorted: T[], limit?: number) {
+  const [expanded, setExpanded] = useState(false);
+  const collapsible = !!limit && sorted.length > limit;
+  return {
+    rows: collapsible && !expanded ? sorted.slice(0, limit) : sorted,
+    collapsible,
+    expanded,
+    hiddenCount: collapsible ? sorted.length - limit! : 0,
+    toggle: () => setExpanded((v) => !v),
+  };
+}
+
+function ShowMoreFooter({ expanded, hiddenCount, total, onToggle }: { expanded: boolean; hiddenCount: number; total: number; onToggle: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      className="flex w-full items-center justify-center gap-1.5 border-t border-slate-100 bg-gray-50/70 py-2.5 text-[11px] font-bold uppercase tracking-wide text-primary transition-colors hover:bg-gray-100 dark:border-white/10 dark:bg-dark-2 dark:hover:bg-meta-4"
+    >
+      {expanded ? (
+        <><ChevronUp className="size-3.5" /> See less</>
+      ) : (
+        <><ChevronDown className="size-3.5" /> See more — {hiddenCount} of {total} hidden</>
+      )}
+    </button>
+  );
+}
+
 function OfficerBoardCard({ board, rows, limit, showTrend = true }: { board: (typeof BOARDS)[number]; rows: RankRow[]; limit?: number; showTrend?: boolean }) {
   const tabs = OFFICER_TABS[board.key];
   const [activeTab, setActiveTab] = useState(tabs[0].key);
   const tab = tabs.find((t) => t.key === activeTab) || tabs[0];
 
   const sorted = [...rows].sort((a, b) => tab.value(b) - tab.value(a));
-  const display = limit ? sorted.slice(0, limit) : sorted;
+  const { rows: display, collapsible, expanded, hiddenCount, toggle } = useCollapsibleRows(sorted, limit);
 
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm dark:border-white/10 dark:bg-boxdark">
@@ -187,6 +229,7 @@ function OfficerBoardCard({ board, rows, limit, showTrend = true }: { board: (ty
       {display.length === 0 ? (
         <EmptyState icon={board.icon} title="No ranking data for this period" />
       ) : (
+        <>
         <table className="w-full text-left text-sm">
           <thead className="bg-gray-50 text-[11px] uppercase tracking-wide text-gray-500 dark:bg-dark-2 dark:text-gray-400">
             <tr><th className="px-4 py-2.5 font-bold">#</th><th className="px-4 py-2.5 font-bold">Officer</th><th className="px-4 py-2.5 font-bold">Outlet</th><th className="px-4 py-2.5 text-right font-bold">Score</th>{showTrend && <th className="px-4 py-2.5 text-right font-bold"></th>}</tr>
@@ -220,6 +263,8 @@ function OfficerBoardCard({ board, rows, limit, showTrend = true }: { board: (ty
             })}
           </tbody>
         </table>
+        {collapsible && <ShowMoreFooter expanded={expanded} hiddenCount={hiddenCount} total={sorted.length} onToggle={toggle} />}
+        </>
       )}
     </div>
   );
@@ -237,7 +282,7 @@ function OutletBoardCard({ rows, limit }: { rows: OutletRankRow[]; limit?: numbe
   const tab = OUTLET_TABS.find((t) => t.key === activeTab) || OUTLET_TABS[0];
 
   const sorted = [...rows].sort((a, b) => tab.value(b) - tab.value(a));
-  const display = limit ? sorted.slice(0, limit) : sorted;
+  const { rows: display, collapsible, expanded, hiddenCount, toggle } = useCollapsibleRows(sorted, limit);
 
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm dark:border-white/10 dark:bg-boxdark">
@@ -255,6 +300,7 @@ function OutletBoardCard({ rows, limit }: { rows: OutletRankRow[]; limit?: numbe
       {display.length === 0 ? (
         <EmptyState icon={Store} title="No outlet activity" />
       ) : (
+        <>
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead className="bg-gray-50 text-[11px] uppercase tracking-wide text-gray-500 dark:bg-dark-2 dark:text-gray-400">
@@ -283,6 +329,8 @@ function OutletBoardCard({ rows, limit }: { rows: OutletRankRow[]; limit?: numbe
             </tbody>
           </table>
         </div>
+        {collapsible && <ShowMoreFooter expanded={expanded} hiddenCount={hiddenCount} total={sorted.length} onToggle={toggle} />}
+        </>
       )}
     </div>
   );
@@ -297,6 +345,7 @@ export default function AdminRankingsPage() {
   const [data, setData] = useState<RankingsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [badges, setBadges] = useState<BadgeRow[]>([]);
+  const [badgePeriods, setBadgePeriods] = useState<BadgePeriod[]>([]);
   const [badgesLoading, setBadgesLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [outletRankings, setOutletRankings] = useState<OutletRankRow[]>([]);
@@ -329,7 +378,11 @@ export default function AdminRankingsPage() {
     setBadgesLoading(true);
     fetch(`${BACKEND_URL}/api/admin-panel/badges`, { headers: authHeaders() })
       .then((r) => r.json())
-      .then((json) => { if (json.success) setBadges(json.data || []); })
+      .then((json) => {
+        if (!json.success) return;
+        setBadges(json.data || []);
+        setBadgePeriods(json.periods || []);
+      })
       .catch((err) => console.error("Failed to load badges:", err))
       .finally(() => setBadgesLoading(false));
   };
@@ -355,20 +408,21 @@ export default function AdminRankingsPage() {
 
   const monthLabel = data ? new Date(data.period.year, data.period.month - 1).toLocaleString("default", { month: "long", year: "numeric" }) : "";
 
-  const badgeMonthOptions = useMemo(() => {
-    const seen = new Map<string, { value: string; label: string; sortKey: number }>();
-    for (const b of badges) {
-      const value = `${b.year}-${b.month}`;
-      if (!seen.has(value)) {
-        seen.set(value, {
-          value,
-          label: new Date(b.year, b.month - 1).toLocaleString("default", { month: "long", year: "numeric" }),
-          sortKey: b.year * 12 + b.month,
-        });
-      }
-    }
-    return Array.from(seen.values()).sort((a, b) => b.sortKey - a.sortKey);
-  }, [badges]);
+  // Built from the API's `periods` (every distinct month in the badges table),
+  // not from `badges` — deriving it from the returned rows meant a truncated
+  // page of history silently truncated the filter's options along with it.
+  const badgeMonthOptions = useMemo(
+    () =>
+      badgePeriods
+        .slice()
+        .sort((a, b) => b.year - a.year || b.month - a.month)
+        .map((p) => ({
+          value: `${p.year}-${p.month}`,
+          label: new Date(p.year, p.month - 1).toLocaleString("default", { month: "long", year: "numeric" }),
+          count: p.count,
+        })),
+    [badgePeriods],
+  );
 
   const filteredBadges = badgeMonthFilter === "all" ? badges : badges.filter((b) => `${b.year}-${b.month}` === badgeMonthFilter);
 
@@ -425,7 +479,7 @@ export default function AdminRankingsPage() {
         {outletLoading ? (
           <TableSkeleton rows={4} cols={5} />
         ) : (
-          <OutletBoardCard rows={outletRankings} />
+          <OutletBoardCard rows={outletRankings} limit={10} />
         )}
       </div>
 
@@ -441,12 +495,12 @@ export default function AdminRankingsPage() {
           <>
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
               {BOARDS.map((board) => (
-                <OfficerBoardCard key={board.key} board={board} rows={globalData?.[board.key] || []} showTrend={false} />
+                <OfficerBoardCard key={board.key} board={board} rows={globalData?.[board.key] || []} limit={10} showTrend={false} />
               ))}
             </div>
             <div className="mt-6">
               <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-dark dark:text-white"><Store className="size-4 text-blue-500" /> Outlets — All-Time</h3>
-              <OutletBoardCard rows={globalData?.outlet || []} />
+              <OutletBoardCard rows={globalData?.outlet || []} limit={10} />
             </div>
           </>
         )}
@@ -461,9 +515,9 @@ export default function AdminRankingsPage() {
               onChange={(e) => setBadgeMonthFilter(e.target.value)}
               className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 dark:border-white/10 dark:bg-boxdark dark:text-gray-200"
             >
-              <option value="all">All Months</option>
+              <option value="all">All Months ({badges.length})</option>
               {badgeMonthOptions.map((opt) => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
+                <option key={opt.value} value={opt.value}>{opt.label} ({opt.count})</option>
               ))}
             </select>
           )}
@@ -471,7 +525,7 @@ export default function AdminRankingsPage() {
         {badgesLoading ? (
           <TableSkeleton rows={4} cols={5} />
         ) : badges.length === 0 ? (
-          <div className="rounded-2xl border border-slate-100 bg-white shadow-sm dark:border-white/10 dark:bg-boxdark"><EmptyState icon={Award} title="No badges awarded yet" description="Use Sync Badges to award this month's top performers." /></div>
+          <div className="rounded-2xl border border-slate-100 bg-white shadow-sm dark:border-white/10 dark:bg-boxdark"><EmptyState icon={Award} title="No badges awarded yet" description="Use Sync Badges to award the top performers for every month on record." /></div>
         ) : filteredBadges.length === 0 ? (
           <div className="rounded-2xl border border-slate-100 bg-white shadow-sm dark:border-white/10 dark:bg-boxdark"><EmptyState icon={Award} title="No badges for this month" /></div>
         ) : (
