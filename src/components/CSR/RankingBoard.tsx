@@ -78,17 +78,17 @@ const RankingBoard: React.FC<RankingBoardProps> = ({ rankings, currentUserId }) 
 
       {/* Table with fixed height and scroll */}
       <div className="overflow-x-auto w-full custom-scrollbar" style={{ maxHeight: '535px' }}>
-        <table className="w-full text-left border-collapse min-w-[1000px]">
+        <table className="w-full text-left border-collapse min-w-[800px]">
             <thead className="sticky top-0 bg-white z-10">
                 <tr className="bg-gray-50/50 border-b border-gray-100">
-                    <th className="px-6 py-4 text-[8px] font-black text-gray-400 uppercase">Rank</th>
-                    <th className="px-4 py-4 text-[8px] font-black text-gray-400 uppercase w-[180px] md:w-[220px]">CSR Participant</th>
-                    <th className="px-6 py-4 text-[8px] font-black text-gray-400 uppercase text-center">Done</th>
-                    <th className="px-6 py-4 text-[8px] font-black text-gray-400 uppercase">Achievement</th>
-                    <th className="px-6 py-4 text-[8px] font-black text-gray-400 uppercase">Sale Amount</th>
-                    <th className="px-6 py-4 text-[8px] font-black text-gray-400 uppercase text-center">Complaints</th>
-                    <th className="px-6 py-4 text-[8px] font-black text-gray-400 uppercase text-center">Score</th>
-                    <th className="px-6 py-4 text-[8px] font-black text-gray-400 uppercase text-right">Trend</th>
+                    <th className="px-4 py-4 text-[8px] font-black text-gray-400 uppercase min-w-[60px]">Rank</th>
+                    <th className="px-4 py-4 text-[8px] font-black text-gray-400 uppercase min-w-[180px]">CSR Participant</th>
+                    <th className="px-4 py-4 text-[8px] font-black text-gray-400 uppercase text-center min-w-[60px]">Done</th>
+                    <th className="px-4 py-4 text-[8px] font-black text-gray-400 uppercase min-w-[120px]">Achievement</th>
+                    <th className="px-4 py-4 text-[8px] font-black text-gray-400 uppercase min-w-[100px]">Sale Amount</th>
+                    <th className="px-4 py-4 text-[8px] font-black text-gray-400 uppercase text-center min-w-[100px]">Complaints</th>
+                    <th className="px-4 py-4 text-[8px] font-black text-gray-400 uppercase text-center min-w-[60px]">Score</th>
+                    <th className="px-4 py-4 text-[8px] font-black text-gray-400 uppercase text-right min-w-[70px]">Trend</th>
                 </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
@@ -100,7 +100,7 @@ const RankingBoard: React.FC<RankingBoardProps> = ({ rankings, currentUserId }) 
 
                     return (
                         <tr key={item.userId} className={`hover:bg-gray-50 transition-colors ${isCurrentUser ? 'bg-red-50/30' : ''}`}>
-                            <td className="px-6 py-3">
+                            <td className="px-4 py-3 min-w-[60px]">
                                 <div className="flex items-center justify-center">
                                     {rank <= 3 ? (
                                         <div className={`flex h-7 w-7 items-center justify-center rounded-xl text-white shadow-md ${rank === 1 ? 'bg-yellow-400' : rank === 2 ? 'bg-slate-300' : 'bg-orange-300'}`}>
@@ -111,45 +111,45 @@ const RankingBoard: React.FC<RankingBoardProps> = ({ rankings, currentUserId }) 
                                     )}
                                 </div>
                             </td>
-                            <td className="px-4 py-3 whitespace-nowrap">
+                            <td className="px-4 py-3 min-w-[180px]">
                                 <div className="flex items-center gap-3">
-                                    <div className="h-8 w-8 overflow-hidden rounded-xl border border-gray-100 bg-gray-50">
+                                    <div className="h-8 w-8 overflow-hidden rounded-xl border border-gray-100 bg-gray-50 shrink-0">
                                         {item.image ? <img src={item.image} alt="" className="h-full w-full object-cover" /> : <User size={14} className="text-gray-200 m-auto mt-2" />}
                                     </div>
-                                    <div>
-                                        <span className={`text-xs font-black ${isCurrentUser ? 'text-[#E31E24]' : 'text-gray-800'}`}>{item.name}</span>
-                                        <p className="text-[7px] font-bold text-gray-400 uppercase tracking-tighter">@{item.username}</p>
+                                    <div className="min-w-0">
+                                        <span className={`text-xs font-black block truncate ${isCurrentUser ? 'text-[#E31E24]' : 'text-gray-800'}`}>{item.name}</span>
+                                        <p className="text-[7px] font-bold text-gray-400 uppercase tracking-tighter truncate">@{item.username}</p>
                                     </div>
                                 </div>
                             </td>
-                            <td className="px-6 py-3 text-center font-black text-gray-800 text-xs">{item.delivered}</td>
-                            <td className="px-6 py-3">
+                            <td className="px-4 py-3 text-center font-black text-gray-800 text-xs min-w-[60px]">{item.delivered}</td>
+                            <td className="px-4 py-3 min-w-[120px]">
                                 <div className="flex items-center gap-2">
-                                    <div className="w-16 bg-gray-100 h-1.5 rounded-full overflow-hidden">
+                                    <div className="w-16 bg-gray-100 h-1.5 rounded-full overflow-hidden shrink-0">
                                         <div className={`h-full rounded-full transition-all duration-1000 ${achievementPct >= 100 ? 'bg-emerald-500' : 'bg-[#E31E24]'}`} style={{ width: `${Math.min(100, achievementPct)}%` }}></div>
                                     </div>
-                                    <span className="text-[9px] font-black text-gray-800">{achievementPct}%</span>
+                                    <span className="text-[9px] font-black text-gray-800 shrink-0">{achievementPct}%</span>
                                 </div>
                             </td>
-                            <td className="px-6 py-3 font-black text-gray-800 text-xs">{formatCurrency(item.totalSales)}</td>
-                            <td className="px-6 py-3">
+                            <td className="px-4 py-3 font-black text-gray-800 text-xs min-w-[100px] break-words">{formatCurrency(item.totalSales)}</td>
+                            <td className="px-4 py-3 min-w-[100px]">
                                 <div className="flex flex-col items-center">
                                     <div className="flex items-center gap-2">
                                         <div className="flex items-center gap-1">
-                                            <CheckCircle2 size={10} className="text-emerald-500" />
+                                            <CheckCircle2 size={10} className="text-emerald-500 shrink-0" />
                                             <span className="text-[10px] font-black text-emerald-600">{item.complaintsSolved}</span>
                                         </div>
-                                        <div className="w-px h-3 bg-gray-100"></div>
+                                        <div className="w-px h-3 bg-gray-100 shrink-0"></div>
                                         <div className="flex items-center gap-1">
-                                            <MessageSquare size={10} className="text-amber-500" />
+                                            <MessageSquare size={10} className="text-amber-500 shrink-0" />
                                             <span className="text-[10px] font-black text-amber-600">{item.complaintsPending}</span>
                                         </div>
                                     </div>
                                     <p className="text-[7px] font-bold text-gray-400 uppercase mt-0.5">Solved / Pending</p>
                                 </div>
                             </td>
-                            <td className="px-6 py-3 text-center font-black text-[#E31E24] text-xs">{item.score.toLocaleString()}</td>
-                            <td className="px-6 py-3 text-right">
+                            <td className="px-4 py-3 text-center font-black text-[#E31E24] text-xs min-w-[60px]">{item.score.toLocaleString()}</td>
+                            <td className="px-4 py-3 text-right min-w-[70px]">
                                 <div className={`flex items-center justify-end gap-1 font-black text-[9px] ${item.trend >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
                                     {item.trend >= 0 ? <ArrowUpRight size={10} /> : <ArrowDownRight size={10} />}
                                     {Math.abs(item.trend || 0)}%
