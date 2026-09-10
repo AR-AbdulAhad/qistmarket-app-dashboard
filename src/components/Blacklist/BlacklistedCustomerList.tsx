@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import Loader from '@/components/common/Loader'
 import {
   ColumnDef,
@@ -13,15 +13,39 @@ import Cookies from 'js-cookie'
 import { SearchIcon, PointerUp } from '@/assets/icons'
 import { useProfileModal } from '../../../contexts/ProfileModalContext'
 import { useAuth } from '../../../contexts/AuthContext'
-import { AlertTriangle, Ban, ShieldCheck, Filter, X } from 'lucide-react'
+import { AlertTriangle, Ban, ShieldCheck, Filter, X, ChevronDown, ChevronRight, Users, Calendar, FileWarning, UserCog } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL
+
+interface Guarantor {
+  id: number
+  name: string
+  cnic_number: string | null
+  telephone_number: string | null
+  relationship: string | null
+  grantor_number: number
+  area: string | null
+  present_address: string | null
+  permanent_address: string | null
+  is_blacklisted: boolean
+  blacklist_reason: string | null
+  blacklist_date: string | null
+  blacklist_status: string | null
+  blacklisted_by_name: string | null
+}
 
 interface CustomerGroup {
   customer: any
   ledgerSummary: any
   orders: any[]
+}
+
+const fmtDate = (val: string | null | undefined) => {
+  if (!val) return null
+  const date = new Date(val)
+  if (isNaN(date.getTime())) return null
+  return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
 const fmt = (n: number) => `Rs. ${Number(n).toLocaleString()}`
@@ -54,6 +78,7 @@ const BlacklistedCustomerList = () => {
   const [globalFilter, setGlobalFilter] = useState('')
   const [loading, setLoading] = useState(false)
   const [whitelistingCnic, setWhitelistingCnic] = useState<string | null>(null)
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
   const { openProfile } = useProfileModal()
   const { user } = useAuth()
   const canWhitelist = ['admin', 'super admin', 'accountant'].includes(user?.role?.toLowerCase() || '')
@@ -106,6 +131,18 @@ const BlacklistedCustomerList = () => {
     const timer = setTimeout(() => setGlobalFilter(searchInput), 200)
     return () => clearTimeout(timer)
   }, [searchInput])
+
+  const getRowKey = (c: CustomerGroup) =>
+    `${c.customer.cnic_number || c.customer.name}-${c.orders?.[0]?.order_id ?? ''}`
+
+  const toggleExpand = (key: string) => {
+    setExpandedRows(prev => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
 
   const handleViewProfile = (customerGroup: CustomerGroup) => {
     if (customerGroup.orders && customerGroup.orders.length > 0) {
@@ -202,14 +239,37 @@ const BlacklistedCustomerList = () => {
       id: 'customer_name',
       accessorFn: (row) => row.customer.name,
       header: 'Customer Name',
-      cell: ({ row }) => (
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-100 text-red-600">
-            <Ban size={18} />
+      cell: ({ row }) => {
+        const guarantors: Guarantor[] = row.original.customer.guarantors || []
+        const key = getRowKey(row.original)
+        const isExpanded = expandedRows.has(key)
+        return (
+          <div className="flex items-center gap-2">
+            {guarantors.length > 0 ? (
+              <button
+                onClick={() => toggleExpand(key)}
+                title={`${guarantors.length} guarantor(s) — click to ${isExpanded ? 'collapse' : 'expand'}`}
+                className="flex h-6 w-6 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-red-500 dark:hover:bg-meta-4 transition-colors shrink-0"
+              >
+                {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+              </button>
+            ) : (
+              <span className="w-6 shrink-0" />
+            )}
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-100 text-red-600 shrink-0">
+              <Ban size={18} />
+            </div>
+            <div className="flex flex-col">
+              <span className="font-bold text-dark dark:text-white">{row.original.customer.name}</span>
+              {guarantors.length > 0 && (
+                <span className="flex items-center gap-1 text-[10px] font-bold text-amber-600 uppercase tracking-wide">
+                  <Users size={10} /> {guarantors.length} guarantor{guarantors.length > 1 ? 's' : ''}
+                </span>
+              )}
+            </div>
           </div>
-          <span className="font-bold text-dark dark:text-white">{row.original.customer.name}</span>
-        </div>
-      )
+        )
+      }
     },
     {
       id: 'whatsapp_number',
@@ -328,6 +388,14 @@ const BlacklistedCustomerList = () => {
       ),
     },
     {
+      id: 'blacklisted_by',
+      accessorFn: (row) => row.customer.blacklisted_by_name || 'System (Auto-flagged)',
+      header: 'Blacklisted By',
+      cell: ({ getValue }) => (
+        <span className="text-xs font-semibold text-gray-600 dark:text-gray-300">{getValue() as string}</span>
+      ),
+    },
+    {
       id: 'actions',
       header: 'Actions',
       enableSorting: false,
@@ -356,7 +424,7 @@ const BlacklistedCustomerList = () => {
         )
       },
     },
-  ], [canWhitelist, whitelistingCnic])
+  ], [canWhitelist, whitelistingCnic, expandedRows])
 
   const filteredData = useMemo(() => {
     const needle = globalFilter.toLowerCase()
@@ -366,11 +434,16 @@ const BlacklistedCustomerList = () => {
 
     return customers.filter(c => {
       if (globalFilter) {
-        const matchesSearch =
+        const matchesCustomer =
           (c.customer.name || '').toLowerCase().includes(needle) ||
           (c.customer.whatsapp_number || '').includes(globalFilter) ||
           (c.customer.cnic_number && c.customer.cnic_number.toLowerCase().includes(needle))
-        if (!matchesSearch) return false
+        const matchesGuarantor = (c.customer.guarantors || []).some((g: Guarantor) =>
+          (g.name || '').toLowerCase().includes(needle) ||
+          (g.cnic_number || '').toLowerCase().includes(needle) ||
+          (g.telephone_number || '').includes(globalFilter)
+        )
+        if (!matchesCustomer && !matchesGuarantor) return false
       }
       if (reasonFilter !== ALL && (c.customer.blacklist_reason || 'Auto-flagged (90+ days delinquency)') !== reasonFilter) return false
       if (areaFilter !== ALL && (c.customer.area || '-') !== areaFilter) return false
@@ -416,7 +489,7 @@ const BlacklistedCustomerList = () => {
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             className="w-full rounded-2xl border border-stroke bg-gray-50 px-6 py-4 outline-none focus:border-red-500 dark:border-strokedark dark:bg-meta-4 transition-all"
-            placeholder="Search blacklisted customers..."
+            placeholder="Search by customer or guarantor name, CNIC, phone..."
           />
           <SearchIcon className="absolute right-6 top-1/2 -translate-y-1/2 text-gray-400" />
         </div>
@@ -537,15 +610,94 @@ const BlacklistedCustomerList = () => {
                 </td>
               </tr>
             ) : (
-              table.getRowModel().rows.map((row) => (
-                <tr key={row.id} className="hover:bg-red-50/30 dark:hover:bg-red-900/5 transition-colors group">
-                  {row.getVisibleCells().map((cell) => (
-                    <td key={cell.id} className="py-6 px-4">
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </td>
-                  ))}
-                </tr>
-              ))
+              table.getRowModel().rows.map((row) => {
+                const guarantors: Guarantor[] = row.original.customer.guarantors || []
+                const rowKey = getRowKey(row.original)
+                const isExpanded = guarantors.length > 0 && expandedRows.has(rowKey)
+                return (
+                  <React.Fragment key={row.id}>
+                    <tr className="hover:bg-red-50/30 dark:hover:bg-red-900/5 transition-colors group">
+                      {row.getVisibleCells().map((cell) => (
+                        <td key={cell.id} className="py-6 px-4">
+                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                        </td>
+                      ))}
+                    </tr>
+                    {isExpanded && (
+                      <tr className="bg-amber-50/40 dark:bg-amber-500/5">
+                        <td colSpan={columns.length} className="px-4 pb-6 pt-0">
+                          <div className="ml-9 rounded-2xl border border-amber-200/60 dark:border-amber-500/20 bg-white dark:bg-meta-4 p-5">
+                            <div className="mb-4 flex items-center gap-1.5 text-xs font-black uppercase tracking-widest text-amber-600">
+                              <Users size={14} /> Guarantor Details ({guarantors.length})
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              {guarantors.map((g) => (
+                                <div key={g.id} className="rounded-xl border border-stroke dark:border-strokedark p-4">
+                                  <div className="mb-3 flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-100 text-amber-600 dark:bg-amber-500/10 text-xs font-black">
+                                        G{g.grantor_number || ''}
+                                      </div>
+                                      <span className="font-bold text-dark dark:text-white text-sm">{g.name}</span>
+                                    </div>
+                                    {g.is_blacklisted && (
+                                      <span className="inline-flex items-center gap-1 rounded-full bg-red-500 px-2.5 py-0.5 text-[9px] font-black uppercase text-white">
+                                        <AlertTriangle size={10} /> {g.blacklist_status || 'Blacklisted'}
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  {/* Contact section */}
+                                  <div className="mb-3 grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
+                                    <div>
+                                      <span className="block text-[10px] font-bold uppercase text-gray-400">CNIC</span>
+                                      <span className="font-semibold text-gray-700 dark:text-gray-200">{g.cnic_number || '-'}</span>
+                                    </div>
+                                    <div>
+                                      <span className="block text-[10px] font-bold uppercase text-gray-400">Phone</span>
+                                      <span className="font-semibold text-gray-700 dark:text-gray-200">{g.telephone_number || '-'}</span>
+                                    </div>
+                                    <div>
+                                      <span className="block text-[10px] font-bold uppercase text-gray-400">Relationship</span>
+                                      <span className="font-semibold text-gray-700 dark:text-gray-200">{g.relationship || '-'}</span>
+                                    </div>
+                                    <div>
+                                      <span className="block text-[10px] font-bold uppercase text-gray-400">Area</span>
+                                      <span className="font-semibold text-gray-700 dark:text-gray-200">{g.area || '-'}</span>
+                                    </div>
+                                    <div className="col-span-2">
+                                      <span className="block text-[10px] font-bold uppercase text-gray-400">Address</span>
+                                      <span className="font-semibold text-gray-700 dark:text-gray-200">{g.present_address || g.permanent_address || '-'}</span>
+                                    </div>
+                                  </div>
+
+                                  {/* Blacklist section — only when this specific guarantor is blacklisted */}
+                                  {g.is_blacklisted && (
+                                    <div className="border-t border-dashed border-stroke dark:border-strokedark pt-2.5 mt-2.5 grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
+                                      <div>
+                                        <span className="flex items-center gap-1 text-[10px] font-bold uppercase text-gray-400"><Calendar size={10} /> Blacklist Date</span>
+                                        <span className="font-semibold text-gray-700 dark:text-gray-200">{fmtDate(g.blacklist_date) || '-'}</span>
+                                      </div>
+                                      <div>
+                                        <span className="flex items-center gap-1 text-[10px] font-bold uppercase text-gray-400"><UserCog size={10} /> Blacklisted By</span>
+                                        <span className="font-semibold text-gray-700 dark:text-gray-200">{g.blacklisted_by_name || '-'}</span>
+                                      </div>
+                                      <div className="col-span-2">
+                                        <span className="flex items-center gap-1 text-[10px] font-bold uppercase text-gray-400"><FileWarning size={10} /> Reason</span>
+                                        <span className="font-semibold text-gray-700 dark:text-gray-200">{g.blacklist_reason || '-'}</span>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
+                )
+              })
             )}
           </tbody>
         </table>
