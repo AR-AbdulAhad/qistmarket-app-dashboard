@@ -58,7 +58,7 @@ export default function OutletInventoryPage() {
     const [totalPages, setTotalPages] = useState(1);
     const [limit] = useState(20);
     const [totalItemsCount, setTotalItemsCount] = useState(0);
-    const [totalStats, setTotalStats] = useState({ totalStock: 0, inStock: 0, sold: 0, outOfStock: 0 });
+    const [totalStats, setTotalStats] = useState({ totalStock: 0, inStock: 0, sold: 0, outOfStock: 0, stockValue: 0 });
 
     // Expanded group keys
     const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set());
@@ -389,7 +389,9 @@ export default function OutletInventoryPage() {
     const totalItems = inventory.reduce((s, i) => s + i.quantity, 0);
     const totalInStock = inventory.filter(i => i.status === "In Stock" || i.status === "Used Stock").reduce((s, i) => s + i.quantity, 0);
     const totalSold = inventory.filter(i => i.status === "Sold").reduce((s, i) => s + i.quantity, 0);
-    const totalStockValue = inventory.filter(i => i.status === "In Stock" || i.status === "Used Stock").reduce((s, i) => s + (i.quantity * (i.purchase_price || 0)), 0);
+    // Backend-computed across the FULL outlet inventory (not just this page) — matches
+    // the Outlet Reports "Inventory Report" valuation so the two screens agree.
+    const totalStockValue = totalStats.stockValue;
 
     return (
         <div className="p-4 md:p-6 max-w-7xl mx-auto relative">
