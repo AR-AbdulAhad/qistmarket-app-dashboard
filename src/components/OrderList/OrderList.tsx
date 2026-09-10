@@ -1642,7 +1642,7 @@ const OrderListContent = ({ forcedStatus, forcedChannel, apiEndpoint, hideAction
                 key={headerGroup.id}
               >
                 {headerGroup.headers.map((header) => (
-                  <th key={header.id} className="whitespace-nowrap px-3 py-4 align-top">
+                  <th key={header.id} className="px-3 py-4 align-top min-w-[120px]">
                     <div className="flex flex-col min-h-[70px]">
                       <div
                         className="flex cursor-pointer items-center"
@@ -1696,7 +1696,7 @@ const OrderListContent = ({ forcedStatus, forcedChannel, apiEndpoint, hideAction
                   key={row.id}
                 >
                   {row.getVisibleCells().map((cell) => (
-                    <td key={cell.id} className="truncate px-3 py-3">
+                    <td key={cell.id} className="px-3 py-3 min-w-[120px]">
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </td>
                   ))}

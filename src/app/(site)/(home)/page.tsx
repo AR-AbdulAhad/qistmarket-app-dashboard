@@ -94,6 +94,7 @@ interface DailyTrendPoint {
 interface ReportSummary {
   totalReceived: number
   totalPending: number
+  totalSalesAmount?: number
   dailyTrend: DailyTrendPoint[]
 }
 
@@ -378,12 +379,19 @@ export default function Home() {
         />
       </div>
 
-      <div className="grid gap-5 md:grid-cols-2">
+      <div className="grid gap-5 md:grid-cols-3">
         <DashboardCard
           title="Total Collected (This Month)"
           value={reportSummary?.totalReceived ?? 0}
           subtitle="Advance + installment payments received"
           tone="success"
+          isCurrency
+        />
+        <DashboardCard
+          title="Total Sales (Delivered This Month)"
+          value={reportSummary?.totalSalesAmount ?? 0}
+          subtitle="Sum of delivered order amounts"
+          tone="primary"
           isCurrency
         />
         <DashboardCard
@@ -520,8 +528,8 @@ export default function Home() {
                             </span>
                           </div>
                         </td>
-                        <td className="px-3 py-2 align-top">
-                          <span className="line-clamp-2 text-xs text-gray-700 dark:text-gray-200">
+                        <td className="px-3 py-2 align-top min-w-[150px]">
+                          <span className="text-xs text-gray-700 dark:text-gray-200 break-words">
                             {order.product_name}
                           </span>
                         </td>
@@ -766,7 +774,7 @@ function DashboardCard({ title, value, subtitle, tone = 'primary', isCurrency = 
     <div className="relative overflow-hidden rounded-[10px] border border-stroke bg-white p-4 shadow-1 dark:border-dark-3 dark:bg-gray-dark">
       <div>
         <p className="pr-10 text-xs font-medium text-gray-500 dark:text-gray-400">{title}</p>
-        <p className={`mt-2 text-lg sm:text-xl lg:text-[22px] font-bold tracking-tight ${tones.value} break-all`}>
+        <p className={`mt-2 text-lg sm:text-xl lg:text-[22px] font-bold tracking-tight ${tones.value} break-words`}>
           {isCurrency ? `PKR ${value.toLocaleString('en-PK')}` : value.toLocaleString()}
         </p>
       </div>
