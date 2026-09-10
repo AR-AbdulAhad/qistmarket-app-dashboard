@@ -40,6 +40,8 @@ interface HistoryRow {
   cnic: string;
   action: "blacklist" | "whitelist";
   category: string | null;
+  reason_code: string | null;
+  reason_label: string | null;
   status: string;
   reason: string | null;
   created_at: string;
@@ -48,12 +50,11 @@ interface HistoryRow {
 interface PendingRequest { id: number; cnic: string; reason: string | null; created_at: string; created_by: { full_name: string } | null }
 interface RiskScore { cnic: string; score: number; tier: string; factors: string[] }
 
-const CATEGORIES = [
-  { value: "", label: "No category" },
-  { value: "fraud", label: "Fraud" },
-  { value: "non_payment", label: "Non-payment" },
-  { value: "other", label: "Other" },
-];
+// The canonical blacklist reason buckets. Owned by the backend
+// (src/utils/blacklistReasonUtils.js) and delivered with both the list and the
+// history responses, so adding or renaming a bucket is a one-file change there
+// and never needs a matching edit here.
+interface ReasonType { code: string; label: string; description: string; manual: boolean }
 
 export default function BlacklistPage() {
   const [tab, setTab] = useState<"list" | "manage" | "approvals" | "history">("list");
@@ -69,6 +70,7 @@ export default function BlacklistPage() {
   const [actioningCnic, setActioningCnic] = useState<string | null>(null);
   const [reason, setReason] = useState("");
   const [category, setCategory] = useState("");
+  const [reasonTypes, setReasonTypes] = useState<ReasonType[]>([]);
   const [riskLookup, setRiskLookup] = useState<RiskScore | null>(null);
 
   // Approvals tab
@@ -84,7 +86,10 @@ export default function BlacklistPage() {
     fetch(`${BACKEND_URL}/api/accounts/blacklist`, { headers: authHeaders() })
       .then((res) => res.json())
       .then((json) => {
-        if (json.success) setCustomers(json.data.customers);
+        if (json.success) {
+          setCustomers(json.data.customers);
+          setReasonTypes(json.data.reasonTypes ?? []);
+        }
       })
       .catch((err) => console.error("Failed to load blacklist:", err))
       .finally(() => setLoadingList(false));
@@ -95,7 +100,11 @@ export default function BlacklistPage() {
     fetch(`${BACKEND_URL}/api/accounts/blacklist/history`, { headers: authHeaders() })
       .then((res) => res.json())
       .then((json) => {
-        if (json.success) setHistory(json.data);
+        if (json.success) {
+          setHistory(json.data);
+          // Backstop for the reason dropdown in case the list call above failed.
+          if (json.reasonTypes) setReasonTypes(json.reasonTypes);
+        }
       })
       .catch((err) => console.error("Failed to load history:", err))
       .finally(() => setLoadingHistory(false));
@@ -160,6 +169,13 @@ export default function BlacklistPage() {
   const handleAction = async (cnic: string, action: "blacklist" | "whitelist") => {
     if (!reason.trim()) {
       toast.error(`Please enter a reason for ${action === "whitelist" ? "whitelisting" : "blacklisting"}.`);
+      return;
+    }
+    // A blacklist must land in a canonical bucket — that bucket is what the
+    // Blacklisted Customers "Reason" filter groups by. Whitelist reasons are
+    // narrative, not a risk classification, so they stay untagged.
+    if (action === "blacklist" && !category) {
+      toast.error("Please select a reason type before blacklisting.");
       return;
     }
 
@@ -262,8 +278,16 @@ export default function BlacklistPage() {
               placeholder="Search by CNIC, phone, or name..."
               className="flex-1 rounded-xl border border-stroke bg-white px-4 py-2.5 text-sm outline-none transition focus:border-[#ff3d3d] dark:border-dark-3 dark:bg-gray-dark dark:text-white"
             />
-            <select value={category} onChange={(e) => setCategory(e.target.value)} className="rounded-xl border border-stroke bg-white px-4 py-2.5 text-sm outline-none dark:border-dark-3 dark:bg-gray-dark dark:text-white">
-              {CATEGORIES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+            <select
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              title={reasonTypes.find((t) => t.code === category)?.description || "Reason type — required to blacklist"}
+              className="rounded-xl border border-stroke bg-white px-4 py-2.5 text-sm outline-none dark:border-dark-3 dark:bg-gray-dark dark:text-white"
+            >
+              <option value="">Reason type (required to blacklist)</option>
+              {reasonTypes.filter((t) => t.manual).map((t) => (
+                <option key={t.code} value={t.code} title={t.description}>{t.label}</option>
+              ))}
             </select>
             <input
               value={reason}
@@ -384,7 +408,7 @@ export default function BlacklistPage() {
                   <th className="px-4 py-3 font-bold">Date</th>
                   <th className="px-4 py-3 font-bold">CNIC</th>
                   <th className="px-4 py-3 font-bold">Action</th>
-                  <th className="px-4 py-3 font-bold">Category</th>
+                  <th className="px-4 py-3 font-bold">Reason Type</th>
                   <th className="px-4 py-3 font-bold">Status</th>
                   <th className="px-4 py-3 font-bold">Reason</th>
                   <th className="px-4 py-3 font-bold">By</th>
@@ -400,7 +424,10 @@ export default function BlacklistPage() {
                         {h.action === "blacklist" ? "Blacklisted" : "Whitelisted"}
                       </span>
                     </td>
-                    <td className="px-4 py-3.5 capitalize text-gray-500">{h.category?.replace("_", " ") || "—"}</td>
+                    {/* Whitelist rows carry no risk classification by design, so
+                        the backend leaves their bucket off rather than tagging
+                        a clearance with a blacklist reason. */}
+                    <td className="px-4 py-3.5 text-gray-500">{h.action === "whitelist" ? "—" : h.reason_label || h.category?.replace("_", " ") || "—"}</td>
                     <td className="px-4 py-3.5 capitalize text-gray-500">{h.status}</td>
                     <td className="px-4 py-3.5 text-gray-500">{h.reason || "—"}</td>
                     <td className="px-4 py-3.5 text-gray-500">{h.created_by?.full_name || "—"}</td>
