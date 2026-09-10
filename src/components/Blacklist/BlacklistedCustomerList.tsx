@@ -70,7 +70,7 @@ const matchesOverdueBucket = (days: number, bucket: string) => {
 }
 
 const selectClass =
-  'rounded-xl border border-stroke bg-gray-50 px-3 py-2.5 text-xs font-semibold text-gray-600 outline-none focus:border-red-500 dark:border-strokedark dark:bg-meta-4 dark:text-gray-300 transition-all'
+  'min-w-0 w-full rounded-xl border border-stroke bg-gray-50 px-3 py-2.5 text-xs font-semibold text-gray-600 outline-none focus:border-red-500 dark:border-strokedark dark:bg-meta-4 dark:text-gray-300 transition-all'
 
 const BlacklistedCustomerList = () => {
   const [customers, setCustomers] = useState<CustomerGroup[]>([])
@@ -306,7 +306,7 @@ const BlacklistedCustomerList = () => {
     },
     {
       id: 'recovery_officer',
-      accessorFn: (row) => row.customer.recovery_officer_name || '-',
+      accessorFn: (row) => row.customer.recovery_officer_name || 'Not assigned',
       header: 'Recovery Officer',
     },
     {
@@ -336,7 +336,7 @@ const BlacklistedCustomerList = () => {
       header: 'Blacklist Date',
       cell: ({ getValue }) => {
         const val = getValue() as string | null
-        if (!val) return <span className="text-gray-400">-</span>
+        if (!val) return <span className="text-gray-400">Not recorded</span>
         const date = new Date(val)
         if (isNaN(date.getTime())) return '-'
         return (
@@ -381,17 +381,21 @@ const BlacklistedCustomerList = () => {
     },
     {
       id: 'reason',
-      accessorFn: (row) => row.customer.blacklist_reason || 'Auto-flagged (90+ days delinquency)',
+      accessorFn: (row) => row.customer.blacklist_reason || 'Blacklist history not recorded',
       header: 'Reason',
       cell: ({ getValue }) => (
-        <div className="text-xs text-gray-500 max-w-[200px] truncate" title={getValue() as string}>
-          {getValue() as string}
-        </div>
+        <details className="group w-60 text-xs text-gray-600 dark:text-gray-300">
+          <summary className="cursor-pointer rounded p-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-red-500" title="Click to read the full reason">
+            <span className="inline-block max-w-[200px] truncate align-bottom group-open:hidden">{getValue() as string}</span>
+            <span className="hidden group-open:inline">Hide full reason</span>
+          </summary>
+          <p className="mt-2 whitespace-pre-wrap break-words rounded-lg bg-gray-50 p-3 dark:bg-meta-4">{getValue() as string}</p>
+        </details>
       ),
     },
     {
       id: 'blacklisted_by',
-      accessorFn: (row) => row.customer.blacklisted_by_name || 'System (Auto-flagged)',
+      accessorFn: (row) => row.customer.blacklisted_by_name || 'Not recorded',
       header: 'Blacklisted By',
       cell: ({ getValue }) => (
         <span className="text-xs font-semibold text-gray-600 dark:text-gray-300">{getValue() as string}</span>
@@ -447,7 +451,7 @@ const BlacklistedCustomerList = () => {
         )
         if (!matchesCustomer && !matchesGuarantor) return false
       }
-      if (reasonFilter !== ALL && (c.customer.blacklist_reason || 'Auto-flagged (90+ days delinquency)') !== reasonFilter) return false
+      if (reasonFilter !== ALL && (c.customer.blacklist_reason || 'Blacklist history not recorded') !== reasonFilter) return false
       if (areaFilter !== ALL && (c.customer.area || '-') !== areaFilter) return false
       if (roleFilter !== ALL && (c.customer.blacklisted_role || 'Customer') !== roleFilter) return false
       if (officerFilter !== ALL && (c.customer.recovery_officer_name || '-') !== officerFilter) return false
@@ -475,14 +479,14 @@ const BlacklistedCustomerList = () => {
   })
 
   return (
-    <section className="rounded-[2.5rem] bg-white p-8">
+    <section className="w-full min-w-0 max-w-full rounded-2xl bg-white p-3 sm:p-5 lg:p-8">
       <div className="mb-6 flex flex-col md:flex-row items-center justify-between gap-6">
         <div>
-          <h2 className="text-3xl font-black text-gray-800 dark:text-white tracking-tight flex items-center gap-3">
+          <h2 className="text-2xl sm:text-3xl font-black text-gray-800 dark:text-white tracking-tight flex items-center gap-3">
             <Ban className="text-red-500" size={32} />
             Blacklisted Customers
           </h2>
-          <p className="text-sm text-gray-400 mt-1 font-medium">Automatic monitoring of accounts with 90+ days delinquency.</p>
+          <p className="text-sm text-gray-400 mt-1 font-medium">Customer and guarantor blacklist records, including manual and automatic actions.</p>
         </div>
 
         <div className="relative w-full max-w-md">
@@ -512,7 +516,7 @@ const BlacklistedCustomerList = () => {
             </button>
           )}
         </div>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-7">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
           <select value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)} className={selectClass}>
             <option value={ALL}>Customer / Guarantor / G2</option>
             <option value="Customer">Customer</option>
@@ -545,7 +549,7 @@ const BlacklistedCustomerList = () => {
             <option value="Pending Whitelist">Pending Whitelist</option>
           </select>
 
-          <div className="flex items-center gap-1.5">
+          <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-1.5 sm:col-span-2">
             <input
               type="date"
               value={dateFrom}
@@ -565,9 +569,9 @@ const BlacklistedCustomerList = () => {
         </div>
       </div>
 
-      <div className="overflow-x-auto">
-        <table className="w-full text-left">
-          <thead>
+      <div className="max-h-[75vh] w-full min-w-0 overflow-auto rounded-xl border border-stroke" tabIndex={0} role="region" aria-label="Blacklisted customers; scroll to view all columns">
+        <table className="w-full min-w-[1800px] text-left">
+          <thead className="sticky top-0 z-10 bg-white dark:bg-meta-4">
             {table.getHeaderGroups().map((hg) => (
               <tr key={hg.id} className="border-b border-stroke dark:border-strokedark">
                 {hg.headers.map((header) => (
@@ -620,7 +624,7 @@ const BlacklistedCustomerList = () => {
                   <React.Fragment key={row.id}>
                     <tr className="hover:bg-red-50/30 dark:hover:bg-red-900/5 transition-colors group">
                       {row.getVisibleCells().map((cell) => (
-                        <td key={cell.id} className="py-6 px-4">
+                        <td key={cell.id} className="py-4 px-3 align-top">
                           {flexRender(cell.column.columnDef.cell, cell.getContext())}
                         </td>
                       ))}
@@ -628,7 +632,7 @@ const BlacklistedCustomerList = () => {
                     {isExpanded && (
                       <tr className="bg-amber-50/40 dark:bg-amber-500/5">
                         <td colSpan={columns.length} className="px-4 pb-6 pt-0">
-                          <div className="ml-9 rounded-2xl border border-amber-200/60 dark:border-amber-500/20 bg-white dark:bg-meta-4 p-5">
+                          <div className="max-w-[1200px] rounded-2xl border border-amber-200/60 dark:border-amber-500/20 bg-white dark:bg-meta-4 p-5">
                             <div className="mb-4 flex items-center gap-1.5 text-xs font-black uppercase tracking-widest text-amber-600">
                               <Users size={14} /> Guarantor Details ({guarantors.length})
                             </div>
