@@ -619,6 +619,7 @@ export default function DeliveredProductDetails({
                     paymentDetails={deliveredProduct.payment_details}
                     title="Payment Details (Current Delivery)"
                     editable={user?.role === 'Super Admin'}
+                    orderId={deliveredProduct.order_info?.id}
                     onSaved={fetchDeliveredProductDetails}
                 />
 

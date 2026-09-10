@@ -20,11 +20,14 @@ export const PaymentDetailsSection = ({
     paymentDetails,
     title = "Payment Details",
     editable = false,
+    orderId,
     onSaved,
 }: {
     paymentDetails: any,
     title?: string,
     editable?: boolean,
+    /** Needed only for the missing-ledger repair action. */
+    orderId?: number,
     onSaved?: () => Promise<void> | void,
 }) => {
     const [expandedInstallments, setExpandedInstallments] = useState(true);
@@ -37,11 +40,40 @@ export const PaymentDetailsSection = ({
     const [isEditingAdvance, setIsEditingAdvance] = useState(false);
     const [advanceForm, setAdvanceForm] = useState({ amount: '', paid_amount: '', payment_method: '' });
     const [savingAdvance, setSavingAdvance] = useState(false);
+    const [rebuildingLedger, setRebuildingLedger] = useState(false);
 
     if (!paymentDetails) return null;
 
     const ledgerId = paymentDetails.installment_plan?.ledger_id;
     const installments = paymentDetails.installment_plan?.installments || [];
+    // Set by the API when the order has a delivery but no ledger row at all —
+    // i.e. delivery completed but the ledger write failed afterwards.
+    const ledgerMissing = !!paymentDetails.ledger_missing && !ledgerId;
+
+    const handleRebuildLedger = async () => {
+        if (!orderId) return;
+        const token = Cookies.get('auth_token');
+        if (!token) {
+            toast.error('Authentication required');
+            return;
+        }
+        setRebuildingLedger(true);
+        try {
+            const res = await fetch(`${BACKEND_URL}/api/ledger/rebuild/${orderId}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+            });
+            const json = await res.json();
+            if (!res.ok || !json.success) throw new Error(json.message || 'Failed to generate ledger');
+            toast.success(json.message || 'Ledger generated successfully');
+            if (onSaved) await onSaved();
+        } catch (err: any) {
+            console.error(err);
+            toast.error(err.message || 'Failed to generate ledger');
+        } finally {
+            setRebuildingLedger(false);
+        }
+    };
 
     const startEdit = () => {
         setEditedRows(installments.map((inst: any) => ({
@@ -188,6 +220,39 @@ export const PaymentDetailsSection = ({
                 </svg>
                 {title}
             </h3>
+
+            {/* Delivered, but the ledger row was never written. Without this the
+                whole card just renders empty and looks like "no data yet". */}
+            {ledgerMissing && (
+                <div className="mb-4 rounded-lg border border-orange-300 bg-orange-50 p-4 dark:border-orange-500/40 dark:bg-orange-500/10">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="flex items-start gap-3">
+                            <svg className="mt-0.5 h-5 w-5 shrink-0 text-orange-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                            </svg>
+                            <div>
+                                <h4 className="font-semibold text-orange-800 dark:text-orange-300">Installment ledger missing</h4>
+                                <p className="mt-1 text-sm text-orange-700 dark:text-orange-200">
+                                    This order was delivered but no installment ledger was created, so there is no
+                                    payment schedule, no ledger PDF and no recovery entries for it.
+                                    {editable
+                                        ? ' Generate it from the delivery record — the schedule will start from the original delivery date.'
+                                        : ' Please ask a Super Admin to generate it.'}
+                                </p>
+                            </div>
+                        </div>
+                        {editable && orderId && (
+                            <button
+                                onClick={handleRebuildLedger}
+                                disabled={rebuildingLedger}
+                                className="shrink-0 rounded-lg bg-orange-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                                {rebuildingLedger ? 'Generating…' : 'Generate Ledger'}
+                            </button>
+                        )}
+                    </div>
+                </div>
+            )}
 
             {/* Advance Payment */}
             {paymentDetails.advance_payment && (
