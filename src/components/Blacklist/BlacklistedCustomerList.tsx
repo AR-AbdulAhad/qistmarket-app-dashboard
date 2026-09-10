@@ -31,6 +31,40 @@ const AREA_SOURCE_HINT: Record<string, string> = {
   zone: 'district only',
 }
 
+// One canonical blacklist reason bucket. The backend owns this vocabulary
+// (src/utils/blacklistReasonUtils.js) and sends it with the list — the filter
+// used to be built from the distinct free-text reasons themselves, so every
+// typo an officer ever typed became a permanent dropdown option.
+interface ReasonType {
+  code: string
+  label: string
+  description: string
+  manual: boolean
+}
+
+// Colour per bucket so the Reason column reads at a glance. Anything not
+// listed falls back to the neutral grey below.
+const REASON_BADGE_STYLES: Record<string, string> = {
+  auto_delinquency: 'bg-slate-100 text-slate-600 dark:bg-slate-500/10 dark:text-slate-300',
+  non_payment: 'bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-400',
+  fraud: 'bg-rose-100 text-rose-700 dark:bg-rose-500/10 dark:text-rose-400',
+  untraceable: 'bg-orange-50 text-orange-600 dark:bg-orange-500/10 dark:text-orange-400',
+  device_tampering: 'bg-purple-50 text-purple-600 dark:bg-purple-500/10 dark:text-purple-400',
+  guarantor_issue: 'bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-400',
+  legal_action: 'bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400',
+  other: 'bg-gray-100 text-gray-600 dark:bg-meta-4 dark:text-gray-300',
+  not_recorded: 'bg-gray-50 text-gray-400 dark:bg-meta-4 dark:text-gray-500',
+}
+
+const ReasonBadge = ({ code, label }: { code?: string | null; label?: string | null }) => {
+  if (!label) return null
+  return (
+    <span className={`inline-block w-fit rounded px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wide ${REASON_BADGE_STYLES[code || ''] || REASON_BADGE_STYLES.other}`}>
+      {label}
+    </span>
+  )
+}
+
 interface Guarantor {
   id: number
   name: string
@@ -44,6 +78,8 @@ interface Guarantor {
   permanent_address: string | null
   is_blacklisted: boolean
   blacklist_reason: string | null
+  blacklist_reason_code: string | null
+  blacklist_reason_label: string | null
   blacklist_date: string | null
   blacklist_date_source: BlacklistDateSource
   blacklist_status: string | null
@@ -89,6 +125,7 @@ const selectClass =
 
 const BlacklistedCustomerList = () => {
   const [customers, setCustomers] = useState<CustomerGroup[]>([])
+  const [reasonTypes, setReasonTypes] = useState<ReasonType[]>([])
   const [searchInput, setSearchInput] = useState('')
   const [globalFilter, setGlobalFilter] = useState('')
   const [loading, setLoading] = useState(false)
@@ -130,6 +167,7 @@ const BlacklistedCustomerList = () => {
           return dateB - dateA
         })
         setCustomers(sorted)
+        setReasonTypes(json.data.reasonTypes ?? [])
       }
     } catch (err) {
       console.error(err)
@@ -213,10 +251,21 @@ const BlacklistedCustomerList = () => {
   }
 
   // ── Distinct option lists for the filter dropdowns, derived from live data ──
-  const reasonOptions = useMemo(
-    () => Array.from(new Set(customers.map(c => c.customer.blacklist_reason).filter(Boolean))).sort(),
-    [customers]
-  )
+  // Reason is the exception: it is driven by the backend's fixed vocabulary,
+  // not by the free-text reasons, so a new typo can never add an option. Only
+  // buckets that actually have records are offered (with their count), so the
+  // dropdown stays short without ever hiding a reason someone can filter on.
+  const reasonOptions = useMemo(() => {
+    const counts = new Map<string, number>()
+    for (const c of customers) {
+      const code = c.customer.blacklist_reason_code || 'not_recorded'
+      counts.set(code, (counts.get(code) || 0) + 1)
+    }
+    return reasonTypes
+      .filter((t) => counts.has(t.code))
+      .map((t) => ({ ...t, count: counts.get(t.code) as number }))
+  }, [customers, reasonTypes])
+
   const areaOptions = useMemo(
     () => Array.from(new Set(customers.map(c => c.customer.area).filter(Boolean))).sort(),
     [customers]
@@ -425,17 +474,27 @@ const BlacklistedCustomerList = () => {
     },
     {
       id: 'reason',
-      accessorFn: (row) => row.customer.blacklist_reason || 'Blacklist history not recorded',
+      // Sorts/filters on the canonical bucket, but still shows the officer's
+      // own words underneath — the bucket is for grouping, the free text is
+      // the detail nobody wants to lose.
+      accessorFn: (row) => row.customer.blacklist_reason_label || 'History not recorded',
       header: 'Reason',
-      cell: ({ getValue }) => (
-        <details className="group w-60 text-xs text-gray-600 dark:text-gray-300">
-          <summary className="cursor-pointer rounded p-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-red-500" title="Click to read the full reason">
-            <span className="inline-block max-w-[200px] truncate align-bottom group-open:hidden">{getValue() as string}</span>
-            <span className="hidden group-open:inline">Hide full reason</span>
-          </summary>
-          <p className="mt-2 whitespace-pre-wrap break-words rounded-lg bg-gray-50 p-3 dark:bg-meta-4">{getValue() as string}</p>
-        </details>
-      ),
+      cell: ({ row }) => {
+        const { blacklist_reason_code: code, blacklist_reason_label: label, blacklist_reason: text } = row.original.customer
+        const detail = text || 'Blacklist history not recorded'
+        return (
+          <div className="w-60 text-xs text-gray-600 dark:text-gray-300">
+            <ReasonBadge code={code} label={label} />
+            <details className="group mt-1">
+              <summary className="cursor-pointer rounded p-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-red-500" title="Click to read the full reason">
+                <span className="inline-block max-w-[200px] truncate align-bottom group-open:hidden">{detail}</span>
+                <span className="hidden group-open:inline">Hide full reason</span>
+              </summary>
+              <p className="mt-2 whitespace-pre-wrap break-words rounded-lg bg-gray-50 p-3 dark:bg-meta-4">{detail}</p>
+            </details>
+          </div>
+        )
+      },
     },
     {
       id: 'blacklisted_by',
@@ -495,7 +554,7 @@ const BlacklistedCustomerList = () => {
         )
         if (!matchesCustomer && !matchesGuarantor) return false
       }
-      if (reasonFilter !== ALL && (c.customer.blacklist_reason || 'Blacklist history not recorded') !== reasonFilter) return false
+      if (reasonFilter !== ALL && (c.customer.blacklist_reason_code || 'not_recorded') !== reasonFilter) return false
       if (areaFilter !== ALL && (c.customer.area || '-') !== areaFilter) return false
       if (roleFilter !== ALL && (c.customer.blacklisted_role || 'Customer') !== roleFilter) return false
       if (officerFilter !== ALL && (c.customer.recovery_officer_name || '-') !== officerFilter) return false
@@ -579,8 +638,12 @@ const BlacklistedCustomerList = () => {
           </select>
 
           <select value={reasonFilter} onChange={(e) => setReasonFilter(e.target.value)} className={selectClass}>
-            <option value={ALL}>All Reasons</option>
-            {reasonOptions.map((r) => <option key={r} value={r} title={r}>{r.length > 28 ? `${r.slice(0, 28)}…` : r}</option>)}
+            <option value={ALL}>All Reasons ({customers.length})</option>
+            {reasonOptions.map((r) => (
+              <option key={r.code} value={r.code} title={r.description}>
+                {r.label} ({r.count})
+              </option>
+            ))}
           </select>
 
           <select value={overdueBucket} onChange={(e) => setOverdueBucket(e.target.value)} className={selectClass}>
@@ -746,7 +809,8 @@ const BlacklistedCustomerList = () => {
                                       </div>
                                       <div className="col-span-2">
                                         <span className="flex items-center gap-1 text-[10px] font-bold uppercase text-gray-400"><FileWarning size={10} /> Reason</span>
-                                        <span className="font-semibold text-gray-700 dark:text-gray-200">{g.blacklist_reason || '-'}</span>
+                                        <ReasonBadge code={g.blacklist_reason_code} label={g.blacklist_reason_label} />
+                                        <span className="block font-semibold text-gray-700 dark:text-gray-200">{g.blacklist_reason || '-'}</span>
                                       </div>
                                     </div>
                                   )}

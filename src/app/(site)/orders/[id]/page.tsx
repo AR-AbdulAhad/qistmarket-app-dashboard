@@ -1053,7 +1053,38 @@ export default function OrderDetailsPage() {
                                     toast.error('No CNIC found for this account — cannot blacklist.');
                                     return;
                                 }
-                                const reason = window.prompt(`Reason for blacklisting account (${order.customer_name || 'Customer'}):`, '');
+                                const token = Cookies.get('auth_token');
+
+                                // Every blacklist must land in one of the canonical reason
+                                // buckets — that bucket is what the Blacklisted Customers
+                                // "Reason" filter groups by. The vocabulary is fetched rather
+                                // than hard-coded so it only ever lives in one place
+                                // (backend src/utils/blacklistReasonUtils.js).
+                                let types: { code: string; label: string; manual: boolean }[] = [];
+                                try {
+                                    const typesRes = await fetch(`${API_BASE}/api/accounts/blacklist/reason-types`, {
+                                        headers: { Authorization: `Bearer ${token}` }
+                                    });
+                                    const typesJson = await typesRes.json();
+                                    types = (typesJson.data || []).filter((t: any) => t.manual);
+                                } catch (e) {
+                                    console.error(e);
+                                }
+                                if (!types.length) {
+                                    toast.error('Could not load blacklist reason types — please try again.');
+                                    return;
+                                }
+
+                                const menu = types.map((t, i) => `${i + 1}. ${t.label}`).join('\n');
+                                const picked = window.prompt(`Reason type for blacklisting ${order.customer_name || 'this account'} — enter a number:\n\n${menu}`, '1');
+                                if (picked === null) return;
+                                const category = types[parseInt(picked.trim(), 10) - 1]?.code;
+                                if (!category) {
+                                    toast.error(`Please enter a number between 1 and ${types.length}.`);
+                                    return;
+                                }
+
+                                const reason = window.prompt(`Details for blacklisting account (${order.customer_name || 'Customer'}):`, '');
                                 if (reason === null) return;
                                 if (!reason.trim()) {
                                     toast.error('A reason is required to blacklist an account.');
@@ -1061,7 +1092,6 @@ export default function OrderDetailsPage() {
                                 }
 
                                 try {
-                                    const token = Cookies.get('auth_token');
                                     const res = await fetch(`${API_BASE}/api/accounts/blacklist/action`, {
                                         method: 'POST',
                                         headers: {
@@ -1073,6 +1103,7 @@ export default function OrderDetailsPage() {
                                             action: 'blacklist',
                                             targetType: 'all',
                                             verificationId: order.verification?.id,
+                                            category,
                                             reason: reason.trim()
                                         })
                                     });
