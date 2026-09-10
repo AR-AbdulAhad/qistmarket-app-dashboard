@@ -83,7 +83,7 @@ const BlacklistedCustomerList = () => {
   const { user } = useAuth()
   const canWhitelist = ['admin', 'super admin', 'accountant'].includes(user?.role?.toLowerCase() || '')
 
-  const [sorting, setSorting] = useState<SortingState>([{ id: 'created_at', desc: true }])
+  const [sorting, setSorting] = useState<SortingState>([{ id: 'delivered_at', desc: true }])
 
   // Filters — see spec item 5 (Sorting & Filters): Reason, Area, Customer/Guarantor/G2,
   // Recovery Officer, Days Overdue, Blacklist Date, Status.
@@ -310,13 +310,14 @@ const BlacklistedCustomerList = () => {
       header: 'Recovery Officer',
     },
     {
-      id: 'created_at',
-      accessorFn: (row) => row.customer.created_at,
+      id: 'delivered_at',
+      accessorFn: (row) => row.customer.delivered_at,
       header: 'Registration',
       cell: ({ getValue }) => {
         const val = getValue() as string
         if (!val) return '-'
         const date = new Date(val)
+        if (isNaN(date.getTime())) return '-'
         return (
           <div className="flex flex-col">
             <span className="font-bold text-dark dark:text-white">
@@ -337,6 +338,7 @@ const BlacklistedCustomerList = () => {
         const val = getValue() as string | null
         if (!val) return <span className="text-gray-400">-</span>
         const date = new Date(val)
+        if (isNaN(date.getTime())) return '-'
         return (
           <span className="text-xs font-semibold text-gray-600 dark:text-gray-300">
             {date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
@@ -497,7 +499,7 @@ const BlacklistedCustomerList = () => {
 
       {/* Filter bar */}
       <div className="mb-8 rounded-2xl border border-stroke bg-gray-50/60 p-4 dark:border-strokedark dark:bg-meta-4/30">
-        <div className="mb-3 flex items-center justify-between">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <span className="flex items-center gap-1.5 text-xs font-black uppercase tracking-widest text-gray-400">
             <Filter size={13} /> Filters
           </span>
@@ -633,18 +635,17 @@ const BlacklistedCustomerList = () => {
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                               {guarantors.map((g) => (
                                 <div key={g.id} className="rounded-xl border border-stroke dark:border-strokedark p-4">
-                                  <div className="mb-3 flex items-center justify-between">
+                                  <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                                     <div className="flex items-center gap-2">
                                       <div className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-100 text-amber-600 dark:bg-amber-500/10 text-xs font-black">
                                         G{g.grantor_number || ''}
                                       </div>
                                       <span className="font-bold text-dark dark:text-white text-sm">{g.name}</span>
                                     </div>
-                                    {g.is_blacklisted && (
-                                      <span className="inline-flex items-center gap-1 rounded-full bg-red-500 px-2.5 py-0.5 text-[9px] font-black uppercase text-white">
-                                        <AlertTriangle size={10} /> {g.blacklist_status || 'Blacklisted'}
-                                      </span>
-                                    )}
+                                    <span className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-0.5 text-[9px] font-black uppercase text-white ${g.is_blacklisted ? g.blacklist_status === 'Pending Whitelist' ? 'bg-amber-500' : 'bg-red-500' : 'bg-emerald-500'}`}>
+                                      {g.is_blacklisted ? <AlertTriangle size={10} /> : <ShieldCheck size={10} />}
+                                      {g.is_blacklisted ? g.blacklist_status || 'Blacklisted' : 'Whitelisted'}
+                                    </span>
                                   </div>
 
                                   {/* Contact section */}
