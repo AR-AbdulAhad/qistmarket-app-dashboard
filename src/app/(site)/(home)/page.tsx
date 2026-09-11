@@ -143,9 +143,22 @@ export default function Home() {
   useEffect(() => {
     if (!authLoading && user) {
       const userRole = user.role?.toLowerCase()
+      // Any field/outlet-affiliated role can log in through the outlet
+      // login flow (it only checks username+outlet_id, not role) — Recovery
+      // Officer, Verification Officer, Delivery Agent and Stock Manager all
+      // need the same redirect Branch User already got, otherwise landing
+      // or navigating back to "/" leaves them stranded on the admin-only
+      // Operations Dashboard instead of their outlet dashboard.
+      const outletOnlyRoles = [
+        'branch user',
+        'recovery officer',
+        'verification officer',
+        'delivery agent',
+        'stock manager',
+      ]
       if (userRole === 'sales officer') {
         router.push('/csr/dashboard')
-      } else if (userRole === 'branch user') {
+      } else if (userRole && outletOnlyRoles.includes(userRole)) {
         router.push('/outlet/dashboard')
       } else if (userRole === 'hr') {
         router.push('/hr/dashboard')

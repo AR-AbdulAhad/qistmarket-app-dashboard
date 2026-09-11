@@ -18,6 +18,7 @@ interface Outlet {
   code: string;
   name: string;
   address: string | null;
+  phone: string | null;
   status: string;
   type: string;
 }
@@ -39,7 +40,7 @@ export default function AdminOutletsPage() {
   const [search, setSearch] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Outlet | null>(null);
-  const [form, setForm] = useState({ code: "", name: "", address: "", status: "active" });
+  const [form, setForm] = useState({ code: "", name: "", address: "", phone: "", status: "active" });
   const [saving, setSaving] = useState(false);
   const [attendance, setAttendance] = useState<Record<number, AttendanceRow>>({});
   const [staffPanel, setStaffPanel] = useState<Outlet | null>(null);
@@ -102,13 +103,13 @@ export default function AdminOutletsPage() {
 
   const openCreate = () => {
     setEditing(null);
-    setForm({ code: "", name: "", address: "", status: "active" });
+    setForm({ code: "", name: "", address: "", phone: "", status: "active" });
     setShowForm(true);
   };
 
   const openEdit = (o: Outlet) => {
     setEditing(o);
-    setForm({ code: o.code, name: o.name, address: o.address || "", status: o.status });
+    setForm({ code: o.code, name: o.name, address: o.address || "", phone: o.phone || "", status: o.status });
     setShowForm(true);
   };
 
@@ -165,6 +166,7 @@ export default function AdminOutletsPage() {
             <Field label="Code *" value={form.code} onChange={(v) => setForm({ ...form, code: v })} />
             <Field label="Name *" value={form.name} onChange={(v) => setForm({ ...form, name: v })} />
             <Field label="Address" value={form.address} onChange={(v) => setForm({ ...form, address: v })} />
+            <Field label="Phone" value={form.phone} onChange={(v) => setForm({ ...form, phone: v })} />
             <div>
               <label className="mb-1.5 block text-xs font-medium text-gray-500">Status</label>
               <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })} className="w-full rounded-xl border border-stroke bg-white px-4 py-2.5 text-sm outline-none transition focus:border-[#ff3d3d] dark:border-dark-3 dark:bg-gray-dark dark:text-white">
@@ -215,7 +217,7 @@ export default function AdminOutletsPage() {
                   <tr key={o.id} className="border-t border-slate-50 transition hover:bg-slate-50/70 dark:border-white/5 dark:hover:bg-white/5">
                     <td className="px-4 py-3.5">
                       <p className="font-semibold text-dark dark:text-white">{o.name}</p>
-                      <p className="text-xs text-gray-400">{o.code} {o.address ? `· ${o.address}` : ""}</p>
+                      <p className="text-xs text-gray-400">{o.code} {o.address ? `· ${o.address}` : ""} {o.phone ? `· ${o.phone}` : ""}</p>
                     </td>
                     <td className="px-4 py-3.5 capitalize text-gray-600 dark:text-gray-300">{o.type}</td>
                     <td className="px-4 py-3.5">

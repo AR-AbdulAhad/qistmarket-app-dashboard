@@ -117,9 +117,9 @@ export default function OutletReturnsPage() {
       });
       const d = await res.json();
       if (!d.success) throw new Error(d.error || "Failed");
-      
+
       toast.success("Return processed successfully");
-      
+
       setSelectedOrder(null);
       setOrderQuery("");
       setIsCash(false);
@@ -318,12 +318,12 @@ export default function OutletReturnsPage() {
                 className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border-2 border-stroke dark:border-strokedark rounded-2xl focus:border-primary outline-none font-bold text-gray-800 dark:text-white transition-all" />
             </div>
 
-            {/* Already-blacklisted warning (return is blocked) */}
+            {/* Already-blacklisted notice (return still proceeds, account stays blacklisted) */}
             {selectedOrder.is_customer_blacklisted && (
-              <div className="flex items-center gap-3 bg-red-50 dark:bg-red-900/10 border-2 border-red-200 dark:border-red-900/30 p-4 rounded-2xl">
-                <AlertCircle size={20} className="text-red-600 shrink-0" />
-                <p className="text-xs font-bold text-red-600 uppercase tracking-tight">
-                  This customer/account is already blacklisted. This order cannot be returned.
+              <div className="flex items-center gap-3 bg-amber-50 dark:bg-amber-900/10 border-2 border-amber-200 dark:border-amber-900/30 p-4 rounded-2xl">
+                <AlertCircle size={20} className="text-amber-600 shrink-0" />
+                <p className="text-xs font-bold text-amber-700 dark:text-amber-500 uppercase tracking-tight">
+                  This account is already blacklisted. The return will still be processed, but the account stays blacklisted until an admin whitelists it from Blacklisted Customers.
                 </p>
               </div>
             )}
@@ -342,7 +342,7 @@ export default function OutletReturnsPage() {
               </div>
             )}
 
-            <button onClick={handleInitiateReturn} disabled={submitting || (isCash && !refundAmt) || selectedOrder.is_customer_blacklisted}
+            <button onClick={handleInitiateReturn} disabled={submitting || (isCash && !refundAmt)}
               className="w-full py-5 bg-primary hover:bg-opacity-90 disabled:opacity-50 text-white rounded-2xl text-sm font-black uppercase tracking-widest shadow-2xl shadow-primary/30 transition-all active:scale-[0.98] flex items-center justify-center gap-3">
               {submitting ? (
                 <><div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div><span>Processing...</span></>
@@ -426,11 +426,32 @@ export default function OutletReturnsPage() {
                       )}
                     </td>
                     <td className="px-5 py-4">
-                      <div className="flex items-center gap-2">
-                        <div className="w-1.5 h-1.5 rounded-full bg-success"></div>
-                        <p className="text-xs font-black text-gray-700 dark:text-gray-200">
-                          {r.verified_at ? formatExactDate(r.verified_at) : ""}
-                        </p>
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-center gap-2">
+                          <div className="w-1.5 h-1.5 rounded-full bg-success"></div>
+                          <p className="text-xs font-black text-gray-700 dark:text-gray-200">
+                            {r.verified_at ? formatExactDate(r.verified_at) : ""}
+                          </p>
+                        </div>
+                        {(() => {
+                          const returnTime = new Date(r.verified_at || r.created_at).getTime();
+                          if (isNaN(returnTime)) return null;
+                          const clearTime = returnTime + 3 * 24 * 60 * 60 * 1000;
+                          const clearsAtDateStr = formatExactDate(new Date(clearTime), 'MMM DD, YYYY');
+                          const now = Date.now();
+                          const diffMs = clearTime - now;
+                          const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+                          const text = diffMs <= 0
+                            ? `Moves to Cleared: ${clearsAtDateStr} (Today)`
+                            : diffDays === 1
+                            ? `Moves to Cleared: ${clearsAtDateStr} (Tomorrow)`
+                            : `Moves to Cleared: ${clearsAtDateStr} (${diffDays} days left)`;
+                          return (
+                            <span className="text-[9px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/50 px-1.5 py-0.5 rounded border border-emerald-200 dark:border-emerald-800/60 w-fit">
+                              {text}
+                            </span>
+                          );
+                        })()}
                       </div>
                     </td>
                   </tr>

@@ -39,6 +39,21 @@ export function Sidebar() {
   }, [pathname]);
 
   // Filter navigation data based on user role
+  // Any field/outlet-affiliated role (not just "Branch User") can actually
+  // authenticate through /api/outlet/login — outletController.js's
+  // loginOutletUser only checks username+outlet_id, not role — so a Recovery
+  // Officer, Verification Officer, Delivery Agent, or Stock Manager logging
+  // in that way previously matched none of the exclusions below and fell
+  // through to seeing MAIN MENU + CSR PORTAL + OUTLET PORTAL all at once.
+  // These all belong in the same "outlet portal only" bucket as Branch User.
+  const outletOnlyRoles = [
+    "branch user",
+    "recovery officer",
+    "verification officer",
+    "delivery agent",
+    "stock manager",
+  ];
+
   const filteredNavData = NAV_DATA.filter((section) => {
     const allowedRoles = ["sales officer"];
 
@@ -55,7 +70,7 @@ export function Sidebar() {
     if (section.label === "OUTLET PORTAL" && (userRole === "admin" || userRole === "super admin")) {
       return false;
     }
-    if (section.label === "CSR PORTAL" && (userRole === "admin" || userRole === "super admin" || userRole === "branch user")) {
+    if (section.label === "CSR PORTAL" && (userRole === "admin" || userRole === "super admin" || outletOnlyRoles.includes(userRole))) {
       return false;
     }
 
@@ -80,7 +95,7 @@ export function Sidebar() {
       return false;
     }
 
-    if (section.label === "MAIN MENU" && userRole === "branch user") {
+    if (section.label === "MAIN MENU" && outletOnlyRoles.includes(userRole)) {
       return false;
     }
 
@@ -129,10 +144,10 @@ export function Sidebar() {
           <div className="relative pr-4.5">
             <Link
               href={
-                userRole === "sales officer" 
-                  ? "/csr/dashboard" 
-                  : userRole === "branch user" 
-                    ? "/outlet/dashboard" 
+                userRole === "sales officer"
+                  ? "/csr/dashboard"
+                  : outletOnlyRoles.includes(userRole)
+                    ? "/outlet/dashboard"
                     : userRole === "hr"
                       ? "/hr/dashboard"
                       : "/"

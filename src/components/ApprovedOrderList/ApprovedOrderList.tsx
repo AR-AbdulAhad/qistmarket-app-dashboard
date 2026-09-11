@@ -680,17 +680,25 @@ const ApprovedOrderList = () => {
                     </li>
 
                     {user?.role_id === 5 && !order.delivery_officer && !order.verification?.home_location_required && (
-                      <li>
-                        <button
-                          onClick={() => {
-                            router.push(`/orders/${order.id}/self-pickup`);
-                            setIsOpen(false);
-                          }}
-                          className="block w-full px-4 py-2.5 text-left border-t border-gray-50 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/30"
-                        >
-                          Self Pickup
-                        </button>
-                      </li>
+                      ((order as any).is_customer_blacklisted || (order as any).customer?.is_blacklisted || (order as any).verification?.purchaser?.is_blacklisted || (order as any).verification?.grantors?.some((g: any) => g.is_blacklisted)) ? (
+                        <li>
+                          <span className="block w-full px-4 py-2.5 text-left border-t border-gray-50 text-red-500 font-semibold text-xs cursor-not-allowed dark:border-dark-3">
+                            This account is blacklisted
+                          </span>
+                        </li>
+                      ) : (
+                        <li>
+                          <button
+                            onClick={() => {
+                              router.push(`/orders/${order.id}/self-pickup`);
+                              setIsOpen(false);
+                            }}
+                            className="block w-full px-4 py-2.5 text-left border-t border-gray-50 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/30"
+                          >
+                            Self Pickup
+                          </button>
+                        </li>
+                      )
                     )}
 
                     <li>

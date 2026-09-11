@@ -11,7 +11,7 @@ import {
 import Cookies from 'js-cookie'
 import { SearchIcon } from '@/assets/icons'
 import { useProfileModal } from '../../../contexts/ProfileModalContext'
-import { CheckCircle, PartyPopper } from 'lucide-react'
+import { CheckCircle, PartyPopper, Ban } from 'lucide-react'
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL
 
@@ -72,7 +72,14 @@ const ClearedCustomerList = () => {
           <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
             <CheckCircle size={18} />
           </div>
-          <span className="font-bold text-dark dark:text-white">{row.original.customer.name}</span>
+          <div className="flex flex-col">
+            <span className="font-bold text-dark dark:text-white">{row.original.customer.name}</span>
+            {row.original.customer.is_blacklisted && (
+              <span className="inline-flex w-fit items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-red-600 dark:bg-red-900/30 dark:text-red-400">
+                <Ban size={10} /> Blacklisted
+              </span>
+            )}
+          </div>
         </div>
       )
     },
@@ -138,12 +145,15 @@ const ClearedCustomerList = () => {
           </button>
           <button
             onClick={() => {
+              if (row.original.customer.is_blacklisted) return;
               const lastOrder = row.original.orders?.[0];
               if (lastOrder) {
                 router.push(`/convert-sale/${lastOrder.order_id}`);
               }
             }}
-            className="rounded-xl bg-blue-600 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-white hover:bg-blue-700 shadow-lg shadow-blue-500/20 transition-all hover:scale-105 active:scale-95 whitespace-nowrap"
+            disabled={row.original.customer.is_blacklisted}
+            title={row.original.customer.is_blacklisted ? 'Whitelist this account first from Blacklisted Customers' : undefined}
+            className="rounded-xl bg-blue-600 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-white hover:bg-blue-700 shadow-lg shadow-blue-500/20 transition-all hover:scale-105 active:scale-95 whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:scale-100"
           >
             Convert Sale
           </button>
