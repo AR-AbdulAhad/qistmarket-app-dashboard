@@ -79,6 +79,11 @@ interface OverridesData {
   officers?: Record<string, Record<string, any>>;
 }
 
+interface TargetsConfig {
+  csr_monthly_sales_target: number;
+  csr_customer_target: number;
+}
+
 interface ScoringConfigModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -86,13 +91,16 @@ interface ScoringConfigModalProps {
 }
 
 export default function ScoringConfigModal({ isOpen, onClose, onSaved }: ScoringConfigModalProps) {
-  const [activeTab, setActiveTab] = useState<"outlet" | "csr" | "delivery" | "recovery" | "verification">("outlet");
-  
+  const [activeTab, setActiveTab] = useState<"outlet" | "csr" | "delivery" | "recovery" | "verification" | "targets">("outlet");
+
   // Master global config loaded from backend
   const [globalConfig, setGlobalConfig] = useState<ScoringConfig | null>(null);
   // Active config displayed & manipulated in form
   const [config, setConfig] = useState<ScoringConfig | null>(null);
-  
+
+  // CSR monthly targets — global-only, no per-outlet/officer overrides
+  const [targets, setTargets] = useState<TargetsConfig | null>(null);
+
   const [entities, setEntities] = useState<ScoringEntities | null>(null);
   const [overrides, setOverrides] = useState<OverridesData>({});
   const [selectedScope, setSelectedScope] = useState<string>("global");
@@ -110,15 +118,17 @@ export default function ScoringConfigModal({ isOpen, onClose, onSaved }: Scoring
   const loadInitialData = async () => {
     setLoading(true);
     try {
-      const [cfgRes, ovrRes, entRes] = await Promise.all([
+      const [cfgRes, ovrRes, entRes, tgtRes] = await Promise.all([
         fetch(`${BACKEND_URL}/api/admin-panel/scoring-rules`, { headers: authHeaders() }),
         fetch(`${BACKEND_URL}/api/admin-panel/scoring-rules/overrides`, { headers: authHeaders() }),
         fetch(`${BACKEND_URL}/api/admin-panel/scoring-rules/entities`, { headers: authHeaders() }),
+        fetch(`${BACKEND_URL}/api/admin-panel/targets`, { headers: authHeaders() }),
       ]);
 
       const cfgJson = await cfgRes.json();
       const ovrJson = await ovrRes.json();
       const entJson = await entRes.json();
+      const tgtJson = await tgtRes.json();
 
       if (cfgJson.success) {
         setGlobalConfig(cfgJson.data);
@@ -130,6 +140,9 @@ export default function ScoringConfigModal({ isOpen, onClose, onSaved }: Scoring
       if (entJson.success) {
         setEntities(entJson.data || { outlets: [], officers: [] });
       }
+      if (tgtJson.success) {
+        setTargets(tgtJson.data);
+      }
     } catch (err: any) {
       toast.error(err.message || "Failed to load scoring configuration");
     } finally {
@@ -138,7 +151,7 @@ export default function ScoringConfigModal({ isOpen, onClose, onSaved }: Scoring
   };
 
   // Switch tabs & update scope accordingly
-  const handleTabChange = (tabId: "outlet" | "csr" | "delivery" | "recovery" | "verification") => {
+  const handleTabChange = (tabId: "outlet" | "csr" | "delivery" | "recovery" | "verification" | "targets") => {
     setActiveTab(tabId);
     setSelectedScope("global");
     if (globalConfig) {
@@ -146,31 +159,63 @@ export default function ScoringConfigModal({ isOpen, onClose, onSaved }: Scoring
     }
   };
 
-  // Change scope selection (e.g. global -> outlet:2 or officer:15)
+  const updateTargetVal = (key: keyof TargetsConfig, value: number) => {
+    if (!targets) return;
+    const clean = isNaN(value) ? 0 : Math.max(0, Math.floor(value));
+    setTargets({ ...targets, [key]: clean });
+  };
+
+  const handleSaveTargets = async () => {
+    if (!targets) return;
+    setSaving(true);
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/admin-panel/targets`, {
+        method: "POST",
+        headers: authHeaders(),
+        body: JSON.stringify(targets),
+      });
+      const json = await res.json();
+      if (json.success) {
+        toast.success("CSR targets saved successfully!");
+        setTargets(json.data);
+        if (onSaved) onSaved();
+      } else {
+        toast.error(json.message || "Failed to save CSR targets");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Error saving CSR targets");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Change scope selection (e.g. global -> outlet:2 or officer:15) — never invoked
+  // for the "targets" tab, whose scope selector is hidden (targets are global-only).
   const handleScopeChange = (scope: string) => {
     setSelectedScope(scope);
     if (!globalConfig || !config) return;
+    const section = activeTab as keyof ScoringConfig;
 
     if (scope === "global") {
-      setConfig((prev) => prev ? { ...prev, [activeTab]: { ...globalConfig[activeTab] } } : prev);
+      setConfig((prev) => prev ? { ...prev, [section]: { ...globalConfig[section] } } : prev);
       return;
     }
 
     const [type, idStr] = scope.split(":");
     const targetGroup = type === "outlet" ? "outlets" : "officers";
-    const entityOverride = overrides[targetGroup]?.[idStr]?.[activeTab];
+    const entityOverride = overrides[targetGroup]?.[idStr]?.[section];
 
     const effectiveSectionRules = {
-      ...globalConfig[activeTab],
+      ...globalConfig[section],
       ...(entityOverride || {}),
     };
 
-    setConfig((prev) => prev ? { ...prev, [activeTab]: effectiveSectionRules } : prev);
+    setConfig((prev) => prev ? { ...prev, [section]: effectiveSectionRules } : prev);
   };
 
   // Check if current active tab has a custom override for selectedScope
   const hasCurrentOverride = () => {
-    if (selectedScope === "global") return false;
+    if (selectedScope === "global" || activeTab === "targets") return false;
     const [type, idStr] = selectedScope.split(":");
     const targetGroup = type === "outlet" ? "outlets" : "officers";
     return !!overrides[targetGroup]?.[idStr]?.[activeTab];
@@ -203,7 +248,7 @@ export default function ScoringConfigModal({ isOpen, onClose, onSaved }: Scoring
             type,
             id: Number(idStr),
             section: activeTab,
-            rules: config[activeTab],
+            rules: config[activeTab as keyof ScoringConfig],
           }),
         });
         const json = await res.json();
@@ -241,7 +286,8 @@ export default function ScoringConfigModal({ isOpen, onClose, onSaved }: Scoring
         toast.success("Override removed! Reverted to global default.");
         setOverrides(json.data || {});
         if (globalConfig) {
-          setConfig((prev) => prev ? { ...prev, [activeTab]: { ...globalConfig[activeTab] } } : prev);
+          const section = activeTab as keyof ScoringConfig;
+          setConfig((prev) => prev ? { ...prev, [section]: { ...globalConfig[section] } } : prev);
         }
         if (onSaved) onSaved();
       } else {
@@ -295,6 +341,7 @@ export default function ScoringConfigModal({ isOpen, onClose, onSaved }: Scoring
     { id: "delivery", label: "Delivery Officers" },
     { id: "recovery", label: "Recovery Officers" },
     { id: "verification", label: "Verification Officers" },
+    { id: "targets", label: "CSR Targets" },
   ] as const;
 
   const getFilteredOfficers = (tab: string) => {
@@ -358,7 +405,8 @@ export default function ScoringConfigModal({ isOpen, onClose, onSaved }: Scoring
         ) : (
           <div className="py-6 space-y-4 max-h-[60vh] overflow-y-auto pr-1">
 
-            {/* Scope Selection Bar */}
+            {/* Scope Selection Bar — targets are global-only, no per-outlet/officer override */}
+            {activeTab !== "targets" && (
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-slate-50 dark:bg-meta-4/30 p-3.5 border border-slate-200/80 dark:border-gray-700">
               <div className="flex items-center gap-2">
                 <Layers className="size-4 text-primary" />
@@ -414,6 +462,7 @@ export default function ScoringConfigModal({ isOpen, onClose, onSaved }: Scoring
                 ) : null}
               </div>
             </div>
+            )}
 
             {/* Fields Grid */}
             {activeTab === "outlet" && (
@@ -805,6 +854,48 @@ export default function ScoringConfigModal({ isOpen, onClose, onSaved }: Scoring
                 </div>
               </div>
             )}
+
+            {activeTab === "targets" && (
+              targets ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="rounded-xl border border-gray-100 dark:border-gray-800 p-4 bg-gray-50/50 dark:bg-meta-4/20">
+                    <label className="text-xs font-bold text-gray-700 dark:text-gray-200 block mb-1">
+                      Monthly Sales Target (PKR)
+                    </label>
+                    <input
+                      type="number"
+                      value={targets.csr_monthly_sales_target}
+                      onChange={(e) => updateTargetVal("csr_monthly_sales_target", e.target.valueAsNumber)}
+                      className="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-boxdark px-3 py-2 text-sm font-semibold focus:outline-none focus:border-primary"
+                      onFocus={(e) => { const t = e.target; setTimeout(() => t.select(), 0); }}
+                    />
+                    <p className="text-[11px] text-gray-500 mt-1">Combined CSR team sales target for the month, shown as &quot;Total Sales&quot; progress on the CSR dashboard</p>
+                  </div>
+
+                  <div className="rounded-xl border border-gray-100 dark:border-gray-800 p-4 bg-gray-50/50 dark:bg-meta-4/20">
+                    <label className="text-xs font-bold text-gray-700 dark:text-gray-200 block mb-1">
+                      Monthly Customer Target
+                    </label>
+                    <input
+                      type="number"
+                      value={targets.csr_customer_target}
+                      onChange={(e) => updateTargetVal("csr_customer_target", e.target.valueAsNumber)}
+                      className="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-boxdark px-3 py-2 text-sm font-semibold focus:outline-none focus:border-primary"
+                      onFocus={(e) => { const t = e.target; setTimeout(() => t.select(), 0); }}
+                    />
+                    <p className="text-[11px] text-gray-500 mt-1">Combined CSR team delivered-customer target for the month, drives the working-days/daily-avg KPIs</p>
+                  </div>
+
+                  <div className="md:col-span-2 rounded-xl bg-blue-50/50 dark:bg-blue-500/5 border border-blue-100 dark:border-blue-900/30 p-3.5 text-[11px] text-gray-500 dark:text-gray-400">
+                    These targets are global — one value for the whole CSR team, no per-outlet/officer override. They replace the CSR_MONTHLY_TARGET / CSR_CUSTOMER_TARGET environment variables.
+                  </div>
+                </div>
+              ) : (
+                <div className="flex h-32 items-center justify-center">
+                  <RefreshCw className="size-6 animate-spin text-primary" />
+                </div>
+              )
+            )}
           </div>
         )}
 
@@ -827,12 +918,12 @@ export default function ScoringConfigModal({ isOpen, onClose, onSaved }: Scoring
               Cancel
             </button>
             <button
-              onClick={handleSave}
+              onClick={activeTab === "targets" ? handleSaveTargets : handleSave}
               disabled={saving || loading}
               className="flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-xs font-bold text-white shadow-md shadow-primary/30 hover:bg-opacity-90 transition-all disabled:opacity-50"
             >
               <Save className="size-4" />
-              {saving ? "Saving..." : selectedScope === "global" ? "Save Global Rules" : "Save Custom Override"}
+              {saving ? "Saving..." : activeTab === "targets" ? "Save Targets" : selectedScope === "global" ? "Save Global Rules" : "Save Custom Override"}
             </button>
           </div>
         </div>
