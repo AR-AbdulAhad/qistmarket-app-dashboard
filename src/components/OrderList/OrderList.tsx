@@ -89,6 +89,8 @@ interface Order {
   outlet_id?: number | null
   cancelled_reason?: string | null
   cancelled_at?: string | null
+  is_customer_blacklisted?: boolean
+  can_exchange?: boolean
   verification: VerificationNested | null
   productHistories?: {
     id: number
@@ -831,6 +833,7 @@ const OrderListContent = ({ forcedStatus, forcedChannel, apiEndpoint, hideAction
     router.push(`/orders/${order.id}`)
   }
 
+
   const confirmBulkUnassign = async () => {
       const isVerification = forcedStatus === 'new' || forcedStatus === 'pending' || forcedStatus === 'in_progress';
       const ids = table.getSelectedRowModel().rows.map((r) => r.original.id)
@@ -899,17 +902,44 @@ const OrderListContent = ({ forcedStatus, forcedChannel, apiEndpoint, hideAction
       cell: ({ row, getValue }) => {
         const orig = row.original as any
         const isDelivered = (orig.status || '').toLowerCase() === 'delivered' || Boolean(orig.is_delivered)
+        const isReturned = (orig.status || '').toLowerCase() === 'returned' || forcedStatus === 'returned'
         const rawVal = getValue() as string
         const val = isDelivered ? (orig.delivered_at || rawVal) : rawVal
         const createdAt = orig.created_at
+
+        let clearedMoveText = null
+        if (isReturned && val) {
+          const returnTime = new Date(val).getTime()
+          if (!isNaN(returnTime)) {
+            const clearTime = returnTime + 3 * 24 * 60 * 60 * 1000
+            const clearsAtDateStr = formatExactDate(new Date(clearTime), 'MMM DD, YYYY')
+            const now = Date.now()
+            const diffMs = clearTime - now
+            const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24))
+
+            if (diffMs <= 0) {
+              clearedMoveText = `Moves to Cleared: ${clearsAtDateStr} (Today)`
+            } else if (diffDays === 1) {
+              clearedMoveText = `Moves to Cleared: ${clearsAtDateStr} (Tomorrow)`
+            } else {
+              clearedMoveText = `Moves to Cleared: ${clearsAtDateStr} (${diffDays} days left)`
+            }
+          }
+        }
+
         return (
-          <div className="flex flex-col">
+          <div className="flex flex-col gap-0.5">
             <span className="font-bold text-dark dark:text-white">
               {val ? formatExactDate(val, 'MMM DD, YYYY hh:mm A') : 'N/A'}
             </span>
             {createdAt && (
               <span className="text-[10px] text-gray-400">
                 Placed: {formatExactDate(createdAt, 'MMM DD, YYYY')}
+              </span>
+            )}
+            {clearedMoveText && (
+              <span className="text-[9px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/50 px-1.5 py-0.5 rounded border border-emerald-200 dark:border-emerald-800/60 w-fit mt-1">
+                {clearedMoveText}
               </span>
             )}
           </div>
@@ -1418,19 +1448,54 @@ const OrderListContent = ({ forcedStatus, forcedChannel, apiEndpoint, hideAction
                   </>
                 )}
 
-                {/* Self Pickup (for outlet users when approved or returned) */}
-                {isOutletBranchUser && !isSuperAdmin && (order.status === 'approved' || order.status === 'returned') && !order.delivery_officer && !order.verification?.home_location_required && (
-                  <li>
-                    <button
-                      onClick={() => {
-                        router.push(`/orders/${order.id}/self-pickup`);
-                        setIsOpen(false);
-                      }}
-                      className="block w-full px-4 py-2.5 text-left border-t border-gray-50 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/30"
-                    >
-                      Self Pickup
-                    </button>
-                  </li>
+                {/* Self Pickup (for outlet users, approved orders only) */}
+                {isOutletBranchUser && !isSuperAdmin && order.status === 'approved' && !order.delivery_officer && !order.verification?.home_location_required && (
+                  ((order as any).is_customer_blacklisted || (order as any).customer?.is_blacklisted || (order as any).verification?.purchaser?.is_blacklisted || (order as any).verification?.grantors?.some((g: any) => g.is_blacklisted)) ? (
+                    <li>
+                      <span className="block w-full px-4 py-2.5 text-left border-t border-gray-50 text-red-500 font-semibold text-xs cursor-not-allowed dark:border-dark-3">
+                        This account is blacklisted
+                      </span>
+                    </li>
+                  ) : (
+                    <li>
+                      <button
+                        onClick={() => {
+                          router.push(`/orders/${order.id}/self-pickup`);
+                          setIsOpen(false);
+                        }}
+                        className="block w-full px-4 py-2.5 text-left border-t border-gray-50 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/30"
+                      >
+                        Self Pickup
+                      </button>
+                    </li>
+                  )
+                )}
+
+                {/* Self Pickup (returned orders — same wizard, since the
+                    Delivery row was already deleted at return time, so the page's
+                    "no delivery yet" path treats it exactly like a fresh order).
+                    Not restricted to outlet branch users like the approved-order
+                    case above — the backend enforces outlet ownership either way. */}
+                {(order.status?.toLowerCase() === 'returned' || forcedStatus === 'returned') && !order.verification?.home_location_required && (
+                  ((order as any).is_customer_blacklisted || (order as any).customer?.is_blacklisted || (order as any).verification?.purchaser?.is_blacklisted || (order as any).verification?.grantors?.some((g: any) => g.is_blacklisted)) ? (
+                    <li>
+                      <span className="block w-full px-4 py-2.5 text-left border-t border-gray-50 text-red-500 font-semibold text-xs cursor-not-allowed dark:border-dark-3">
+                        This account is blacklisted
+                      </span>
+                    </li>
+                  ) : (
+                    <li>
+                      <button
+                        onClick={() => {
+                          router.push(`/orders/${order.id}/self-pickup`);
+                          setIsOpen(false);
+                        }}
+                        className="block w-full px-4 py-2.5 text-left border-t border-gray-50 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/30"
+                      >
+                        Self Pickup
+                      </button>
+                    </li>
+                  )
                 )}
 
 

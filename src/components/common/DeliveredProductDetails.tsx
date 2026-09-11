@@ -617,7 +617,7 @@ export default function DeliveredProductDetails({
                 {/* Payment Details Section */}
                 <PaymentDetailsSection
                     paymentDetails={deliveredProduct.payment_details}
-                    title="Payment Details (Current Delivery)"
+                    title={deliveredProduct.archived_deliveries?.length > 0 ? "Payment Details (New Product After Exchange)" : "Payment Details (Current Delivery)"}
                     editable={user?.role === 'Super Admin'}
                     orderId={deliveredProduct.order_info?.id}
                     onSaved={fetchDeliveredProductDetails}
@@ -692,7 +692,7 @@ export default function DeliveredProductDetails({
                                         <div className="mt-4">
                                             <PaymentDetailsSection
                                                 paymentDetails={ad.payment_details}
-                                                title="Payment Details (Before Return)"
+                                                title="Payment Details (Cleared due to Return)"
                                             />
                                         </div>
                                     )}
